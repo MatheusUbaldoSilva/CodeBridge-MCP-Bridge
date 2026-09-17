@@ -1,61 +1,47 @@
-# CodeBridge MCP Bridge
+# CodeBridge 2.0 — MCP Bridge
 
-> CodeBridge 2.0 — MCP Bridge
+Status: **migração interna para MCP autoral concluída**
 
-Status: **Pre-alpha / arquitetura inicial**
+O CodeBridge 2.0 usa um MCP próprio como único caminho oficial entre ChatGPT e o runtime local.
 
-CodeBridge MCP Bridge é a segunda geração do CodeBridge. Ele nasce como um projeto separado do CodeBridge 1.x — Browser Bridge para preservar a versão atual funcionando enquanto a integração MCP é construída do zero.
-
-## Objetivo
-
-Permitir que o ChatGPT opere PowerShell 5.1, CMD e SSH por meio do CodeBridge sem depender de extensão de navegador, automação do DOM, digitação simulada ou blocos `@CODEBRIDGE`.
-
-Arquitetura alvo:
+## Arquitetura oficial
 
 ```text
 ChatGPT
-   ↓ MCP
-Remote Desktop Commander
+   ↓ MCP streamable HTTP
+CodeBridge MCP Autoral
+   ↓ CBMCP/1
+Adapter local
+   ↓ API local autenticada
+CodeBridge 2.0 Runtime
    ↓
-CodeBridge 2.0
-   ↓
-Fila / políticas / aprovação
+Autoridade única de terminal
    ↓
 PowerShell 5.1 | CMD | SSH
    ↓
-Resultado estruturado
+Execution Ledger / output persistente
    ↑
-MCP
+MCP Autoral
    ↑
 ChatGPT
 ```
-## Princípio central
+## Garantias do caminho atual
 
-O Remote Desktop Commander é o canal de transporte, não a autoridade de execução.
+- `CBMCP/1` com `REQUEST_SYN → REQUEST_ACK` e `RESPONSE_SYN → RESPONSE_ACK`;
+- idempotência por `request_id` e hash SHA-256 do payload;
+- ledger SQLite persistente para protocolo e execuções;
+- `execution_id` próprio para cada execução;
+- PowerShell 5.1, CMD e SSH no mesmo executor V2;
+- comando preparado no terminal real antes do Enter;
+- resultado final persistido;
+- saída incremental append-only por cursor;
+- replay sem novo Enter;
+- stop direcionado por `execution_id`;
+- recuperação de execução incompleta após restart;
+- interface local com terminais reais e telemetria.
 
-As solicitações de automação entram no CodeBridge 2.0 e passam por política, fila, aprovação, execução, cancelamento, histórico e auditoria.
+## Ferramentas MCP principais
 
-## O que deixa de existir no 2.0
+`codebridge_status`, `codebridge_v2_start`, `codebridge_v2_status`, `codebridge_v2_result`, `codebridge_v2_output` e `codebridge_v2_stop`.
 
-- extensão Chrome obrigatória;
-- leitura do DOM do ChatGPT;
-- digitação simulada no compositor;
-- protocolo textual legado do Browser Bridge;
-- identificação por aba do navegador;
-- entrega de resultados dependente da extensão.
-## O que será preservado e evoluído
-
-- sessões persistentes de PowerShell 5.1, CMD e SSH;
-- fila e políticas locais;
-- aprovação antes da execução;
-- stop e cancelamento;
-- histórico e resultados estruturados;
-- monitoramento e reconexão SSH;
-- telemetria e estado visual do runtime;
-- execução sequencial e parada segura em falhas.
-
-## API estrutural planejada
-
-A nova integração não depende de blocos formatados. O protocolo interno será composto por operações explícitas como `status`, `run`, `cancel`, `stop`, `result` e `history`.
-
-O objetivo é que o usuário possa pedir uma tarefa em linguagem natural e o ChatGPT acione essas operações por MCP sem precisar exibir o protocolo de transporte.
+O Browser Bridge 1.x permanece um projeto separado. O CodeBridge 2.0 não depende da extensão Chrome, DOM do ChatGPT, digitação simulada ou protocolo textual `@CODEBRIDGE`.

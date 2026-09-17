@@ -1,34 +1,44 @@
 # Arquitetura — CodeBridge 2.0 MCP Bridge
 
-## Motivação
+## Princípio central
 
-O Browser Bridge provou o conceito de automação. O MCP Bridge substitui a camada de comunicação do navegador por uma integração MCP dedicada.
+O MCP autoral é o único transporte oficial entre ChatGPT e o CodeBridge 2.0. A autoridade de execução permanece dentro do runtime local.
 
-## Separação das versões
+## Fluxo
 
-**CodeBridge 1.x — Browser Bridge** permanece funcional e independente.
+1. ChatGPT chama uma ferramenta do MCP autoral.
+2. O MCP cria um `REQUEST_SYN` CBMCP/1.
+3. O adapter persiste e confirma o pedido com `REQUEST_ACK`.
+4. O adapter chama a API local autenticada do CodeBridge.
+5. O runtime valida alvo, identidade e disponibilidade do terminal.
+6. O comando é preparado no terminal real.
+7. O executor V2 registra `execution_id`, estado e saída incremental.
+8. PowerShell 5.1, CMD ou SSH executa o comando.
+9. O resultado é persistido localmente.
+10. O adapter cria `RESPONSE_SYN` e o MCP confirma com `RESPONSE_ACK`.
 
-**CodeBridge 2.0 — MCP Bridge** é um projeto novo, com repositório e ciclo de desenvolvimento próprios.
+## Autoridade de terminal
 
-## Fluxo alvo
+`TerminalManager.prepare()` possui a trava lógica comum para impedir que dois caminhos de automação preparem comandos simultaneamente.
 
-1. ChatGPT envia uma operação pelo MCP.
-2. Remote Desktop Commander encaminha a solicitação ao CodeBridge 2.0.
-3. O CodeBridge valida alvo, política e estado.
-4. A solicitação passa pela fila e aprovação.
-5. O terminal persistente executa a operação.
-6. O resultado é registrado localmente.
-7. O resultado estruturado retorna ao ChatGPT.
+Os destinos canônicos são `POWERSHELL5.1`, `CMD` e `SSH`.
+## Persistência
+
+- `author_mcp_protocol.db`: handshake CBMCP/1 e deduplicação;
+- `executions_v2.db`: identidade, estado e resultado das execuções;
+- `execution_output_chunks`: saída incremental append-only por cursor;
+- `jobs.db`: fila local tradicional da interface.
+
 ## Invariantes
 
-- o CodeBridge continua sendo a autoridade local de execução;
-- o transporte MCP não executa comandos fora do fluxo do CodeBridge;
-- cada solicitação recebe identidade própria e resultado correlacionado;
-- uma perda de conexão não pode duplicar automaticamente uma operação mutável;
-- resultados só são consumidos após confirmação;
-- cancelamento de fila e parada de execução são operações distintas;
-- PowerShell, CMD e SSH seguem contratos equivalentes de execução e retorno.
+- o MCP não executa shell diretamente;
+- nenhum retry pode executar novamente uma mutação já associada ao mesmo `request_id`;
+- o comando aparece no terminal real antes do Enter;
+- resultados só concluem o handshake após `RESPONSE_ACK`;
+- restart transforma execução V2 incompleta de runtime anterior em `INTERRUPTED`;
+- stop por `execution_id` só atua sobre a execução correspondente;
+- PowerShell 5.1, CMD e SSH usam o mesmo contrato V2 de start/status/result/output/stop.
 
-## Integração do agente remoto
+## Interface
 
-Quando o núcleo estiver estabilizado, o Remote Desktop Commander deverá poder iniciar junto com o CodeBridge 2.0, preferencialmente em segundo plano, com indicador visual de conexão MCP. O encerramento também deverá ser controlado pelo aplicativo.
+A interface usa PySide6 + QWebEngineView + xterm.js para exibir os terminais persistentes. O estado do MCP autoral é obtido pelo health do adapter e pela porta do servidor MCP.

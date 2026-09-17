@@ -1,38 +1,40 @@
-# Roadmap inicial — CodeBridge 2.0 MCP Bridge
+# Roadmap — CodeBridge 2.0 MCP Bridge
 
-## Fase 0 — Fundação
+## Fundação — concluída
 
-- repositório novo e independente;
-- documentação de arquitetura e contratos;
-- identidade própria do protocolo MCP/IPC;
-- nenhum código da extensão do Browser Bridge.
+- repositório independente do Browser Bridge 1.x;
+- runtime local próprio;
+- PowerShell 5.1, CMD e SSH persistentes;
+- API local autenticada;
+- interface própria com xterm.js;
+- telemetria Windows e Linux.
 
-## Fase 1 — Núcleo local
+## MCP autoral — concluído no caminho local
 
-- status estruturado;
-- execução PowerShell 5.1;
-- execução CMD;
-- execução SSH;
-- fila e aprovação;
-- resultado correlacionado;
-- confirmação de consumo;
-- cancel e stop.
+- protocolo `CBMCP/1`;
+- handshake SYN/ACK nos dois sentidos;
+- ledger persistente do protocolo;
+- MCP streamable HTTP;
+- adapter local dedicado;
+- status real do CodeBridge;
+- execução V2 persistente;
+- output incremental por cursor;
+- stop por `execution_id`;
+- replay idempotente.
 
-## Fase 2 — Integração MCP
+## Paridade de terminais — concluída
 
-- adaptador local dedicado;
-- operações estruturadas `status`, `run`, `cancel`, `stop`, `result` e `history`;
-- correlação por sessão/conversa sem depender de aba do navegador;
-- tratamento de timeout, reconexão e idempotência.
-## Fase 3 — Operação integrada
+O executor V2 suporta `POWERSHELL5.1`, `CMD` e `SSH` com o mesmo contrato de start, status, result, output e stop.
+## Próximas etapas de estabilização
 
-- Remote Desktop Commander inicia com o CodeBridge 2.0;
-- indicador visual MCP conectado/desconectado;
-- encerramento controlado do agente;
-- testes de erro, cancelamento, stop e perda de conexão;
-- testes com saída grande e caracteres especiais;
-- medição de latência por destino.
+- autenticação explícita para exposição pública do MCP;
+- substituir nomes internos `phase5b/5c/5d/5f` por endpoints V2 canônicos;
+- consolidar testes de stress, soak e outputs de múltiplos MB;
+- definir retenção/expiração dos ledgers SQLite;
+- revisar política de host key da telemetria SSH;
+- remover scripts temporários de patch após o próximo checkpoint;
+- versionar `app_rewrite`, `author_mcp` e `tests` no Git.
 
-## Critério de aceitação
+## Critério de aceitação do caminho MCP autoral
 
-Abrir o CodeBridge 2.0, entrar no ChatGPT e executar tarefas em PowerShell, CMD e SSH sem extensão de navegador, sem protocolo textual visível e sem intervenção manual no terminal, preservando aprovação, histórico, cancelamento e auditoria.
+Abrir o CodeBridge 2.0 e operar PowerShell 5.1, CMD e SSH exclusivamente pelas ferramentas do MCP autoral, mantendo preparação visível, idempotência, persistência, streaming, cancelamento e auditoria.

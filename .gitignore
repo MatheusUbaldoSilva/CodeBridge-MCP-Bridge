@@ -14,3 +14,21 @@ venv/
 .idea/
 .DS_Store
 Thumbs.db
+# CodeBridge 2.0 - artefatos locais/legados
+/app/
+/backup_*/
+/patch_*.py
+/fix_*.py
+/repair_*.py
+/*_probe.py
+/restart_*.ps1
+/restart_*.cmd
+/author_mcp/stack_state.json
+# Artefatos de desenvolvimento e evidencias transitorias
+**/*.before_*
+**/patch_*.py
+**/probe_*.py
+/patch_*.ps1
+/tests/*.out
+/tests/*_id.txt
+/tests/*evidence*.txt
