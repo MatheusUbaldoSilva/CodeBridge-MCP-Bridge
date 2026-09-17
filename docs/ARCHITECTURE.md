@@ -51,6 +51,14 @@ Se uma stack completa já estiver online, o runtime apenas a detecta e não assu
 
 `BridgeRuntime.stop()` encerra somente processos iniciados pelo próprio `AuthorMCPManager`. Túnel público/ngrok não faz parte deste lifecycle local.
 
+## Acesso remoto autenticado
+
+O acesso remoto usa uma segunda instância do mesmo MCP em `127.0.0.1:8767/mcp`, mantendo `8765` exclusivamente local. O túnel HTTPS encaminha apenas para `8767`.
+
+A instância pública exige `Authorization: Bearer <token>`. O segredo é mantido no Windows Credential Manager sob `CodeBridge-MCP-Bridge:MCP-Public`; arquivos de estado registram somente fingerprint SHA-256 reduzido, URL e PIDs. Requisições sem credencial válida recebem HTTP 401 antes de alcançar o protocolo MCP.
+
+`author_mcp/public_stack.py` não encerra processos genéricos: no stop ele atua somente nos PIDs que registrou e valida a linha de comando antes de finalizar.
+
 ## Interface
 
 A interface usa PySide6 + QWebEngineView + xterm.js para exibir os terminais persistentes. O estado do MCP autoral é obtido pelo health do adapter e pela porta do servidor MCP.

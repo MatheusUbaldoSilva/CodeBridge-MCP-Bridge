@@ -1,4 +1,6 @@
 import argparse
+import hmac
+import os
 from datetime import datetime, timezone
 from typing import Any
 
@@ -475,6 +477,33 @@ def codebridge_stop() -> StopResult:
     )
 
 
+class BearerAuthMiddleware:
+    def __init__(self, app, token: str):
+        if not token:
+            raise ValueError("Bearer token vazio")
+        self.app = app
+        self.expected = ("Bearer " + token).encode("utf-8")
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http":
+            headers = {k.lower(): v for k, v in scope.get("headers", [])}
+            supplied = headers.get(b"authorization", b"")
+            if not hmac.compare_digest(supplied, self.expected):
+                body = b'{"error":"unauthorized"}'
+                await send({
+                    "type": "http.response.start",
+                    "status": 401,
+                    "headers": [
+                        (b"content-type", b"application/json"),
+                        (b"content-length", str(len(body)).encode("ascii")),
+                        (b"www-authenticate", b"Bearer"),
+                    ],
+                })
+                await send({"type": "http.response.body", "body": body})
+                return
+        await self.app(scope, receive, send)
+
+
 def build_security(public_host: str | None, port: int) -> TransportSecuritySettings:
     allowed_hosts = [f"127.0.0.1:{port}", f"localhost:{port}"]
     allowed_origins = [f"http://127.0.0.1:{port}", f"http://localhost:{port}"]
@@ -494,13 +523,28 @@ def main():
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--public-host", default=None)
+    parser.add_argument("--require-bearer", action="store_true")
     args = parser.parse_args()
+    security = build_security(args.public_host, args.port)
+    if args.require_bearer:
+        token = os.environ.get("CODEBRIDGE_MCP_BEARER_TOKEN", "").strip()
+        if not token:
+            raise RuntimeError("CODEBRIDGE_MCP_BEARER_TOKEN ausente")
+        import uvicorn
+        app = mcp.streamable_http_app(
+            streamable_http_path="/mcp",
+            transport_security=security,
+            host=args.host,
+        )
+        app = BearerAuthMiddleware(app, token)
+        uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+        return
     mcp.run(
         transport="streamable-http",
         host=args.host,
         port=args.port,
         streamable_http_path="/mcp",
-        transport_security=build_security(args.public_host, args.port),
+        transport_security=security,
     )
 
 

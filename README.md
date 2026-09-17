@@ -42,7 +42,9 @@ ChatGPT
 - ao iniciar, o runtime sobe automaticamente o adapter local `127.0.0.1:8766` e o MCP `127.0.0.1:8765/mcp`;
 - no encerramento normal, o runtime encerra somente os processos MCP que ele próprio iniciou.
 
-A ativação automática atual é **somente local**. Exposição pública/túnel é uma camada separada e não é iniciada pelo runtime.
+A ativação automática atual é **somente local**. A exposição externa é uma camada separada e não é iniciada pelo runtime.
+
+Para integração remota existe uma segunda instância MCP em `127.0.0.1:8767/mcp`, exposta por túnel HTTPS e protegida por Bearer token. O token é armazenado no Windows Credential Manager (`CodeBridge-MCP-Bridge:MCP-Public`) e não é gravado no repositório nem no arquivo de estado. `author_mcp/public_stack.py` inicia, consulta e encerra somente os processos públicos que ele próprio criou.
 
 ## Ferramentas MCP principais
 
