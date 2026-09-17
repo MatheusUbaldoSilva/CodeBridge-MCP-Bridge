@@ -297,9 +297,11 @@ class MainWindow(QMainWindow):
         t = s["terminals"]
         author_mcp = s.get("author_mcp") or {}
         self.overall.setText(f"Estado geral: {s['overall']}")
+        managed = "  gerenciado pelo CodeBridge" if author_mcp.get("managed_by_codebridge") else ""
+        error = f"  erro: {author_mcp.get('last_error')}" if author_mcp.get("last_error") else ""
         self.author_mcp.setText(
-            "MCP Autoral: " + str(author_mcp.get("state") or "OFFLINE") +
-            (f"  PID {author_mcp.get('adapter_pid')}" if author_mcp.get("adapter_pid") else "")
+            "MCP Autoral: " + str(author_mcp.get("state") or "OFFLINE") + managed +
+            (f"  PID {author_mcp.get('adapter_pid')}" if author_mcp.get("adapter_pid") else "") + error
         )
         self.api.setText(
             f"API local: {'ONLINE' if s['api']['online'] else 'OFFLINE'}  "

@@ -39,6 +39,18 @@ Os destinos canônicos são `POWERSHELL5.1`, `CMD` e `SSH`.
 - stop por `execution_id` só atua sobre a execução correspondente;
 - PowerShell 5.1, CMD e SSH usam o mesmo contrato V2 de start/status/result/output/stop.
 
+## Ciclo de vida do MCP autoral
+
+`BridgeRuntime.start()` sobe a stack local do MCP autoral depois que a API local e o `runtime.json` já estão disponíveis.
+
+O `AuthorMCPManager` inicia somente:
+- adapter local em `127.0.0.1:8766`;
+- servidor MCP local em `127.0.0.1:8765/mcp`.
+
+Se uma stack completa já estiver online, o runtime apenas a detecta e não assume propriedade. Se apenas uma das portas estiver ocupada, o início automático é bloqueado como estado degradado para evitar colisão.
+
+`BridgeRuntime.stop()` encerra somente processos iniciados pelo próprio `AuthorMCPManager`. Túnel público/ngrok não faz parte deste lifecycle local.
+
 ## Interface
 
 A interface usa PySide6 + QWebEngineView + xterm.js para exibir os terminais persistentes. O estado do MCP autoral é obtido pelo health do adapter e pela porta do servidor MCP.

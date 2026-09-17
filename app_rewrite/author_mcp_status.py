@@ -45,7 +45,10 @@ class AuthorMCPStatus:
             "adapter_online": adapter_ok,
             "mcp_online": mcp_ok,
             "adapter_pid": health.get("pid"),
-            "public_url": saved.get("public_url"),
-            "mcp_url": saved.get("mcp_url"),
+            "local_adapter_url": "http://127.0.0.1:8766" if adapter_ok else None,
+            "local_mcp_url": "http://127.0.0.1:8765/mcp" if mcp_ok else None,
+            "mcp_url": "http://127.0.0.1:8765/mcp" if mcp_ok else None,
+            "public_url": None,
+            "saved_public_url": saved.get("public_url"),
             "operations": sorted(operations),
         }

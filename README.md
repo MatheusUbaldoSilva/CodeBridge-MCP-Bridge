@@ -38,7 +38,11 @@ ChatGPT
 - replay sem novo Enter;
 - stop direcionado por `execution_id`;
 - recuperação de execução incompleta após restart;
-- interface local com terminais reais e telemetria.
+- interface local com terminais reais e telemetria;
+- ao iniciar, o runtime sobe automaticamente o adapter local `127.0.0.1:8766` e o MCP `127.0.0.1:8765/mcp`;
+- no encerramento normal, o runtime encerra somente os processos MCP que ele próprio iniciou.
+
+A ativação automática atual é **somente local**. Exposição pública/túnel é uma camada separada e não é iniciada pelo runtime.
 
 ## Ferramentas MCP principais
 

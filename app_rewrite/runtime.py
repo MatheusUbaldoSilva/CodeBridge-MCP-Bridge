@@ -5,7 +5,7 @@ import threading
 import time
 
 from api_server import BridgeAPI
-from author_mcp_status import AuthorMCPStatus
+from author_mcp_manager import AuthorMCPManager
 from constants import APP_NAME, APP_VERSION, DATA_DIR, DEFAULT_HOST, RUNTIME_FILE
 from executor import ExecutionEngine
 from external_prepare_store import ExternalPrepareStore, ExternalPrepareConflict, command_hash
@@ -37,7 +37,7 @@ class BridgeRuntime:
         self.auto_execute = self.terminals.config.load_auto_execute()
         self.auto_preview_seconds = 0.35
         self.engine = ExecutionEngine(self.store, self.terminals)
-        self.author_mcp = AuthorMCPStatus()
+        self.author_mcp = AuthorMCPManager()
         self.token = secrets.token_urlsafe(32)
         self.api = BridgeAPI(self, host=DEFAULT_HOST, port=0, token=self.token)
         self.started_at = None
@@ -62,6 +62,7 @@ class BridgeRuntime:
         self.started_at = time.time()
         self._started = True
         self._write_runtime_file()
+        self.author_mcp.start()
         return True
 
     def _write_runtime_file(self):
@@ -562,15 +563,18 @@ class BridgeRuntime:
             return True
 
         try:
-            self.api.stop()
+            self.author_mcp.stop()
         finally:
             try:
-                self.engine.stop(wait=True, timeout=5)
+                self.api.stop()
             finally:
                 try:
-                    self.terminals.close()
+                    self.engine.stop(wait=True, timeout=5)
                 finally:
-                    pass
+                    try:
+                        self.terminals.close()
+                    finally:
+                        pass
 
         self._started = False
         try:
