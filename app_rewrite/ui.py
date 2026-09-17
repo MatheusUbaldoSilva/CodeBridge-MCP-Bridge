@@ -41,9 +41,10 @@ class MainWindow(QMainWindow):
         self.subtitle = QLabel("MCP estruturado • comandos visiveis antes do Enter")
         self.overall = QLabel()
         self.author_mcp = QLabel()
+        self.secure_tunnel = QLabel()
         self.api = QLabel()
         self.active = QLabel()
-        for widget in (self.title, self.subtitle, self.overall, self.author_mcp, self.api, self.active):
+        for widget in (self.title, self.subtitle, self.overall, self.author_mcp, self.secure_tunnel, self.api, self.active):
             layout.addWidget(widget)
         buttons = QHBoxLayout()
         self.refresh_button = QPushButton("Atualizar estado")
@@ -296,12 +297,19 @@ class MainWindow(QMainWindow):
         self._update_auto_button()
         t = s["terminals"]
         author_mcp = s.get("author_mcp") or {}
+        secure_tunnel = s.get("secure_tunnel") or {}
         self.overall.setText(f"Estado geral: {s['overall']}")
         managed = "  gerenciado pelo CodeBridge" if author_mcp.get("managed_by_codebridge") else ""
         error = f"  erro: {author_mcp.get('last_error')}" if author_mcp.get("last_error") else ""
         self.author_mcp.setText(
             "MCP Autoral: " + str(author_mcp.get("state") or "OFFLINE") + managed +
             (f"  PID {author_mcp.get('adapter_pid')}" if author_mcp.get("adapter_pid") else "") + error
+        )
+        tunnel_managed = "  gerenciado pelo CodeBridge" if secure_tunnel.get("managed_by_codebridge") else ""
+        tunnel_error = f"  erro: {secure_tunnel.get('last_error')}" if secure_tunnel.get("last_error") else ""
+        self.secure_tunnel.setText(
+            "Secure Tunnel: " + str(secure_tunnel.get("state") or "OFFLINE") + tunnel_managed +
+            (f"  PID {secure_tunnel.get('managed_pid')}" if secure_tunnel.get("managed_pid") else "") + tunnel_error
         )
         self.api.setText(
             f"API local: {'ONLINE' if s['api']['online'] else 'OFFLINE'}  "

@@ -6,6 +6,7 @@ import time
 
 from api_server import BridgeAPI
 from author_mcp_manager import AuthorMCPManager
+from secure_tunnel_manager import SecureTunnelManager
 from constants import APP_NAME, APP_VERSION, DATA_DIR, DEFAULT_HOST, RUNTIME_FILE
 from executor import ExecutionEngine
 from external_prepare_store import ExternalPrepareStore, ExternalPrepareConflict, command_hash
@@ -38,6 +39,7 @@ class BridgeRuntime:
         self.auto_preview_seconds = 0.35
         self.engine = ExecutionEngine(self.store, self.terminals)
         self.author_mcp = AuthorMCPManager()
+        self.secure_tunnel = SecureTunnelManager()
         self.token = secrets.token_urlsafe(32)
         self.api = BridgeAPI(self, host=DEFAULT_HOST, port=0, token=self.token)
         self.started_at = None
@@ -63,6 +65,7 @@ class BridgeRuntime:
         self._started = True
         self._write_runtime_file()
         self.author_mcp.start()
+        self.secure_tunnel.start()
         return True
 
     def _write_runtime_file(self):
@@ -533,6 +536,7 @@ class BridgeRuntime:
         terminals = self.terminals.status()
         counts = self.store.counts()
         author_mcp = self.author_mcp.status()
+        secure_tunnel = self.secure_tunnel.status()
         overall = (
             "READY"
             if terminals["powershell"]["online"]
@@ -544,6 +548,7 @@ class BridgeRuntime:
             "version": APP_VERSION,
             "overall": overall,
             "author_mcp": author_mcp,
+            "secure_tunnel": secure_tunnel,
             "api": {
                 "online": self.api.running,
                 "host": self.api.host,
@@ -563,18 +568,21 @@ class BridgeRuntime:
             return True
 
         try:
-            self.author_mcp.stop()
+            self.secure_tunnel.stop()
         finally:
             try:
-                self.api.stop()
+                self.author_mcp.stop()
             finally:
                 try:
-                    self.engine.stop(wait=True, timeout=5)
+                    self.api.stop()
                 finally:
                     try:
-                        self.terminals.close()
+                        self.engine.stop(wait=True, timeout=5)
                     finally:
-                        pass
+                        try:
+                            self.terminals.close()
+                        finally:
+                            pass
 
         self._started = False
         try:

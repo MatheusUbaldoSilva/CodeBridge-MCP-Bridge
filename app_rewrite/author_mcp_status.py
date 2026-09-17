@@ -1,14 +1,9 @@
 import json
 import socket
-from pathlib import Path
 from urllib.request import urlopen
 
 
 class AuthorMCPStatus:
-    def __init__(self):
-        root = Path(__file__).resolve().parent.parent
-        self.state_file = root / "author_mcp" / "stack_state.json"
-
     @staticmethod
     def _port_open(port):
         try:
@@ -18,12 +13,6 @@ class AuthorMCPStatus:
             return False
 
     def status(self):
-        saved = {}
-        try:
-            if self.state_file.is_file():
-                saved = json.loads(self.state_file.read_text(encoding="utf-8-sig"))
-        except Exception:
-            saved = {}
         health = {}
         try:
             with urlopen("http://127.0.0.1:8766/health", timeout=0.5) as response:
@@ -49,6 +38,5 @@ class AuthorMCPStatus:
             "local_mcp_url": "http://127.0.0.1:8765/mcp" if mcp_ok else None,
             "mcp_url": "http://127.0.0.1:8765/mcp" if mcp_ok else None,
             "public_url": None,
-            "saved_public_url": saved.get("public_url"),
             "operations": sorted(operations),
         }
