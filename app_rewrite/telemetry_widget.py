@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox, QFrame, QHBoxLayout, QLabel, QProgressBar,
-    QPushButton, QScrollArea, QVBoxLayout, QWidget,
+    QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
 )
 
 
@@ -46,6 +46,7 @@ class TelemetryPanel(QFrame):
         self.setObjectName("telemetryPanel")
         self.setMinimumWidth(270)
         self.setMaximumWidth(300)
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         self.setStyleSheet(
             "QFrame#telemetryPanel{background:#171717;border:1px solid #333;}"
             "QLabel{color:#ddd;} QProgressBar{border:1px solid #444;background:#0d0d0d;"
@@ -73,8 +74,13 @@ class TelemetryPanel(QFrame):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setSizeAdjustPolicy(QScrollArea.AdjustIgnored)
         scroll.setFrameShape(QFrame.NoFrame)
         self.body = QWidget()
+        self.body.setMinimumWidth(0)
+        self.body.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self.body_layout = QVBoxLayout(self.body)
         self.body_layout.setContentsMargins(0, 4, 0, 4)
         self.body_layout.setSpacing(7)
@@ -92,12 +98,16 @@ class TelemetryPanel(QFrame):
         self.cpu_bar = self._metric("CPU")
         self.cpu_detail = QLabel()
         self.cpu_spark = QLabel()
+        self.cpu_spark.setMinimumWidth(0)
+        self.cpu_spark.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self.cpu_spark.setStyleSheet("color:#7ad67a;font-family:Consolas;")
         self.body_layout.addWidget(self.cpu_detail)
         self.body_layout.addWidget(self.cpu_spark)
         self.ram_bar = self._metric("RAM")
         self.ram_detail = QLabel()
         self.ram_spark = QLabel()
+        self.ram_spark.setMinimumWidth(0)
+        self.ram_spark.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self.ram_spark.setStyleSheet("color:#65a9ff;font-family:Consolas;")
         self.body_layout.addWidget(self.ram_detail)
         self.body_layout.addWidget(self.ram_spark)
