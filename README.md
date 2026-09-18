@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/codebridge_brand.png" alt="CodeBridge" width="760">
+  <img src="assets/codebridge_brand_branco.png" alt="CodeBridge" width="760">
 </p>
 
 # CodeBridge 2.0 — MCP Bridge
