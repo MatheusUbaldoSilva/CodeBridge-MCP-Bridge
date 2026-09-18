@@ -14,7 +14,7 @@ from config_store import ConfigStore
 from secure_tunnel_manager import SecureTunnelManager
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QColor, QIcon, QPalette
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -29,9 +29,98 @@ from PySide6.QtWidgets import (
     QWizardPage,
 )
 
+ORGANIZATION_URL = "https://platform.openai.com/settings/organization/general"
 API_KEYS_URL = "https://platform.openai.com/settings/organization/api-keys"
 TUNNELS_URL = "https://platform.openai.com/settings/organization/tunnels"
 CHATGPT_URL = "https://chatgpt.com/"
+
+DARK_STYLESHEET = """
+QWidget {
+    background-color: #0b1117;
+    color: #e8eef4;
+    font-family: "Segoe UI";
+    font-size: 10pt;
+}
+QWizard, QWizardPage {
+    background-color: #0b1117;
+}
+QLabel {
+    color: #dce6ee;
+    background: transparent;
+}
+QLineEdit {
+    background-color: #111922;
+    color: #f3f7fa;
+    border: 1px solid #2a3a49;
+    border-radius: 6px;
+    padding: 7px 9px;
+    min-height: 22px;
+    selection-background-color: #117a8b;
+}
+QLineEdit:focus {
+    border: 1px solid #22b8cf;
+}
+QPushButton {
+    background-color: #18232e;
+    color: #f1f6f9;
+    border: 1px solid #304354;
+    border-radius: 6px;
+    padding: 7px 14px;
+    min-height: 22px;
+}
+QPushButton:hover {
+    background-color: #20303e;
+    border-color: #3e5a6e;
+}
+QPushButton:pressed {
+    background-color: #111922;
+}
+QPushButton:default {
+    background-color: #0f6f78;
+    border-color: #16a5b3;
+    font-weight: 600;
+}
+QCheckBox {
+    color: #dce6ee;
+    spacing: 7px;
+}
+QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+}
+QCheckBox::indicator:unchecked {
+    border: 1px solid #42586a;
+    background: #111922;
+    border-radius: 3px;
+}
+QCheckBox::indicator:checked {
+    border: 1px solid #21b8a8;
+    background: #118b7e;
+    border-radius: 3px;
+}
+QMessageBox {
+    background-color: #0b1117;
+}
+"""
+
+
+def apply_dark_theme(app):
+    app.setStyle("Fusion")
+    palette = QPalette()
+    palette.setColor(QPalette.ColorRole.Window, QColor("#0b1117"))
+    palette.setColor(QPalette.ColorRole.WindowText, QColor("#e8eef4"))
+    palette.setColor(QPalette.ColorRole.Base, QColor("#111922"))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#15202a"))
+    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor("#111922"))
+    palette.setColor(QPalette.ColorRole.ToolTipText, QColor("#e8eef4"))
+    palette.setColor(QPalette.ColorRole.Text, QColor("#e8eef4"))
+    palette.setColor(QPalette.ColorRole.Button, QColor("#18232e"))
+    palette.setColor(QPalette.ColorRole.ButtonText, QColor("#f1f6f9"))
+    palette.setColor(QPalette.ColorRole.BrightText, QColor("#ffffff"))
+    palette.setColor(QPalette.ColorRole.Highlight, QColor("#117a8b"))
+    palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
+    app.setPalette(palette)
+    app.setStyleSheet(DARK_STYLESHEET)
 
 
 def open_url(url):
@@ -42,36 +131,66 @@ def copy_text(text):
     QApplication.clipboard().setText(str(text or ""))
 
 
-class IntroPage(QWizardPage):
+class OrganizationPage(QWizardPage):
     def __init__(self):
         super().__init__()
-        self.setTitle("Configuração empresarial do CodeBridge")
+        self.setTitle("Organização OpenAI")
         self.setSubTitle(
-            "Este assistente configura a chave da organização, o OpenAI Tunnel "
-            "e mostra como criar o MCP do CodeBridge no ChatGPT."
+            "Confirme a organização correta antes de criar a API key e o túnel."
         )
 
         layout = QVBoxLayout(self)
 
         text = QLabel(
-            "Antes de continuar, tenha acesso à organização da empresa na "
-            "OpenAI Platform. A API key ficará protegida no Windows por DPAPI "
-            "e não será gravada no GitHub nem em arquivo de texto."
+            "Clique em Abrir Organização OpenAI. Na página Geral da organização, "
+            "confira o nome da organização e localize o campo Organization ID. "
+            "Copie esse identificador e cole abaixo. O Organization ID identifica "
+            "a organização da empresa e é diferente da API key e do Tunnel ID."
         )
         text.setWordWrap(True)
         layout.addWidget(text)
 
+        open_org = QPushButton("Abrir Organização OpenAI")
+        open_org.clicked.connect(lambda: open_url(ORGANIZATION_URL))
+        layout.addWidget(open_org)
+
+        hint = QLabel(
+            "Página: platform.openai.com/settings/organization/general\n"
+            "Procure por: Organization ID"
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color:#8fb2c7; padding: 4px 0 8px 0;")
+        layout.addWidget(hint)
+
         self.company = QLineEdit()
-        self.company.setPlaceholderText("Ex.: Empresa")
+        self.company.setPlaceholderText("Ex.: Atlântic Drones")
+
+        self.organization_id = QLineEdit()
+        self.organization_id.setPlaceholderText("Cole o Organization ID da OpenAI")
+
         self.plugin = QLineEdit("CodeBridge MCP")
 
         form = QFormLayout()
-        form.addRow("Empresa:", self.company)
+        form.addRow("Nome da empresa:", self.company)
+        form.addRow("Organization ID:", self.organization_id)
         form.addRow("Nome do plugin:", self.plugin)
         layout.addLayout(form)
 
         self.registerField("company*", self.company)
+        self.registerField("organization_id*", self.organization_id)
         self.registerField("plugin*", self.plugin)
+
+    def validatePage(self):
+        organization_id = self.organization_id.text().strip()
+        if len(organization_id) < 4 or any(ch.isspace() for ch in organization_id):
+            QMessageBox.warning(
+                self,
+                "Organization ID inválido",
+                "Cole o Organization ID exatamente como aparece na página Geral "
+                "da organização da OpenAI.",
+            )
+            return False
+        return True
 
 
 class OpenAIPage(QWizardPage):
@@ -79,17 +198,15 @@ class OpenAIPage(QWizardPage):
         super().__init__()
         self.setTitle("API key e OpenAI Tunnel")
         self.setSubTitle(
-            "Crie uma chave da organização com acesso a Túneis e um túnel "
-            "para este computador."
+            "Crie uma chave com acesso a Túneis e um túnel para este computador."
         )
 
         layout = QVBoxLayout(self)
 
         info = QLabel(
             "1. Clique em Criar API key. Em computador de empresa, prefira "
-            "Conta de serviço; para um teste inicial, uma chave vinculada a Você "
-            "também funciona se tiver as permissões corretas.\n"
-            "2. Se usar permissões Restritas, a linha Túneis NÃO pode ficar "
+            "Conta de serviço.\n"
+            "2. Se usar permissões Restritas, a linha Túneis não pode ficar "
             "como Nenhum: a identidade precisa de Ler + Usar em Túneis.\n"
             "3. Clique em Criar Tunnel e crie um túnel para esta máquina.\n"
             "4. Cole abaixo a API key e o Tunnel ID (formato tunnel_...)."
@@ -108,7 +225,9 @@ class OpenAIPage(QWizardPage):
 
         self.api_key = QLineEdit()
         self.api_key.setEchoMode(QLineEdit.EchoMode.Password)
-        self.api_key.setPlaceholderText("Cole a API key da organização")
+        self.api_key.setPlaceholderText(
+            "Cole a API key ou deixe vazio para manter a chave já configurada"
+        )
 
         self.tunnel_id = QLineEdit()
         self.tunnel_id.setPlaceholderText("tunnel_...")
@@ -119,10 +238,13 @@ class OpenAIPage(QWizardPage):
         layout.addLayout(form)
 
         warning = QLabel(
-            "Importante: esta API key autentica o tunnel-client local. "
-            "Ela NÃO deve ser colada como senha do plugin no ChatGPT."
+            "Importante: a API key autentica o tunnel-client local. "
+            "Ela NÃO deve ser usada como senha do plugin no ChatGPT. "
+            "Se esta máquina já estiver configurada, deixe a API key vazia "
+            "para preservar a chave protegida pelo Windows."
         )
         warning.setWordWrap(True)
+        warning.setStyleSheet("color:#f2c879; padding-top: 6px;")
         layout.addWidget(warning)
 
         self.registerField("api_key", self.api_key)
@@ -132,7 +254,7 @@ class OpenAIPage(QWizardPage):
         key = self.api_key.text().strip()
         tunnel_id = self.tunnel_id.text().strip()
 
-        if len(key) < 20 or any(ch.isspace() for ch in key):
+        if key and (len(key) < 20 or any(ch.isspace() for ch in key)):
             QMessageBox.warning(
                 self,
                 "API key inválida",
@@ -156,9 +278,21 @@ class OpenAIPage(QWizardPage):
                 self.field("company"),
                 tunnel_id,
                 self.field("plugin"),
+                organization_id=self.field("organization_id"),
             )
             manager = SecureTunnelManager(config)
-            manager.save_runtime_key(key)
+
+            if key:
+                manager.save_runtime_key(key)
+            elif not manager.credential_configured():
+                QMessageBox.warning(
+                    self,
+                    "API key necessária",
+                    "Esta máquina ainda não possui uma API key protegida. "
+                    "Cole a chave da organização para continuar.",
+                )
+                return False
+
             manager.prepare_profile()
         except Exception as exc:
             QMessageBox.critical(
@@ -214,6 +348,7 @@ class ChatGPTPage(QWizardPage):
     def initializePage(self):
         plugin = str(self.field("plugin") or "CodeBridge MCP")
         tunnel_id = str(self.field("tunnel_id") or "")
+        organization_id = str(self.field("organization_id") or "")
         logo = ROOT / "assets" / "codebridge_plugin_256.png"
 
         self.instructions.setText(
@@ -224,6 +359,7 @@ class ChatGPTPage(QWizardPage):
             "no computador local.\n"
             f"4. Ícone: {logo}\n"
             "5. Em Conexão, selecione o OpenAI Tunnel criado para esta máquina.\n"
+            f"   Organization ID: {organization_id}\n"
             f"   Tunnel ID: {tunnel_id}\n"
             "6. Não reutilize a API key da organização como credencial do plugin. "
             "Ela fica somente neste computador para o tunnel-client.\n"
@@ -252,7 +388,9 @@ class FinishPage(QWizardPage):
 
         info = QLabel(
             "Ao iniciar o CodeBridge, ele sobe o MCP local e o Secure Tunnel "
-            "da empresa. Depois, faça o teste codebridge_ping no ChatGPT."
+            "da empresa. Depois, faça o teste codebridge_ping no ChatGPT. "
+            "As próximas versões podem ser aplicadas pelo atalho "
+            "Atualizar CodeBridge, sem refazer esta configuração."
         )
         info.setWordWrap(True)
         layout.addWidget(info)
@@ -266,18 +404,19 @@ class SetupWizard(QWizard):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Configurar CodeBridge")
-        self.resize(760, 520)
+        self.resize(780, 560)
+        self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
 
         icon = ROOT / "assets" / "codebridge.ico"
         if icon.is_file():
             self.setWindowIcon(QIcon(str(icon)))
 
-        self.intro = IntroPage()
+        self.organization = OrganizationPage()
         self.openai = OpenAIPage()
         self.chatgpt = ChatGPTPage()
         self.finish_page = FinishPage()
 
-        self.addPage(self.intro)
+        self.addPage(self.organization)
         self.addPage(self.openai)
         self.addPage(self.chatgpt)
         self.addPage(self.finish_page)
@@ -289,9 +428,11 @@ class SetupWizard(QWizard):
 
         current = ConfigStore().load_company()
         if current.get("company_name"):
-            self.intro.company.setText(current["company_name"])
+            self.organization.company.setText(current["company_name"])
+        if current.get("organization_id"):
+            self.organization.organization_id.setText(current["organization_id"])
         if current.get("plugin_name"):
-            self.intro.plugin.setText(current["plugin_name"])
+            self.organization.plugin.setText(current["plugin_name"])
         if current.get("tunnel_id"):
             self.openai.tunnel_id.setText(current["tunnel_id"])
 
@@ -315,6 +456,7 @@ class SetupWizard(QWizard):
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("CodeBridge Setup")
+    apply_dark_theme(app)
     wizard = SetupWizard()
     wizard.show()
     return app.exec()

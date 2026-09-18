@@ -70,4 +70,8 @@ O instalador cria um runtime Python isolado, instala as dependências, instala o
 
 O executável pronto é gerado em `installer/dist/CodeBridge-Setup.exe` e também copiado para a Área de Trabalho.
 
+Depois da primeira instalação, use **CodeBridge > Atualizar CodeBridge** no Menu Iniciar. O atualizador baixa a versão mais recente, valida o SHA-256 e atualiza os arquivos sem apagar API key, Tunnel ID, Organization ID, SSH ou preferências locais.
+
+O assistente inicial também possui acesso direto à página **Organização > Geral** da OpenAI Platform para localizar o **Organization ID**, e usa tema escuro próprio.
+
 Documentação completa: `docs/INSTALLER.md`.

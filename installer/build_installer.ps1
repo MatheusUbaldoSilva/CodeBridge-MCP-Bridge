@@ -5,6 +5,7 @@ $Root = Split-Path -Parent $PSScriptRoot
 $Script = Join-Path $PSScriptRoot 'CodeBridge.nsi'
 $Desktop = [Environment]::GetFolderPath('Desktop')
 $Output = Join-Path $PSScriptRoot 'dist\CodeBridge-Setup.exe'
+$HashOutput = Join-Path $PSScriptRoot 'dist\CodeBridge-Setup.sha256'
 $PayloadTools = Join-Path $PSScriptRoot 'payload\tools'
 
 $Candidates = @(
@@ -43,10 +44,16 @@ finally {
 }
 
 if (-not (Test-Path $Output)) { throw "Instalador nao foi criado em $Output" }
+
+$Hash = Get-FileHash $Output -Algorithm SHA256
+$HashLine = "$($Hash.Hash.ToLowerInvariant())  CodeBridge-Setup.exe"
+[IO.File]::WriteAllText($HashOutput, $HashLine + [Environment]::NewLine, [Text.Encoding]::ASCII)
+
 $DesktopOutput = Join-Path $Desktop 'CodeBridge-Setup.exe'
 Copy-Item $Output $DesktopOutput -Force
-$Hash = Get-FileHash $Output -Algorithm SHA256
+
 Write-Host 'INSTALADOR_OK'
 Write-Host "Repo: $Output"
+Write-Host "Hash file: $HashOutput"
 Write-Host "Desktop: $DesktopOutput"
 Write-Host "SHA256: $($Hash.Hash)"

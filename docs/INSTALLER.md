@@ -48,6 +48,15 @@ O instalador é atualmente **não assinado**. O Windows SmartScreen pode exibir 
 
 ## Configuração guiada
 
+### 0. Confirmar a organização OpenAI
+
+Antes da API key, o assistente oferece o botão **Abrir Organização OpenAI**, que abre:
+
+`https://platform.openai.com/settings/organization/general`
+
+Nessa página, confirme que a organização correta está selecionada e copie o **Organization ID**. Esse identificador é salvo como configuração não secreta do CodeBridge e é diferente da API key e do Tunnel ID.
+
+
 ### 1. Criar API key da organização
 
 Abra:
@@ -92,6 +101,23 @@ Com o CodeBridge aberto, no ChatGPT envie:
 `Use o CodeBridge e chame codebridge_ping com desafio TESTE_INSTALACAO.`
 
 O retorno deve confirmar o handshake do CodeBridge.
+
+
+## Atualizar sem reinstalar ou reconfigurar
+
+Depois da primeira instalação, o Menu Iniciar contém **CodeBridge > Atualizar CodeBridge**. Esse atalho abre o atualizador em tema escuro.
+
+O atualizador:
+
+1. verifica se o CodeBridge está fechado;
+2. baixa o `CodeBridge-Setup.exe` mais recente do GitHub;
+3. baixa o `CodeBridge-Setup.sha256` publicado;
+4. valida o SHA-256 antes de executar;
+5. abre o setup, que detecta automaticamente a instalação existente e entra em modo **Atualizar CodeBridge**.
+
+No modo de atualização, o diretório instalado é reutilizado e o assistente empresarial **não é executado novamente**. Permanecem intactos os dados em `%LOCALAPPDATA%\CodeBridge-MCP-Bridge` e `%APPDATA%\tunnel-client`, incluindo API key protegida por DPAPI, Tunnel ID, Organization ID, configuração SSH, bancos e preferências.
+
+O setup também pode ser baixado manualmente e executado por cima da instalação existente. Se detectar o CodeBridge já instalado, ele atualiza os arquivos sem pedir uma nova configuração.
 
 ## Configurar novamente
 

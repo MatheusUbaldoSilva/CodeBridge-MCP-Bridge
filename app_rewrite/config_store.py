@@ -77,6 +77,9 @@ class ConfigStore:
             profile_name = self._profile_name_for(tunnel_id)
         return {
             "company_name": str(data.get("company_name") or "").strip(),
+            "organization_id": str(
+                data.get("openai_organization_id") or ""
+            ).strip(),
             "tunnel_id": tunnel_id,
             "profile_name": profile_name,
             "plugin_name": str(
@@ -84,8 +87,15 @@ class ConfigStore:
             ).strip(),
         }
 
-    def save_company(self, company_name, tunnel_id, plugin_name="CodeBridge MCP"):
+    def save_company(
+        self,
+        company_name,
+        tunnel_id,
+        plugin_name="CodeBridge MCP",
+        organization_id="",
+    ):
         company_name = str(company_name or "").strip()
+        organization_id = str(organization_id or "").strip()
         tunnel_id = str(tunnel_id or "").strip()
         plugin_name = str(plugin_name or "").strip() or "CodeBridge MCP"
         if not tunnel_id.startswith("tunnel_"):
@@ -96,12 +106,14 @@ class ConfigStore:
         with self._lock:
             data = self._read()
             data["company_name"] = company_name
+            data["openai_organization_id"] = organization_id
             data["tunnel_id"] = tunnel_id
             data["tunnel_profile_name"] = profile_name
             data["mcp_plugin_name"] = plugin_name
             self._write(data)
         return {
             "company_name": company_name,
+            "organization_id": organization_id,
             "tunnel_id": tunnel_id,
             "profile_name": profile_name,
             "plugin_name": plugin_name,
@@ -112,7 +124,7 @@ class ConfigStore:
             data = self._read()
             removed = False
             for key in (
-                "company_name", "tunnel_id",
+                "company_name", "openai_organization_id", "tunnel_id",
                 "tunnel_profile_name", "mcp_plugin_name",
             ):
                 if data.pop(key, None) is not None:
