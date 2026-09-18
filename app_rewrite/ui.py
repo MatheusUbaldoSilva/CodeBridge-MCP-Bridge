@@ -14,6 +14,7 @@ from constants import APP_NAME
 from terminal_widget import TerminalWidget
 from telemetry import TelemetryService
 from telemetry_widget import TelemetryPanel
+from theme import apply_dark_theme
 
 
 class MainWindow(QMainWindow):
@@ -331,6 +332,7 @@ class MainWindow(QMainWindow):
 
 def run_ui(runtime):
     app = QApplication.instance() or QApplication([])
+    apply_dark_theme(app)
     icon_path = (
         Path(__file__).resolve().parent.parent
         / "assets"

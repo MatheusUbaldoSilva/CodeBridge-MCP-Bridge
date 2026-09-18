@@ -36,7 +36,7 @@ New-Item -ItemType Directory -Force -Path (Split-Path $Output -Parent) | Out-Nul
 
 Push-Location $PSScriptRoot
 try {
-    & $MakeNSIS /V3 $Script
+    & $MakeNSIS /V3 /INPUTCHARSET UTF8 $Script
     if ($LASTEXITCODE -ne 0) { throw "makensis falhou com exit code $LASTEXITCODE" }
 }
 finally {

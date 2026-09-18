@@ -37,9 +37,14 @@ class TelemetryPanel(QFrame):
         self.setMaximumWidth(300)
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         self.setStyleSheet(
-            "QFrame#telemetryPanel{background:#171717;border:1px solid #333;}"
-            "QLabel{color:#ddd;} QProgressBar{border:1px solid #444;background:#0d0d0d;"
-            "height:16px;text-align:center;color:#eee;} QProgressBar::chunk{background:#3a8f4b;}"
+            "QFrame#telemetryPanel{background:#11171d;border:1px solid #33414d;}"
+            "QLabel{color:#dce6ee;background:transparent;}"
+            "QScrollArea{background:#11171d;border:0;}"
+            "QScrollArea QWidget{background:#11171d;}"
+            "QComboBox{background:#17212a;color:#eef3f6;border:1px solid #3a4a56;padding:3px;}"
+            "QPushButton{background:#17212a;color:#eef3f6;border:1px solid #3a4a56;padding:4px 7px;}"
+            "QProgressBar{border:1px solid #44525d;background:#080d11;"
+            "height:16px;text-align:center;color:#f3f6f8;} QProgressBar::chunk{background:#3a8f4b;}"
         )
         outer = QVBoxLayout(self)
         outer.setContentsMargins(6, 6, 6, 6)

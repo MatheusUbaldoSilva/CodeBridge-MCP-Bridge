@@ -14,6 +14,7 @@ InstallDirRegKey HKCU "${APP_REGKEY}" "InstallDir"
 RequestExecutionLevel user
 Unicode True
 SetCompressor /SOLID lzma
+ShowInstDetails show
 Icon "..\assets\codebridge.ico"
 UninstallIcon "..\assets\codebridge.ico"
 BrandingText "CodeBridge MCP Bridge"
@@ -32,17 +33,60 @@ Var IsUpdate
 !define MUI_CUSTOMFUNCTION_GUIINIT GuiInit
 !define MUI_ICON "..\assets\codebridge.ico"
 !define MUI_UNICON "..\assets\codebridge.ico"
+!define MUI_BGCOLOR "0B1117"
+!define MUI_TEXTCOLOR "E8EEF4"
+!define MUI_INSTFILESPAGE_COLORS "E8EEF4 0B1117"
+!define MUI_INSTFILESPAGE_PROGRESSBAR "colored"
 !define MUI_WELCOMEPAGE_TITLE "CodeBridge Setup"
-!define MUI_WELCOMEPAGE_TEXT "Instale o CodeBridge em um computador novo ou atualize uma instalaÃ§Ã£o existente sem perder a configuraÃ§Ã£o da empresa, API key protegida, Tunnel ID ou SSH."
+!define MUI_WELCOMEPAGE_TEXT "Instale o CodeBridge em um computador novo ou atualize uma instalação existente sem perder a configuração da empresa, API key protegida, Tunnel ID ou SSH."
 
 !insertmacro MUI_PAGE_WELCOME
+
 !define MUI_PAGE_CUSTOMFUNCTION_PRE DirectoryPagePre
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW DirectoryPageShow
 !insertmacro MUI_PAGE_DIRECTORY
+
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW InstFilesShow
 !insertmacro MUI_PAGE_INSTFILES
+
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "PortugueseBR"
+
+Function ApplyOuterDark
+  SetCtlColors $HWNDPARENT 0xE8EEF4 0x0B1117
+
+  GetDlgItem $0 $HWNDPARENT 1034
+  SetCtlColors $0 0xE8EEF4 0x0B1117
+
+  GetDlgItem $0 $HWNDPARENT 1037
+  SetCtlColors $0 0xE8EEF4 0x0B1117
+
+  GetDlgItem $0 $HWNDPARENT 1038
+  SetCtlColors $0 0xAFC0CC 0x0B1117
+
+  GetDlgItem $0 $HWNDPARENT 1028
+  SetCtlColors $0 0x9FB0BB 0x0B1117
+
+  GetDlgItem $0 $HWNDPARENT 1256
+  SetCtlColors $0 0x9FB0BB 0x0B1117
+
+  GetDlgItem $0 $HWNDPARENT 1
+  SetCtlColors $0 0xF1F6F9 0x18232E
+  GetDlgItem $0 $HWNDPARENT 2
+  SetCtlColors $0 0xF1F6F9 0x18232E
+  GetDlgItem $0 $HWNDPARENT 3
+  SetCtlColors $0 0xF1F6F9 0x18232E
+
+  GetDlgItem $0 $HWNDPARENT 1035
+  SetCtlColors $0 0x33414D 0x0B1117
+  GetDlgItem $0 $HWNDPARENT 1045
+  SetCtlColors $0 0x33414D 0x0B1117
+
+  ; Windows 10/11: solicita barra de título escura. Em versões antigas a chamada é ignorada.
+  System::Call 'dwmapi::DwmSetWindowAttribute(p $HWNDPARENT, i 20, *i 1, i 4)i.r0'
+FunctionEnd
 
 Function .onInit
   StrCpy $IsUpdate "0"
@@ -58,6 +102,8 @@ init_done:
 FunctionEnd
 
 Function GuiInit
+  Call ApplyOuterDark
+
   StrCmp $IsUpdate "1" 0 gui_install
     SendMessage $HWNDPARENT ${WM_SETTEXT} 0 "STR:Atualizar CodeBridge"
     Goto gui_done
@@ -70,6 +116,39 @@ Function DirectoryPagePre
   StrCmp $IsUpdate "1" 0 show_directory
   Abort
 show_directory:
+FunctionEnd
+
+Function DirectoryPageShow
+  Call ApplyOuterDark
+  FindWindow $0 "#32770" "" $HWNDPARENT
+  SetCtlColors $0 0xE8EEF4 0x0B1117
+
+  GetDlgItem $1 $0 1019
+  SetCtlColors $1 0xE8EEF4 0x0B1117
+  GetDlgItem $1 $0 1001
+  SetCtlColors $1 0xE8EEF4 0x111922
+  GetDlgItem $1 $0 1024
+  SetCtlColors $1 0xE8EEF4 0x0B1117
+  GetDlgItem $1 $0 1006
+  SetCtlColors $1 0xE8EEF4 0x0B1117
+FunctionEnd
+
+Function InstFilesShow
+  Call ApplyOuterDark
+  FindWindow $0 "#32770" "" $HWNDPARENT
+  SetCtlColors $0 0xE8EEF4 0x0B1117
+
+  GetDlgItem $1 $0 1006
+  SetCtlColors $1 0xE8EEF4 0x0B1117
+
+  GetDlgItem $1 $0 1004
+  SetCtlColors $1 0xE8EEF4 0x111922
+
+  GetDlgItem $1 $0 1027
+  SetCtlColors $1 0xE8EEF4 0x0B1117
+
+  GetDlgItem $1 $0 1016
+  SetCtlColors $1 0xE8EEF4 0x0B1117
 FunctionEnd
 
 Section "CodeBridge" SEC_MAIN
@@ -116,7 +195,7 @@ Section "CodeBridge" SEC_MAIN
   File "payload\tools\tunnel-client.exe"
   File "payload\tools\cloudflared.exe"
 
-  DetailPrint "Preparando runtime Python e dependÃªncias do CodeBridge..."
+  DetailPrint "Preparando runtime Python e dependências do CodeBridge..."
   nsExec::Exec '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\installer\bootstrap.ps1" -InstallRoot "$INSTDIR"'
   Pop $0
   StrCmp $0 "0" bootstrap_ok
@@ -147,7 +226,7 @@ Section "CodeBridge" SEC_MAIN
     FileClose $1
   shortcuts_done:
 
-  ; Em atualizaÃ§Ã£o, nunca forÃ§a o usuÃ¡rio a refazer a configuraÃ§Ã£o.
+  ; Em atualização, nunca força o usuário a refazer a configuração.
   StrCmp $IsUpdate "1" config_done
   IfSilent config_done
     ExecWait '"$INSTDIR\runtime\python\pythonw.exe" "$INSTDIR\installer\company_setup.py"'
