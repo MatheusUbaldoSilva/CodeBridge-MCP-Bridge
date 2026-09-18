@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory=$true)]
     [string]$InstallRoot
 )
@@ -61,6 +61,23 @@ try {
         New-Item -ItemType Directory -Force -Path (Join-Path $RuntimeDir 'Lib\site-packages') | Out-Null
     }
 
+    # The embeddable Python runtime uses python*._pth and therefore runs in
+    # isolated mode. Explicitly expose CodeBridge source directories so scripts
+    # launched by python.exe/pythonw.exe can import their sibling modules.
+    $pth = Get-ChildItem $RuntimeDir -Filter 'python*._pth' | Select-Object -First 1
+    if (-not $pth) {
+        throw 'python*._pth was not found in embedded runtime.'
+    }
+    @(
+        "python313.zip",
+        ".",
+        "Lib\site-packages",
+        "..\..\app_rewrite",
+        "..\..\author_mcp",
+        "..\..\installer",
+        "import site"
+    ) | Set-Content -LiteralPath $pth.FullName -Encoding ASCII
+    New-Item -ItemType Directory -Force -Path (Join-Path $RuntimeDir 'Lib\site-packages') | Out-Null
     $pipPackage = Join-Path $RuntimeDir 'Lib\site-packages\pip'
     if (-not (Test-Path $pipPackage)) {
         $getPip = Join-Path $TempDir 'get-pip.py'
@@ -103,3 +120,4 @@ catch {
     Write-Error $_
     exit 1
 }
+
