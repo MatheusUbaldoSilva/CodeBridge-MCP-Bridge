@@ -12,7 +12,9 @@ from public_token import ensure_token, fingerprint
 
 ROOT = Path(__file__).resolve().parent.parent
 AUTHOR = ROOT / "author_mcp"
-PYTHON = AUTHOR / ".venv" / "Scripts" / "python.exe"
+PORTABLE_PYTHON = ROOT / "runtime" / "python" / "python.exe"
+VENV_PYTHON = AUTHOR / ".venv" / "Scripts" / "python.exe"
+PYTHON = PORTABLE_PYTHON if PORTABLE_PYTHON.is_file() else VENV_PYTHON
 NGROK = Path(r"C:\Users\Matheus\CodeBridge_MCP_Teste\ngrok\ngrok.exe")
 DATA_DIR = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "CodeBridge-MCP-Bridge"
 STATE_FILE = DATA_DIR / "public_mcp_state.json"

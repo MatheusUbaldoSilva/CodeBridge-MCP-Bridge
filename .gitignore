@@ -32,3 +32,4 @@ Thumbs.db
 /tests/*.out
 /tests/*_id.txt
 /tests/*evidence*.txt
+/installer/payload/

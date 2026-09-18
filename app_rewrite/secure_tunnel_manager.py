@@ -4,28 +4,73 @@ import subprocess
 import time
 from pathlib import Path
 
+from config_store import ConfigStore
 from dpapi_secret_store import DPAPISecretStore
 
 
 class SecureTunnelManager:
-    TUNNEL_ID = "tunnel_6aac530491b08191b2c938673a5eaa02"
-    PROFILE_NAME = "codebridge-local"
     MCP_URL = "http://127.0.0.1:8765/mcp"
     HEALTH_HOST = "127.0.0.1"
     HEALTH_PORT = 8080
 
-    def __init__(self):
+    def __init__(self, config_store=None):
         self.root = Path(__file__).resolve().parent.parent
         local_appdata = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
         appdata = Path(os.environ.get("APPDATA", str(Path.home())))
         self.data_dir = local_appdata / "CodeBridge-MCP-Bridge"
-        self.client = self.data_dir / "tools" / "tunnel-client.exe"
-        self.profile = appdata / "tunnel-client" / f"{self.PROFILE_NAME}.yaml"
-        self.secrets = DPAPISecretStore(self.data_dir / "secure_tunnel_runtime_key.dpapi")
+        bundled_client = self.root / "tools" / "tunnel-client.exe"
+        legacy_client = self.data_dir / "tools" / "tunnel-client.exe"
+        self.client = bundled_client if bundled_client.is_file() else legacy_client
+        self.config = config_store or ConfigStore()
+        self._appdata = appdata
+        self.secrets = DPAPISecretStore(
+            self.data_dir / "secure_tunnel_runtime_key.dpapi"
+        )
+        self.tunnel_id = ""
+        self.profile_name = "codebridge-local"
+        self.profile = appdata / "tunnel-client" / f"{self.profile_name}.yaml"
+        self._reload_company_config()
         self._process = None
         self._log_handle = None
         self._managed = False
         self._last_error = None
+
+    @staticmethod
+    def _legacy_tunnel_id(profile_path):
+        try:
+            text = Path(profile_path).read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            return ""
+        for raw in text.splitlines():
+            line = raw.strip()
+            if not line.startswith("tunnel_id:"):
+                continue
+            value = line.split(":", 1)[1].strip().strip('"').strip("'")
+            if value.startswith("tunnel_"):
+                return value
+        return ""
+
+    def _reload_company_config(self):
+        company = self.config.load_company()
+        if not company.get("tunnel_id"):
+            legacy_profile = (
+                self._appdata / "tunnel-client" / "codebridge-local.yaml"
+            )
+            legacy_id = self._legacy_tunnel_id(legacy_profile)
+            if legacy_id:
+                company = self.config.save_company(
+                    company.get("company_name", ""),
+                    legacy_id,
+                    company.get("plugin_name") or "CodeBridge MCP",
+                )
+        self.tunnel_id = str(company.get("tunnel_id") or "").strip()
+        self.profile_name = (
+            str(company.get("profile_name") or "").strip() or "codebridge-local"
+        )
+        self.profile = (
+            self._appdata / "tunnel-client" / f"{self.profile_name}.yaml"
+        )
+        return company
 
     @staticmethod
     def _process_running(process):
@@ -69,7 +114,9 @@ class SecureTunnelManager:
         if not key:
             raise ValueError("Runtime API key do Secure Tunnel nao pode ser vazia")
         if any(ch.isspace() for ch in key):
-            raise ValueError("Runtime API key invalida: contem espacos ou quebras de linha")
+            raise ValueError(
+                "Runtime API key invalida: contem espacos ou quebras de linha"
+            )
         if len(key) < 20:
             raise ValueError("Runtime API key invalida: tamanho inesperado")
         return self.secrets.save(key)
@@ -90,24 +137,59 @@ class SecureTunnelManager:
 
     def _open_log(self):
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        self._log_handle = open(
-            self.data_dir / "secure_tunnel.log",
-            "a",
-            encoding="utf-8",
-            buffering=1,
-        )
+        if self._log_handle is None or self._log_handle.closed:
+            self._log_handle = open(
+                self.data_dir / "secure_tunnel.log",
+                "a", encoding="utf-8", buffering=1,
+            )
         return self._log_handle
 
-    def _creationflags(self):
+    @staticmethod
+    def _creationflags():
         return getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
+    def _profile_matches(self):
+        try:
+            if not self.profile.is_file():
+                return False
+            text = self.profile.read_text(encoding="utf-8", errors="ignore")
+            return self.tunnel_id in text and self.MCP_URL in text
+        except OSError:
+            return False
+
+    def prepare_profile(self):
+        self._reload_company_config()
+        if not self.tunnel_id:
+            raise RuntimeError("Tunnel ID ainda nao configurado")
+        if not self.client.is_file():
+            raise FileNotFoundError(f"tunnel-client nao encontrado: {self.client}")
+        key = self._load_runtime_key()
+        env = os.environ.copy()
+        env["CONTROL_PLANE_API_KEY"] = key
+        log_handle = self._open_log()
+        self._ensure_profile(env, log_handle)
+        key = None
+        return {
+            "profile": self.profile_name,
+            "profile_path": str(self.profile),
+            "tunnel_id": self.tunnel_id,
+            "mcp_url": self.MCP_URL,
+        }
+
     def _ensure_profile(self, env, log_handle):
-        if self.profile.is_file():
+        if self._profile_matches():
             return
+        self.profile.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self.profile.unlink(missing_ok=True)
+        except OSError:
+            pass
         result = subprocess.run(
             [
-                str(self.client), "init", "--sample", "sample_mcp_remote_no_auth",
-                "--profile", self.PROFILE_NAME, "--tunnel-id", self.TUNNEL_ID,
+                str(self.client), "init",
+                "--sample", "sample_mcp_remote_no_auth",
+                "--profile", self.profile_name,
+                "--tunnel-id", self.tunnel_id,
                 "--mcp-server-url", self.MCP_URL,
             ],
             cwd=str(self.root),
@@ -116,11 +198,13 @@ class SecureTunnelManager:
             stdin=subprocess.DEVNULL,
             env=env,
             creationflags=self._creationflags(),
-            timeout=20,
+            timeout=30,
             check=False,
         )
         if result.returncode != 0:
-            raise RuntimeError(f"tunnel-client init falhou: exit {result.returncode}")
+            raise RuntimeError(
+                f"tunnel-client init falhou: exit {result.returncode}"
+            )
 
     def _terminate(self):
         process = self._process
@@ -134,7 +218,21 @@ class SecureTunnelManager:
             process.wait(timeout=2.0)
 
     def start(self):
+        self._reload_company_config()
         if self._process_running(self._process):
+            return self.status()
+        if not self.tunnel_id:
+            self._managed = False
+            self._last_error = (
+                "Secure Tunnel nao configurado. Execute Configurar CodeBridge."
+            )
+            return self.status()
+        if not self.credential_configured():
+            self._managed = False
+            self._last_error = (
+                "API key do Secure Tunnel nao configurada. "
+                "Execute Configurar CodeBridge."
+            )
             return self.status()
         if self._health_online():
             self._managed = False
@@ -155,7 +253,7 @@ class SecureTunnelManager:
             log_handle = self._open_log()
             self._ensure_profile(env, log_handle)
             self._process = subprocess.Popen(
-                [str(self.client), "run", "--profile", self.PROFILE_NAME],
+                [str(self.client), "run", "--profile", self.profile_name],
                 cwd=str(self.root),
                 stdout=log_handle,
                 stderr=subprocess.STDOUT,
@@ -195,6 +293,7 @@ class SecureTunnelManager:
         return self.status()
 
     def status(self):
+        self._reload_company_config()
         running = self._process_running(self._process)
         health = self._health_online()
         if running and health:
@@ -203,6 +302,8 @@ class SecureTunnelManager:
             state = "STARTING"
         elif health:
             state = "ONLINE_EXTERNAL"
+        elif not self.tunnel_id:
+            state = "CONFIG_REQUIRED"
         else:
             state = "OFFLINE"
         return {
@@ -213,8 +314,8 @@ class SecureTunnelManager:
             "credential_configured": self.credential_configured(),
             "client_available": self.client.is_file(),
             "profile_exists": self.profile.is_file(),
-            "profile": self.PROFILE_NAME,
-            "tunnel_id": self.TUNNEL_ID,
+            "profile": self.profile_name,
+            "tunnel_id": self.tunnel_id or None,
             "mcp_url": self.MCP_URL,
             "last_error": self._last_error,
         }

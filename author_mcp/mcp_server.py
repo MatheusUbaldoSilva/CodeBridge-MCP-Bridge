@@ -1,12 +1,14 @@
 import argparse
+import base64
 import hmac
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
-from mcp.types import ToolAnnotations
+from mcp.types import Icon, ToolAnnotations
 from pydantic import BaseModel
 
 from http_client import ProtocolHTTPClient
@@ -147,9 +149,30 @@ class ExecuteResult(ProtocolOutcome):
     enter_sent: bool
 
 
+def _server_icons():
+    icon_path = (
+        Path(__file__).resolve().parent.parent
+        / "assets"
+        / "codebridge_mcp_64.png"
+    )
+    try:
+        encoded = base64.b64encode(icon_path.read_bytes()).decode("ascii")
+    except OSError:
+        return []
+    return [
+        Icon(
+            src="data:image/png;base64," + encoded,
+            mime_type="image/png",
+            sizes=["64x64"],
+        )
+    ]
+
+
 mcp = MCPServer(
     name="CodeBridge Autoral",
+    title="CodeBridge MCP Bridge",
     description="MCP autoral do CodeBridge. Terminal visivel, execucao assincrona e retorno persistente.",
+    icons=_server_icons(),
     version="0.7.0",
 )
 

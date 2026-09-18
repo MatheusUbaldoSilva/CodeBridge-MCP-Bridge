@@ -33,6 +33,12 @@ def parse_args():
 
 def main():
     args = parse_args()
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            "CodeBridge.MCPBridge.2"
+        )
+    except Exception:
+        pass
     if not args.no_elevate and not is_admin():
         elevate()
         return 0

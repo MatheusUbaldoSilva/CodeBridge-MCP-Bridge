@@ -13,7 +13,11 @@ class AuthorMCPManager:
     def __init__(self):
         self.root = Path(__file__).resolve().parent.parent
         self.author_dir = self.root / "author_mcp"
-        self.python = self.author_dir / ".venv" / "Scripts" / "python.exe"
+        portable_python = self.root / "runtime" / "python" / "python.exe"
+        venv_python = self.author_dir / ".venv" / "Scripts" / "python.exe"
+        self.python = (
+            portable_python if portable_python.is_file() else venv_python
+        )
         local_appdata = Path(os.environ.get("LOCALAPPDATA", str(Path.home())))
         self.data_dir = local_appdata / "CodeBridge-MCP-Bridge"
         self.probe = AuthorMCPStatus()

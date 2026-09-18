@@ -1,13 +1,14 @@
+from pathlib import Path
 import queue
 import threading
 
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
     QMainWindow, QMessageBox, QPushButton, QSpinBox,
     QTabWidget, QVBoxLayout, QWidget,
 )
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import Qt, QTimer
 
 from constants import APP_NAME
 from terminal_widget import TerminalWidget
@@ -32,14 +33,31 @@ class MainWindow(QMainWindow):
 
         root = QWidget(self)
         layout = QVBoxLayout(root)
-        self.title = QLabel("CodeBridge 2.0 — MCP Bridge")
-        self.subtitle = QLabel("MCP estruturado • comandos visiveis antes do Enter")
+        self.brand = QLabel()
+        self.brand.setStyleSheet("background: transparent; border: 0;")
+        self.brand.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        brand_path = (
+            Path(__file__).resolve().parent.parent
+            / "assets"
+            / "codebridge_brand_header.png"
+        )
+        if brand_path.exists():
+            brand_pixmap = QPixmap(str(brand_path))
+            if not brand_pixmap.isNull():
+                self.brand.setPixmap(
+                    brand_pixmap.scaledToHeight(72, Qt.SmoothTransformation)
+                )
+                self.brand.setFixedHeight(80)
+        layout.addWidget(self.brand)
+
         self.overall = QLabel()
         self.author_mcp = QLabel()
         self.secure_tunnel = QLabel()
         self.api = QLabel()
         self.active = QLabel()
-        for widget in (self.title, self.subtitle, self.overall, self.author_mcp, self.secure_tunnel, self.api, self.active):
+        for widget in (
+            self.overall, self.author_mcp, self.secure_tunnel, self.api, self.active
+        ):
             layout.addWidget(widget)
         buttons = QHBoxLayout()
         self.refresh_button = QPushButton("Atualizar estado")
@@ -313,6 +331,16 @@ class MainWindow(QMainWindow):
 
 def run_ui(runtime):
     app = QApplication.instance() or QApplication([])
+    icon_path = (
+        Path(__file__).resolve().parent.parent
+        / "assets"
+        / "codebridge.ico"
+    )
+    if icon_path.exists():
+        icon = QIcon(str(icon_path))
+        app.setWindowIcon(icon)
     window = MainWindow(runtime)
+    if icon_path.exists():
+        window.setWindowIcon(QIcon(str(icon_path)))
     window.show()
     return app.exec()

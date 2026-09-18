@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/codebridge_brand.png" alt="CodeBridge" width="760">
+</p>
+
 # CodeBridge 2.0 — MCP Bridge
 
 Status: **migração interna para MCP autoral concluída**
@@ -51,3 +55,19 @@ Para integração remota existe uma segunda instância MCP em `127.0.0.1:8767/mc
 `codebridge_status`, `codebridge_v2_start`, `codebridge_v2_status`, `codebridge_v2_result`, `codebridge_v2_output` e `codebridge_v2_stop`.
 
 O Browser Bridge 1.x permanece um projeto separado. O CodeBridge 2.0 não depende da extensão Chrome, DOM do ChatGPT, digitação simulada ou protocolo textual `@CODEBRIDGE`.
+
+## Instalador Windows
+
+O projeto inclui um instalador guiado em `installer/`.
+
+Para gerar o `CodeBridge-Setup.exe`:
+
+```powershell
+.\\installer\\build_installer.ps1 -InstallInno
+```
+
+O instalador cria um runtime Python isolado, instala as dependências, instala os componentes do OpenAI Tunnel, solicita a API key e o Tunnel ID da empresa e abre um assistente com o passo a passo para criar o MCP no ChatGPT.
+
+O executável pronto é gerado em `installer/dist/CodeBridge-Setup.exe` e também copiado para a Área de Trabalho.
+
+Documentação completa: `docs/INSTALLER.md`.
