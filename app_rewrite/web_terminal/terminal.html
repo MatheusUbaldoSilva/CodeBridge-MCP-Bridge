@@ -4,9 +4,31 @@
 <meta charset="utf-8">
 <link rel="stylesheet" href="static/xterm.css">
 <style>
-html, body, #terminal { width:100%; height:100%; margin:0; background:#0c0c0c; overflow:hidden; }
+html, body, #terminal {
+  width:100%; height:100%; min-width:0; margin:0;
+  background:#0c0c0c; overflow:hidden;
+}
 body { user-select:text; }
-.xterm { padding:6px; }
+.xterm {
+  width:100%; height:100%; min-width:0; max-width:100%;
+  padding:6px; box-sizing:border-box; overflow:hidden;
+}
+.xterm .xterm-viewport {
+  overflow-x:hidden !important;
+  scrollbar-width:thin;
+  scrollbar-color:transparent transparent;
+}
+.xterm .xterm-viewport::-webkit-scrollbar { width:7px; height:0; }
+.xterm .xterm-viewport::-webkit-scrollbar-track { background:transparent; }
+.xterm .xterm-viewport::-webkit-scrollbar-thumb {
+  background:transparent; border-radius:4px;
+}
+.xterm .xterm-viewport.cb-scroll-visible {
+  scrollbar-color:#666 transparent;
+}
+.xterm .xterm-viewport.cb-scroll-visible::-webkit-scrollbar-thumb { background:#666; }
+.xterm .xterm-viewport.cb-scroll-visible::-webkit-scrollbar-thumb:hover { background:#7a7a7a; }
+.xterm .xterm-screen { max-width:100%; }
 </style>
 <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 <script src="static/xterm.js"></script>
@@ -27,6 +49,33 @@ const fit = new FitAddon.FitAddon();
 term.loadAddon(fit);
 term.open(document.getElementById('terminal'));
 fit.fit();
+
+const viewport = document.querySelector('.xterm-viewport');
+let scrollHideTimer = null;
+const showTerminalScroll = (hold = false) => {
+  if (!viewport) return;
+  viewport.classList.add('cb-scroll-visible');
+  if (scrollHideTimer) clearTimeout(scrollHideTimer);
+  if (!hold) {
+    scrollHideTimer = setTimeout(() => {
+      viewport.classList.remove('cb-scroll-visible');
+      scrollHideTimer = null;
+    }, 850);
+  }
+};
+if (viewport) {
+  viewport.addEventListener('wheel', () => showTerminalScroll(false), { passive:true });
+  viewport.addEventListener('scroll', () => showTerminalScroll(false), { passive:true });
+  viewport.addEventListener('mousemove', event => {
+    const rect = viewport.getBoundingClientRect();
+    if (rect.right - event.clientX <= 18) showTerminalScroll(true);
+    else if (!scrollHideTimer) viewport.classList.remove('cb-scroll-visible');
+  });
+  viewport.addEventListener('mouseleave', () => {
+    if (!scrollHideTimer) viewport.classList.remove('cb-scroll-visible');
+  });
+}
+
 let bridge = null;
 new QWebChannel(qt.webChannelTransport, channel => {
   bridge = channel.objects.bridge;

@@ -70,7 +70,10 @@ class MainWindow(QMainWindow):
         ):
             tab = QWidget()
             tab_layout = QVBoxLayout(tab)
+            tab_layout.setContentsMargins(0, 0, 0, 0)
+            tab_layout.setSpacing(4)
             status = QLabel()
+            status.setContentsMargins(4, 4, 4, 0)
             view = TerminalWidget(self.runtime.terminals, target, tab)
             telemetry_kind = "linux" if target == "SSH" else "windows"
             telemetry_panel = TelemetryPanel(self.telemetry, telemetry_kind, tab)

@@ -26,17 +26,6 @@ def _uptime(seconds):
     return (f"{days}d " if days else "") + f"{hours:02d}h {minutes:02d}m"
 
 
-def _spark(values):
-    blocks = "▁▂▃▄▅▆▇█"
-    if not values:
-        return ""
-    result = []
-    for value in values[-60:]:
-        level = int(max(0.0, min(100.0, float(value))) / 100.0 * (len(blocks) - 1))
-        result.append(blocks[level])
-    return "".join(result)
-
-
 class TelemetryPanel(QFrame):
     def __init__(self, service, kind, parent=None):
         super().__init__(parent)
@@ -97,27 +86,23 @@ class TelemetryPanel(QFrame):
 
         self.cpu_bar = self._metric("CPU")
         self.cpu_detail = QLabel()
-        self.cpu_spark = QLabel()
-        self.cpu_spark.setMinimumWidth(0)
-        self.cpu_spark.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
-        self.cpu_spark.setStyleSheet("color:#7ad67a;font-family:Consolas;")
         self.body_layout.addWidget(self.cpu_detail)
-        self.body_layout.addWidget(self.cpu_spark)
         self.ram_bar = self._metric("RAM")
         self.ram_detail = QLabel()
-        self.ram_spark = QLabel()
-        self.ram_spark.setMinimumWidth(0)
-        self.ram_spark.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
-        self.ram_spark.setStyleSheet("color:#65a9ff;font-family:Consolas;")
         self.body_layout.addWidget(self.ram_detail)
-        self.body_layout.addWidget(self.ram_spark)
 
         self.extra_label = QLabel()
         self.extra_label.setWordWrap(True)
         self.body_layout.addWidget(self.extra_label)
         self.gpu_bar = self._metric("GPU")
         self.gpu_detail = QLabel()
+        self.gpu_detail.setWordWrap(True)
+        self.gpu_detail.setMinimumWidth(0)
+        self.gpu_detail.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self.body_layout.addWidget(self.gpu_detail)
+        self.vram_bar = self._metric("VRAM")
+        self.vram_detail = QLabel()
+        self.body_layout.addWidget(self.vram_detail)
         self.disk_bar = self._metric("DISCO")
         self.disk_detail = QLabel()
         self.body_layout.addWidget(self.disk_detail)
@@ -176,8 +161,6 @@ class TelemetryPanel(QFrame):
             return
         self._set_bar(self.cpu_bar, data.get("cpu_percent", 0))
         self._set_bar(self.ram_bar, data.get("ram_percent", 0))
-        self.cpu_spark.setText(_spark(data.get("cpu_history", [])))
-        self.ram_spark.setText(_spark(data.get("ram_history", [])))
         self.ram_detail.setText(
             f"{_bytes(data.get('ram_used'))} / {_bytes(data.get('ram_total'))}"
         )
@@ -201,18 +184,26 @@ class TelemetryPanel(QFrame):
             gpu = data.get("gpu") or {}
             self.gpu_bar.setVisible(bool(gpu))
             self.gpu_detail.setVisible(bool(gpu))
+            self.vram_bar.setVisible(bool(gpu))
+            self.vram_detail.setVisible(bool(gpu))
             if gpu:
                 self._set_bar(self.gpu_bar, gpu.get("percent", 0))
                 self.gpu_detail.setText(
-                    f"{gpu.get('name','GPU')}\n"
-                    f"VRAM {_bytes((gpu.get('used_mb') or 0) * 1024**2)} / "
-                    f"{_bytes((gpu.get('total_mb') or 0) * 1024**2)}  •  "
-                    f"{gpu.get('temp_c', 0):.0f} °C"
+                    f"{gpu.get('name','GPU')}\nTemperatura {gpu.get('temp_c', 0):.0f} \u00b0C"
+                )
+                used_mb = float(gpu.get("used_mb") or 0)
+                total_mb = float(gpu.get("total_mb") or 0)
+                vram_percent = (used_mb / total_mb * 100.0) if total_mb > 0 else 0.0
+                self._set_bar(self.vram_bar, vram_percent)
+                self.vram_detail.setText(
+                    f"{_bytes(used_mb * 1024**2)} / {_bytes(total_mb * 1024**2)}"
                 )
             self.process_label.setText("")
         else:
             self.gpu_bar.setVisible(False)
             self.gpu_detail.setVisible(False)
+            self.vram_bar.setVisible(False)
+            self.vram_detail.setVisible(False)
             self.cpu_detail.setText(
                 f"Load  {data.get('load1',0):.2f}  {data.get('load5',0):.2f}  {data.get('load15',0):.2f}"
             )

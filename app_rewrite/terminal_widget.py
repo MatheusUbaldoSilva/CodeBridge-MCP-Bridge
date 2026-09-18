@@ -1,9 +1,10 @@
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QTimer, QUrl, Signal, Slot
+from PySide6.QtGui import QColor
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtWidgets import QSizePolicy, QVBoxLayout, QWidget
 
 
 class TerminalBridge(QObject):
@@ -46,10 +47,19 @@ class TerminalWidget(QWidget):
         self._position = 0
         self._initial_replay_done = False
 
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setStyleSheet("background:#0c0c0c;border:0;")
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
         self.web = QWebEngineView(self)
-        layout.addWidget(self.web)
+        self.web.setMinimumWidth(0)
+        self.web.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.web.setStyleSheet("background:#0c0c0c;border:0;")
+        self.web.page().setBackgroundColor(QColor("#0c0c0c"))
+        layout.addWidget(self.web, 1)
 
         self.channel = QWebChannel(self.web.page())
         self.bridge = TerminalBridge(terminals, target, self._mark_ready)
