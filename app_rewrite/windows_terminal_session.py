@@ -495,9 +495,9 @@ class WindowsTerminalSession:
                 state[
                     "control_start_fence"
                 ] = (
-                    "~CBFS"
+                    "\x1b]777;CBFS;"
                     + fence_token
-                    + "~"
+                    + "\x07"
                 ).encode(
                     "ascii"
                 )
@@ -648,9 +648,9 @@ class WindowsTerminalSession:
                 state[
                     "control_end_fence"
                 ] = (
-                    "~CBFE"
+                    "\x1b]777;CBFE;"
                     + fence_token
-                    + "~"
+                    + "\x07"
                 ).encode(
                     "ascii"
                 )
@@ -923,7 +923,8 @@ class WindowsTerminalSession:
             "$global:__CodeBridgeErrorKey]='Stop';"
             "$global:LASTEXITCODE=0;"
             "[Console]::Write("
-            "'~CBFS'+$__cb_begin_fence_token+'~'"
+            "([char]27).ToString()+']777;CBFS;'+"
+            "$__cb_begin_fence_token+([char]7).ToString()"
             ");"
             "Remove-Variable "
             "__cb_begin_fence_token "
@@ -1054,7 +1055,8 @@ class WindowsTerminalSession:
             "__cb_end_ack_prefix "
             "-ErrorAction SilentlyContinue;"
             "[Console]::Write("
-            "'~CBFE'+$__cb_end_fence_token+'~'"
+            "([char]27).ToString()+']777;CBFE;'+"
+            "$__cb_end_fence_token+([char]7).ToString()"
             ");"
             "Remove-Variable "
             "__cb_end_fence_token "
@@ -1771,36 +1773,40 @@ class WindowsTerminalSession:
         prefixes = (
             b"~CBFS",
             b"~CBFE",
+            b"\x1b]777;CBFS;",
+            b"\x1b]777;CBFE;",
+        )
+
+        maximum = max(
+            len(prefix) + 32
+            for prefix in prefixes
         )
 
         start = max(
             0,
-            len(data) - 37,
+            len(data) - maximum,
         )
 
         for index in range(
             start,
             len(data),
         ):
-            if data[index:index + 1] != b"~":
-                continue
-
             suffix = data[index:]
 
-            if any(
-                prefix.startswith(
+            for prefix in prefixes:
+                if prefix.startswith(
                     suffix
-                )
-                for prefix in prefixes
-            ):
-                return index
+                ):
+                    return index
 
-            if (
-                len(suffix) >= 5
-                and suffix[:5]
-                in prefixes
-            ):
-                token = suffix[5:]
+                if not suffix.startswith(
+                    prefix
+                ):
+                    continue
+
+                token = suffix[
+                    len(prefix):
+                ]
 
                 if (
                     len(token) <= 32
@@ -1829,7 +1835,11 @@ class WindowsTerminalSession:
         )
 
         filtered = re.sub(
-            rb"~CBF[SE][0-9A-Fa-f]{32}~",
+            (
+                rb"(?:~CBF[SE][0-9A-Fa-f]{32}~"
+                rb"|\x1b\]777;CBF[SE];"
+                rb"[0-9A-Fa-f]{32}\x07)"
+            ),
             b"",
             pending,
         )

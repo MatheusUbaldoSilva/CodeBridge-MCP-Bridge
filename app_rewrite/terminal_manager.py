@@ -29,7 +29,8 @@ class TerminalManager:
         self._log_limit = 120000
         self._raw_streams = {"POWERSHELL5.1": "", "CMD": "", "SSH": ""}
         self._raw_generation = {"POWERSHELL5.1": 0, "CMD": 0, "SSH": 0}
-        self._raw_limit = 500000
+        self._raw_base = {"POWERSHELL5.1": 0, "CMD": 0, "SSH": 0}
+        self._raw_limit = 5000000
         self._raw_decoders = {
             key: codecs.getincrementaldecoder("utf-8")(errors="replace")
             for key in self._raw_streams
@@ -98,8 +99,9 @@ class TerminalManager:
                 return
             value = self._raw_streams[target] + text
             if len(value) > self._raw_limit:
-                value = value[-self._raw_limit:]
-                self._raw_generation[target] += 1
+                drop = len(value) - self._raw_limit
+                value = value[drop:]
+                self._raw_base[target] += drop
             self._raw_streams[target] = value
 
     def raw_delta(self, target, generation, position):
@@ -107,15 +109,18 @@ class TerminalManager:
         with self._lock:
             current = self._raw_generation[target]
             value = self._raw_streams[target]
-            if generation != current or position > len(value):
-                return current, len(value), value, True
-            return current, len(value), value[position:], False
+            base = self._raw_base[target]
+            end = base + len(value)
+            if generation != current or position < base or position > end:
+                return current, end, value, True
+            return current, end, value[position - base:], False
 
     def _reset_raw(self, target):
         target = self.normalize_target(target)
         with self._lock:
             self._raw_streams[target] = ""
             self._raw_generation[target] += 1
+            self._raw_base[target] = 0
             self._raw_decoders[target] = codecs.getincrementaldecoder("utf-8")(errors="replace")
 
     def _callback(self, target):

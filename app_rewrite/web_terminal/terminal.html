@@ -87,11 +87,8 @@ new QWebChannel(qt.webChannelTransport, channel => {
   bridge.resize(term.cols, term.rows);
   term.focus();
 });
-window.addEventListener('resize', () => { fit.fit(); if (bridge) bridge.resize(term.cols, term.rows); });
-window.cbFit = () => {
-  fit.fit();
-  if (bridge && term.cols >= 20 && term.rows >= 5) bridge.resize(term.cols, term.rows);
-};
+window.addEventListener('resize', () => fit.fit());
+window.cbFit = () => fit.fit();
 window.cbFocus = () => term.focus();
 </script>
 </body>

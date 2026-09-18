@@ -16,6 +16,12 @@ class TerminalBridge(QObject):
         self.terminals = terminals
         self.target = target
         self.on_ready = on_ready
+        self._pending_resize = None
+        self._last_resize = None
+        self._resize_timer = QTimer(self)
+        self._resize_timer.setSingleShot(True)
+        self._resize_timer.setInterval(120)
+        self._resize_timer.timeout.connect(self._flush_resize)
 
     @Slot(str)
     def input(self, data):
@@ -26,10 +32,29 @@ class TerminalBridge(QObject):
 
     @Slot(int, int)
     def resize(self, cols, rows):
+        cols = int(cols)
+        rows = int(rows)
+        if cols < 20 or rows < 5:
+            return
+        size = (cols, rows)
+        if size == self._last_resize and self._pending_resize is None:
+            return
+        self._pending_resize = size
+        self._resize_timer.start()
+
+    def _flush_resize(self):
+        size = self._pending_resize
+        self._pending_resize = None
+        if size is None or size == self._last_resize:
+            return
         try:
-            self.terminals.resize(self.target, cols, rows)
+            result = self.terminals.resize(
+                self.target, size[0], size[1]
+            )
         except Exception:
-            pass
+            return
+        if result is not False:
+            self._last_resize = size
 
     @Slot()
     def ready(self):
@@ -75,7 +100,7 @@ class TerminalWidget(QWidget):
             QTimer.singleShot(0, self._fit_and_replay_once)
 
     def drain(self):
-        if not self._ready:
+        if not self._ready or not self.isVisible():
             return
         generation, position, delta, reset = self.terminals.raw_delta(
             self.target, self._generation, self._position
@@ -107,6 +132,7 @@ class TerminalWidget(QWidget):
     def showEvent(self, event):
         super().showEvent(event)
         QTimer.singleShot(0, self._fit_and_replay_once)
+        QTimer.singleShot(40, self.drain)
         QTimer.singleShot(80, self.fit_terminal)
 
     def resizeEvent(self, event):

@@ -1,17 +1,15 @@
 import queue
 import threading
-from pathlib import Path
 
-from PySide6.QtGui import QFontDatabase, QTextCursor, QKeySequence, QShortcut
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-    QMainWindow, QMessageBox, QPlainTextEdit, QPushButton, QSpinBox,
+    QMainWindow, QMessageBox, QPushButton, QSpinBox,
     QTabWidget, QVBoxLayout, QWidget,
 )
 from PySide6.QtCore import QTimer
 
 from constants import APP_NAME
-from dev_watcher import DevWatcher
 from terminal_widget import TerminalWidget
 from telemetry import TelemetryService
 from telemetry_widget import TelemetryPanel
@@ -26,8 +24,6 @@ class MainWindow(QMainWindow):
         self._last_logs = {}
         self._ui_events = queue.Queue()
         self._ssh_busy = False
-        self.dev_watcher = DevWatcher(Path(__file__).resolve().parent.parent)
-        self.dev_watcher.start()
         self.telemetry = TelemetryService(
             self.runtime.terminals.config, self.runtime.terminals.credentials
         )
@@ -86,16 +82,6 @@ class MainWindow(QMainWindow):
             self.terminal_views[target] = view
             self.telemetry_panels[target] = telemetry_panel
             self.tabs.addTab(tab, title)
-
-        self.dev_view = QPlainTextEdit()
-        self.dev_view.setReadOnly(True)
-        self.dev_view.setLineWrapMode(QPlainTextEdit.NoWrap)
-        self.dev_view.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
-        self.dev_view.document().setMaximumBlockCount(10000)
-        history = self.dev_watcher.history_tail()
-        header = "Desenvolvimento ao vivo - watcher em background, historico persistente\n"
-        self.dev_view.setPlainText(header + ("\n" + history if history else ""))
-        self.tabs.addTab(self.dev_view, "Desenvolvimento ao vivo")
 
         self.ssh_tab = QWidget()
         ssh_layout = QVBoxLayout(self.ssh_tab)
@@ -160,17 +146,6 @@ class MainWindow(QMainWindow):
     def refresh_telemetry(self):
         for panel in self.telemetry_panels.values():
             panel.refresh()
-
-    def _refresh_dev_feed(self):
-        events = self.dev_watcher.drain_events(100)
-        if not events:
-            return
-        cursor = self.dev_view.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        for event in events:
-            cursor.insertText("\n" + event)
-        self.dev_view.setTextCursor(cursor)
-        self.dev_view.ensureCursorVisible()
 
     def _load_ssh_settings(self):
         settings = self.runtime.terminals.ssh_settings()
@@ -269,7 +244,6 @@ class MainWindow(QMainWindow):
 
     def refresh_live(self):
         self._drain_ui_events()
-        self._refresh_dev_feed()
         for target in ("POWERSHELL5.1", "CMD", "SSH"):
             self._update_terminal_view(target)
 
@@ -334,10 +308,7 @@ class MainWindow(QMainWindow):
         try:
             self.telemetry.stop()
         finally:
-            try:
-                self.dev_watcher.stop()
-            finally:
-                super().closeEvent(event)
+            super().closeEvent(event)
 
 
 def run_ui(runtime):
