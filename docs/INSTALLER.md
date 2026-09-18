@@ -56,6 +56,10 @@ https://platform.openai.com/settings/organization/api-keys
 
 Crie uma chave apropriada para a empresa e copie o valor. O assistente solicita essa chave e a grava usando DPAPI.
 
+Para computador de empresa, prefira uma **Conta de serviço**. Para validação inicial, uma chave vinculada ao usuário também funciona, desde que tenha as permissões corretas.
+
+Se a chave estiver como **Restrito**, a permissão **Túneis** não pode ficar em **Nenhum**. Para executar o `tunnel-client`, a identidade precisa de **Ler + Usar** em Túneis. Para criar ou editar túneis pela Plataforma, também é necessária a permissão de gerenciamento apropriada no nível da organização.
+
 A chave **não é salva no repositório, no README ou em texto puro**.
 
 ### 2. Criar o OpenAI Tunnel
