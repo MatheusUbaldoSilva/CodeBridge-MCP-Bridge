@@ -2,7 +2,7 @@ import sqlite3
 import threading
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from constants import JOBS_DB, VALID_TARGETS
@@ -21,6 +21,7 @@ class JobStore:
         self._lock = threading.RLock()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
+        self.prune_terminal_jobs()
 
     def _connect(self):
         con = sqlite3.connect(str(self.path), timeout=10)
@@ -190,7 +191,51 @@ class JobStore:
                 (state, utc_now(), str(output), exit_code,
                  error_type, error_message, job_id),
             )
-        return self.get(job_id)
+        result = self.get(job_id)
+        self.prune_terminal_jobs()
+        return result
+
+    def list_visibility_pending(self, limit=100):
+        limit = max(1, min(int(limit), 500))
+        terminal = tuple(TERMINAL_STATES)
+        placeholders = ",".join("?" for _ in terminal)
+        sql = (
+            "SELECT * FROM jobs WHERE "
+            f"(visible_at IS NULL AND state NOT IN ({placeholders})) "
+            "OR (state='PREPARED' AND prepared_visible_at IS NULL) "
+            "ORDER BY created_at ASC LIMIT ?"
+        )
+        with self._lock, self._connect() as con:
+            rows = con.execute(sql, (*terminal, limit)).fetchall()
+        return [self._row(row) for row in rows]
+
+    def prune_terminal_jobs(self, max_age_hours=24, keep_latest=200):
+        max_age_hours = max(1, int(max_age_hours))
+        keep_latest = max(10, int(keep_latest))
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=max_age_hours)).isoformat()
+        terminal = tuple(TERMINAL_STATES)
+        placeholders = ",".join("?" for _ in terminal)
+        deleted = 0
+        with self._lock, self._connect() as con:
+            cur = con.execute(
+                f"DELETE FROM jobs WHERE state IN ({placeholders}) "
+                "AND finished_at IS NOT NULL AND finished_at < ?",
+                (*terminal, cutoff),
+            )
+            deleted += int(cur.rowcount or 0)
+            rows = con.execute(
+                f"SELECT id FROM jobs WHERE state IN ({placeholders}) "
+                "ORDER BY COALESCE(finished_at, created_at) DESC "
+                "LIMIT -1 OFFSET ?",
+                (*terminal, keep_latest),
+            ).fetchall()
+            if rows:
+                ids = [row["id"] for row in rows]
+                con.executemany("DELETE FROM jobs WHERE id=?", ((job_id,) for job_id in ids))
+                deleted += len(ids)
+            if deleted:
+                con.execute("PRAGMA optimize")
+        return deleted
 
     def counts(self):
         with self._lock, self._connect() as con:

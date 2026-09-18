@@ -24,7 +24,6 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(APP_NAME)
         self.resize(980, 720)
         self._last_logs = {}
-        self._last_history = None
         self._ui_events = queue.Queue()
         self._ssh_busy = False
         self.dev_watcher = DevWatcher(Path(__file__).resolve().parent.parent)
@@ -87,12 +86,6 @@ class MainWindow(QMainWindow):
             self.terminal_views[target] = view
             self.telemetry_panels[target] = telemetry_panel
             self.tabs.addTab(tab, title)
-
-        self.history_view = QPlainTextEdit()
-        self.history_view.setReadOnly(True)
-        self.history_view.setLineWrapMode(QPlainTextEdit.NoWrap)
-        self.history_view.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
-        self.tabs.addTab(self.history_view, "Historico")
 
         self.dev_view = QPlainTextEdit()
         self.dev_view.setReadOnly(True)
@@ -264,22 +257,7 @@ class MainWindow(QMainWindow):
     def _update_terminal_view(self, target):
         self.terminal_views[target].drain()
 
-    def _history_text(self, jobs):
-        blocks = []
-        for job in jobs:
-            block = [
-                f"[{job['state']}] {job['target']}  {job['created_at']}",
-                f"> {job['command']}",
-            ]
-            if job.get("output"):
-                block.append(job["output"].rstrip())
-            if job.get("error_message"):
-                block.append(f"ERRO: {job['error_message']}")
-            block.append("-" * 72)
-            blocks.append("\n".join(block))
-        return "\n".join(blocks)
-
-    def _mark_visible_jobs(self, jobs):
+    def _ack_pending_job_visibility(self, jobs):
         for job in jobs:
             try:
                 if not job.get("visible_at"):
@@ -341,12 +319,8 @@ class MainWindow(QMainWindow):
         )
         self.terminal_status["SSH"].setText(f"SSH: {ssh_state}")
 
-        jobs = self.runtime.store.list_recent(30)
-        history = self._history_text(jobs)
-        if history != self._last_history:
-            self._last_history = history
-            self.history_view.setPlainText(history)
-        self._mark_visible_jobs(jobs)
+        visibility_jobs = self.runtime.store.list_visibility_pending(100)
+        self._ack_pending_job_visibility(visibility_jobs)
 
     def refresh(self):
         self.refresh_live()
