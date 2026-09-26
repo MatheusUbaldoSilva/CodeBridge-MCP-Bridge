@@ -24,6 +24,8 @@ class TerminalManager:
         self.ssh_last_error = None
         self.active_target = None
         self._prepared_target = None
+        self._execution_generation = 0
+        self._last_execution_target = None
         self._logs = {"POWERSHELL5.1": "", "CMD": "", "SSH": ""}
         self._log_generation = {"POWERSHELL5.1": 0, "CMD": 0, "SSH": 0}
         self._log_limit = 120000
@@ -269,6 +271,8 @@ class TerminalManager:
             if self._prepared_target != target:
                 raise RuntimeError("comando nao esta preparado no terminal")
             self.active_target = target
+            self._execution_generation += 1
+            self._last_execution_target = target
         self.announce(target, "[RUNNING] Enter enviado")
         try:
             return session.execute(command, on_output=on_output, prepared=True)
@@ -282,6 +286,8 @@ class TerminalManager:
         session = self._ensure_session(target)
         with self._lock:
             self.active_target = target
+            self._execution_generation += 1
+            self._last_execution_target = target
         self.announce(target, f"[RUNNING] {target}\n> {command}")
         try:
             return session.execute(command, on_output=None, prepared=False)
@@ -328,6 +334,12 @@ class TerminalManager:
             ssh = self.ssh
             active = self.active_target
             prepared = self._prepared_target
+            execution_generation = (
+                self._execution_generation
+            )
+            last_execution_target = (
+                self._last_execution_target
+            )
         return {
             "powershell": {"online": bool(self.windows.is_running), "executing": bool(self.windows.is_executing)},
             "cmd": {"online": bool(self.cmd.is_running), "executing": bool(self.cmd.is_executing)},
@@ -339,6 +351,8 @@ class TerminalManager:
             },
             "active_target": active,
             "prepared_target": prepared,
+            "execution_generation": execution_generation,
+            "last_execution_target": last_execution_target,
         }
 
     def close(self):

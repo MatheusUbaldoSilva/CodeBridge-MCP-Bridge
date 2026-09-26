@@ -67,6 +67,12 @@ def codebridge_status():
             "ssh": terminals.get("ssh"),
             "active_target": terminals.get("active_target"),
             "prepared_target": terminals.get("prepared_target"),
+            "execution_generation": terminals.get(
+                "execution_generation"
+            ),
+            "last_execution_target": terminals.get(
+                "last_execution_target"
+            ),
         },
         "queue": status.get("queue"),
         "executor": status.get("executor"),

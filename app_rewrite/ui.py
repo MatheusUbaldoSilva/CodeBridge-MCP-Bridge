@@ -27,6 +27,7 @@ class MainWindow(QMainWindow):
         self._ui_events = queue.Queue()
         self._ssh_busy = False
         self._last_chatgpt_timer_state = None
+        self._last_auto_swap_generation = None
         self.telemetry = TelemetryService(
             self.runtime.terminals.config, self.runtime.terminals.credentials
         )
@@ -191,6 +192,7 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(self.tabs, 1)
         self.terminal_views = {}
         self.terminal_status = {}
+        self.terminal_tab_indices = {}
         for target, title in (
             ("POWERSHELL5.1", "PowerShell"),
             ("CMD", "CMD"),
@@ -207,7 +209,8 @@ class MainWindow(QMainWindow):
             tab_layout.addWidget(view, 1)
             self.terminal_status[target] = status
             self.terminal_views[target] = view
-            self.tabs.addTab(tab, title)
+            tab_index = self.tabs.addTab(tab, title)
+            self.terminal_tab_indices[target] = tab_index
 
         self.ssh_tab = QWidget()
         ssh_layout = QVBoxLayout(self.ssh_tab)
@@ -510,11 +513,52 @@ class MainWindow(QMainWindow):
         for target in ("POWERSHELL5.1", "CMD", "SSH"):
             self._update_terminal_view(target)
 
+    def _auto_swap_terminal_tab(self, terminals):
+        generation = int(
+            terminals.get("execution_generation")
+            or 0
+        )
+        target = str(
+            terminals.get("last_execution_target")
+            or ""
+        ).upper()
+
+        if self._last_auto_swap_generation is None:
+            self._last_auto_swap_generation = generation
+            currently_executing = any(
+                bool(
+                    (terminals.get(name) or {}).get(
+                        "executing"
+                    )
+                )
+                for name in (
+                    "powershell",
+                    "cmd",
+                    "ssh",
+                )
+            )
+            if not currently_executing:
+                return
+        elif generation == self._last_auto_swap_generation:
+            return
+        else:
+            self._last_auto_swap_generation = generation
+
+        tab_index = self.terminal_tab_indices.get(
+            target
+        )
+        if tab_index is None:
+            return
+
+        if self.tabs.currentIndex() != tab_index:
+            self.tabs.setCurrentIndex(tab_index)
+
     def refresh_status(self):
         s = self.runtime.snapshot()
         self._update_auto_button()
         self._update_sound_button()
         t = s["terminals"]
+        self._auto_swap_terminal_tab(t)
         author_mcp = s.get("author_mcp") or {}
         secure_tunnel = s.get("secure_tunnel") or {}
         self.overall.setText(f"Estado geral: {s['overall']}")
