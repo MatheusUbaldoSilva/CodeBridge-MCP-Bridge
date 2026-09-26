@@ -64,6 +64,24 @@ class ConfigStore:
             self._write(data)
             return bool(enabled)
 
+    def load_completion_sound(self):
+        data = self._read()
+        return bool(
+            data.get(
+                "completion_sound_enabled",
+                True,
+            )
+        )
+
+    def save_completion_sound(self, enabled):
+        with self._lock:
+            data = self._read()
+            data[
+                "completion_sound_enabled"
+            ] = bool(enabled)
+            self._write(data)
+            return bool(enabled)
+
     @staticmethod
     def _profile_name_for(tunnel_id):
         suffix = re.sub(r"[^A-Za-z0-9_-]", "", str(tunnel_id))[-12:]

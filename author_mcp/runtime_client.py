@@ -71,6 +71,9 @@ def codebridge_status():
         "queue": status.get("queue"),
         "executor": status.get("executor"),
         "auto_execute": bool(status.get("auto_execute")),
+        "completion_sound": status.get(
+            "completion_sound"
+        ),
         "turn_control": status.get("turn_control"),
     }
 

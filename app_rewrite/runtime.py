@@ -8,6 +8,7 @@ from api_server import BridgeAPI
 from author_mcp_manager import AuthorMCPManager
 from secure_tunnel_manager import SecureTunnelManager
 from chatgpt_companion import ChatGPTCompanionServer, ChatGPTTimerState
+from completion_sound import CompletionSound
 from constants import APP_NAME, APP_VERSION, DATA_DIR, DEFAULT_HOST, RUNTIME_FILE
 from executor import ExecutionEngine
 from external_prepare_store import ExternalPrepareStore, ExternalPrepareConflict, command_hash
@@ -38,7 +39,14 @@ class BridgeRuntime:
         self._external_workers = {}
         self.auto_execute = self.terminals.config.load_auto_execute()
         self.auto_preview_seconds = 0.35
-        self.engine = ExecutionEngine(self.store, self.terminals)
+        self.completion_sound = CompletionSound(
+            self.terminals.config
+        )
+        self.engine = ExecutionEngine(
+            self.store,
+            self.terminals,
+            on_terminal=self._on_execution_terminal,
+        )
         self.author_mcp = AuthorMCPManager()
         self.secure_tunnel = SecureTunnelManager()
         self.chatgpt_timer = ChatGPTTimerState()
@@ -99,6 +107,26 @@ class BridgeRuntime:
         self.auto_execute = bool(enabled)
         self.terminals.config.save_auto_execute(self.auto_execute)
         return self.auto_execute
+
+    def set_completion_sound(self, enabled):
+        return self.completion_sound.set_enabled(
+            enabled
+        )
+
+    def toggle_completion_sound(self):
+        return self.completion_sound.toggle()
+
+    def _on_execution_terminal(
+        self,
+        completion_id,
+        state,
+        target=None,
+    ):
+        return self.completion_sound.notify(
+            completion_id,
+            state,
+            target,
+        )
 
     def dispatch_external(self, request_id, target, command):
         request_id = str(request_id or "").strip()
@@ -207,6 +235,11 @@ class BridgeRuntime:
                         execution_id, error_type="PreparedStateLost",
                         error_message="comando preparado nao esta mais ativo; Enter nao foi enviado"
                     )
+                    self._on_execution_terminal(
+                        execution_id,
+                        "FAILED",
+                        target,
+                    )
                     return
                 self.external_executions.mark_executing(execution_id, self.instance_id)
                 def capture(text):
@@ -214,11 +247,21 @@ class BridgeRuntime:
                 try:
                     output = self.terminals.execute_prepared(target, command, on_output=capture)
                     self.external_executions.mark_finished(execution_id, output=output, exit_code=0)
+                    self._on_execution_terminal(
+                        execution_id,
+                        "FINISHED",
+                        target,
+                    )
                 except Exception as exc:
                     self.external_executions.mark_failed(
                         execution_id, output=getattr(exc, "output", "") or "",
                         exit_code=getattr(exc, "exit_code", None),
                         error_type=type(exc).__name__, error_message=str(exc),
+                    )
+                    self._on_execution_terminal(
+                        execution_id,
+                        "FAILED",
+                        target,
                     )
                 finally:
                     self._external_prepared_request_id = None
@@ -267,6 +310,11 @@ class BridgeRuntime:
                 self.terminals.prepare(target, command)
             except Exception as exc:
                 self.execution_ledger.transition(execution_id, "FAILED", runtime_instance=self.instance_id, error_type=type(exc).__name__, error_message=str(exc))
+                self._on_execution_terminal(
+                    execution_id,
+                    "FAILED",
+                    target,
+                )
                 raise
             worker = threading.Thread(target=self._run_phase5b_local, args=(execution_id, target, command), name=f"CodeBridgeV2-{execution_id[-10:]}", daemon=True)
             self._phase5b_workers[execution_id] = worker
@@ -290,11 +338,26 @@ class BridgeRuntime:
                 output = self.terminals.execute_prepared(target, command, on_output=capture_output)
                 self.execution_ledger.sync_output(execution_id, output)
                 self.execution_ledger.transition(execution_id, "FINISHED", runtime_instance=self.instance_id, exit_code=0, output=output)
+                self._on_execution_terminal(
+                    execution_id,
+                    "FINISHED",
+                    target,
+                )
             except Exception as exc:
                 output = getattr(exc, "output", "") or ""
                 self.execution_ledger.sync_output(execution_id, output)
                 cancelled = "cancel" in type(exc).__name__.lower()
-                self.execution_ledger.transition(execution_id, "CANCELLED" if cancelled else "FAILED", runtime_instance=self.instance_id, exit_code=getattr(exc, "exit_code", None), error_type=type(exc).__name__, error_message=str(exc), output=output)
+                terminal_state = (
+                    "CANCELLED"
+                    if cancelled
+                    else "FAILED"
+                )
+                self.execution_ledger.transition(execution_id, terminal_state, runtime_instance=self.instance_id, exit_code=getattr(exc, "exit_code", None), error_type=type(exc).__name__, error_message=str(exc), output=output)
+                self._on_execution_terminal(
+                    execution_id,
+                    terminal_state,
+                    target,
+                )
         finally:
             with self._phase5b_lock:
                 self._phase5b_workers.pop(execution_id, None)
@@ -365,6 +428,11 @@ class BridgeRuntime:
                 if not self.terminals.discard_prepared():
                     raise RuntimeError("nao foi possivel descartar comando preparado")
                 row = self.execution_ledger.transition(execution_id, "CANCELLED", runtime_instance=self.instance_id, error_type="ExecutionCancelledBeforeStart", error_message="execucao cancelada antes do Enter")
+                self._on_execution_terminal(
+                    execution_id,
+                    "CANCELLED",
+                    target,
+                )
                 return {"execution_id": execution_id, "cancelled": True, "state": row["state"], "reason": "cancelled_before_start"}
             if state != "RUNNING":
                 raise RuntimeError(f"estado nao cancelavel: {state}")
@@ -484,6 +552,11 @@ class BridgeRuntime:
                 row = self.external_executions.mark_finished(
                     execution_request_id, output=output, exit_code=0
                 )
+                self._on_execution_terminal(
+                    execution_request_id,
+                    "FINISHED",
+                    target,
+                )
             except Exception as exc:
                 row = self.external_executions.mark_failed(
                     execution_request_id,
@@ -491,6 +564,11 @@ class BridgeRuntime:
                     exit_code=getattr(exc, "exit_code", None),
                     error_type=type(exc).__name__,
                     error_message=str(exc),
+                )
+                self._on_execution_terminal(
+                    execution_request_id,
+                    "FAILED",
+                    target,
                 )
             finally:
                 self._external_prepared_request_id = None
@@ -643,6 +721,11 @@ class BridgeRuntime:
             },
             "terminals": terminals,
             "auto_execute": bool(self.auto_execute),
+            "completion_sound": {
+                "enabled": bool(
+                    self.completion_sound.enabled
+                ),
+            },
             "queue": counts,
             "executor": {
                 "running": self.engine.running,

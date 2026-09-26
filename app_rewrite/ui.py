@@ -82,12 +82,20 @@ class MainWindow(QMainWindow):
         buttons = QHBoxLayout()
         self.refresh_button = QPushButton("Atualizar estado")
         self.stop_button = QPushButton("Parar comando ativo")
+        self.sound_button = QPushButton()
+        self.sound_button.setToolTip(
+            "Som ao finalizar comando"
+        )
         self.auto_button = QPushButton()
         self.refresh_button.clicked.connect(self.refresh)
         self.stop_button.clicked.connect(self.stop_active)
+        self.sound_button.clicked.connect(
+            self.toggle_completion_sound
+        )
         self.auto_button.clicked.connect(self.toggle_auto)
         buttons.addWidget(self.refresh_button)
         buttons.addWidget(self.stop_button)
+        buttons.addWidget(self.sound_button)
         buttons.addWidget(self.auto_button)
         buttons.addStretch(1)
         info_layout.addLayout(buttons)
@@ -243,6 +251,7 @@ class MainWindow(QMainWindow):
         self.stop_shortcut = QShortcut(QKeySequence("Ctrl+Shift+P"), self)
         self.stop_shortcut.activated.connect(self.stop_active)
         self._update_auto_button()
+        self._update_sound_button()
         self._load_ssh_settings()
         self.live_timer = QTimer(self)
         self.live_timer.timeout.connect(self.refresh_live)
@@ -266,6 +275,37 @@ class MainWindow(QMainWindow):
     def toggle_auto(self):
         self.runtime.set_auto_execute(not self.runtime.auto_execute)
         self._update_auto_button()
+
+    def _update_sound_button(self):
+        enabled = bool(
+            self.runtime.completion_sound.enabled
+        )
+        self.sound_button.setText(
+            "🔔" if enabled else "🔕"
+        )
+        self.sound_button.setToolTip(
+            "Som de conclusão: "
+            + ("ligado" if enabled else "desligado")
+        )
+        if enabled:
+            self.sound_button.setStyleSheet(
+                "background:#1f7a3d;"
+                "color:white;"
+                "font-weight:bold;"
+            )
+        else:
+            self.sound_button.setStyleSheet(
+                "background:#39434c;"
+                "color:#d7e0e7;"
+                "font-weight:bold;"
+            )
+
+        auto_size = self.auto_button.sizeHint()
+        self.sound_button.setFixedSize(auto_size)
+
+    def toggle_completion_sound(self):
+        self.runtime.toggle_completion_sound()
+        self._update_sound_button()
 
     def _sync_telemetry_panel(self, index):
         if index >= 2:
@@ -473,6 +513,7 @@ class MainWindow(QMainWindow):
     def refresh_status(self):
         s = self.runtime.snapshot()
         self._update_auto_button()
+        self._update_sound_button()
         t = s["terminals"]
         author_mcp = s.get("author_mcp") or {}
         secure_tunnel = s.get("secure_tunnel") or {}

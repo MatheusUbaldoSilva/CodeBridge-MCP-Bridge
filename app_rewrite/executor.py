@@ -3,11 +3,19 @@ import time
 
 
 class ExecutionEngine:
-    def __init__(self, store, terminals, poll_interval=0.10, preview_seconds=0.35):
+    def __init__(
+        self,
+        store,
+        terminals,
+        poll_interval=0.10,
+        preview_seconds=0.35,
+        on_terminal=None,
+    ):
         self.store = store
         self.terminals = terminals
         self.poll_interval = float(poll_interval)
         self.preview_seconds = float(preview_seconds)
+        self.on_terminal = on_terminal
         self._stop = threading.Event()
         self._wake = threading.Event()
         self._thread = None
@@ -84,6 +92,7 @@ class ExecutionEngine:
         with self._lock:
             self._active_job_id = job_id
         prepared_at = None
+        terminal_state = None
         try:
             self.terminals.prepare(target, command)
             prepared_at = time.monotonic()
@@ -96,12 +105,14 @@ class ExecutionEngine:
 
             if self._is_cancel_requested(job_id):
                 self.store.finish(job_id, "CANCELLED", exit_code=130)
+                terminal_state = "CANCELLED"
                 self.terminals.announce(target, "[CANCELLED] antes do Enter")
                 return
 
             self.store.mark_running(job_id)
             output = self.terminals.execute_prepared(target, command)
             self.store.finish(job_id, "SUCCESS", output=output, exit_code=0)
+            terminal_state = "SUCCESS"
             self.terminals.announce(target, "[SUCCESS] exit_code=0")
         except Exception as exc:
             output = getattr(exc, "output", "") or ""
@@ -123,6 +134,7 @@ class ExecutionEngine:
                 )
             except Exception:
                 pass
+            terminal_state = state
             self.terminals.announce(target, f"[{state}] {name}: {exc}")
         finally:
             if prepared_at is not None and self.terminals.status().get("prepared_target"):
@@ -133,4 +145,18 @@ class ExecutionEngine:
             self._clear_cancel(job_id)
             with self._lock:
                 self._active_job_id = None
+
+            if (
+                terminal_state
+                and callable(self.on_terminal)
+            ):
+                try:
+                    self.on_terminal(
+                        job_id,
+                        terminal_state,
+                        target,
+                    )
+                except Exception:
+                    pass
+
             time.sleep(0)

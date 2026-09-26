@@ -43,6 +43,7 @@ class StatusResult(ProtocolOutcome):
     queue: dict[str, Any] | None
     executor: dict[str, Any] | None
     auto_execute: bool
+    completion_sound: dict[str, Any] | None
 
 
 class PrepareResult(ProtocolOutcome):
@@ -240,6 +241,9 @@ def codebridge_status() -> StatusResult:
         queue=payload.get("queue"),
         executor=payload.get("executor"),
         auto_execute=bool(payload.get("auto_execute")),
+        completion_sound=payload.get(
+            "completion_sound"
+        ),
     )
 
 
