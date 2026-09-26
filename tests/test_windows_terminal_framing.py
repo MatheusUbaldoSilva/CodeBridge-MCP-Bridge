@@ -7,7 +7,7 @@ from pathlib import Path
 
 APP_DIR = (
     Path(__file__).resolve().parents[1]
-    / "app"
+    / "app_rewrite"
 )
 
 if str(APP_DIR) not in sys.path:
@@ -32,17 +32,17 @@ END_TOKEN = (
 )
 
 START_FENCE = (
-    "~CBFS"
+    "\x1b]777;CBFS;"
     + START_TOKEN
-    + "~"
+    + "\x07"
 ).encode(
     "ascii"
 )
 
 END_FENCE = (
-    "~CBFE"
+    "\x1b]777;CBFE;"
     + END_TOKEN
-    + "~"
+    + "\x07"
 ).encode(
     "ascii"
 )
@@ -61,7 +61,12 @@ def make_state(
                 errors="replace"
             ),
         "on_output": None,
+        "command_echo_bytes": b"",
+        "capture_prefix": bytearray(),
+        "command_echo_pending": False,
         "phase": phase,
+        "drain_started_at": None,
+        "drain_last_activity": None,
         "accepted": True,
         "control_begin_seen": True,
         "control_execution_id":
@@ -70,6 +75,7 @@ def make_state(
         "control_end_seen": False,
         "control_failed": None,
         "control_exit_code": None,
+        "control_prompt_bytes": b"PS C:\\> ",
         "control_start_fence_token":
             START_TOKEN,
         "control_start_fence":
@@ -134,15 +140,15 @@ class WindowsTerminalFramingTests(
 
         session._process_execution_bytes(
             b"PS C:\\> comando"
+            + b"\r\n\x1b[13;154H"
             + START_FENCE[
                 :split
             ]
         )
 
         session._process_execution_bytes(
-            b"\r\n\x1b[13;154H"
-            + START_FENCE[
-                split - 1:
+            START_FENCE[
+                split:
             ]
             + b"\x1b[143C"
         )

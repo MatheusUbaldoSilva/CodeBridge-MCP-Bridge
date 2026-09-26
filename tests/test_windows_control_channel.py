@@ -5,7 +5,7 @@ from pathlib import Path
 
 APP_DIR = (
     Path(__file__).resolve().parents[1]
-    / "app"
+    / "app_rewrite"
 )
 
 if str(APP_DIR) not in sys.path:

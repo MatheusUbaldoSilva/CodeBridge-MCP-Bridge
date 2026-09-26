@@ -240,6 +240,9 @@ class WindowsTerminalSession:
 
         self._reader_thread = None
         self._reader_stop = threading.Event()
+        self._bootstrap_ready = threading.Event()
+        self._prompt_ready = threading.Event()
+        self._prompt_ready_text = None
 
         self._control_channel = (
             WindowsControlChannel(
@@ -409,6 +412,37 @@ class WindowsTerminalSession:
         except UnicodeDecodeError:
             return b"ERROR:ENCODING"
 
+        if message == "BOOTSTRAP_READY":
+            self._bootstrap_ready.set()
+            return b"ACK:BOOTSTRAP_READY"
+
+        if message.startswith(
+            "PROMPT_READY:"
+        ):
+            encoded_buffer = message[
+                len("PROMPT_READY:"):
+            ]
+
+            try:
+                prompt_buffer = (
+                    base64.b64decode(
+                        encoded_buffer,
+                        validate=True,
+                    ).decode(
+                        "utf-8"
+                    )
+                )
+            except Exception:
+                return b"ERROR:PROMPT_READY"
+
+            with self._state_lock:
+                self._prompt_ready_text = (
+                    prompt_buffer
+                )
+                self._prompt_ready.set()
+
+            return None
+
         if message.startswith(
             "BEGIN:"
         ):
@@ -516,10 +550,10 @@ class WindowsTerminalSession:
         ):
             parts = message.split(
                 ":",
-                3,
+                4,
             )
 
-            if len(parts) != 4:
+            if len(parts) not in (4, 5):
                 return b"ERROR:END_FORMAT"
 
             execution_id = parts[1]
@@ -563,6 +597,17 @@ class WindowsTerminalSession:
 
             except ValueError:
                 return b"ERROR:END_EXIT"
+
+            prompt_bytes = b""
+
+            if len(parts) == 5:
+                try:
+                    prompt_bytes = base64.b64decode(
+                        parts[4],
+                        validate=True,
+                    )
+                except Exception:
+                    return b"ERROR:END_PROMPT"
 
             failed = (
                 success_text != "true"
@@ -608,12 +653,20 @@ class WindowsTerminalSession:
                 ] = True
 
                 state[
+                    "control_end_seen_at"
+                ] = time.monotonic()
+
+                state[
                     "control_failed"
                 ] = failed
 
                 state[
                     "control_exit_code"
                 ] = exit_code
+
+                state[
+                    "control_prompt_bytes"
+                ] = prompt_bytes
 
             fence_token = (
                 uuid.uuid4().hex
@@ -760,10 +813,35 @@ class WindowsTerminalSession:
             "$global:__CodeBridgeAutomationPagerState=$null;"
             "$__cb_f9={"
             "param($key,$arg);"
-            "[Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt("
-            "$key,$arg"
-            ")"
-            "};"
+            "$__cb_prompt_line='';"
+            "$__cb_prompt_cursor=0;"
+            "[Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState("
+            "[ref]$__cb_prompt_line,[ref]$__cb_prompt_cursor"
+            ");"
+            "$__cb_prompt_b64=[Convert]::ToBase64String("
+            "[Text.Encoding]::UTF8.GetBytes($__cb_prompt_line)"
+            ");"
+            "$__cb_prompt_ready_text="
+            "'PROMPT_READY:'+$__cb_prompt_b64;"
+            "$__cb_prompt_ready=[Text.Encoding]::ASCII.GetBytes("
+            "$__cb_prompt_ready_text"
+            ");"
+            "$__cb_prompt_ready_header=[BitConverter]::GetBytes("
+            "[UInt32]$__cb_prompt_ready.Length"
+            ");"
+            "$__cb_control_state.Pipe.Write("
+            "$__cb_prompt_ready_header,0,$__cb_prompt_ready_header.Length"
+            ");"
+            "$__cb_control_state.Pipe.Write("
+            "$__cb_prompt_ready,0,$__cb_prompt_ready.Length"
+            ");"
+            "$__cb_control_state.Pipe.Flush();"
+            "Remove-Variable "
+            "__cb_prompt_line,__cb_prompt_cursor,"
+            "__cb_prompt_b64,__cb_prompt_ready_text,"
+            "__cb_prompt_ready,__cb_prompt_ready_header "
+            "-ErrorAction SilentlyContinue"
+            "}.GetNewClosure();"
             "Set-PSReadLineKeyHandler "
             "-Chord F9 "
             "-ScriptBlock $__cb_f9;"
@@ -774,6 +852,7 @@ class WindowsTerminalSession:
             "-Chord F11 "
             "-Function AddLine;"
             "$__cb_f12={"
+            "param($key,$arg);"
             "$__cb_ping=[Text.Encoding]::UTF8.GetBytes('PING');"
             "$__cb_ping_header=[BitConverter]::GetBytes("
             "[UInt32]$__cb_ping.Length"
@@ -938,7 +1017,63 @@ class WindowsTerminalSession:
             "Remove-Variable "
             "__cb_f12 "
             "-ErrorAction SilentlyContinue;"
+            "$global:__CodeBridgeBootstrapReadySent=$false;"
             "$__cb_prompt={"
+            "if (-not $global:__CodeBridgeBootstrapReadySent) {"
+            "$__cb_bootstrap_ready="
+            "[Text.Encoding]::ASCII.GetBytes('BOOTSTRAP_READY');"
+            "$__cb_bootstrap_header=[BitConverter]::GetBytes("
+            "[UInt32]$__cb_bootstrap_ready.Length"
+            ");"
+            "$__cb_control_state.Pipe.Write("
+            "$__cb_bootstrap_header,0,$__cb_bootstrap_header.Length"
+            ");"
+            "$__cb_control_state.Pipe.Write("
+            "$__cb_bootstrap_ready,0,$__cb_bootstrap_ready.Length"
+            ");"
+            "$__cb_control_state.Pipe.Flush();"
+            "$__cb_bootstrap_header_in=New-Object byte[] 4;"
+            "$__cb_bootstrap_offset=0;"
+            "while ($__cb_bootstrap_offset -lt 4) {"
+            "$__cb_bootstrap_read=$__cb_control_state.Pipe.Read("
+            "$__cb_bootstrap_header_in,$__cb_bootstrap_offset,"
+            "4-$__cb_bootstrap_offset"
+            ");"
+            "if ($__cb_bootstrap_read -le 0) {"
+            "throw 'EOF no ACK:BOOTSTRAP_READY'"
+            "};"
+            "$__cb_bootstrap_offset+=$__cb_bootstrap_read"
+            "};"
+            "$__cb_bootstrap_length=[BitConverter]::ToUInt32("
+            "$__cb_bootstrap_header_in,0"
+            ");"
+            "$__cb_bootstrap_payload="
+            "New-Object byte[] $__cb_bootstrap_length;"
+            "$__cb_bootstrap_offset=0;"
+            "while ($__cb_bootstrap_offset -lt $__cb_bootstrap_length) {"
+            "$__cb_bootstrap_read=$__cb_control_state.Pipe.Read("
+            "$__cb_bootstrap_payload,$__cb_bootstrap_offset,"
+            "$__cb_bootstrap_length-$__cb_bootstrap_offset"
+            ");"
+            "if ($__cb_bootstrap_read -le 0) {"
+            "throw 'EOF lendo ACK:BOOTSTRAP_READY'"
+            "};"
+            "$__cb_bootstrap_offset+=$__cb_bootstrap_read"
+            "};"
+            "$__cb_bootstrap_ack=[Text.Encoding]::ASCII.GetString("
+            "$__cb_bootstrap_payload"
+            ");"
+            "if ($__cb_bootstrap_ack -ne 'ACK:BOOTSTRAP_READY') {"
+            "throw 'ACK:BOOTSTRAP_READY invalido'"
+            "};"
+            "$global:__CodeBridgeBootstrapReadySent=$true;"
+            "Remove-Variable "
+            "__cb_bootstrap_ready,__cb_bootstrap_header,"
+            "__cb_bootstrap_header_in,__cb_bootstrap_offset,"
+            "__cb_bootstrap_read,__cb_bootstrap_length,"
+            "__cb_bootstrap_payload,__cb_bootstrap_ack "
+            "-ErrorAction SilentlyContinue"
+            "};"
             "$__cb_ok=$?;"
             "$__cb_lec=$global:LASTEXITCODE;"
             "if ($global:__CodeBridgeAutomationActive) {"
@@ -982,10 +1117,17 @@ class WindowsTerminalSession:
             "} else {"
             "[string]$__cb_lec"
             "};"
+            "$__cb_original_prompt="
+            "[string](& $global:__CodeBridgeOriginalPrompt);"
+            "$__cb_prompt_b64="
+            "[Convert]::ToBase64String("
+            "[Text.Encoding]::UTF8.GetBytes($__cb_original_prompt)"
+            ");"
             "$__cb_end_text="
             "'END:'+$__cb_control_state.ExecutionId+':'"
             "+[string]$__cb_ok+':'"
-            "+$__cb_control_exit;"
+            "+$__cb_control_exit+':'"
+            "+$__cb_prompt_b64;"
             "$__cb_end=[Text.Encoding]::ASCII.GetBytes("
             "$__cb_end_text"
             ");"
@@ -1048,20 +1190,20 @@ class WindowsTerminalSession:
             "$__cb_end_fence_token,'N'"
             ");"
             "Remove-Variable "
-            "__cb_control_exit,__cb_end_text,__cb_end,"
+            "__cb_control_exit,__cb_prompt_b64,"
+            "__cb_end_text,__cb_end,"
             "__cb_end_header,__cb_end_header_in,"
             "__cb_end_offset,__cb_end_read,__cb_end_length,"
             "__cb_end_payload,__cb_end_ack,"
             "__cb_end_ack_prefix "
             "-ErrorAction SilentlyContinue;"
-            "[Console]::Write("
+            "$__cb_end_fence="
             "([char]27).ToString()+']777;CBFE;'+"
-            "$__cb_end_fence_token+([char]7).ToString()"
-            ");"
+            "$__cb_end_fence_token+([char]7).ToString();"
             "Remove-Variable "
             "__cb_end_fence_token "
             "-ErrorAction SilentlyContinue;"
-            "return (& $global:__CodeBridgeOriginalPrompt)"
+            "return ([string]$__cb_original_prompt+$__cb_end_fence)"
             "};"
             "return (& $global:__CodeBridgeOriginalPrompt)"
             "}.GetNewClosure();"
@@ -1118,6 +1260,10 @@ class WindowsTerminalSession:
             return True
 
         self.close()
+
+        self._bootstrap_ready.clear()
+        with self._state_lock:
+            self._visible_protocol_filter_buffer.clear()
 
         if not os.path.isfile(
             self._executable
@@ -1366,6 +1512,14 @@ class WindowsTerminalSession:
                 self._control_channel.wait_ready(
                     timeout=5.0
                 )
+
+                if not self._bootstrap_ready.wait(
+                    timeout=5.0
+                ):
+                    raise TimeoutError(
+                        "Timeout aguardando bootstrap "
+                        "PowerShell/PSReadLine"
+                    )
 
             except Exception:
                 self.close()
@@ -1956,6 +2110,165 @@ class WindowsTerminalSession:
             chunk
         )
 
+    def _append_capture_bytes(
+        self,
+        state,
+        data,
+        execution_chunks,
+        visible_chunks,
+        final=False,
+    ):
+        prefix = state[
+            "capture_prefix"
+        ]
+
+        if data:
+            prefix.extend(
+                bytes(data)
+            )
+
+        if not state.get(
+            "command_echo_pending",
+            False,
+        ):
+            if prefix:
+                self._append_execution_bytes(
+                    state,
+                    bytes(prefix),
+                    execution_chunks,
+                )
+                prefix.clear()
+            return
+
+        command_echo = state.get(
+            "command_echo_bytes"
+        ) or b""
+
+        if not command_echo:
+            state[
+                "command_echo_pending"
+            ] = False
+            if prefix:
+                self._append_execution_bytes(
+                    state,
+                    bytes(prefix),
+                    execution_chunks,
+                )
+                prefix.clear()
+            return
+
+        (
+            echo_match,
+            partial_start,
+        ) = self._find_console_decorated_marker(
+            prefix,
+            command_echo,
+        )
+
+        if echo_match is not None:
+            (
+                echo_start,
+                echo_end,
+            ) = echo_match
+
+            line_start = max(
+                prefix.rfind(
+                    b"\r",
+                    0,
+                    echo_start,
+                ),
+                prefix.rfind(
+                    b"\n",
+                    0,
+                    echo_start,
+                ),
+            ) + 1
+
+            decorated = bytes(
+                prefix[
+                    line_start:echo_end
+                ]
+            )
+
+            if b"\x1b[" in decorated:
+                line_end = self._line_end(
+                    prefix,
+                    echo_end,
+                )
+
+                if (
+                    line_end is None
+                    and not final
+                ):
+                    return
+
+                consume = (
+                    line_end[1]
+                    if line_end is not None
+                    else echo_end
+                )
+
+                visual = bytes(
+                    prefix[
+                        :consume
+                    ]
+                )
+
+                if visual:
+                    visible_chunks.append(
+                        visual
+                    )
+
+                remaining = bytes(
+                    prefix[
+                        consume:
+                    ]
+                )
+
+                prefix.clear()
+                state[
+                    "command_echo_pending"
+                ] = False
+
+                if remaining:
+                    self._append_execution_bytes(
+                        state,
+                        remaining,
+                        execution_chunks,
+                    )
+
+                return
+
+        if (
+            partial_start is not None
+            and not final
+        ):
+            return
+
+        line_end = self._line_end(
+            prefix,
+            0,
+        )
+
+        if (
+            line_end is None
+            and not final
+            and len(prefix) < 65536
+        ):
+            return
+
+        state[
+            "command_echo_pending"
+        ] = False
+
+        if prefix:
+            self._append_execution_bytes(
+                state,
+                bytes(prefix),
+                execution_chunks,
+            )
+            prefix.clear()
+
     def _complete_execution_locked(
         self,
         state,
@@ -1989,6 +2302,13 @@ class WindowsTerminalSession:
             )
 
             if state is not None:
+                if state.get(
+                    "phase"
+                ) == "DRAIN_AFTER_END":
+                    state[
+                        "drain_last_activity"
+                    ] = time.monotonic()
+
                 buffer = state[
                     "buffer"
                 ]
@@ -2008,6 +2328,11 @@ class WindowsTerminalSession:
                         )
 
                         if not marker:
+                            # O canal de controle pode entregar a start fence
+                            # depois de o ConPTY ja ter produzido output.
+                            # Preserve os bytes ate o token chegar; classifica-los
+                            # como apenas visuais aqui perde output de comandos
+                            # muito rapidos.
                             break
 
                         position = buffer.find(
@@ -2106,10 +2431,11 @@ class WindowsTerminalSession:
                                     buffer
                                 )
 
-                                self._append_execution_bytes(
+                                self._append_capture_bytes(
                                     state,
                                     chunk,
                                     execution_chunks,
+                                    visible_chunks,
                                 )
 
                                 buffer.clear()
@@ -2147,6 +2473,15 @@ class WindowsTerminalSession:
                                 ) = decorated_match
 
                         if position < 0:
+                            if state.get(
+                                "control_end_seen",
+                                False,
+                            ):
+                                # Depois do END, preserve todo o tail ate a
+                                # fence final. Ele pode conter output atrasado
+                                # seguido do prompt e precisa ser separado.
+                                break
+
                             keep = (
                                 self._safe_prefix_length(
                                     buffer,
@@ -2187,17 +2522,43 @@ class WindowsTerminalSession:
                             break
 
                         if position > 0:
-                            chunk = bytes(
+                            before_marker = bytes(
                                 buffer[
                                     :position
                                 ]
                             )
+                            prompt_bytes = state.get(
+                                "control_prompt_bytes"
+                            ) or b""
+                            prompt_position = (
+                                before_marker.rfind(
+                                    prompt_bytes
+                                )
+                                if prompt_bytes
+                                else -1
+                            )
+
+                            if prompt_position >= 0:
+                                chunk = before_marker[
+                                    :prompt_position
+                                ]
+                                prompt_chunk = before_marker[
+                                    prompt_position:
+                                ]
+                            else:
+                                chunk = before_marker
+                                prompt_chunk = b""
 
                             self._append_execution_bytes(
                                 state,
                                 chunk,
                                 execution_chunks,
                             )
+
+                            if prompt_chunk:
+                                visible_chunks.append(
+                                    prompt_chunk
+                                )
 
                         residual = bytes(
                             buffer[
@@ -2275,16 +2636,138 @@ class WindowsTerminalSession:
                                 "exit_code"
                             ] = 130
 
-                        completion_event = (
-                            self._complete_execution_locked(
-                                state
+                        if state.get(
+                            "error"
+                        ) is not None:
+                            completion_event = (
+                                self._complete_execution_locked(
+                                    state
+                                )
                             )
-                        )
+
+                            if residual:
+                                visible_chunks.append(
+                                    residual
+                                )
+
+                            break
+
+                        now = time.monotonic()
+                        state[
+                            "phase"
+                        ] = "DRAIN_AFTER_END"
+                        state[
+                            "drain_started_at"
+                        ] = now
+                        state[
+                            "drain_last_activity"
+                        ] = now
 
                         if residual:
-                            visible_chunks.append(
+                            buffer.extend(
                                 residual
                             )
+
+                        continue
+
+                    if phase == "DRAIN_AFTER_END":
+                        prompt_bytes = state.get(
+                            "control_prompt_bytes"
+                        ) or b""
+
+                        prompt_position = (
+                            buffer.rfind(
+                                prompt_bytes
+                            )
+                            if prompt_bytes
+                            else -1
+                        )
+
+                        if prompt_position >= 0:
+                            late_chunk = bytes(
+                                buffer[
+                                    :prompt_position
+                                ]
+                            )
+
+                            command_echo = state.get(
+                                "command_echo_bytes"
+                            ) or b""
+
+                            if (
+                                late_chunk
+                                and command_echo
+                            ):
+                                (
+                                    echo_match,
+                                    _,
+                                ) = (
+                                    self._find_console_decorated_marker(
+                                        late_chunk,
+                                        command_echo,
+                                    )
+                                )
+
+                                if (
+                                    echo_match is not None
+                                    and echo_match[0] < 1024
+                                ):
+                                    (
+                                        _,
+                                        echo_end,
+                                    ) = echo_match
+
+                                    line_end = self._line_end(
+                                        late_chunk,
+                                        echo_end,
+                                    )
+
+                                    if line_end is not None:
+                                        (
+                                            _,
+                                            consume,
+                                        ) = line_end
+                                    else:
+                                        consume = echo_end
+
+                                    echo_chunk = late_chunk[
+                                        :consume
+                                    ]
+                                    late_chunk = late_chunk[
+                                        consume:
+                                    ]
+
+                                    if echo_chunk:
+                                        visible_chunks.append(
+                                            echo_chunk
+                                        )
+
+                            if late_chunk:
+                                self._append_execution_bytes(
+                                    state,
+                                    late_chunk,
+                                    execution_chunks,
+                                )
+
+                            prompt_chunk = bytes(
+                                buffer[
+                                    prompt_position:
+                                ]
+                            )
+                            buffer.clear()
+
+                            if prompt_chunk:
+                                visible_chunks.append(
+                                    prompt_chunk
+                                )
+
+                            completion_event = (
+                                self._complete_execution_locked(
+                                    state
+                                )
+                            )
+
+                            break
 
                         break
 
@@ -2406,15 +2889,40 @@ class WindowsTerminalSession:
                     ctypes.get_last_error()
                 )
 
-                if error_code not in (
-                    ERROR_BROKEN_PIPE,
-                    ERROR_INVALID_HANDLE,
-                ):
-                    with self._state_lock:
+                completion_event = None
+
+                with self._state_lock:
+                    if error_code not in (
+                        ERROR_BROKEN_PIPE,
+                        ERROR_INVALID_HANDLE,
+                    ):
                         self._last_error = OSError(
                             error_code,
                             "ReadFile do ConPTY falhou",
                         )
+
+                    state = self._execution_state
+
+                    if (
+                        state is not None
+                        and not state.get(
+                            "done",
+                            False,
+                        )
+                    ):
+                        state["error"] = (
+                            PowerShellSessionInterrupted(
+                                "Sessao PowerShell encerrada durante a execucao"
+                            )
+                        )
+                        completion_event = (
+                            self._complete_execution_locked(
+                                state
+                            )
+                        )
+
+                if completion_event is not None:
+                    completion_event.set()
 
                 break
 
@@ -2522,51 +3030,130 @@ class WindowsTerminalSession:
             character_delay
         )
 
-        if cancelled():
-            return False
+        def read_prompt_buffer():
+            with self._state_lock:
+                self._prompt_ready_text = None
+                self._prompt_ready.clear()
 
-        self.send(
-            self._native_clear_line_sequence
-        )
+            self.send(
+                self._native_redraw_prompt_sequence
+            )
 
-        for index, line in enumerate(
-            lines
-        ):
-            if cancelled():
-                return False
+            ready_deadline = (
+                time.monotonic() + 3.0
+            )
 
-            if delay <= 0:
-                if line:
-                    self.send(
-                        line
+            while not self._prompt_ready.wait(
+                0.05
+            ):
+                if cancelled():
+                    return None
+
+                if not self.is_running:
+                    raise RuntimeError(
+                        "PowerShell encerrou enquanto "
+                        "aguardava prontidao do PSReadLine"
                     )
 
-            else:
-                for char in line:
+                if time.monotonic() >= ready_deadline:
+                    raise TimeoutError(
+                        "Timeout aguardando prontidao "
+                        "do PSReadLine"
+                    )
+
+            with self._state_lock:
+                prompt_buffer = (
+                    self._prompt_ready_text
+                )
+
+            if prompt_buffer is None:
+                raise RuntimeError(
+                    "PSReadLine nao informou o "
+                    "buffer preparado"
+                )
+
+            return (
+                prompt_buffer.replace(
+                    "\r\n",
+                    "\n",
+                ).replace(
+                    "\r",
+                    "\n",
+                )
+            )
+
+        def type_command():
+            self.send(
+                self._native_clear_line_sequence
+            )
+
+            for index, line in enumerate(
+                lines
+            ):
+                if cancelled():
+                    return False
+
+                if delay <= 0:
+                    if line:
+                        self.send(
+                            line
+                        )
+
+                else:
+                    for char in line:
+                        if cancelled():
+                            return False
+
+                        self.send(
+                            char
+                        )
+
+                        if cancel_event is not None:
+                            if cancel_event.wait(
+                                delay
+                            ):
+                                return False
+
+                        else:
+                            time.sleep(
+                                delay
+                            )
+
+                if index < len(lines) - 1:
                     if cancelled():
                         return False
 
                     self.send(
-                        char
+                        self._native_add_line_sequence
                     )
 
-                    if cancel_event is not None:
-                        if cancel_event.wait(
-                            delay
-                        ):
-                            return False
+            return True
 
-                    else:
-                        time.sleep(
-                            delay
-                        )
+        if cancelled():
+            return False
 
-            if index < len(lines) - 1:
-                if cancelled():
-                    return False
+        if read_prompt_buffer() is None:
+            return False
 
-                self.send(
-                    self._native_add_line_sequence
+        if not type_command():
+            return False
+
+        prepared_buffer = (
+            read_prompt_buffer()
+        )
+
+        if prepared_buffer != normalized:
+            if not type_command():
+                return False
+
+            prepared_buffer = (
+                read_prompt_buffer()
+            )
+
+            if prepared_buffer != normalized:
+                raise RuntimeError(
+                    "Buffer PSReadLine divergente "
+                    "do comando preparado"
                 )
 
         return not cancelled()
@@ -2638,13 +3225,32 @@ class WindowsTerminalSession:
                     )
                 ),
                 "on_output": on_output,
+                "command_echo_bytes": (
+                    command.replace(
+                        "\r\n",
+                        "\n",
+                    ).replace(
+                        "\r",
+                        "\n",
+                    ).replace(
+                        "\n",
+                        "",
+                    ).encode(
+                        "utf-8"
+                    )
+                ),
+                "capture_prefix": bytearray(),
+                "command_echo_pending": True,
                 "phase": "WAIT_START_FENCE",
+                "drain_started_at": None,
+                "drain_last_activity": None,
                 "accepted": False,
                 "control_begin_seen": False,
                 "control_execution_id": None,
                 "control_end_seen": False,
                 "control_failed": None,
                 "control_exit_code": None,
+                "control_prompt_bytes": b"",
                 "control_start_fence_token": None,
                 "control_start_fence": None,
                 "control_end_fence_token": None,
@@ -2726,9 +3332,83 @@ class WindowsTerminalSession:
                     output="",
                 ) from error
 
-            state[
+            while not state[
                 "event"
-            ].wait()
+            ].wait(0.10):
+                recovery_chunk = b""
+                recovery_event = None
+
+                with self._state_lock:
+                    process_handle = self._process_handle
+                    process_exit_code = wintypes.DWORD()
+                    process_alive = bool(
+                        process_handle
+                        and _kernel32.GetExitCodeProcess(
+                            process_handle,
+                            ctypes.byref(
+                                process_exit_code
+                            ),
+                        )
+                        and process_exit_code.value
+                        == STILL_ACTIVE
+                    )
+
+                    if (
+                        self._execution_state is state
+                        and not process_alive
+                    ):
+                        state["error"] = (
+                            PowerShellSessionInterrupted(
+                                "Sessao PowerShell encerrada durante a execucao"
+                            )
+                        )
+                        recovery_event = (
+                            self._complete_execution_locked(
+                                state
+                            )
+                        )
+
+                    end_seen_at = state.get(
+                        "control_end_seen_at"
+                    )
+
+                    if (
+                        self._execution_state is state
+                        and end_seen_at is not None
+                        and time.monotonic() - end_seen_at >= 2.0
+                    ):
+                        if state["buffer"]:
+                            recovery_chunk = bytes(
+                                state["buffer"]
+                            )
+                            state["buffer"].clear()
+                            state["output"].extend(
+                                recovery_chunk
+                            )
+
+                        state["failed"] = bool(
+                            state["control_failed"]
+                        )
+                        state["exit_code"] = int(
+                            state["control_exit_code"]
+                        )
+                        recovery_event = (
+                            self._complete_execution_locked(
+                                state
+                            )
+                        )
+
+                if recovery_chunk:
+                    self._emit_execution_text(
+                        state,
+                        recovery_chunk,
+                    )
+                    self._emit_visible_bytes(
+                        recovery_chunk
+                    )
+
+                if recovery_event is not None:
+                    recovery_event.set()
 
             remaining = state[
                 "decoder"
@@ -3097,6 +3777,7 @@ class WindowsTerminalSession:
             self._pid = None
 
             self._output_callback = None
+            self._visible_protocol_filter_buffer.clear()
 
         self._control_channel.close()
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 APP_DIR = (
     Path(__file__).resolve().parents[1]
-    / "app"
+    / "app_rewrite"
 )
 
 if str(APP_DIR) not in sys.path:
@@ -92,9 +92,9 @@ class WindowsTerminalControlTests(
                 "control_start_fence"
             ],
             (
-                "~CBFS"
+                "\x1b]777;CBFS;"
                 + fence_token
-                + "~"
+                + "\x07"
             ).encode(
                 "ascii"
             ),
@@ -187,9 +187,9 @@ class WindowsTerminalControlTests(
                 "control_end_fence"
             ],
             (
-                "~CBFE"
+                "\x1b]777;CBFE;"
                 + fence_token
-                + "~"
+                + "\x07"
             ).encode(
                 "ascii"
             ),
