@@ -9,8 +9,9 @@ from protocol import PROTOCOL_VERSION, ProtocolConflict, ProtocolError, sha256_p
 from runtime_client import (
     codebridge_discard, codebridge_dispatch, codebridge_execute_prepared,
     codebridge_execution_status, codebridge_prepare, codebridge_start_async,
-    codebridge_status, codebridge_stop, codebridge_v2_output, codebridge_v2_result,
-    codebridge_v2_start, codebridge_v2_status, codebridge_v2_stop,
+    codebridge_status, codebridge_stop, codebridge_turn_control,
+    codebridge_v2_output, codebridge_v2_result, codebridge_v2_start,
+    codebridge_v2_status, codebridge_v2_stop,
 )
 
 
@@ -18,6 +19,14 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8766
 DATA_DIR = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "CodeBridge-MCP-Bridge"
 LEDGER_FILE = DATA_DIR / "author_mcp_protocol.db"
+
+NEW_WORK_OPERATIONS = {
+    "PREPARE",
+    "DISPATCH",
+    "EXECUTE_PREPARED",
+    "START_ASYNC",
+    "EXECUTION_V2_START",
+}
 
 
 class AdapterState:
@@ -103,19 +112,70 @@ class AdapterState:
             exchange = self.ledger.get_exchange(request_id)
             operation = exchange["operation"]
             payload = exchange["request_payload"]
+            turn_control = None
             try:
-                result = self.operations[operation](payload, request_id=request_id)
-                if isinstance(result, dict):
-                    result = dict(result)
-                    result.setdefault("operation_ok", True)
-            except Exception as exc:
+                turn_control = (
+                    codebridge_turn_control()
+                )
+            except Exception:
+                pass
+
+            if (
+                operation in NEW_WORK_OPERATIONS
+                and isinstance(turn_control, dict)
+                and turn_control.get(
+                    "request_wrap_up"
+                )
+            ):
                 result = {
                     "operation_ok": False,
-                    "error_type": type(exc).__name__,
-                    "error_message": str(exc),
+                    "error_type":
+                        "TurnWrapUpRequested",
+                    "error_message": (
+                        "Nova execucao bloqueada: "
+                        "fechamento normal do turno "
+                        "foi solicitado."
+                    ),
                     "retriable": False,
                 }
-            return self.ledger.prepare_response(request_id, result)
+            else:
+                try:
+                    result = self.operations[
+                        operation
+                    ](
+                        payload,
+                        request_id=request_id,
+                    )
+                    if isinstance(result, dict):
+                        result = dict(result)
+                        result.setdefault(
+                            "operation_ok",
+                            True,
+                        )
+                except Exception as exc:
+                    result = {
+                        "operation_ok": False,
+                        "error_type":
+                            type(exc).__name__,
+                        "error_message": str(exc),
+                        "retriable": False,
+                    }
+
+            if isinstance(result, dict):
+                try:
+                    result["turn_control"] = (
+                        codebridge_turn_control()
+                    )
+                except Exception:
+                    result.setdefault(
+                        "turn_control",
+                        turn_control,
+                    )
+
+            return self.ledger.prepare_response(
+                request_id,
+                result,
+            )
 
     def response_ack(self, body):
         if body.get("protocol") != PROTOCOL_VERSION or body.get("type") != "RESPONSE_ACK":

@@ -7,6 +7,7 @@ import time
 from api_server import BridgeAPI
 from author_mcp_manager import AuthorMCPManager
 from secure_tunnel_manager import SecureTunnelManager
+from chatgpt_companion import ChatGPTCompanionServer, ChatGPTTimerState
 from constants import APP_NAME, APP_VERSION, DATA_DIR, DEFAULT_HOST, RUNTIME_FILE
 from executor import ExecutionEngine
 from external_prepare_store import ExternalPrepareStore, ExternalPrepareConflict, command_hash
@@ -40,6 +41,10 @@ class BridgeRuntime:
         self.engine = ExecutionEngine(self.store, self.terminals)
         self.author_mcp = AuthorMCPManager()
         self.secure_tunnel = SecureTunnelManager()
+        self.chatgpt_timer = ChatGPTTimerState()
+        self.chatgpt_companion = ChatGPTCompanionServer(
+            self.chatgpt_timer
+        )
         self.token = secrets.token_urlsafe(32)
         self.api = BridgeAPI(self, host=DEFAULT_HOST, port=0, token=self.token)
         self.started_at = None
@@ -60,6 +65,7 @@ class BridgeRuntime:
         self.terminals.start()
         self.engine.start()
         self.api.start()
+        self.chatgpt_companion.start()
 
         self.started_at = time.time()
         self._started = True
@@ -77,6 +83,10 @@ class BridgeRuntime:
             "port": self.api.port,
             "token": self.token,
             "started_at": self.started_at,
+            "chatgpt_companion": {
+                "host": self.chatgpt_companion.host,
+                "port": self.chatgpt_companion.port,
+            },
         }
         temp = RUNTIME_FILE.with_suffix(".tmp")
         temp.write_text(
@@ -506,7 +516,67 @@ class BridgeRuntime:
             "enter_sent": row["state"] in ("EXECUTING", "FINISHED", "FAILED"),
         }
 
-    def stop_active(self):
+    def has_active_command(self):
+        status = self.terminals.status()
+
+        if any(
+            bool((status.get(name) or {}).get("executing"))
+            for name in ("powershell", "cmd", "ssh")
+        ):
+            return True
+
+        if (
+            status.get("active_target")
+            or status.get("prepared_target")
+            or self.engine.active_job_id
+        ):
+            return True
+
+        with self._phase5b_lock:
+            execution_id = (
+                self._phase5b_active_execution_id
+            )
+
+        if execution_id:
+            try:
+                row = self.execution_ledger.get(
+                    execution_id
+                )
+                if row.get("state") in (
+                    "CREATED",
+                    "RUNNING",
+                ):
+                    return True
+            except Exception:
+                return True
+
+        return False
+
+    def request_graceful_stop(self):
+        if not self.has_active_command():
+            return {
+                "requested": False,
+                "reason": "no_active_command",
+                "turn_control":
+                    self.chatgpt_timer.turn_control(),
+            }
+
+        result = (
+            self.chatgpt_timer.request_manual_wrap_up(
+                "manual_stop_button"
+            )
+        )
+        return {
+            "requested": True,
+            "already_requested": not bool(
+                result.get("applied")
+            ),
+            "turn_control": result.get(
+                "turn_control"
+            ),
+        }
+
+    def force_stop_active(self):
         status = self.terminals.status()
         executing = any(
             bool((status.get(name) or {}).get("executing"))
@@ -522,6 +592,11 @@ class BridgeRuntime:
         if status.get("active_target"):
             return bool(self.terminals.cancel_active())
         return bool(self.engine.cancel(None))
+
+    def stop_active(self):
+        # Mantem a semantica antiga para /v1/stop e chamadas
+        # explicitas de cancelamento imediato.
+        return self.force_stop_active()
 
     def approve(self, job_id):
         job = self.store.approve(job_id)
@@ -582,6 +657,13 @@ class BridgeRuntime:
                 if v2_active is not None
                 else None
             ),
+            "chatgpt_timer": self.chatgpt_timer.snapshot(),
+            "turn_control": self.chatgpt_timer.turn_control(),
+            "chatgpt_companion": {
+                "online": self.chatgpt_companion.running,
+                "host": self.chatgpt_companion.host,
+                "port": self.chatgpt_companion.port,
+            },
         }
 
     def stop(self):
@@ -595,15 +677,18 @@ class BridgeRuntime:
                 self.author_mcp.stop()
             finally:
                 try:
-                    self.api.stop()
+                    self.chatgpt_companion.stop()
                 finally:
                     try:
-                        self.engine.stop(wait=True, timeout=5)
+                        self.api.stop()
                     finally:
                         try:
-                            self.terminals.close()
+                            self.engine.stop(wait=True, timeout=5)
                         finally:
-                            pass
+                            try:
+                                self.terminals.close()
+                            finally:
+                                pass
 
         self._started = False
         try:

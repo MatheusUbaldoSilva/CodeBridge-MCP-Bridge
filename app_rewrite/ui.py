@@ -4,9 +4,9 @@ import threading
 
 from PySide6.QtGui import QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
-    QApplication, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-    QMainWindow, QMessageBox, QPushButton, QSpinBox,
-    QTabWidget, QVBoxLayout, QWidget,
+    QApplication, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
+    QMainWindow, QMessageBox, QPushButton, QSizePolicy, QSpinBox,
+    QStackedWidget, QTabWidget, QVBoxLayout, QWidget,
 )
 from PySide6.QtCore import Qt, QTimer
 
@@ -26,6 +26,7 @@ class MainWindow(QMainWindow):
         self._last_logs = {}
         self._ui_events = queue.Queue()
         self._ssh_busy = False
+        self._last_chatgpt_timer_state = None
         self.telemetry = TelemetryService(
             self.runtime.terminals.config, self.runtime.terminals.credentials
         )
@@ -33,7 +34,24 @@ class MainWindow(QMainWindow):
         self.telemetry_panels = {}
 
         root = QWidget(self)
-        layout = QVBoxLayout(root)
+        layout = QHBoxLayout(root)
+        layout.setSpacing(8)
+
+        left_panel = QWidget(root)
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(4)
+        layout.addWidget(left_panel, 1)
+
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(14)
+
+        info_panel = QWidget(left_panel)
+        info_layout = QVBoxLayout(info_panel)
+        info_layout.setContentsMargins(0, 0, 0, 0)
+        info_layout.setSpacing(4)
+
         self.brand = QLabel()
         self.brand.setStyleSheet("background: transparent; border: 0;")
         self.brand.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
@@ -49,7 +67,7 @@ class MainWindow(QMainWindow):
                     brand_pixmap.scaledToHeight(72, Qt.SmoothTransformation)
                 )
                 self.brand.setFixedHeight(80)
-        layout.addWidget(self.brand)
+        info_layout.addWidget(self.brand)
 
         self.overall = QLabel()
         self.author_mcp = QLabel()
@@ -59,7 +77,8 @@ class MainWindow(QMainWindow):
         for widget in (
             self.overall, self.author_mcp, self.secure_tunnel, self.api, self.active
         ):
-            layout.addWidget(widget)
+            info_layout.addWidget(widget)
+
         buttons = QHBoxLayout()
         self.refresh_button = QPushButton("Atualizar estado")
         self.stop_button = QPushButton("Parar comando ativo")
@@ -71,10 +90,97 @@ class MainWindow(QMainWindow):
         buttons.addWidget(self.stop_button)
         buttons.addWidget(self.auto_button)
         buttons.addStretch(1)
-        layout.addLayout(buttons)
+        info_layout.addLayout(buttons)
+
+        header.addWidget(info_panel, 0)
+        header.addStretch(1)
+
+        self.chatgpt_timer_box = QFrame(left_panel)
+        self.chatgpt_timer_box.setObjectName("chatgptTimerBox")
+        self.chatgpt_timer_box.setMinimumWidth(420)
+        self.chatgpt_timer_box.setMaximumWidth(620)
+        self.chatgpt_timer_box.setFixedHeight(145)
+        self.chatgpt_timer_box.setStyleSheet(
+            "QFrame#chatgptTimerBox{"
+            "background:#0a1015;"
+            "border:1px solid #33414d;"
+            "border-radius:10px;"
+            "}"
+        )
+        timer_layout = QVBoxLayout(self.chatgpt_timer_box)
+        timer_layout.setContentsMargins(20, 12, 20, 12)
+        timer_layout.setSpacing(2)
+
+        self.chatgpt_timer_label = QLabel("00:00")
+        self.chatgpt_timer_label.setAlignment(Qt.AlignCenter)
+        self.chatgpt_timer_label.setStyleSheet(
+            "color:#eef3f6;"
+            "font-family:Consolas,'Courier New',monospace;"
+            "font-size:52px;"
+            "font-weight:700;"
+            "letter-spacing:2px;"
+            "background:transparent;"
+            "border:0;"
+        )
+        self.chatgpt_timer_status = QLabel("AGUARDANDO")
+        self.chatgpt_timer_status.setAlignment(Qt.AlignCenter)
+        self.chatgpt_timer_status.setStyleSheet(
+            "color:#7f93a3;"
+            "font-size:13px;"
+            "font-weight:600;"
+            "letter-spacing:1px;"
+            "background:transparent;"
+            "border:0;"
+        )
+        timer_layout.addStretch(1)
+        timer_layout.addWidget(self.chatgpt_timer_label)
+        timer_layout.addWidget(self.chatgpt_timer_status)
+        timer_layout.addStretch(1)
+
+        header.addWidget(
+            self.chatgpt_timer_box,
+            0,
+            Qt.AlignVCenter,
+        )
+        header.addStretch(1)
+        left_layout.addLayout(header)
+
+        self.telemetry_stack = QStackedWidget(root)
+        self.telemetry_stack.setMinimumWidth(270)
+        self.telemetry_stack.setMaximumWidth(300)
+        self.telemetry_stack.setSizePolicy(
+            QSizePolicy.Fixed,
+            QSizePolicy.Expanding,
+        )
+
+        self.telemetry_windows = TelemetryPanel(
+            self.telemetry,
+            "windows",
+            self.telemetry_stack,
+        )
+        self.telemetry_linux = TelemetryPanel(
+            self.telemetry,
+            "linux",
+            self.telemetry_stack,
+        )
+        self.telemetry_stack.addWidget(
+            self.telemetry_windows
+        )
+        self.telemetry_stack.addWidget(
+            self.telemetry_linux
+        )
+        self.telemetry_panels = {
+            "windows": self.telemetry_windows,
+            "linux": self.telemetry_linux,
+        }
+
+        layout.addWidget(
+            self.telemetry_stack,
+            0,
+        )
 
         self.tabs = QTabWidget()
-        layout.addWidget(self.tabs, 1)
+        left_layout.addWidget(self.tabs, 1)
         self.terminal_views = {}
         self.terminal_status = {}
         for target, title in (
@@ -89,17 +195,10 @@ class MainWindow(QMainWindow):
             status = QLabel()
             status.setContentsMargins(4, 4, 4, 0)
             view = TerminalWidget(self.runtime.terminals, target, tab)
-            telemetry_kind = "linux" if target == "SSH" else "windows"
-            telemetry_panel = TelemetryPanel(self.telemetry, telemetry_kind, tab)
-            content = QHBoxLayout()
-            content.setContentsMargins(0, 0, 0, 0)
-            content.addWidget(view, 1)
-            content.addWidget(telemetry_panel)
             tab_layout.addWidget(status)
-            tab_layout.addLayout(content, 1)
+            tab_layout.addWidget(view, 1)
             self.terminal_status[target] = status
             self.terminal_views[target] = view
-            self.telemetry_panels[target] = telemetry_panel
             self.tabs.addTab(tab, title)
 
         self.ssh_tab = QWidget()
@@ -131,6 +230,12 @@ class MainWindow(QMainWindow):
         ssh_layout.addWidget(self.ssh_config_status)
         ssh_layout.addStretch(1)
         self.tabs.addTab(self.ssh_tab, "Configuracao SSH")
+        self.tabs.currentChanged.connect(
+            self._sync_telemetry_panel
+        )
+        self._sync_telemetry_panel(
+            self.tabs.currentIndex()
+        )
 
         self.setCentralWidget(root)
         self.auto_shortcut = QShortcut(QKeySequence("Ctrl+Shift+S"), self)
@@ -161,6 +266,16 @@ class MainWindow(QMainWindow):
     def toggle_auto(self):
         self.runtime.set_auto_execute(not self.runtime.auto_execute)
         self._update_auto_button()
+
+    def _sync_telemetry_panel(self, index):
+        if index >= 2:
+            self.telemetry_stack.setCurrentWidget(
+                self.telemetry_linux
+            )
+        else:
+            self.telemetry_stack.setCurrentWidget(
+                self.telemetry_windows
+            )
 
     def refresh_telemetry(self):
         for panel in self.telemetry_panels.values():
@@ -261,8 +376,97 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
+    @staticmethod
+    def _format_chatgpt_elapsed(seconds):
+        total_seconds = int(
+            max(0.0, float(seconds or 0.0))
+        )
+        minutes, whole_seconds = divmod(
+            total_seconds,
+            60,
+        )
+        return (
+            f"{minutes:02d}:"
+            f"{whole_seconds:02d}"
+        )
+
+    def _refresh_chatgpt_timer(self):
+        timer = self.runtime.chatgpt_timer.snapshot()
+        control = self.runtime.chatgpt_timer.turn_control()
+        state = str(
+            timer.get("state") or "IDLE"
+        ).upper()
+        control_stage = str(
+            control.get("stage") or "INACTIVE"
+        ).upper()
+
+        self.chatgpt_timer_label.setText(
+            self._format_chatgpt_elapsed(
+                timer.get("elapsed_seconds")
+            )
+        )
+
+        visual_state = state
+        if state == "RUNNING":
+            if control_stage == "PREPARE_WRAP_UP":
+                visual_state = "PREPARE_WRAP_UP"
+            elif control_stage == "WRAP_UP_NOW":
+                visual_state = "WRAP_UP_NOW"
+
+        if visual_state == self._last_chatgpt_timer_state:
+            return
+
+        self._last_chatgpt_timer_state = visual_state
+
+        labels = {
+            "IDLE": (
+                "AGUARDANDO",
+                "#7f93a3",
+            ),
+            "RUNNING": (
+                "PROCESSANDO",
+                "#4fd1c5",
+            ),
+            "PREPARE_WRAP_UP": (
+                "FINALIZANDO EM BREVE",
+                "#e5b45f",
+            ),
+            "WRAP_UP_NOW": (
+                "ENCERRAR TURNO",
+                "#e58484",
+            ),
+            "FINISHED": (
+                "CONCLUÍDO",
+                "#6dd56d",
+            ),
+            "CANCELLED": (
+                "INTERROMPIDO",
+                "#e5b45f",
+            ),
+        }
+        text, color = labels.get(
+            visual_state,
+            (
+                visual_state,
+                "#7f93a3",
+            ),
+        )
+        self.chatgpt_timer_status.setText(
+            text
+        )
+        self.chatgpt_timer_status.setStyleSheet(
+            "color:"
+            + color
+            + ";font-size:13px;"
+            "font-weight:600;"
+            "letter-spacing:1px;"
+            "background:transparent;"
+            "border:0;"
+        )
+
     def refresh_live(self):
         self._drain_ui_events()
+        self._refresh_chatgpt_timer()
         for target in ("POWERSHELL5.1", "CMD", "SSH"):
             self._update_terminal_view(target)
 
@@ -320,6 +524,29 @@ class MainWindow(QMainWindow):
         )
         active_execution = s.get("active_execution")
         active_id = s["executor"]["active_job_id"]
+        turn_control = s.get("turn_control") or {}
+        manual_stop_requested = bool(
+            turn_control.get("manual_request")
+        )
+        active_command = bool(
+            active_execution
+            or active_id
+            or t.get("active_target")
+            or t.get("prepared_target")
+            or any(
+                bool(
+                    (t.get(name) or {}).get(
+                        "executing"
+                    )
+                )
+                for name in (
+                    "powershell",
+                    "cmd",
+                    "ssh",
+                )
+            )
+        )
+
         if active_execution:
             self.active.setText(
                 "Job ativo: "
@@ -340,6 +567,33 @@ class MainWindow(QMainWindow):
         else:
             self.active.setText("Job ativo: nenhum")
 
+        if manual_stop_requested:
+            if active_command:
+                self.stop_button.setText(
+                    "Forçar parada"
+                )
+                self.stop_button.setEnabled(
+                    True
+                )
+                self.active.setText(
+                    self.active.text()
+                    + " | PARADA SOLICITADA"
+                )
+            else:
+                self.stop_button.setText(
+                    "Parada solicitada"
+                )
+                self.stop_button.setEnabled(
+                    False
+                )
+        else:
+            self.stop_button.setText(
+                "Parar comando ativo"
+            )
+            self.stop_button.setEnabled(
+                active_command
+            )
+
         self.terminal_status["POWERSHELL5.1"].setText(
             f"PowerShell 5.1: {'ONLINE' if t['powershell']['online'] else 'OFFLINE'}"
         )
@@ -359,8 +613,29 @@ class MainWindow(QMainWindow):
         self.refresh_status()
 
     def stop_active(self):
-        if not self.runtime.stop_active():
-            QMessageBox.information(self, APP_NAME, "Nenhum comando ativo para parar.")
+        control = (
+            self.runtime.chatgpt_timer.turn_control()
+        )
+
+        if control.get("manual_request"):
+            if not self.runtime.force_stop_active():
+                QMessageBox.information(
+                    self,
+                    APP_NAME,
+                    "Nenhum comando ativo para forcar.",
+                )
+        else:
+            result = (
+                self.runtime.request_graceful_stop()
+            )
+            if not result.get("requested"):
+                QMessageBox.information(
+                    self,
+                    APP_NAME,
+                    "Nenhum comando ativo para parar.",
+                )
+
+        self.refresh()
 
     def closeEvent(self, event):
         try:

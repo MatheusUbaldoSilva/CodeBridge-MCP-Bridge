@@ -71,6 +71,30 @@ def codebridge_status():
         "queue": status.get("queue"),
         "executor": status.get("executor"),
         "auto_execute": bool(status.get("auto_execute")),
+        "turn_control": status.get("turn_control"),
+    }
+
+
+def codebridge_turn_control():
+    runtime = _load_runtime()
+    url = (
+        f"http://{runtime['host']}:"
+        f"{int(runtime['port'])}/v1/status"
+    )
+    payload = _get_json(
+        url,
+        runtime["token"],
+        timeout=3.0,
+    )
+    status = payload.get("status") or {}
+    control = status.get("turn_control")
+    if isinstance(control, dict):
+        return dict(control)
+    return {
+        "stage": "INACTIVE",
+        "action": "NONE",
+        "request_wrap_up": False,
+        "directive": "No turn wrap-up is requested.",
     }
 
 

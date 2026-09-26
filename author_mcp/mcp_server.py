@@ -20,12 +20,14 @@ class PingResult(BaseModel):
     desafio: str
     executor_conectado: bool
     timestamp_utc: str
+    turn_control: dict[str, Any] | None = None
 
 
 class ProtocolOutcome(BaseModel):
     operation_ok: bool = True
     operation_error_type: str | None = None
     operation_error_message: str | None = None
+    turn_control: dict[str, Any] | None = None
 
 
 class StatusResult(ProtocolOutcome):
@@ -173,7 +175,7 @@ mcp = MCPServer(
     title="CodeBridge MCP Bridge",
     description="MCP autoral do CodeBridge. Terminal visivel, execucao assincrona e retorno persistente.",
     icons=_server_icons(),
-    version="0.7.0",
+    version="0.8.0",
 )
 
 
@@ -182,6 +184,7 @@ def _outcome_fields(payload):
         "operation_ok": bool(payload.get("operation_ok", True)),
         "operation_error_type": payload.get("error_type"),
         "operation_error_message": payload.get("error_message"),
+        "turn_control": payload.get("turn_control"),
     }
 
 
@@ -192,12 +195,25 @@ def _outcome_fields(payload):
     structured_output=True,
 )
 def codebridge_ping(desafio: str) -> PingResult:
+    turn_control = None
+    try:
+        exchange = ProtocolHTTPClient().exchange(
+            "STATUS",
+            {},
+        )
+        turn_control = (
+            exchange.get("payload") or {}
+        ).get("turn_control")
+    except Exception:
+        pass
+
     return PingResult(
         status="ok",
         mensagem="CODEBRIDGE_AUTHOR_OK",
         desafio=desafio,
         executor_conectado=False,
         timestamp_utc=datetime.now(timezone.utc).isoformat(),
+        turn_control=turn_control,
     )
 
 

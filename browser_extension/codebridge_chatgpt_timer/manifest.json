@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "CodeBridge ChatGPT Timer",
+  "version": "0.1.2",
+  "description": "Sincroniza o tempo de resposta do ChatGPT com o CodeBridge 2.0.",
+  "host_permissions": [
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
