@@ -543,6 +543,18 @@ class BridgeRuntime:
             and terminals["cmd"]["online"]
             else "DEGRADED"
         )
+        with self._phase5b_lock:
+            v2_active_execution_id = (
+                self._phase5b_active_execution_id
+            )
+            v2_active = (
+                self.execution_ledger.get(
+                    v2_active_execution_id
+                )
+                if v2_active_execution_id
+                else None
+            )
+
         return {
             "app": APP_NAME,
             "version": APP_VERSION,
@@ -561,6 +573,15 @@ class BridgeRuntime:
                 "running": self.engine.running,
                 "active_job_id": self.engine.active_job_id,
             },
+            "active_execution": (
+                {
+                    "execution_id": v2_active["execution_id"],
+                    "state": v2_active["state"],
+                    "target": v2_active["target"],
+                }
+                if v2_active is not None
+                else None
+            ),
         }
 
     def stop(self):

@@ -1,11 +1,29 @@
+import ctypes
 import os
 import socket
 import subprocess
 import time
+from ctypes import wintypes
 from pathlib import Path
 
 from config_store import ConfigStore
 from dpapi_secret_store import DPAPISecretStore
+
+
+_MIB_TCP_STATE_LISTEN = 2
+_AF_INET = 2
+_TCP_TABLE_OWNER_PID_LISTENER = 3
+
+
+class _MIB_TCPROW_OWNER_PID(ctypes.Structure):
+    _fields_ = [
+        ("dwState", wintypes.DWORD),
+        ("dwLocalAddr", wintypes.DWORD),
+        ("dwLocalPort", wintypes.DWORD),
+        ("dwRemoteAddr", wintypes.DWORD),
+        ("dwRemotePort", wintypes.DWORD),
+        ("dwOwningPid", wintypes.DWORD),
+    ]
 
 
 class SecureTunnelManager:
@@ -97,6 +115,63 @@ class SecureTunnelManager:
                 return True
         except OSError:
             return False
+
+    @classmethod
+    def _health_listener_pid(cls):
+        if os.name != "nt":
+            return None
+
+        get_table = ctypes.windll.iphlpapi.GetExtendedTcpTable
+        size = wintypes.ULONG(0)
+        result = get_table(
+            None,
+            ctypes.byref(size),
+            False,
+            _AF_INET,
+            _TCP_TABLE_OWNER_PID_LISTENER,
+            0,
+        )
+        if result not in (0, 122):
+            return None
+
+        buffer = ctypes.create_string_buffer(size.value)
+        result = get_table(
+            buffer,
+            ctypes.byref(size),
+            False,
+            _AF_INET,
+            _TCP_TABLE_OWNER_PID_LISTENER,
+            0,
+        )
+        if result != 0:
+            return None
+
+        count = ctypes.cast(
+            buffer,
+            ctypes.POINTER(wintypes.DWORD),
+        ).contents.value
+        row_size = ctypes.sizeof(_MIB_TCPROW_OWNER_PID)
+        base = ctypes.addressof(buffer) + ctypes.sizeof(wintypes.DWORD)
+
+        for index in range(count):
+            row = _MIB_TCPROW_OWNER_PID.from_address(
+                base + index * row_size
+            )
+            port = socket.ntohs(row.dwLocalPort & 0xFFFF)
+            address = socket.inet_ntoa(
+                int(row.dwLocalAddr).to_bytes(
+                    4,
+                    byteorder="little",
+                )
+            )
+            if (
+                row.dwState == _MIB_TCP_STATE_LISTEN
+                and port == cls.HEALTH_PORT
+                and address == cls.HEALTH_HOST
+            ):
+                return int(row.dwOwningPid)
+
+        return None
 
     def _log_contains(self, marker):
         log_path = self.data_dir / "secure_tunnel.log"
@@ -296,12 +371,17 @@ class SecureTunnelManager:
         self._reload_company_config()
         running = self._process_running(self._process)
         health = self._health_online()
+        external_pid = (
+            self._health_listener_pid()
+            if health and not running
+            else None
+        )
         if running and health:
             state = "ONLINE"
         elif running:
             state = "STARTING"
         elif health:
-            state = "ONLINE_EXTERNAL"
+            state = "ONLINE"
         elif not self.tunnel_id:
             state = "CONFIG_REQUIRED"
         else:
@@ -310,6 +390,8 @@ class SecureTunnelManager:
             "state": state,
             "managed_by_codebridge": bool(self._managed and running),
             "managed_pid": self._process.pid if running else None,
+            "external_pid": external_pid,
+            "external_process": bool(health and not running),
             "health_online": bool(health),
             "credential_configured": self.credential_configured(),
             "client_available": self.client.is_file(),

@@ -279,18 +279,57 @@ class MainWindow(QMainWindow):
             "MCP Autoral: " + str(author_mcp.get("state") or "OFFLINE") + managed +
             (f"  PID {author_mcp.get('adapter_pid')}" if author_mcp.get("adapter_pid") else "") + error
         )
-        tunnel_managed = "  gerenciado pelo CodeBridge" if secure_tunnel.get("managed_by_codebridge") else ""
-        tunnel_error = f"  erro: {secure_tunnel.get('last_error')}" if secure_tunnel.get("last_error") else ""
+        tunnel_state = str(
+            secure_tunnel.get("state") or "OFFLINE"
+        )
+        tunnel_managed = (
+            "  gerenciado pelo CodeBridge"
+            if secure_tunnel.get("managed_by_codebridge")
+            else ""
+        )
+        tunnel_error = (
+            f"  erro: {secure_tunnel.get('last_error')}"
+            if secure_tunnel.get("last_error")
+            and not secure_tunnel.get("health_online")
+            else ""
+        )
+        tunnel_note = (
+            "  (processo externo)"
+            if secure_tunnel.get("external_process")
+            else ""
+        )
+        tunnel_pid = (
+            secure_tunnel.get("managed_pid")
+            or secure_tunnel.get("external_pid")
+        )
         self.secure_tunnel.setText(
-            "Secure Tunnel: " + str(secure_tunnel.get("state") or "OFFLINE") + tunnel_managed +
-            (f"  PID {secure_tunnel.get('managed_pid')}" if secure_tunnel.get("managed_pid") else "") + tunnel_error
+            "Secure Tunnel: "
+            + tunnel_state
+            + (
+                f"  PID {tunnel_pid}"
+                if tunnel_pid
+                else ""
+            )
+            + tunnel_note
+            + tunnel_managed
+            + tunnel_error
         )
         self.api.setText(
             f"API local: {'ONLINE' if s['api']['online'] else 'OFFLINE'}  "
             f"{s['api']['host']}:{s['api']['port']}"
         )
+        active_execution = s.get("active_execution")
         active_id = s["executor"]["active_job_id"]
-        if active_id:
+        if active_execution:
+            self.active.setText(
+                "Job ativo: "
+                + str(active_execution["state"])
+                + " | "
+                + str(active_execution["target"])
+                + " | "
+                + str(active_execution["execution_id"])
+            )
+        elif active_id:
             try:
                 job = self.runtime.store.get(active_id)
                 self.active.setText(
