@@ -78,6 +78,7 @@ class ChatGPTTimerStateTests(unittest.TestCase):
     def test_turn_control_normal(self):
         timer = ChatGPTTimerState()
         timer.start("normal")
+        timer.claim(reason="test")
         self._force_elapsed(
             timer,
             PREPARE_WRAP_UP_SECONDS - 1,
@@ -98,6 +99,7 @@ class ChatGPTTimerStateTests(unittest.TestCase):
     def test_turn_control_prepare_wrap_up(self):
         timer = ChatGPTTimerState()
         timer.start("prepare")
+        timer.claim(reason="test")
         self._force_elapsed(
             timer,
             PREPARE_WRAP_UP_SECONDS + 0.1,
@@ -118,6 +120,7 @@ class ChatGPTTimerStateTests(unittest.TestCase):
     def test_turn_control_wrap_up_now(self):
         timer = ChatGPTTimerState()
         timer.start("wrap")
+        timer.claim(reason="test")
         self._force_elapsed(
             timer,
             WRAP_UP_SECONDS + 0.1,
@@ -143,9 +146,29 @@ class ChatGPTTimerStateTests(unittest.TestCase):
             control["directive"],
         )
 
+    def test_turn_control_unclaimed_is_inactive(self):
+        timer = ChatGPTTimerState()
+        timer.start("candidate")
+        self._force_elapsed(
+            timer,
+            WRAP_UP_SECONDS + 30,
+        )
+        control = timer.turn_control()
+        self.assertEqual(
+            control["stage"],
+            "INACTIVE",
+        )
+        self.assertFalse(
+            control["request_wrap_up"]
+        )
+        self.assertFalse(
+            control["claimed_by_codebridge"]
+        )
+
     def test_turn_control_inactive_after_finish(self):
         timer = ChatGPTTimerState()
         timer.start("done")
+        timer.claim(reason="test")
         timer.finish("done")
         control = timer.turn_control()
         self.assertEqual(
@@ -213,7 +236,7 @@ class ChatGPTTimerStateTests(unittest.TestCase):
         control = timer.turn_control()
         self.assertEqual(
             control["stage"],
-            "NORMAL",
+            "INACTIVE",
         )
         self.assertFalse(
             control["manual_request"]
@@ -221,6 +244,76 @@ class ChatGPTTimerStateTests(unittest.TestCase):
         self.assertFalse(
             control["request_wrap_up"]
         )
+
+        timer.claim(reason="test")
+        control = timer.turn_control()
+        self.assertEqual(
+            control["stage"],
+            "NORMAL",
+        )
+
+    def test_finish_callback_requires_claim(self):
+        calls = []
+        timer = ChatGPTTimerState(
+            on_finished=lambda request_id, snapshot: (
+                calls.append(
+                    (
+                        request_id,
+                        snapshot["state"],
+                    )
+                )
+            )
+        )
+
+        timer.start("plain")
+        timer.finish("plain")
+        self.assertEqual(calls, [])
+
+        timer.start("claimed")
+        claim = timer.claim(
+            reason="/v1/phase5b/start"
+        )
+        self.assertTrue(claim["applied"])
+        self.assertTrue(
+            claim["timer"]["claimed_by_codebridge"]
+        )
+
+        timer.finish("claimed")
+        self.assertEqual(
+            calls,
+            [("claimed", "FINISHED")],
+        )
+
+    def test_cancelled_claimed_turn_does_not_callback(self):
+        calls = []
+        timer = ChatGPTTimerState(
+            on_finished=lambda *args: calls.append(args)
+        )
+        timer.start("cancelled")
+        timer.claim(reason="test")
+        timer.cancel("cancelled")
+
+        self.assertEqual(calls, [])
+        self.assertEqual(
+            timer.snapshot()["state"],
+            "CANCELLED",
+        )
+
+    def test_new_turn_clears_claim(self):
+        timer = ChatGPTTimerState()
+        timer.start("first")
+        timer.claim(reason="test")
+        self.assertTrue(
+            timer.snapshot()["claimed_by_codebridge"]
+        )
+
+        timer.start("second")
+        snapshot = timer.snapshot()
+        self.assertFalse(
+            snapshot["claimed_by_codebridge"]
+        )
+        self.assertIsNone(snapshot["claim_reason"])
+        self.assertIsNone(snapshot["claimed_at"])
 
 
 class ChatGPTCompanionServerTests(unittest.TestCase):
@@ -264,22 +357,16 @@ class ChatGPTCompanionServerTests(unittest.TestCase):
                 response.read().decode("utf-8")
             )
 
-    def test_http_start_finish(self):
-        started = self._post(
-            "start",
-            "http-1",
-        )
-        self.assertTrue(started["ok"])
-        self.assertEqual(
-            started["timer"]["state"],
-            "RUNNING",
-        )
+    def test_http_finish_current_runtime_turn(self):
+        self.timer.start("runtime-1")
+        self.timer.claim(reason="codebridge_call")
 
         finished = self._post(
             "finish",
-            "http-1",
+            None,
         )
         self.assertTrue(finished["ok"])
+        self.assertTrue(finished["applied"])
         self.assertEqual(
             finished["timer"]["state"],
             "FINISHED",

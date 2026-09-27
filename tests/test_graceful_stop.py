@@ -78,7 +78,7 @@ class GracefulStopTests(unittest.TestCase):
         )
         self.assertEqual(
             control["stage"],
-            "NORMAL",
+            "INACTIVE",
         )
 
 

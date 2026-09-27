@@ -436,9 +436,16 @@ class MainWindow(QMainWindow):
     def _refresh_chatgpt_timer(self):
         timer = self.runtime.chatgpt_timer.snapshot()
         control = self.runtime.chatgpt_timer.turn_control()
-        state = str(
-            timer.get("state") or "IDLE"
-        ).upper()
+        claimed = bool(
+            timer.get("claimed_by_codebridge")
+        )
+        state = (
+            str(
+                timer.get("state") or "IDLE"
+            ).upper()
+            if claimed
+            else "IDLE"
+        )
         control_stage = str(
             control.get("stage") or "INACTIVE"
         ).upper()
@@ -446,6 +453,8 @@ class MainWindow(QMainWindow):
         self.chatgpt_timer_label.setText(
             self._format_chatgpt_elapsed(
                 timer.get("elapsed_seconds")
+                if claimed
+                else 0.0
             )
         )
 

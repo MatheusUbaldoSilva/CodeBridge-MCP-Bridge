@@ -21,8 +21,9 @@ class ChatGPTTimerState:
         "CANCELLED",
     }
 
-    def __init__(self):
+    def __init__(self, on_finished=None):
         self._lock = threading.RLock()
+        self._on_finished = on_finished
         self._state = "IDLE"
         self._request_id = None
         self._started_monotonic = None
@@ -32,6 +33,9 @@ class ChatGPTTimerState:
         self._manual_wrap_up_requested = False
         self._manual_wrap_up_reason = None
         self._manual_wrap_up_requested_at = None
+        self._claimed_by_codebridge = False
+        self._claim_reason = None
+        self._claimed_at = None
 
     def _snapshot_locked(self):
         elapsed = 0.0
@@ -57,6 +61,11 @@ class ChatGPTTimerState:
             "elapsed_seconds": elapsed,
             "started_at": self._started_at,
             "finished_at": self._finished_at,
+            "claimed_by_codebridge": bool(
+                self._claimed_by_codebridge
+            ),
+            "claim_reason": self._claim_reason,
+            "claimed_at": self._claimed_at,
         }
 
     def snapshot(self):
@@ -72,6 +81,9 @@ class ChatGPTTimerState:
         )
         running = (
             timer.get("state") == "RUNNING"
+        )
+        claimed = bool(
+            timer.get("claimed_by_codebridge")
         )
 
         with self._lock:
@@ -101,12 +113,12 @@ class ChatGPTTimerState:
                 "the ChatGPT generation."
             )
 
-        elif not running:
+        elif not running or not claimed:
             stage = "INACTIVE"
             action = "NONE"
             remaining = None
             directive = (
-                "No turn wrap-up is requested."
+                "No claimed CodeBridge turn is active."
             )
 
         elif elapsed >= WRAP_UP_SECONDS:
@@ -159,6 +171,7 @@ class ChatGPTTimerState:
             "wrap_up_seconds": WRAP_UP_SECONDS,
             "remaining_seconds": remaining,
             "request_id": timer.get("request_id"),
+            "claimed_by_codebridge": claimed,
             "manual_request": manual_requested,
             "reason": (
                 manual_reason
@@ -232,9 +245,52 @@ class ChatGPTTimerState:
             self._finished_monotonic = None
             self._started_at = time.time()
             self._finished_at = None
+            self._claimed_by_codebridge = False
+            self._claim_reason = None
+            self._claimed_at = None
 
             return {
                 "applied": True,
+                "timer": self._snapshot_locked(),
+            }
+
+    def claim(
+        self,
+        reason="codebridge_work",
+        request_id=None,
+    ):
+        request_id = str(
+            request_id or ""
+        ).strip()
+
+        with self._lock:
+            if self._state != "RUNNING":
+                return {
+                    "applied": False,
+                    "timer": self._snapshot_locked(),
+                }
+
+            if (
+                request_id
+                and request_id != self._request_id
+            ):
+                return {
+                    "applied": False,
+                    "timer": self._snapshot_locked(),
+                }
+
+            already_claimed = bool(
+                self._claimed_by_codebridge
+            )
+            if not already_claimed:
+                self._claimed_by_codebridge = True
+                self._claim_reason = str(
+                    reason or "codebridge_work"
+                )
+                self._claimed_at = time.time()
+
+            return {
+                "applied": not already_claimed,
                 "timer": self._snapshot_locked(),
             }
 
@@ -263,11 +319,27 @@ class ChatGPTTimerState:
             self._state = state
             self._finished_monotonic = time.monotonic()
             self._finished_at = time.time()
+            should_notify = bool(
+                state == "FINISHED"
+                and self._claimed_by_codebridge
+                and callable(self._on_finished)
+            )
+            finished_request_id = self._request_id
+            timer = self._snapshot_locked()
 
-            return {
-                "applied": True,
-                "timer": self._snapshot_locked(),
-            }
+        if should_notify:
+            try:
+                self._on_finished(
+                    finished_request_id,
+                    timer,
+                )
+            except Exception:
+                pass
+
+        return {
+            "applied": True,
+            "timer": timer,
+        }
 
     def finish(self, request_id=None):
         return self._finish(
@@ -292,6 +364,9 @@ class ChatGPTTimerState:
             self._manual_wrap_up_requested = False
             self._manual_wrap_up_reason = None
             self._manual_wrap_up_requested_at = None
+            self._claimed_by_codebridge = False
+            self._claim_reason = None
+            self._claimed_at = None
 
             return {
                 "applied": True,
@@ -445,17 +520,7 @@ class ChatGPTCompanionServer:
                         "request_id"
                     )
 
-                    if path == "/v1/chatgpt/timer/start":
-                        result = companion.timer.start(
-                            request_id,
-                            resume_manual=bool(
-                                body.get(
-                                    "resume_manual",
-                                    False,
-                                )
-                            ),
-                        )
-                    elif path == "/v1/chatgpt/timer/finish":
+                    if path == "/v1/chatgpt/timer/finish":
                         result = companion.timer.finish(
                             request_id
                         )

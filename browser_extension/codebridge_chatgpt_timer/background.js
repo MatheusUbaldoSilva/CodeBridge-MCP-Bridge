@@ -2,11 +2,7 @@ const COMPANION_BASE = "http://127.0.0.1:8768";
 const COMPANION_HEADER = "X-CodeBridge-Companion";
 const COMPANION_HEADER_VALUE = "chatgpt-timer-v1";
 
-async function sendTimerEvent(
-  action,
-  requestId,
-  resumeManual = false
-) {
+async function sendTimerEvent(action) {
   const response = await fetch(
     `${COMPANION_BASE}/v1/chatgpt/timer/${action}`,
     {
@@ -16,8 +12,7 @@ async function sendTimerEvent(
         [COMPANION_HEADER]: COMPANION_HEADER_VALUE,
       },
       body: JSON.stringify({
-        request_id: requestId || null,
-        resume_manual: Boolean(resumeManual),
+        request_id: null,
       }),
       cache: "no-store",
     }
@@ -31,12 +26,11 @@ async function sendTimerEvent(
 
   return response.json();
 }
-
 chrome.runtime.onMessage.addListener(
   (message, sender, sendResponse) => {
     if (
-      !message ||
-      message.type !== "CODEBRIDGE_CHATGPT_TIMER"
+      !message
+      || message.type !== "CODEBRIDGE_CHATGPT_TIMER"
     ) {
       return false;
     }
@@ -46,7 +40,7 @@ chrome.runtime.onMessage.addListener(
     ).toLowerCase();
 
     if (
-      !["start", "finish", "cancel", "reset"].includes(action)
+      !["finish", "cancel"].includes(action)
     ) {
       sendResponse({
         ok: false,
@@ -55,11 +49,7 @@ chrome.runtime.onMessage.addListener(
       return false;
     }
 
-    sendTimerEvent(
-      action,
-      message.requestId,
-      Boolean(message.resumeManual)
-    )
+    sendTimerEvent(action)
       .then((payload) => {
         sendResponse({
           ok: true,

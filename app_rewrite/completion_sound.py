@@ -2,11 +2,6 @@ import ctypes
 import threading
 import time
 
-try:
-    import winsound
-except ImportError:  # pragma: no cover
-    winsound = None
-
 
 class CompletionSound:
     def __init__(self, config, play_fn=None):

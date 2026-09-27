@@ -57,6 +57,9 @@ class BridgeAPI:
                     return
                 path = urlparse(self.path).path
                 try:
+                    bridge.runtime.ensure_chatgpt_turn(
+                        reason=path
+                    )
                     if path == "/v1/status":
                         return self._send(200, {"ok": True, "status": bridge.runtime.snapshot()})
                     if path == "/v1/ssh/config":
@@ -104,6 +107,9 @@ class BridgeAPI:
                 path = urlparse(self.path).path
                 try:
                     body = self._json_body()
+                    bridge.runtime.ensure_chatgpt_turn(
+                        reason=path
+                    )
                     if path == "/v1/jobs":
                         job = bridge.runtime.submit(body.get("target"), body.get("command"))
                         return self._send(201, {"ok": True, "job": job})
