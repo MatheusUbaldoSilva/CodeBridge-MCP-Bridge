@@ -2,7 +2,7 @@
 !include "WinMessages.nsh"
 
 !define APP_NAME "CodeBridge"
-!define APP_VERSION "2.0.0-prealpha"
+!include "version.nsh"
 !define APP_PUBLISHER "CodeBridge"
 !define APP_REGKEY "Software\CodeBridge"
 !define APP_UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\CodeBridge"
@@ -19,15 +19,16 @@ Icon "..\assets\codebridge.ico"
 UninstallIcon "..\assets\codebridge.ico"
 BrandingText "CodeBridge MCP Bridge"
 
-VIProductVersion "2.0.0.0"
+VIProductVersion "${APP_FILE_VERSION}"
 VIAddVersionKey /LANG=1046 "ProductName" "CodeBridge"
 VIAddVersionKey /LANG=1046 "FileDescription" "Instalador e atualizador do CodeBridge MCP Bridge"
-VIAddVersionKey /LANG=1046 "FileVersion" "2.0.0-prealpha"
-VIAddVersionKey /LANG=1046 "ProductVersion" "2.0.0-prealpha"
+VIAddVersionKey /LANG=1046 "FileVersion" "${APP_VERSION}"
+VIAddVersionKey /LANG=1046 "ProductVersion" "${APP_VERSION}"
 VIAddVersionKey /LANG=1046 "CompanyName" "CodeBridge"
 VIAddVersionKey /LANG=1046 "LegalCopyright" "Copyright (C) 2026 CodeBridge"
 
 Var IsUpdate
+Var InstalledVersion
 
 !define MUI_ABORTWARNING
 !define MUI_CUSTOMFUNCTION_GUIINIT GuiInit
@@ -90,7 +91,9 @@ FunctionEnd
 
 Function .onInit
   StrCpy $IsUpdate "0"
+  StrCpy $InstalledVersion ""
 
+  ReadRegStr $InstalledVersion HKCU "${APP_REGKEY}" "Version"
   ReadRegStr $0 HKCU "${APP_REGKEY}" "InstallDir"
   StrCmp $0 "" init_done
   IfFileExists "$0\app_rewrite\main.py" 0 init_done
@@ -105,8 +108,12 @@ Function GuiInit
   Call ApplyOuterDark
 
   StrCmp $IsUpdate "1" 0 gui_install
-    SendMessage $HWNDPARENT ${WM_SETTEXT} 0 "STR:Atualizar CodeBridge"
-    Goto gui_done
+    StrCmp $InstalledVersion "" gui_update_simple
+      SendMessage $HWNDPARENT ${WM_SETTEXT} 0 "STR:Atualizar CodeBridge $InstalledVersion -> ${APP_VERSION}"
+      Goto gui_done
+    gui_update_simple:
+      SendMessage $HWNDPARENT ${WM_SETTEXT} 0 "STR:Atualizar CodeBridge para ${APP_VERSION}"
+      Goto gui_done
   gui_install:
     SendMessage $HWNDPARENT ${WM_SETTEXT} 0 "STR:Instalar CodeBridge"
   gui_done:
@@ -164,6 +171,7 @@ Section "CodeBridge" SEC_MAIN
   SetOutPath "$INSTDIR"
   File "..\requirements.txt"
   File "..\README.md"
+  File "..\version.json"
 
   SetOutPath "$INSTDIR\docs"
   File "..\docs\INSTALLER.md"
@@ -189,7 +197,15 @@ Section "CodeBridge" SEC_MAIN
   SetOutPath "$INSTDIR\installer"
   File "bootstrap.ps1"
   File "company_setup.py"
+  File "extension_setup.py"
   File "updater.py"
+
+  ; Extensão unpacked em caminho fixo. O Chrome deve apontar sempre
+  ; para esta pasta, inclusive depois de futuras atualizações.
+  SetOutPath "$INSTDIR\browser_extension\codebridge_chatgpt_timer"
+  File "..\browser_extension\codebridge_chatgpt_timer\manifest.json"
+  File "..\browser_extension\codebridge_chatgpt_timer\background.js"
+  File "..\browser_extension\codebridge_chatgpt_timer\content.js"
 
   SetOutPath "$INSTDIR\tools"
   File "payload\tools\tunnel-client.exe"
@@ -219,6 +235,7 @@ Section "CodeBridge" SEC_MAIN
     CreateDirectory "$SMPROGRAMS\CodeBridge"
     CreateShortcut "$SMPROGRAMS\CodeBridge\CodeBridge.lnk" "$INSTDIR\runtime\python\pythonw.exe" '"$INSTDIR\app_rewrite\main.py"' "$INSTDIR\assets\codebridge.ico" 0 SW_SHOWNORMAL "" "CodeBridge MCP Bridge"
     CreateShortcut "$SMPROGRAMS\CodeBridge\Configurar CodeBridge.lnk" "$INSTDIR\runtime\python\pythonw.exe" '"$INSTDIR\installer\company_setup.py"' "$INSTDIR\assets\codebridge.ico" 0 SW_SHOWNORMAL "" "Configurar CodeBridge"
+    CreateShortcut "$SMPROGRAMS\CodeBridge\Extensão ChatGPT Timer.lnk" "$INSTDIR\runtime\python\pythonw.exe" '"$INSTDIR\installer\extension_setup.py"' "$INSTDIR\assets\codebridge.ico" 0 SW_SHOWNORMAL "" "Configurar extensão ChatGPT Timer"
     CreateShortcut "$SMPROGRAMS\CodeBridge\Atualizar CodeBridge.lnk" "$INSTDIR\runtime\python\pythonw.exe" '"$INSTDIR\installer\updater.py"' "$INSTDIR\assets\codebridge.ico" 0 SW_SHOWNORMAL "" "Atualizar CodeBridge"
     CreateShortcut "$DESKTOP\CodeBridge 2.0 - MCP Bridge.lnk" "$INSTDIR\runtime\python\pythonw.exe" '"$INSTDIR\app_rewrite\main.py"' "$INSTDIR\assets\codebridge.ico" 0 SW_SHOWNORMAL "" "CodeBridge MCP Bridge"
     FileOpen $1 "$INSTDIR\shortcuts.created" w
@@ -231,6 +248,18 @@ Section "CodeBridge" SEC_MAIN
   IfSilent config_done
     ExecWait '"$INSTDIR\runtime\python\pythonw.exe" "$INSTDIR\installer\company_setup.py"'
   config_done:
+
+  ; O assistente só é oferecido quando a extensão ainda precisa de atenção:
+  ; primeira ativação, caminho incorreto, desabilitada ou versão antiga.
+  IfSilent extension_done
+    nsExec::Exec '"$INSTDIR\runtime\python\python.exe" "$INSTDIR\installer\extension_setup.py" --needs-attention'
+    Pop $0
+    StrCmp $0 "10" 0 extension_done
+
+    MessageBox MB_ICONINFORMATION|MB_YESNO       "CodeBridge instalado/atualizado com sucesso.$\r$\n$\r$\nPara usar o cronômetro do ChatGPT, falta ativar ou recarregar a extensão do navegador.$\r$\n$\r$\nDeseja configurar agora?"       IDNO extension_done
+
+    Exec '"$INSTDIR\runtime\python\pythonw.exe" "$INSTDIR\installer\extension_setup.py"'
+  extension_done:
 SectionEnd
 
 Section "Uninstall"
@@ -240,6 +269,7 @@ Section "Uninstall"
     Delete "$DESKTOP\CodeBridge 2.0 - MCP Bridge.lnk"
     Delete "$SMPROGRAMS\CodeBridge\CodeBridge.lnk"
     Delete "$SMPROGRAMS\CodeBridge\Configurar CodeBridge.lnk"
+    Delete "$SMPROGRAMS\CodeBridge\Extensão ChatGPT Timer.lnk"
     Delete "$SMPROGRAMS\CodeBridge\Atualizar CodeBridge.lnk"
     RMDir "$SMPROGRAMS\CodeBridge"
   skip_shortcut_cleanup:

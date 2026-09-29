@@ -1,6 +1,7 @@
 (() => {
   const MESSAGE_TYPE = "CODEBRIDGE_CHATGPT_TIMER";
   const CHECK_INTERVAL_MS = 100;
+  const HEARTBEAT_INTERVAL_MS = 15000;
 
   let seenStopButton = false;
   let finishSent = false;
@@ -17,6 +18,12 @@
       }
     );
   }
+
+  sendEvent("heartbeat");
+  window.setInterval(
+    () => sendEvent("heartbeat"),
+    HEARTBEAT_INTERVAL_MS
+  );
 
   function isVisible(element) {
     if (!(element instanceof Element)) {

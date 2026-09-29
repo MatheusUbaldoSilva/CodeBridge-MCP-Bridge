@@ -386,6 +386,45 @@ class ChatGPTCompanionServer:
         self.port = int(port)
         self._server = None
         self._thread = None
+        self._extension_lock = threading.RLock()
+        self._extension_heartbeat = None
+
+    def record_extension_heartbeat(self, payload):
+        heartbeat = {
+            "last_seen_epoch": time.time(),
+            "version": str(payload.get("version") or ""),
+            "extension_id": str(payload.get("extension_id") or ""),
+        }
+        with self._extension_lock:
+            self._extension_heartbeat = heartbeat
+        return self.extension_status()
+
+    def extension_status(self):
+        with self._extension_lock:
+            heartbeat = (
+                dict(self._extension_heartbeat)
+                if self._extension_heartbeat is not None
+                else None
+            )
+
+        if heartbeat is None:
+            return {
+                "connected": False,
+                "age_seconds": None,
+                "version": "",
+                "extension_id": "",
+            }
+
+        age = max(
+            0.0,
+            time.time() - heartbeat["last_seen_epoch"],
+        )
+        return {
+            "connected": age <= 90.0,
+            "age_seconds": round(age, 3),
+            "version": heartbeat["version"],
+            "extension_id": heartbeat["extension_id"],
+        }
 
     @property
     def running(self):
@@ -489,6 +528,15 @@ class ChatGPTCompanionServer:
                 if not self._guard():
                     return
 
+                if path == "/v1/extension/status":
+                    return self._send(
+                        200,
+                        {
+                            "ok": True,
+                            "extension": companion.extension_status(),
+                        },
+                    )
+
                 if path == "/v1/chatgpt/timer":
                     return self._send(
                         200,
@@ -520,7 +568,15 @@ class ChatGPTCompanionServer:
                         "request_id"
                     )
 
-                    if path == "/v1/chatgpt/timer/finish":
+                    if path == "/v1/extension/heartbeat":
+                        result = {
+                            "extension": (
+                                companion.record_extension_heartbeat(
+                                    body
+                                )
+                            )
+                        }
+                    elif path == "/v1/chatgpt/timer/finish":
                         result = companion.timer.finish(
                             request_id
                         )

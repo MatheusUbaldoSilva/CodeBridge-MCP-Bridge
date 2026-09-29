@@ -7,12 +7,45 @@ $Desktop = [Environment]::GetFolderPath('Desktop')
 $Output = Join-Path $PSScriptRoot 'dist\CodeBridge-Setup.exe'
 $HashOutput = Join-Path $PSScriptRoot 'dist\CodeBridge-Setup.sha256'
 $PayloadTools = Join-Path $PSScriptRoot 'payload\tools'
+$VersionFile = Join-Path $Root 'version.json'
+$VersionInclude = Join-Path $PSScriptRoot 'version.nsh'
+
+if (-not (Test-Path $VersionFile)) {
+    throw "version.json nao encontrado: $VersionFile"
+}
+$VersionData = Get-Content -Raw -LiteralPath $VersionFile | ConvertFrom-Json
+$AppVersion = [string]$VersionData.version
+$FileVersion = [string]$VersionData.windows_file_version
+if ([string]::IsNullOrWhiteSpace($AppVersion) -or [string]::IsNullOrWhiteSpace($FileVersion)) {
+    throw 'version.json invalido'
+}
+$VersionNsh = @(
+    "!define APP_VERSION `"$AppVersion`""
+    "!define APP_FILE_VERSION `"$FileVersion`""
+) -join [Environment]::NewLine
+[IO.File]::WriteAllText(
+    $VersionInclude,
+    $VersionNsh + [Environment]::NewLine,
+    (New-Object Text.UTF8Encoding($false))
+)
+
+$RegistryProgramFiles = $null
+$RegistryProgramFilesX86 = $null
+try {
+    $ProgramFilesReg = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion'
+    $RegistryProgramFiles = [string]$ProgramFilesReg.ProgramFilesDir
+    $RegistryProgramFilesX86 = [string]$ProgramFilesReg.'ProgramFilesDir (x86)'
+}
+catch {
+}
 
 $Candidates = @(
     "${env:ProgramFiles(x86)}\NSIS\makensis.exe",
     "$env:ProgramFiles\NSIS\makensis.exe",
+    "$RegistryProgramFilesX86\NSIS\makensis.exe",
+    "$RegistryProgramFiles\NSIS\makensis.exe",
     "$env:LOCALAPPDATA\Programs\NSIS\makensis.exe"
-)
+) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 $MakeNSIS = $Candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 
 if (-not $MakeNSIS -and $InstallNSIS) {

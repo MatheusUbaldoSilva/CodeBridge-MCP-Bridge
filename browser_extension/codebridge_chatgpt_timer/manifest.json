@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CodeBridge ChatGPT Timer",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Sincroniza o tempo de resposta do ChatGPT com o CodeBridge 2.0.",
   "host_permissions": [
     "http://127.0.0.1/*"
