@@ -1,19 +1,36 @@
 import ctypes
 import threading
-import time
+from pathlib import Path
+
+
+DEFAULT_AUDIO_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "assets"
+    / "completion_execucao_concluida.mp3"
+)
 
 
 class CompletionSound:
-    def __init__(self, config, play_fn=None):
+    _audio_lock = threading.Lock()
+
+    def __init__(
+        self,
+        config,
+        play_fn=None,
+        audio_path=None,
+    ):
         self._config = config
         self._lock = threading.RLock()
         self._enabled = bool(
             config.load_completion_sound()
         )
+        self._audio_path = Path(
+            audio_path or DEFAULT_AUDIO_PATH
+        )
         self._play_fn = (
             play_fn
             if play_fn is not None
-            else self._play_windows_notification
+            else self._play_windows_audio
         )
         self._seen = set()
         self._seen_order = []
@@ -22,6 +39,10 @@ class CompletionSound:
     def enabled(self):
         with self._lock:
             return self._enabled
+
+    @property
+    def audio_path(self):
+        return self._audio_path
 
     def set_enabled(self, enabled):
         enabled = bool(enabled)
@@ -73,22 +94,87 @@ class CompletionSound:
             return False
 
     @staticmethod
-    def _ring_worker():
+    def _mci_error_text(code):
+        buffer = ctypes.create_unicode_buffer(256)
         try:
-            user32 = ctypes.windll.user32
+            ok = ctypes.windll.winmm.mciGetErrorStringW(
+                int(code),
+                buffer,
+                len(buffer),
+            )
         except Exception:
-            return
+            return f"MCI error {code}"
+        if ok:
+            return buffer.value
+        return f"MCI error {code}"
 
-        for index in range(5):
-            user32.MessageBeep(0x40)
-            if index < 4:
-                time.sleep(1.5)
+    def _audio_worker(self):
+        alias = (
+            "CodeBridgeCompletionAudio_"
+            + str(threading.get_ident())
+        )
+        with self._audio_lock:
+            winmm = None
+            opened = False
+            try:
+                winmm = ctypes.windll.winmm
+                send = winmm.mciSendStringW
+                audio = str(
+                    self._audio_path.resolve()
+                )
+                command = (
+                    'open "'
+                    + audio
+                    + '" type mpegvideo alias '
+                    + alias
+                )
+                result = send(
+                    command,
+                    None,
+                    0,
+                    None,
+                )
+                if result:
+                    raise OSError(
+                        self._mci_error_text(result)
+                    )
+                opened = True
 
-    @staticmethod
-    def _play_windows_notification():
+                result = send(
+                    "play " + alias + " wait",
+                    None,
+                    0,
+                    None,
+                )
+                if result:
+                    raise OSError(
+                        self._mci_error_text(result)
+                    )
+            except Exception:
+                try:
+                    ctypes.windll.user32.MessageBeep(
+                        0x40
+                    )
+                except Exception:
+                    pass
+            finally:
+                if opened and winmm is not None:
+                    try:
+                        winmm.mciSendStringW(
+                            "close " + alias,
+                            None,
+                            0,
+                            None,
+                        )
+                    except Exception:
+                        pass
+
+    def _play_windows_audio(self):
+        if not self._audio_path.is_file():
+            return False
         threading.Thread(
-            target=CompletionSound._ring_worker,
-            name="CodeBridgeCompletionBell",
+            target=self._audio_worker,
+            name="CodeBridgeCompletionAudio",
             daemon=True,
         ).start()
         return True

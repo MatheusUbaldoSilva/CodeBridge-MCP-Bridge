@@ -63,6 +63,44 @@ class CompletionSoundTests(unittest.TestCase):
             )
         )
         self.assertEqual(calls, ["bell"])
+    def test_default_audio_asset_exists(self):
+        class FakeConfig:
+            def load_completion_sound(self):
+                return True
+
+            def save_completion_sound(
+                self,
+                enabled,
+            ):
+                return bool(enabled)
+
+        sound = CompletionSound(FakeConfig())
+        self.assertTrue(sound.audio_path.is_file())
+        self.assertEqual(
+            sound.audio_path.name,
+            "completion_execucao_concluida.mp3",
+        )
+
+    def test_missing_audio_does_not_start_playback(self):
+        class FakeConfig:
+            def load_completion_sound(self):
+                return True
+
+            def save_completion_sound(
+                self,
+                enabled,
+            ):
+                return bool(enabled)
+
+        sound = CompletionSound(
+            FakeConfig(),
+            audio_path=Path(
+                "__missing_completion_audio__.mp3"
+            ),
+        )
+        self.assertFalse(
+            sound._play_windows_audio()
+        )
     def test_disabled_marks_completion_without_playing(self):
         calls = []
 
