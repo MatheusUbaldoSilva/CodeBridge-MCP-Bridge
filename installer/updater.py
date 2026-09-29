@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -36,6 +37,105 @@ except Exception:
 REPOSITORY = "MatheusUbaldoSilva/CodeBridge-MCP-Bridge"
 COMMIT_API = f"https://api.github.com/repos/{REPOSITORY}/commits/main"
 RAW_ROOT = "https://raw.githubusercontent.com"
+
+_PRERELEASE_RANK = {
+    "prealpha": 0,
+    "alpha": 1,
+    "beta": 2,
+    "rc": 3,
+}
+
+
+def version_key(value):
+    text = str(value or "").strip().lower()
+    match = re.fullmatch(
+        r"(\d+)\.(\d+)\.(\d+)"
+        r"(?:-([a-z]+)(\d*)?)?",
+        text,
+    )
+    if not match:
+        raise ValueError(f"Versão inválida: {value}")
+
+    major, minor, patch = (
+        int(match.group(1)),
+        int(match.group(2)),
+        int(match.group(3)),
+    )
+    label = match.group(4)
+    serial = int(match.group(5) or 0)
+
+    if label is None:
+        prerelease_rank = 100
+    elif label in _PRERELEASE_RANK:
+        prerelease_rank = _PRERELEASE_RANK[label]
+    else:
+        raise ValueError(
+            f"Pré-lançamento não suportado: {label}"
+        )
+
+    return (
+        major,
+        minor,
+        patch,
+        prerelease_rank,
+        serial,
+    )
+
+
+def compare_versions(left, right):
+    left_key = version_key(left)
+    right_key = version_key(right)
+    return (left_key > right_key) - (left_key < right_key)
+
+
+def resolve_remote_release():
+    api_request = urllib.request.Request(
+        COMMIT_API,
+        headers={
+            "User-Agent": "CodeBridge-Updater/2.0",
+            "Accept": "application/vnd.github+json",
+        },
+    )
+    with urllib.request.urlopen(
+        api_request,
+        timeout=30,
+    ) as response:
+        commit = json.loads(
+            response.read().decode("utf-8")
+        )
+
+    commit_sha = str(commit.get("sha") or "").strip()
+    if len(commit_sha) != 40:
+        raise RuntimeError(
+            "Não foi possível resolver o commit mais recente"
+        )
+
+    root = f"{RAW_ROOT}/{REPOSITORY}/{commit_sha}"
+    version_request = urllib.request.Request(
+        root + "/version.json",
+        headers={
+            "User-Agent": "CodeBridge-Updater/2.0"
+        },
+    )
+    with urllib.request.urlopen(
+        version_request,
+        timeout=30,
+    ) as response:
+        payload = json.loads(
+            response.read().decode("utf-8")
+        )
+
+    remote_version = str(
+        payload.get("version") or ""
+    ).strip()
+    version_key(remote_version)
+
+    return {
+        "commit_sha": commit_sha,
+        "version": remote_version,
+        "dist_root": root + "/installer/dist",
+    }
+
 
 DARK_STYLESHEET = """
 QWidget {
@@ -128,30 +228,53 @@ def codebridge_running():
 class DownloadWorker(QObject):
     progress = Signal(int)
     finished = Signal(str)
+    up_to_date = Signal(str)
+    status = Signal(str)
     failed = Signal(str)
 
     def run(self):
         try:
-            temp_dir = Path(tempfile.gettempdir()) / "CodeBridge-Update"
-            temp_dir.mkdir(parents=True, exist_ok=True)
-            installer = temp_dir / "CodeBridge-Setup.exe"
+            self.status.emit("Verificando versão publicada...")
+            release = resolve_remote_release()
+            remote_version = release["version"]
 
-            api_request = urllib.request.Request(
-                COMMIT_API,
-                headers={
-                    "User-Agent": "CodeBridge-Updater/2.0",
-                    "Accept": "application/vnd.github+json",
-                },
+            if compare_versions(
+                remote_version,
+                APP_VERSION,
+            ) <= 0:
+                self.progress.emit(100)
+                self.up_to_date.emit(remote_version)
+                return
+
+            self.status.emit(
+                "Atualização encontrada: "
+                + APP_VERSION
+                + " -> "
+                + remote_version
             )
-            with urllib.request.urlopen(api_request, timeout=30) as response:
-                commit = json.loads(response.read().decode("utf-8"))
-            commit_sha = str(commit.get("sha") or "").strip()
-            if len(commit_sha) != 40:
-                raise RuntimeError("Não foi possível resolver o commit mais recente")
 
-            base = f"{RAW_ROOT}/{REPOSITORY}/{commit_sha}/installer/dist"
-            hash_url = base + "/CodeBridge-Setup.sha256"
-            installer_url = base + "/CodeBridge-Setup.exe"
+            temp_dir = (
+                Path(tempfile.gettempdir())
+                / "CodeBridge-Update"
+            )
+            temp_dir.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+            installer = (
+                temp_dir
+                / "CodeBridge-Setup.exe"
+            )
+
+            base = release["dist_root"]
+            hash_url = (
+                base
+                + "/CodeBridge-Setup.sha256"
+            )
+            installer_url = (
+                base
+                + "/CodeBridge-Setup.exe"
+            )
 
             hash_request = urllib.request.Request(
                 hash_url, headers={"User-Agent": "CodeBridge-Updater/2.0"}
@@ -215,8 +338,10 @@ class UpdaterWindow(QWidget):
 
         text = QLabel(
             f"Versão instalada: {APP_VERSION}\n\n"
-            "Este atualizador baixa o CodeBridge-Setup.exe mais recente do GitHub, "
-            "confere o SHA-256 publicado e executa o instalador em modo de atualização. "
+            "O atualizador compara a versão instalada com a versão publicada "
+            "no GitHub. Quando houver uma versão mais nova, baixa o "
+            "CodeBridge-Setup.exe, confere o SHA-256 publicado e executa o "
+            "instalador em modo de atualização. "
             "A configuração da empresa, API key protegida, Tunnel ID e SSH são mantidos."
         )
         text.setWordWrap(True)
@@ -230,12 +355,21 @@ class UpdaterWindow(QWidget):
         warning.setStyleSheet("color:#f2c879; padding:6px 0;")
         layout.addWidget(warning)
 
+        self.status_label = QLabel(
+            "Pronto para verificar atualizações."
+        )
+        self.status_label.setWordWrap(True)
+        self.status_label.setStyleSheet(
+            "color:#9fc4d8; padding:4px 0;"
+        )
+        layout.addWidget(self.status_label)
+
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
         self.progress.setValue(0)
         layout.addWidget(self.progress)
 
-        self.button = QPushButton("Baixar e atualizar")
+        self.button = QPushButton("Verificar e atualizar")
         self.button.clicked.connect(self.start_update)
         layout.addWidget(self.button)
 
@@ -250,22 +384,47 @@ class UpdaterWindow(QWidget):
             return
 
         self.button.setEnabled(False)
-        self.button.setText("Baixando atualização...")
+        self.button.setText("Verificando...")
+        self.status_label.setText(
+            "Consultando a versão publicada..."
+        )
         self.progress.setValue(0)
 
         self.thread = QThread(self)
         self.worker = DownloadWorker()
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.run)
-        self.worker.progress.connect(self.progress.setValue)
-        self.worker.finished.connect(self.download_finished)
-        self.worker.failed.connect(self.download_failed)
-        self.worker.finished.connect(self.thread.quit)
-        self.worker.failed.connect(self.thread.quit)
+        self.worker.progress.connect(
+            self.progress.setValue
+        )
+        self.worker.status.connect(
+            self.status_label.setText
+        )
+        self.worker.finished.connect(
+            self.download_finished
+        )
+        self.worker.up_to_date.connect(
+            self.update_not_needed
+        )
+        self.worker.failed.connect(
+            self.download_failed
+         )
+        self.worker.finished.connect(
+            self.thread.quit
+         )
+        self.worker.up_to_date.connect(
+            self.thread.quit
+       )
+        self.worker.failed.connect(
+            self.thread.quit
+        )
         self.thread.start()
 
     def download_finished(self, installer):
         self.button.setText("Atualização pronta")
+        self.status_label.setText(
+            "Download validado. Abrindo o instalador..."
+        )
         try:
             subprocess.Popen([installer], cwd=str(Path(installer).parent))
         except Exception as exc:
@@ -279,9 +438,43 @@ class UpdaterWindow(QWidget):
             return
         QApplication.instance().quit()
 
+    def update_not_needed(self, remote_version):
+        self.button.setEnabled(True)
+        relation = compare_versions(
+            remote_version,
+            APP_VERSION,
+        )
+        if relation == 0:
+            message = (
+                "Você já está usando a versão mais recente: "
+                + APP_VERSION
+            )
+            self.button.setText("Já está atualizado")
+        else:
+            message = (
+                "A versão instalada "
+                + APP_VERSION
+                + " é mais recente que a versão publicada "
+                + remote_version
+                + ". Nenhum downgrade será feito."
+            )
+            self.button.setText(
+                "Nenhuma atualização necessária"
+            )
+
+        self.status_label.setText(message)
+        QMessageBox.information(
+            self,
+            "CodeBridge atualizado",
+            message,
+        )
+
     def download_failed(self, message):
         self.button.setEnabled(True)
         self.button.setText("Tentar novamente")
+        self.status_label.setText(
+            "Falha ao verificar ou baixar a atualização."
+        )
         QMessageBox.critical(
             self,
             "Falha ao baixar atualização",
