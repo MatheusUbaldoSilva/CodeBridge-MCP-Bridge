@@ -6,6 +6,8 @@ import time
 from ctypes import wintypes
 from pathlib import Path
 
+import psutil
+
 from config_store import ConfigStore
 from dpapi_secret_store import DPAPISecretStore
 
@@ -52,6 +54,7 @@ class SecureTunnelManager:
         self._log_handle = None
         self._managed = False
         self._last_error = None
+        self._recycled_pid = None
 
     @staticmethod
     def _legacy_tunnel_id(profile_path):
@@ -115,6 +118,162 @@ class SecureTunnelManager:
                 return True
         except OSError:
             return False
+
+    def _allowed_client_paths(self):
+        candidates = {
+            self.client,
+            self.root / "tools" / "tunnel-client.exe",
+            self.data_dir / "tools" / "tunnel-client.exe",
+        }
+        result = set()
+        for candidate in candidates:
+            try:
+                result.add(
+                    os.path.normcase(
+                        os.path.abspath(str(candidate))
+                    )
+                )
+            except Exception:
+                pass
+        return result
+
+    def _existing_tunnel_info(self, pid):
+        if not pid:
+            return None
+        try:
+            process = psutil.Process(int(pid))
+            executable = os.path.normcase(
+                os.path.abspath(process.exe())
+            )
+            cmdline = [
+                str(part)
+                for part in process.cmdline()
+            ]
+            parent_pid = int(process.ppid() or 0)
+        except (
+            psutil.NoSuchProcess,
+            psutil.AccessDenied,
+            OSError,
+            ValueError,
+        ):
+            return None
+
+        normalized = [
+            part.strip().lower()
+            for part in cmdline
+        ]
+        profile_matches = False
+        for index, part in enumerate(normalized):
+            if part != "--profile":
+                continue
+            if index + 1 >= len(cmdline):
+                continue
+            if (
+                str(cmdline[index + 1]).strip()
+                == self.profile_name
+            ):
+                profile_matches = True
+                break
+
+        is_ours = bool(
+            executable in self._allowed_client_paths()
+            and "run" in normalized
+            and profile_matches
+        )
+        parent_is_live_codebridge = False
+        ancestor_pid = parent_pid
+        for _ in range(4):
+            if ancestor_pid <= 0:
+                break
+            try:
+                parent = psutil.Process(ancestor_pid)
+                parent_cmd = " ".join(
+                    str(part)
+                    for part in parent.cmdline()
+                ).lower()
+                if (
+                    parent.is_running()
+                    and "main.py" in parent_cmd
+                    and "codebridge" in parent_cmd
+                ):
+                    parent_is_live_codebridge = True
+                    break
+                ancestor_pid = int(parent.ppid() or 0)
+            except (
+                psutil.NoSuchProcess,
+                psutil.AccessDenied,
+                OSError,
+            ):
+                break
+
+        return {
+            "pid": int(pid),
+            "executable": executable,
+            "cmdline": cmdline,
+            "parent_pid": parent_pid or None,
+            "is_codebridge_tunnel": is_ours,
+            "parent_is_live_codebridge": (
+                parent_is_live_codebridge
+            ),
+        }
+
+    @staticmethod
+    def _terminate_pid(pid):
+        process = psutil.Process(int(pid))
+        process.terminate()
+        try:
+            process.wait(timeout=5.0)
+        except psutil.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=2.0)
+
+    def _recycle_inherited_tunnel(self):
+        if not self._health_online():
+            return True
+
+        pid = self._health_listener_pid()
+        info = self._existing_tunnel_info(pid)
+        if not info or not info["is_codebridge_tunnel"]:
+            self._last_error = (
+                "Porta do Secure Tunnel ocupada por processo "
+                "nao reconhecido; nenhuma finalizacao automatica "
+                "foi executada"
+            )
+            return False
+
+        if info["parent_is_live_codebridge"]:
+            self._last_error = (
+                "Secure Tunnel pertence a outra instancia ativa "
+                "do CodeBridge; recuperacao automatica bloqueada"
+            )
+            return False
+
+        try:
+            self._terminate_pid(pid)
+        except (
+            psutil.NoSuchProcess,
+            psutil.AccessDenied,
+            psutil.TimeoutExpired,
+            OSError,
+        ) as exc:
+            self._last_error = (
+                "Falha ao reciclar Secure Tunnel herdado: "
+                f"{type(exc).__name__}: {exc}"
+            )
+            return False
+
+        if not self._wait_for(
+            lambda: not self._health_online(),
+            timeout=6.0,
+        ):
+            self._last_error = (
+                "Secure Tunnel herdado foi finalizado, mas "
+                "a porta de health continuou ocupada"
+            )
+            return False
+
+        self._recycled_pid = int(pid)
+        return True
 
     @classmethod
     def _health_listener_pid(cls):
@@ -311,11 +470,8 @@ class SecureTunnelManager:
             return self.status()
         if self._health_online():
             self._managed = False
-            self._last_error = (
-                "Secure Tunnel ja esta ONLINE fora do CodeBridge; "
-                "o processo existente nao sera assumido nem encerrado"
-            )
-            return self.status()
+            if not self._recycle_inherited_tunnel():
+                return self.status()
         if not self.client.is_file():
             self._last_error = f"tunnel-client nao encontrado: {self.client}"
             return self.status()
@@ -392,6 +548,7 @@ class SecureTunnelManager:
             "managed_pid": self._process.pid if running else None,
             "external_pid": external_pid,
             "external_process": bool(health and not running),
+            "recycled_inherited_pid": self._recycled_pid,
             "health_online": bool(health),
             "credential_configured": self.credential_configured(),
             "client_available": self.client.is_file(),

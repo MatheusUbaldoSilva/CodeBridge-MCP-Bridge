@@ -1,2 +1,2 @@
-!define APP_VERSION "2.0.2-prealpha"
-!define APP_FILE_VERSION "2.0.2.0"
+!define APP_VERSION "2.0.3-prealpha"
+!define APP_FILE_VERSION "2.0.3.0"
