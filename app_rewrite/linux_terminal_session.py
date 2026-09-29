@@ -1267,7 +1267,9 @@ class LinuxTerminalSession:
             )
 
             channel.exec_command(
-                "exec env force_color_prompt=yes bash -il"
+                "exec env force_color_prompt=yes "
+                "GIT_PAGER=cat PAGER=cat "
+                "GIT_TERMINAL_PROMPT=0 bash -il"
             )
 
             marker_token = (

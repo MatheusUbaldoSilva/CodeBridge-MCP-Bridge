@@ -674,8 +674,126 @@ class BridgeRuntime:
     def cancel(self, job_id):
         return self.engine.cancel(job_id)
 
+    def _runtime_has_terminal_owner(self):
+        if self.engine.active_job_id:
+            return True
+
+        with self._phase5b_lock:
+            if any(
+                worker.is_alive()
+                for worker in getattr(self, "_phase5b_workers", {}).values()
+            ):
+                return True
+
+            active_v2 = self._phase5b_active_execution_id
+
+        if active_v2:
+            try:
+                row = self.execution_ledger.get(active_v2)
+            except Exception:
+                row = None
+
+            if row and row.get("state") in ("CREATED", "RUNNING"):
+                return True
+
+        if self._external_prepared_request_id:
+            return True
+
+        with self._external_workers_lock:
+            if any(
+                worker.is_alive()
+                for worker in self._external_workers.values()
+            ):
+                return True
+
+        return False
+
+    def _recover_orphaned_terminal_state(self, terminals):
+        if self._runtime_has_terminal_owner():
+            return terminals
+
+        stale_targets = set()
+
+        target_map = {
+            "powershell": "POWERSHELL5.1",
+            "cmd": "CMD",
+            "ssh": "SSH",
+        }
+
+        for key, target in target_map.items():
+            state = terminals.get(key) or {}
+            if state.get("executing"):
+                stale_targets.add(target)
+
+        active = terminals.get("active_target")
+        prepared = terminals.get("prepared_target")
+
+        if active:
+            stale_targets.add(active)
+        if prepared:
+            stale_targets.add(prepared)
+
+        if stale_targets:
+            self.external_executions.recover_orphaned(
+                self.instance_id
+            )
+            self.external_prepares.recover_orphaned(
+                self.instance_id
+            )
+
+            for row in self.execution_ledger.list_by_state(
+                "CREATED",
+                "RUNNING",
+            ):
+                if (
+                    row.get("runtime_instance")
+                    == self.instance_id
+                ):
+                    try:
+                        self.execution_ledger.transition(
+                            row["execution_id"],
+                            "INTERRUPTED",
+                            runtime_instance=self.instance_id,
+                            error_type=(
+                                "ExecutionOrphanedStateRecovered"
+                            ),
+                            error_message=(
+                                "estado sem worker ativo; "
+                                "terminal reciclado"
+                            ),
+                        )
+                    except Exception:
+                        pass
+
+            self._external_prepared_request_id = None
+            self._external_prepared_target = None
+            self._external_prepared_command = None
+
+            with self._phase5b_lock:
+                self._phase5b_active_execution_id = None
+
+            for target in sorted(stale_targets):
+                if target in ("POWERSHELL5.1", "CMD"):
+                    self.terminals.recycle(
+                        target,
+                        reason="estado sem owner ativo",
+                    )
+                else:
+                    self.terminals.recover_orphaned(
+                        target,
+                        reason="estado sem owner ativo",
+                    )
+
+            return self.terminals.status()
+
+        self.terminals.ensure_local_online()
+        return self.terminals.status()
+
     def snapshot(self):
         terminals = self.terminals.status()
+        terminals = self._recover_orphaned_terminal_state(
+            terminals
+        )
         counts = self.store.counts()
         author_mcp = self.author_mcp.status()
         secure_tunnel = self.secure_tunnel.status()

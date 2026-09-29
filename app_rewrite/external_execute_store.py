@@ -212,3 +212,15 @@ class ExternalExecuteStore:
         with self._lock, self._connect() as con:
             cur = con.execute("UPDATE external_executions SET state='FAILED',finished_at=?,updated_at=?,error_type='ExecutionInterruptedByRestart',error_message='CodeBridge reiniciado durante execucao; comando nao sera repetido automaticamente' WHERE state IN ('RESERVED','EXECUTING') AND runtime_instance<>?", (now, now, runtime_instance))
             return int(cur.rowcount or 0)
+
+    def recover_orphaned(self, runtime_instance):
+        now = utc_now()
+        with self._lock, self._connect() as con:
+            cur = con.execute(
+                "UPDATE external_executions SET state='FAILED',finished_at=?,updated_at=?,"
+                "error_type='ExecutionOrphanedStateRecovered',"
+                "error_message='estado EXECUTING/RESERVED sem worker ativo; terminal reciclado' "
+                "WHERE state IN ('RESERVED','EXECUTING') AND runtime_instance=?",
+                (now, now, runtime_instance),
+            )
+            return int(cur.rowcount or 0)

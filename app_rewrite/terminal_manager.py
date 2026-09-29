@@ -1,6 +1,8 @@
 import codecs
+import os
 import re
 import threading
+import time
 
 from cmd_terminal_session import CmdTerminalSession
 from config_store import ConfigStore
@@ -33,6 +35,8 @@ class TerminalManager:
         self._raw_generation = {"POWERSHELL5.1": 0, "CMD": 0, "SSH": 0}
         self._raw_base = {"POWERSHELL5.1": 0, "CMD": 0, "SSH": 0}
         self._raw_limit = 5000000
+        self._recovery_lock = threading.Lock()
+        self._recovering_targets = set()
         self._raw_decoders = {
             key: codecs.getincrementaldecoder("utf-8")(errors="replace")
             for key in self._raw_streams
@@ -131,6 +135,12 @@ class TerminalManager:
             self._append_log(target, data)
         return callback
     def start(self):
+        # Execucoes automatizadas nunca devem abrir pagers/prompts
+        # interativos que possam assumir o ConPTY.
+        os.environ["GIT_PAGER"] = "cat"
+        os.environ["PAGER"] = "cat"
+        os.environ["GIT_TERMINAL_PROMPT"] = "0"
+
         self.windows.start(on_output=self._callback("POWERSHELL5.1"), width=120, height=40)
         self.cmd.start(on_output=self._callback("CMD"), width=120, height=40)
         ssh_config = self.config.load_ssh()
@@ -252,6 +262,9 @@ class TerminalManager:
 
     def prepare(self, target, command):
         target = self.normalize_target(target)
+        with self._lock:
+            if target in getattr(self, "_recovering_targets", set()):
+                raise RuntimeError("terminal em recuperacao")
         session = self._ensure_session(target)
         with self._lock:
             if self.active_target is not None or self._prepared_target is not None:
@@ -266,6 +279,9 @@ class TerminalManager:
         return True
     def execute_prepared(self, target, command, on_output=None):
         target = self.normalize_target(target)
+        with self._lock:
+            if target in getattr(self, "_recovering_targets", set()):
+                raise RuntimeError("terminal em recuperacao")
         session = self._ensure_session(target)
         with self._lock:
             if self._prepared_target != target:
@@ -283,6 +299,9 @@ class TerminalManager:
 
     def execute(self, target, command):
         target = self.normalize_target(target)
+        with self._lock:
+            if target in getattr(self, "_recovering_targets", set()):
+                raise RuntimeError("terminal em recuperacao")
         session = self._ensure_session(target)
         with self._lock:
             self.active_target = target
@@ -294,6 +313,175 @@ class TerminalManager:
         finally:
             with self._lock:
                 self.active_target = None
+
+    def _session_for_target(self, target):
+        if target == "POWERSHELL5.1":
+            return self.windows
+        if target == "CMD":
+            return self.cmd
+        with self._lock:
+            return self.ssh
+
+    def recycle(self, target, reason="recovery"):
+        target = self.normalize_target(target)
+
+        with self._recovery_lock:
+            with self._lock:
+                self._recovering_targets.add(target)
+                if self.active_target == target:
+                    self.active_target = None
+                if self._prepared_target == target:
+                    self._prepared_target = None
+
+            self.announce(
+                target,
+                "[RECOVERY] reciclando terminal: " + str(reason),
+            )
+
+            try:
+                if target == "POWERSHELL5.1":
+                    try:
+                        self.windows.close()
+                    finally:
+                        self._reset_raw(target)
+                        self.windows.start(
+                            on_output=self._callback(target),
+                            width=120,
+                            height=40,
+                        )
+
+                elif target == "CMD":
+                    try:
+                        self.cmd.close()
+                    finally:
+                        self._reset_raw(target)
+                        self.cmd.start(
+                            on_output=self._callback(target),
+                            width=120,
+                            height=40,
+                        )
+
+                else:
+                    with self._lock:
+                        old = self.ssh
+                        self.ssh = None
+
+                    if old is not None:
+                        try:
+                            old.close()
+                        except Exception:
+                            pass
+
+                    self._reset_raw(target)
+                    config = self.config.load_ssh()
+
+                    if (
+                        not config
+                        or not self.credentials.exists()
+                    ):
+                        raise RuntimeError(
+                            "SSH nao configurado para recuperacao"
+                        )
+
+                    self._connect_saved_ssh(config)
+
+                self.announce(
+                    target,
+                    "[RECOVERY] terminal restaurado",
+                )
+                return True
+
+            except Exception as exc:
+                if target == "SSH":
+                    self.ssh_last_error = (
+                        type(exc).__name__
+                        + ": "
+                        + str(exc)
+                    )
+                self.announce(
+                    target,
+                    "[RECOVERY] falhou: "
+                    + type(exc).__name__
+                    + ": "
+                    + str(exc),
+                )
+                return False
+
+            finally:
+                with self._lock:
+                    self._recovering_targets.discard(target)
+
+    def _recover_after_cancel(self, target, session):
+        deadline = time.monotonic() + 2.0
+
+        while (
+            session is not None
+            and session.is_executing
+            and time.monotonic() < deadline
+        ):
+            time.sleep(0.05)
+
+        with self._lock:
+            current = self._session_for_target(target)
+
+        if current is not session:
+            with self._lock:
+                self._recovering_targets.discard(target)
+            return
+
+        self.recycle(
+            target,
+            reason="cancelamento confirmado/forcado",
+        )
+
+    def recover_orphaned(self, target, reason="orphaned_state"):
+        target = self.normalize_target(target)
+        with self._lock:
+            if target in getattr(self, "_recovering_targets", set()):
+                return False
+            self._recovering_targets.add(target)
+
+        worker = threading.Thread(
+            target=self.recycle,
+            args=(target, reason),
+            name="CodeBridge-Recover-" + target.replace(".", ""),
+            daemon=True,
+        )
+        worker.start()
+        return True
+
+    def ensure_local_online(self):
+        with self._lock:
+            busy = bool(
+                self.active_target
+                or self._prepared_target
+                or self._recovering_targets
+            )
+
+        if busy:
+            return False
+
+        recovered = False
+
+        if not self.windows.is_running:
+            recovered = (
+                self.recycle(
+                    "POWERSHELL5.1",
+                    reason="sessao local offline",
+                )
+                or recovered
+            )
+
+        if not self.cmd.is_running:
+            recovered = (
+                self.recycle(
+                    "CMD",
+                    reason="sessao local offline",
+                )
+                or recovered
+            )
+
+        return recovered
 
     def discard_prepared(self):
         with self._lock:
@@ -317,16 +505,52 @@ class TerminalManager:
             target = self.active_target
             prepared = self._prepared_target
             ssh = self.ssh
-        # execute_prepared mantem _prepared_target ate o fim da execucao.
-        # Priorize Ctrl+C quando a sessao realmente estiver executando.
+
+        # Depois de Ctrl+C nao confiamos que um programa interativo
+        # devolveu o prompt. O terminal afetado entra em RECOVERING e
+        # sera reciclado antes de aceitar outro comando.
+        session = None
+
         if target == "POWERSHELL5.1" and self.windows.is_executing:
-            return self.windows.cancel_current()
-        if target == "CMD" and self.cmd.is_executing:
-            return self.cmd.cancel_current()
-        if target == "SSH" and ssh is not None and ssh.is_executing:
-            return ssh.cancel_current()
+            session = self.windows
+        elif target == "CMD" and self.cmd.is_executing:
+            session = self.cmd
+        elif target == "SSH" and ssh is not None and ssh.is_executing:
+            session = ssh
+
+        if session is not None:
+            with self._lock:
+                self._recovering_targets.add(target)
+
+            try:
+                cancelled = bool(
+                    session.cancel_current()
+                )
+            except Exception:
+                with self._lock:
+                    self._recovering_targets.discard(target)
+                raise
+
+            if not cancelled:
+                with self._lock:
+                    self._recovering_targets.discard(target)
+                return False
+
+            worker = threading.Thread(
+                target=self._recover_after_cancel,
+                args=(target, session),
+                name=(
+                    "CodeBridge-CancelRecovery-"
+                    + target.replace(".", "")
+                ),
+                daemon=True,
+            )
+            worker.start()
+            return True
+
         if prepared is not None:
             return self.discard_prepared()
+
         return False
 
     def status(self):
@@ -334,6 +558,7 @@ class TerminalManager:
             ssh = self.ssh
             active = self.active_target
             prepared = self._prepared_target
+            recovering = set(getattr(self, "_recovering_targets", set()))
             execution_generation = (
                 self._execution_generation
             )
@@ -341,12 +566,21 @@ class TerminalManager:
                 self._last_execution_target
             )
         return {
-            "powershell": {"online": bool(self.windows.is_running), "executing": bool(self.windows.is_executing)},
-            "cmd": {"online": bool(self.cmd.is_running), "executing": bool(self.cmd.is_executing)},
+            "powershell": {
+                "online": bool(self.windows.is_running),
+                "executing": bool(self.windows.is_executing),
+                "recovering": "POWERSHELL5.1" in recovering,
+            },
+            "cmd": {
+                "online": bool(self.cmd.is_running),
+                "executing": bool(self.cmd.is_executing),
+                "recovering": "CMD" in recovering,
+            },
             "ssh": {
                 "configured": bool(self.config.load_ssh() and self.credentials.exists()),
                 "online": bool(ssh is not None and ssh.is_running),
                 "executing": bool(ssh is not None and ssh.is_executing),
+                "recovering": "SSH" in recovering,
                 "last_error": self.ssh_last_error,
             },
             "active_target": active,

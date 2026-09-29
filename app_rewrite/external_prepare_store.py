@@ -137,3 +137,14 @@ class ExternalPrepareStore:
                 (runtime_instance, now, request_id),
             )
         return self.get(request_id)
+
+    def recover_orphaned(self, runtime_instance):
+        now = utc_now()
+        with self._lock, self._connect() as con:
+            cur = con.execute(
+                "UPDATE prepared_commands SET state='DISCARDED',finished_at=?,updated_at=?,"
+                "error_message='estado PREPARING/PREPARED sem worker ativo; terminal reciclado' "
+                "WHERE state IN ('PREPARING','PREPARED') AND runtime_instance=?",
+                (now, now, runtime_instance),
+            )
+            return int(cur.rowcount or 0)
