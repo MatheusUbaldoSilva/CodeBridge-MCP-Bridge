@@ -44,12 +44,11 @@ class BridgeRuntime:
         self.engine = ExecutionEngine(
             self.store,
             self.terminals,
+            on_terminal=self._on_execution_terminal,
         )
         self.author_mcp = AuthorMCPManager()
         self.secure_tunnel = SecureTunnelManager()
-        self.chatgpt_timer = ChatGPTTimerState(
-            on_finished=self._on_chatgpt_turn_finished
-        )
+        self.chatgpt_timer = ChatGPTTimerState()
         self.chatgpt_companion = ChatGPTCompanionServer(
             self.chatgpt_timer
         )
@@ -141,19 +140,19 @@ class BridgeRuntime:
             "timer": self.chatgpt_timer.snapshot(),
         }
 
-    def _on_chatgpt_turn_finished(
+    def _on_execution_terminal(
         self,
-        request_id,
-        timer,
+        completion_id,
+        state,
+        target=None,
     ):
-        completion_id = (
-            "chatgpt:"
-            + str(request_id or "unknown")
-        )
+        state = str(state or "").upper()
+        if state not in {"FINISHED", "SUCCESS"}:
+            return False
         return self.completion_sound.notify(
             completion_id,
-            "FINISHED",
-            "CHATGPT",
+            state,
+            target,
         )
 
     def dispatch_external(self, request_id, target, command):
@@ -270,6 +269,11 @@ class BridgeRuntime:
                 try:
                     output = self.terminals.execute_prepared(target, command, on_output=capture)
                     self.external_executions.mark_finished(execution_id, output=output, exit_code=0)
+                    self._on_execution_terminal(
+                        execution_id,
+                        "FINISHED",
+                        target,
+                    )
                 except Exception as exc:
                     self.external_executions.mark_failed(
                         execution_id, output=getattr(exc, "output", "") or "",
@@ -346,6 +350,11 @@ class BridgeRuntime:
                 output = self.terminals.execute_prepared(target, command, on_output=capture_output)
                 self.execution_ledger.sync_output(execution_id, output)
                 self.execution_ledger.transition(execution_id, "FINISHED", runtime_instance=self.instance_id, exit_code=0, output=output)
+                self._on_execution_terminal(
+                    execution_id,
+                    "FINISHED",
+                    target,
+                )
             except Exception as exc:
                 output = getattr(exc, "output", "") or ""
                 self.execution_ledger.sync_output(execution_id, output)
@@ -543,6 +552,11 @@ class BridgeRuntime:
                 output = self.terminals.execute_prepared(target, command)
                 row = self.external_executions.mark_finished(
                     execution_request_id, output=output, exit_code=0
+                )
+                self._on_execution_terminal(
+                    execution_request_id,
+                    "FINISHED",
+                    target,
                 )
             except Exception as exc:
                 row = self.external_executions.mark_failed(

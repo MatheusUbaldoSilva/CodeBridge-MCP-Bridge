@@ -21,9 +21,8 @@ class ChatGPTTimerState:
         "CANCELLED",
     }
 
-    def __init__(self, on_finished=None):
+    def __init__(self):
         self._lock = threading.RLock()
-        self._on_finished = on_finished
         self._state = "IDLE"
         self._request_id = None
         self._started_monotonic = None
@@ -319,22 +318,7 @@ class ChatGPTTimerState:
             self._state = state
             self._finished_monotonic = time.monotonic()
             self._finished_at = time.time()
-            should_notify = bool(
-                state == "FINISHED"
-                and self._claimed_by_codebridge
-                and callable(self._on_finished)
-            )
-            finished_request_id = self._request_id
             timer = self._snapshot_locked()
-
-        if should_notify:
-            try:
-                self._on_finished(
-                    finished_request_id,
-                    timer,
-                )
-            except Exception:
-                pass
 
         return {
             "applied": True,

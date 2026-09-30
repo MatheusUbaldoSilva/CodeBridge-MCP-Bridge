@@ -112,7 +112,7 @@ class UpdaterVersionTests(unittest.TestCase):
         digest = hashlib.sha256(payload).hexdigest()
         release = {
             "commit_sha": "b" * 40,
-            "version": "2.0.5-prealpha",
+            "version": "2.0.6-prealpha",
             "dist_root": "https://example.invalid/dist",
         }
 
@@ -154,7 +154,7 @@ class UpdaterVersionTests(unittest.TestCase):
 
         self.assertTrue(
             any(
-                "2.0.5-prealpha" in message
+                "2.0.6-prealpha" in message
                 for message in statuses
             )
         )

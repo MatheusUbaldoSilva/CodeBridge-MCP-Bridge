@@ -252,53 +252,6 @@ class ChatGPTTimerStateTests(unittest.TestCase):
             "NORMAL",
         )
 
-    def test_finish_callback_requires_claim(self):
-        calls = []
-        timer = ChatGPTTimerState(
-            on_finished=lambda request_id, snapshot: (
-                calls.append(
-                    (
-                        request_id,
-                        snapshot["state"],
-                    )
-                )
-            )
-        )
-
-        timer.start("plain")
-        timer.finish("plain")
-        self.assertEqual(calls, [])
-
-        timer.start("claimed")
-        claim = timer.claim(
-            reason="/v1/phase5b/start"
-        )
-        self.assertTrue(claim["applied"])
-        self.assertTrue(
-            claim["timer"]["claimed_by_codebridge"]
-        )
-
-        timer.finish("claimed")
-        self.assertEqual(
-            calls,
-            [("claimed", "FINISHED")],
-        )
-
-    def test_cancelled_claimed_turn_does_not_callback(self):
-        calls = []
-        timer = ChatGPTTimerState(
-            on_finished=lambda *args: calls.append(args)
-        )
-        timer.start("cancelled")
-        timer.claim(reason="test")
-        timer.cancel("cancelled")
-
-        self.assertEqual(calls, [])
-        self.assertEqual(
-            timer.snapshot()["state"],
-            "CANCELLED",
-        )
-
     def test_new_turn_clears_claim(self):
         timer = ChatGPTTimerState()
         timer.start("first")

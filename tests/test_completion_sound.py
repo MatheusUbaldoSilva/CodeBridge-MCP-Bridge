@@ -150,5 +150,65 @@ class CompletionSoundTests(unittest.TestCase):
         self.assertEqual(calls, ["bell"])
 
 
+class RuntimeCompletionRoutingTests(unittest.TestCase):
+    def make_runtime(self):
+        from runtime import BridgeRuntime
+
+        calls = []
+
+        class FakeSound:
+            def notify(self, completion_id, state, target=None):
+                calls.append((completion_id, state, target))
+                return True
+
+        runtime = BridgeRuntime.__new__(BridgeRuntime)
+        runtime.completion_sound = FakeSound()
+        return runtime, calls
+
+    def test_finished_execution_plays_completion_audio(self):
+        runtime, calls = self.make_runtime()
+        result = runtime._on_execution_terminal(
+            "exec_1",
+            "FINISHED",
+            "POWERSHELL5.1",
+        )
+        self.assertTrue(result)
+        self.assertEqual(
+            calls,
+            [("exec_1", "FINISHED", "POWERSHELL5.1")],
+        )
+
+    def test_success_queue_job_plays_completion_audio(self):
+        runtime, calls = self.make_runtime()
+        result = runtime._on_execution_terminal(
+            "job_1",
+            "SUCCESS",
+            "CMD",
+        )
+        self.assertTrue(result)
+        self.assertEqual(
+            calls,
+            [("job_1", "SUCCESS", "CMD")],
+        )
+
+    def test_failed_or_cancelled_execution_does_not_play_success_audio(self):
+        runtime, calls = self.make_runtime()
+        self.assertFalse(
+            runtime._on_execution_terminal(
+                "exec_failed",
+                "FAILED",
+                "SSH",
+            )
+        )
+        self.assertFalse(
+            runtime._on_execution_terminal(
+                "exec_cancelled",
+                "CANCELLED",
+                "SSH",
+            )
+        )
+        self.assertEqual(calls, [])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
