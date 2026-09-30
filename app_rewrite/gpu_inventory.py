@@ -1,12 +1,188 @@
-﻿import ctypes
+import ctypes
 import os
 import uuid
 from ctypes import wintypes
+from dataclasses import dataclass, replace
 
 
 DXGI_ERROR_NOT_FOUND = 0x887A0002
 DXGI_ADAPTER_FLAG_SOFTWARE = 0x2
 IID_IDXGIFACTORY1 = "770aae78-f26f-4dba-a829-253c83d1b387"
+
+VENDOR_NAMES = {
+    "10DE": "NVIDIA",
+    "1002": "AMD",
+    "8086": "Intel",
+    "5143": "Qualcomm",
+    "1414": "Microsoft",
+    "15AD": "VMware",
+    "1AF4": "VirtIO",
+    "1B36": "Red Hat",
+    "1234": "QEMU",
+}
+
+_DISCRETE_VRAM_THRESHOLD = 512 * 1024**2
+
+
+@dataclass(frozen=True)
+class GPUDevice:
+    index: int
+    name: str
+    vendor_id: str
+    vendor_name: str
+    device_id: str
+    subsystem_id: str
+    revision: int
+    dedicated_vram_bytes: int
+    dedicated_system_bytes: int
+    shared_system_bytes: int
+    luid: str
+    is_software: bool
+    is_integrated: bool
+    is_discrete: bool
+    adapter_type: str
+    is_primary: bool = False
+
+    @classmethod
+    def from_record(cls, record):
+        vendor_id = str(
+            record.get("vendor_id") or ""
+        ).upper()
+        dedicated = int(
+            record.get("dedicated_vram_bytes")
+            or 0
+        )
+        shared = int(
+            record.get("shared_system_bytes")
+            or 0
+        )
+        is_software = bool(
+            record.get("is_software")
+        )
+
+        is_discrete = bool(
+            not is_software
+            and dedicated
+            >= _DISCRETE_VRAM_THRESHOLD
+        )
+        is_integrated = bool(
+            not is_software
+            and not is_discrete
+            and shared > 0
+        )
+
+        if is_software:
+            adapter_type = "software"
+        elif is_discrete:
+            adapter_type = "discrete"
+        elif is_integrated:
+            adapter_type = "integrated"
+        else:
+            adapter_type = "hardware"
+
+        return cls(
+            index=int(record.get("index") or 0),
+            name=str(
+                record.get("name") or "GPU"
+            ),
+            vendor_id=vendor_id,
+            vendor_name=VENDOR_NAMES.get(
+                vendor_id,
+                "Unknown",
+            ),
+            device_id=str(
+                record.get("device_id") or ""
+            ).upper(),
+            subsystem_id=str(
+                record.get("subsystem_id") or ""
+            ).upper(),
+            revision=int(
+                record.get("revision") or 0
+            ),
+            dedicated_vram_bytes=dedicated,
+            dedicated_system_bytes=int(
+                record.get(
+                    "dedicated_system_bytes"
+                )
+                or 0
+            ),
+            shared_system_bytes=shared,
+            luid=str(record.get("luid") or ""),
+            is_software=is_software,
+            is_integrated=is_integrated,
+            is_discrete=is_discrete,
+            adapter_type=adapter_type,
+            is_primary=bool(
+                record.get("is_primary")
+            ),
+        )
+
+    def to_dict(self):
+        return {
+            "index": self.index,
+            "name": self.name,
+            "vendor_id": self.vendor_id,
+            "vendor_name": self.vendor_name,
+            "device_id": self.device_id,
+            "subsystem_id": self.subsystem_id,
+            "revision": self.revision,
+            "dedicated_vram_bytes": (
+                self.dedicated_vram_bytes
+            ),
+            "dedicated_system_bytes": (
+                self.dedicated_system_bytes
+            ),
+            "shared_system_bytes": (
+                self.shared_system_bytes
+            ),
+            "luid": self.luid,
+            "is_software": self.is_software,
+            "is_integrated": self.is_integrated,
+            "is_discrete": self.is_discrete,
+            "adapter_type": self.adapter_type,
+            "is_primary": self.is_primary,
+        }
+
+
+def _primary_score(device):
+    return (
+        1 if not device.is_software else 0,
+        1 if device.is_discrete else 0,
+        int(device.dedicated_vram_bytes),
+        int(device.shared_system_bytes),
+        -int(device.index),
+    )
+
+
+def select_primary_gpu(devices):
+    devices = list(devices or [])
+    if not devices:
+        return None
+    return max(
+        devices,
+        key=_primary_score,
+    )
+
+
+def build_gpu_devices(records):
+    devices = [
+        GPUDevice.from_record(record)
+        for record in (records or [])
+    ]
+    primary = select_primary_gpu(devices)
+    if primary is None:
+        return devices
+
+    return [
+        replace(
+            device,
+            is_primary=(
+                device.index == primary.index
+                and device.luid == primary.luid
+            ),
+        )
+        for device in devices
+    ]
 
 
 class _GUID(ctypes.Structure):
@@ -203,6 +379,11 @@ def _enumerate_dxgi_adapters():
 
 def discover_windows_gpus():
     try:
-        return _enumerate_dxgi_adapters()
+        records = _enumerate_dxgi_adapters()
     except Exception:
         return []
+
+    return [
+        device.to_dict()
+        for device in build_gpu_devices(records)
+    ]

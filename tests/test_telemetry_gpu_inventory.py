@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -19,6 +19,7 @@ class GpuInventoryTelemetryTests(unittest.TestCase):
                 "name": "Example GPU",
                 "vendor_id": "1234",
                 "device_id": "5678",
+                "is_primary": True,
             }
         ]
         with patch.object(
@@ -34,6 +35,10 @@ class GpuInventoryTelemetryTests(unittest.TestCase):
         self.assertEqual(
             service._gpu_inventory,
             expected,
+        )
+        self.assertEqual(
+            service._primary_gpu,
+            expected[0],
         )
         discover.assert_called_once_with()
 

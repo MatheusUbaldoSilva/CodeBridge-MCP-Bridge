@@ -30,6 +30,14 @@ class TelemetryService:
         self._gpu_inventory = (
             discover_windows_gpus()
         )
+        self._primary_gpu = next(
+            (
+                gpu
+                for gpu in self._gpu_inventory
+                if gpu.get("is_primary")
+            ),
+            None,
+        )
     def start(self):
         if self._threads:
             return False
@@ -128,6 +136,9 @@ class TelemetryService:
                     "gpu": gpu,
                     "gpu_inventory": copy.deepcopy(
                         self._gpu_inventory
+                    ),
+                    "primary_gpu": copy.deepcopy(
+                        self._primary_gpu
                     ),
                 }
                 with self._lock:
