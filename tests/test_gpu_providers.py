@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,7 +11,6 @@ if str(APP) not in sys.path:
 from gpu_providers import (
     GpuProviderManager,
     NvidiaSmiProvider,
-    legacy_gpu_snapshot,
 )
 
 
@@ -226,46 +225,6 @@ class ProviderManagerTests(unittest.TestCase):
                 "provider"
             ],
             "broken",
-        )
-
-    def test_legacy_snapshot_requires_real_temperature_provider(self):
-        generic = {
-            "primary": nvidia_device(),
-        }
-        self.assertIsNone(
-            legacy_gpu_snapshot(generic)
-        )
-
-        enriched_device = nvidia_device()
-        enriched_device.update(
-            {
-                "percent": 33.0,
-                "vram_used_bytes": (
-                    213 * 1024**2
-                ),
-                "vram_total_bytes": (
-                    6144 * 1024**2
-                ),
-                "temperature_c": 53.0,
-                "metric_sources": {
-                    "temperature_c": (
-                        "nvidia_smi"
-                    ),
-                },
-            }
-        )
-        legacy = legacy_gpu_snapshot(
-            {
-                "primary": enriched_device,
-            }
-        )
-        self.assertEqual(
-            legacy["temp_c"],
-            53.0,
-        )
-        self.assertEqual(
-            legacy["used_mb"],
-            213.0,
         )
 
 

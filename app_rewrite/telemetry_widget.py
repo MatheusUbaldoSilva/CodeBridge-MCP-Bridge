@@ -26,6 +26,57 @@ def _uptime(seconds):
     return (f"{days}d " if days else "") + f"{hours:02d}h {minutes:02d}m"
 
 
+def _gpu_view(data):
+    telemetry = data.get("gpu_telemetry") or {}
+    primary = telemetry.get("primary")
+
+    if not primary:
+        inventory = data.get("primary_gpu") or {}
+        if not inventory:
+            return None
+        primary = {
+            "name": inventory.get("name"),
+            "percent": None,
+            "temperature_c": None,
+            "vram_used_bytes": None,
+            "vram_total_bytes": inventory.get(
+                "dedicated_vram_bytes"
+            ),
+            "vram_percent": None,
+        }
+
+    used = primary.get("vram_used_bytes")
+    total = primary.get("vram_total_bytes")
+    percent = primary.get("vram_percent")
+
+    if (
+        percent is None
+        and used is not None
+        and total
+    ):
+        percent = (
+            float(used)
+            / float(total)
+            * 100.0
+        )
+
+    temp = primary.get("temperature_c")
+    temperature_text = "N/D"
+    if temp is not None:
+        temperature_text = (
+            f"{float(temp):.0f} \u00b0C"
+        )
+
+    return {
+        "name": primary.get("name") or "GPU",
+        "gpu_percent": primary.get("percent"),
+        "temperature_text": temperature_text,
+        "vram_used_bytes": used,
+        "vram_total_bytes": total,
+        "vram_percent": percent,
+    }
+
+
 class TelemetryPanel(QFrame):
     def __init__(self, service, kind, parent=None):
         super().__init__(parent)
@@ -153,6 +204,14 @@ class TelemetryPanel(QFrame):
         bar.setValue(value)
         bar.setFormat(f"{value}%")
 
+    @staticmethod
+    def _set_optional_bar(bar, value):
+        if value is None:
+            bar.setValue(0)
+            bar.setFormat("N/D")
+            return
+        TelemetryPanel._set_bar(bar, value)
+
     def refresh(self):
         data = self.service.snapshot(self.kind)
         online = bool(data.get("online"))
@@ -186,22 +245,39 @@ class TelemetryPanel(QFrame):
                 + (f"  •  {data.get('cpu_ghz'):.2f} GHz" if data.get("cpu_ghz") else "")
             )
             self.extra_label.setText("")
-            gpu = data.get("gpu") or {}
+            gpu = _gpu_view(data)
             self.gpu_bar.setVisible(bool(gpu))
             self.gpu_detail.setVisible(bool(gpu))
             self.vram_bar.setVisible(bool(gpu))
             self.vram_detail.setVisible(bool(gpu))
             if gpu:
-                self._set_bar(self.gpu_bar, gpu.get("percent", 0))
-                self.gpu_detail.setText(
-                    f"{gpu.get('name','GPU')}\nTemperatura {gpu.get('temp_c', 0):.0f} \u00b0C"
+                self._set_optional_bar(
+                    self.gpu_bar,
+                    gpu["gpu_percent"],
                 )
-                used_mb = float(gpu.get("used_mb") or 0)
-                total_mb = float(gpu.get("total_mb") or 0)
-                vram_percent = (used_mb / total_mb * 100.0) if total_mb > 0 else 0.0
-                self._set_bar(self.vram_bar, vram_percent)
+                self.gpu_detail.setText(
+                    f"{gpu['name']}\n"
+                    "Temperatura "
+                    f"{gpu['temperature_text']}"
+                )
+                self._set_optional_bar(
+                    self.vram_bar,
+                    gpu["vram_percent"],
+                )
+                used = gpu["vram_used_bytes"]
+                total = gpu["vram_total_bytes"]
+                used_text = (
+                    _bytes(used)
+                    if used is not None
+                    else "N/D"
+                )
+                total_text = (
+                    _bytes(total)
+                    if total is not None
+                    else "N/D"
+                )
                 self.vram_detail.setText(
-                    f"{_bytes(used_mb * 1024**2)} / {_bytes(total_mb * 1024**2)}"
+                    f"{used_text} / {total_text}"
                 )
             self.process_label.setText("")
         else:

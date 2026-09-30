@@ -1,4 +1,4 @@
-﻿import copy
+import copy
 import subprocess
 
 
@@ -311,52 +311,3 @@ class GpuProviderManager:
         result["primary"] = primary
         result["provider_errors"] = errors
         return result
-
-
-def legacy_gpu_snapshot(snapshot):
-    primary = (
-        (snapshot or {}).get("primary")
-        or None
-    )
-    if not primary:
-        return None
-
-    sources = (
-        primary.get("metric_sources")
-        or {}
-    )
-    if sources.get("temperature_c") != (
-        "nvidia_smi"
-    ):
-        return None
-
-    return {
-        "name": primary.get(
-            "name",
-            "GPU",
-        ),
-        "percent": float(
-            primary.get("percent") or 0.0
-        ),
-        "used_mb": (
-            float(
-                primary.get(
-                    "vram_used_bytes"
-                )
-                or 0
-            )
-            / 1024**2
-        ),
-        "total_mb": (
-            float(
-                primary.get(
-                    "vram_total_bytes"
-                )
-                or 0
-            )
-            / 1024**2
-        ),
-        "temp_c": float(
-            primary.get("temperature_c")
-        ),
-    }

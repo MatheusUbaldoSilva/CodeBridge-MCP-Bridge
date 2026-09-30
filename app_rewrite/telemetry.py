@@ -7,10 +7,7 @@ import paramiko
 import psutil
 
 from gpu_inventory import discover_windows_gpus
-from gpu_providers import (
-    GpuProviderManager,
-    legacy_gpu_snapshot,
-)
+from gpu_providers import GpuProviderManager
 from gpu_telemetry_windows import WindowsGpuTelemetry
 
 
@@ -94,7 +91,6 @@ class TelemetryService:
         prev_disk = psutil.disk_io_counters()
         prev_net = psutil.net_io_counters()
         prev_time = time.monotonic()
-        gpu = None
         gpu_telemetry = {
             "devices": [],
             "primary": None,
@@ -123,9 +119,6 @@ class TelemetryService:
                         self._gpu_provider_manager
                         .enrich(generic_gpu)
                     )
-                    gpu = legacy_gpu_snapshot(
-                        gpu_telemetry
-                    )
                     gpu_at = now
                 payload = {
                     "online": True, "error": None, "timestamp": time.time(),
@@ -141,7 +134,6 @@ class TelemetryService:
                     "net_down_bps": self._rate(net.bytes_recv, prev_net.bytes_recv, elapsed),
                     "net_up_bps": self._rate(net.bytes_sent, prev_net.bytes_sent, elapsed),
                     "uptime": max(0.0, time.time() - psutil.boot_time()),
-                    "gpu": gpu,
                     "gpu_telemetry": copy.deepcopy(
                         gpu_telemetry
                     ),
