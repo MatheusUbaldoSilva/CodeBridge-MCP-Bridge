@@ -269,6 +269,41 @@ class ChatGPTTimerStateTests(unittest.TestCase):
         self.assertIsNone(snapshot["claimed_at"])
 
 
+    def test_finished_transition_calls_callback_once(self):
+        calls = []
+        timer = ChatGPTTimerState(
+            on_finished=lambda request_id, snapshot: calls.append(
+                (request_id, snapshot["state"])
+            )
+        )
+        timer.start("turn_1")
+
+        first = timer.finish("turn_1")
+        second = timer.finish("turn_1")
+
+        self.assertTrue(first["applied"])
+        self.assertFalse(second["applied"])
+        self.assertEqual(
+            calls,
+            [("turn_1", "FINISHED")],
+        )
+
+    def test_cancelled_transition_does_not_call_finished_callback(self):
+        calls = []
+        timer = ChatGPTTimerState(
+            on_finished=lambda *args: calls.append(args)
+        )
+        timer.start("turn_1")
+        result = timer.cancel("turn_1")
+
+        self.assertTrue(result["applied"])
+        self.assertEqual(
+            result["timer"]["state"],
+            "CANCELLED",
+        )
+        self.assertEqual(calls, [])
+
+
 class ChatGPTCompanionServerTests(unittest.TestCase):
     def setUp(self):
         self.timer = ChatGPTTimerState()

@@ -150,7 +150,7 @@ class CompletionSoundTests(unittest.TestCase):
         self.assertEqual(calls, ["bell"])
 
 
-class RuntimeCompletionRoutingTests(unittest.TestCase):
+class RuntimeTimerCompletionRoutingTests(unittest.TestCase):
     def make_runtime(self):
         from runtime import BridgeRuntime
 
@@ -165,48 +165,25 @@ class RuntimeCompletionRoutingTests(unittest.TestCase):
         runtime.completion_sound = FakeSound()
         return runtime, calls
 
-    def test_finished_execution_plays_completion_audio(self):
+    def test_finished_timer_state_plays_completion_audio(self):
         runtime, calls = self.make_runtime()
-        result = runtime._on_execution_terminal(
-            "exec_1",
-            "FINISHED",
-            "POWERSHELL5.1",
+        result = runtime._on_chatgpt_timer_finished(
+            "turn_1",
+            {"state": "FINISHED"},
         )
         self.assertTrue(result)
         self.assertEqual(
             calls,
-            [("exec_1", "FINISHED", "POWERSHELL5.1")],
+            [("chatgpt:turn_1", "FINISHED", "CHATGPT")],
         )
 
-    def test_success_queue_job_plays_completion_audio(self):
+    def test_non_finished_timer_state_does_not_play_audio(self):
         runtime, calls = self.make_runtime()
-        result = runtime._on_execution_terminal(
-            "job_1",
-            "SUCCESS",
-            "CMD",
+        result = runtime._on_chatgpt_timer_finished(
+            "turn_1",
+            {"state": "CANCELLED"},
         )
-        self.assertTrue(result)
-        self.assertEqual(
-            calls,
-            [("job_1", "SUCCESS", "CMD")],
-        )
-
-    def test_failed_or_cancelled_execution_does_not_play_success_audio(self):
-        runtime, calls = self.make_runtime()
-        self.assertFalse(
-            runtime._on_execution_terminal(
-                "exec_failed",
-                "FAILED",
-                "SSH",
-            )
-        )
-        self.assertFalse(
-            runtime._on_execution_terminal(
-                "exec_cancelled",
-                "CANCELLED",
-                "SSH",
-            )
-        )
+        self.assertFalse(result)
         self.assertEqual(calls, [])
 
 
