@@ -2,7 +2,7 @@
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = ROOT / "app_rewrite"

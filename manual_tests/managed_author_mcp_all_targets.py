@@ -18,7 +18,7 @@ try:
     assert state.get("state") == "ONLINE", state
     assert state.get("managed_by_codebridge") is True, state
     test = subprocess.run(
-        [str(AUTHOR_PYTHON), str(AUTHOR / "test_author_mcp_v2_all_targets.py")],
+        [str(AUTHOR_PYTHON), str(ROOT / "manual_tests" / "author_mcp_v2_all_targets.py")],
         cwd=str(AUTHOR),
         capture_output=True,
         text=True,

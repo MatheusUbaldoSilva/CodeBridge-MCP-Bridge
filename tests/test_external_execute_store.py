@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 import sys
 
-ROOT = Path(r"C:\Users\Matheus\CodeBridge-MCP-Bridge")
+ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "app_rewrite"))
 
 from external_execute_store import ExternalExecuteStore, ExternalExecuteConflict
