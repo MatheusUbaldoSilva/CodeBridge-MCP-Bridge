@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
@@ -288,6 +289,43 @@ def installer_attention_required():
     return False
 
 
+def codebridge_launcher():
+    pythonw = ROOT / "runtime" / "python" / "pythonw.exe"
+    main_py = ROOT / "app_rewrite" / "main.py"
+    if not pythonw.is_file():
+        raise FileNotFoundError(f"Runtime Python não encontrado: {pythonw}")
+    if not main_py.is_file():
+        raise FileNotFoundError(f"CodeBridge não encontrado: {main_py}")
+    return pythonw, main_py
+
+
+def start_codebridge():
+    if companion_health():
+        return True
+    pythonw, main_py = codebridge_launcher()
+    subprocess.Popen(
+        [str(pythonw), str(main_py)],
+        cwd=str(ROOT / "tools") if (ROOT / "tools").is_dir() else str(ROOT),
+        close_fds=True,
+    )
+    return True
+
+
+def ensure_codebridge(timeout=20.0):
+    if companion_health():
+        return True
+    try:
+        start_codebridge()
+    except Exception:
+        return False
+    deadline = time.monotonic() + max(1.0, float(timeout))
+    while time.monotonic() < deadline:
+        if companion_health():
+            return True
+        time.sleep(0.4)
+    return companion_health()
+
+
 def chrome_executable():
     candidates = [
         Path(os.environ.get("PROGRAMFILES", ""))
@@ -330,7 +368,7 @@ def open_url(url):
 def open_folder():
     if not EXT.is_dir():
         raise FileNotFoundError(
-            f"Pasta da extensÃƒÂ£o nÃƒÂ£o encontrada: {EXT}"
+            f"Pasta da extensão não encontrada: {EXT}"
         )
     os.startfile(str(EXT))
 
@@ -352,7 +390,7 @@ class Window(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(
-            "ExtensÃƒÂ£o ChatGPT Timer Ã¢â‚¬â€ CodeBridge"
+            "Extensão ChatGPT Timer — CodeBridge"
         )
         self.resize(780, 620)
 
@@ -363,7 +401,7 @@ class Window(QWidget):
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
 
-        title = QLabel("ExtensÃƒÂ£o ChatGPT Timer")
+        title = QLabel("Extensão ChatGPT Timer")
         title.setStyleSheet(
             "font-size:20pt;"
             "font-weight:700;"
@@ -372,11 +410,11 @@ class Window(QWidget):
         layout.addWidget(title)
 
         intro = QLabel(
-            "NecessÃƒÂ¡ria para detectar o fim da resposta "
-            "do ChatGPT e concluir o cronÃƒÂ´metro. "
-            "Depois de carregar a extensÃƒÂ£o uma vez, "
-            "as atualizaÃƒÂ§ÃƒÂµes futuras do CodeBridge "
-            "mantÃƒÂªm esta mesma pasta."
+            "Necessária para detectar o fim da resposta "
+            "do ChatGPT e concluir o cronômetro. "
+            "Depois de carregar a extensão uma vez, "
+            "as atualizações futuras do CodeBridge "
+            "mantêm esta mesma pasta."
         )
         intro.setWordWrap(True)
         layout.addWidget(intro)
@@ -395,22 +433,22 @@ class Window(QWidget):
         layout.addWidget(self.status)
 
         steps = QLabel(
-            "<b>Primeira ativaÃƒÂ§ÃƒÂ£o</b><br><br>"
-            "1. Abra as extensÃƒÂµes do Chrome.<br>"
+            "<b>Primeira ativação</b><br><br>"
+            "1. Abra as extensões do Chrome.<br>"
             "2. Ative <b>Modo do desenvolvedor</b>.<br>"
-            "3. Clique em <b>Carregar sem compactaÃƒÂ§ÃƒÂ£o</b>.<br>"
+            "3. Clique em <b>Carregar sem compactação</b>.<br>"
             "4. Selecione a pasta oficial mostrada abaixo.<br>"
             "5. Volte ao CodeBridge e clique em "
-            "<b>Testar extensÃƒÂ£o</b>.<br><br>"
-            "<b>Se ela jÃƒÂ¡ aponta para a pasta oficial</b><br><br>"
-            "Depois de uma atualizaÃƒÂ§ÃƒÂ£o, abra "
+            "<b>Testar extensão</b>.<br><br>"
+            "<b>Se ela já aponta para a pasta oficial</b><br><br>"
+            "Depois de uma atualização, abra "
             "<b>chrome://extensions</b>, encontre "
             "<b>CodeBridge ChatGPT Timer</b>, clique em "
-            "<b>Recarregar Ã¢â€ Â»</b> e teste novamente.<br><br>"
-            "<b>MigraÃƒÂ§ÃƒÂ£o de uma pasta antiga</b><br><br>"
-            "Remova uma ÃƒÂºnica vez a extensÃƒÂ£o antiga antes de "
-            "usar <b>Carregar sem compactaÃƒÂ§ÃƒÂ£o</b> com a pasta oficial. "
-            "Depois disso, nÃƒÂ£o serÃƒÂ¡ necessÃƒÂ¡rio remover novamente."
+            "<b>Recarregar ↻</b> e teste novamente.<br><br>"
+            "<b>Migração de uma pasta antiga</b><br><br>"
+            "Remova uma única vez a extensão antiga antes de "
+            "usar <b>Carregar sem compactação</b> com a pasta oficial. "
+            "Depois disso, não será necessário remover novamente."
         )
         steps.setWordWrap(True)
         layout.addWidget(steps)
@@ -429,7 +467,7 @@ class Window(QWidget):
         row = QHBoxLayout()
 
         button = QPushButton(
-            "Abrir extensÃƒÂµes do Chrome"
+            "Abrir extensões do Chrome"
         )
         button.clicked.connect(
             lambda: self._safe_open(
@@ -439,7 +477,7 @@ class Window(QWidget):
         row.addWidget(button)
 
         button = QPushButton(
-            "Abrir pasta da extensÃƒÂ£o"
+            "Abrir pasta da extensão"
         )
         button.clicked.connect(self.folder)
         row.addWidget(button)
@@ -448,10 +486,14 @@ class Window(QWidget):
 
         row = QHBoxLayout()
 
-        button = QPushButton("Testar extensÃƒÂ£o")
-        button.setDefault(True)
-        button.clicked.connect(self.refresh)
-        row.addWidget(button)
+        self.start_button = QPushButton("Iniciar CodeBridge")
+        self.start_button.clicked.connect(self.start_runtime)
+        row.addWidget(self.start_button)
+
+        self.test_button = QPushButton("Testar extensão")
+        self.test_button.setDefault(True)
+        self.test_button.clicked.connect(self.refresh)
+        row.addWidget(self.test_button)
 
         button = QPushButton("Abrir ChatGPT")
         button.clicked.connect(
@@ -464,9 +506,9 @@ class Window(QWidget):
         layout.addLayout(row)
 
         note = QLabel(
-            "O teste confirma o caminho e a versÃƒÂ£o registrados pelo "
+            "O teste confirma o caminho e a versão registrados pelo "
             "Chrome, o Companion local em 127.0.0.1:8768 e o "
-            "heartbeat enviado pela prÃƒÂ³pria extensÃƒÂ£o."
+            "heartbeat enviado pela própria extensão."
         )
         note.setWordWrap(True)
         note.setStyleSheet("color:#f2c879")
@@ -480,7 +522,7 @@ class Window(QWidget):
         except Exception as error:
             QMessageBox.critical(
                 self,
-                "NÃƒÂ£o foi possÃƒÂ­vel abrir",
+                "Não foi possível abrir",
                 f"{type(error).__name__}: {error}",
             )
 
@@ -490,9 +532,27 @@ class Window(QWidget):
         except Exception as error:
             QMessageBox.critical(
                 self,
-                "Pasta nÃƒÂ£o encontrada",
+                "Pasta não encontrada",
                 f"{type(error).__name__}: {error}",
             )
+
+    def start_runtime(self):
+        self.start_button.setEnabled(False)
+        self.start_button.setText("Iniciando CodeBridge...")
+        QApplication.processEvents()
+        if ensure_codebridge(timeout=20.0):
+            self.refresh()
+            return
+        self.start_button.setEnabled(True)
+        self.start_button.setText("Iniciar CodeBridge")
+        QMessageBox.warning(
+            self,
+            "CodeBridge ainda não está pronto",
+            "Não foi possível detectar o Companion local em 127.0.0.1:8768. "
+            "Confirme a janela de permissão do Windows e tente novamente.",
+        )
+        self.refresh()
+
 
     def refresh(self):
         expected_version = version()
@@ -512,10 +572,16 @@ class Window(QWidget):
         heartbeat = extension_heartbeat_status()
         heartbeat_ok = bool(heartbeat.get("connected"))
 
+        self.test_button.setEnabled(companion_ok)
+        self.start_button.setEnabled(not companion_ok)
+        self.start_button.setText(
+            "CodeBridge aberto" if companion_ok else "Iniciar CodeBridge"
+        )
+
         lines = [
             "<b>Estado atual</b>",
             "",
-            "VersÃƒÂ£o embutida: "
+            "Versão embutida: "
             + (expected_version or "desconhecida"),
         ]
 
@@ -524,13 +590,13 @@ class Window(QWidget):
             enabled = record_enabled(primary)
 
             lines.append(
-                "Chrome: extensÃƒÂ£o detectada na pasta oficial"
+                "Chrome: extensão detectada na pasta oficial"
             )
             lines.append(
                 "Perfil: " + primary["profile"]
             )
             lines.append(
-                "VersÃƒÂ£o detectada: "
+                "Versão detectada: "
                 + (
                     primary.get("version")
                     or "desconhecida"
@@ -547,7 +613,7 @@ class Window(QWidget):
                 )
             else:
                 lines.append(
-                    "Estado registrado: nÃƒÂ£o determinado"
+                    "Estado registrado: não determinado"
                 )
 
             if (
@@ -556,38 +622,43 @@ class Window(QWidget):
                 and primary["version"] != expected_version
             ):
                 lines.append(
-                    "AÃƒÂ§ÃƒÂ£o: clique em Recarregar Ã¢â€ Â» "
+                    "Ação: clique em Recarregar ↻ "
                     "no chrome://extensions"
                 )
         else:
             lines.append(
-                "Chrome: extensÃƒÂ£o ainda nÃƒÂ£o detectada "
+                "Chrome: extensão ainda não detectada "
                 "na pasta oficial"
             )
             lines.append(
-                "AÃƒÂ§ÃƒÂ£o: use Carregar sem compactaÃƒÂ§ÃƒÂ£o "
-                "uma ÃƒÂºnica vez"
+                "Ação: use Carregar sem compactação "
+                "uma única vez"
             )
 
         if legacy:
             lines.append(
-                "MigraÃƒÂ§ÃƒÂ£o: existe registro da extensÃƒÂ£o "
+                "Migração: existe registro da extensão "
                 "apontando para outro caminho"
             )
             if official:
                 lines.append(
-                    "AÃƒÂ§ÃƒÂ£o: remova o registro antigo para evitar "
-                    "duas extensÃƒÂµes ativas"
+                    "Ação: remova o registro antigo para evitar "
+                    "duas extensões ativas"
                 )
             else:
                 lines.append(
-                    "AÃƒÂ§ÃƒÂ£o: remova a extensÃƒÂ£o antiga antes de "
+                    "Ação: remova a extensão antiga antes de "
                     "carregar a pasta oficial"
                 )
 
         lines.append(
+            "CodeBridge: "
+            + ("ABERTO" if companion_ok else "FECHADO")
+        )
+
+        lines.append(
             "Companion 127.0.0.1:8768: "
-            + ("OK" if companion_ok else "indisponÃƒÂ­vel")
+            + ("ONLINE" if companion_ok else "OFFLINE")
         )
 
         if heartbeat_ok:
@@ -595,18 +666,18 @@ class Window(QWidget):
             heartbeat_age = heartbeat.get("age_seconds")
             lines.append("Heartbeat: conectado")
             lines.append(
-                "VersÃƒÂ£o ativa da extensÃƒÂ£o: " + heartbeat_version
+                "Versão ativa da extensão: " + heartbeat_version
             )
             if heartbeat_age is not None:
                 lines.append(
-                    "ÃƒÅ¡ltimo heartbeat: "
+                    "Último heartbeat: "
                     + f"{float(heartbeat_age):.1f}s"
                 )
         else:
-            lines.append("Heartbeat: nÃƒÂ£o detectado")
+            lines.append("Heartbeat: não detectado")
             if official and companion_ok:
                 lines.append(
-                    "AÃƒÂ§ÃƒÂ£o: recarregue a extensÃƒÂ£o no Chrome "
+                    "Ação: recarregue a extensão no Chrome "
                     "e teste novamente"
                 )
 
@@ -627,13 +698,13 @@ class Window(QWidget):
 
         if environment_ready:
             save_verified_state(expected_version)
-            headline = "Ã¢â€”Â ExtensÃƒÂ£o conectada"
+            headline = "● Extensão conectada"
             color = "#79d99a"
         elif official:
-            headline = "Ã¢â€”Â ExtensÃƒÂ£o requer verificaÃƒÂ§ÃƒÂ£o"
+            headline = "● Extensão requer verificação"
             color = "#f2c879"
         else:
-            headline = "Ã¢â€”Â AtivaÃƒÂ§ÃƒÂ£o necessÃƒÂ¡ria"
+            headline = "● Ativação necessária"
             color = "#f2c879"
 
         self.status.setText(
@@ -649,6 +720,9 @@ class Window(QWidget):
 def main():
     if "--needs-attention" in sys.argv:
         return 10 if installer_attention_required() else 0
+
+    if "--ensure-codebridge" in sys.argv:
+        return 0 if ensure_codebridge(timeout=20.0) else 12
 
     app = QApplication(sys.argv)
     app.setApplicationName(
