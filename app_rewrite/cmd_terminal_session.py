@@ -1624,23 +1624,6 @@ class CmdTerminalSession:
 
         return total
 
-    def send_line(
-        self,
-        line,
-    ):
-        if not isinstance(
-            line,
-            str,
-        ):
-            raise TypeError(
-                "line deve ser str"
-            )
-
-        return self.send(
-            line
-            + "\r"
-        )
-
     def send_ctrl_c(
         self,
     ):

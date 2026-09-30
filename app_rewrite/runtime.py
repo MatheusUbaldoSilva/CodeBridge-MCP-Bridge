@@ -14,7 +14,6 @@ from executor import ExecutionEngine
 from external_prepare_store import ExternalPrepareStore, ExternalPrepareConflict, command_hash
 from external_execute_store import ExternalExecuteStore, ExternalExecuteConflict
 from execution_ledger import ExecutionLedger, ExecutionLedgerConflict
-from terminal_errors import PowerShellCommandCancelled
 from job_store import JobStore
 from migration import migrate_legacy_ssh_once
 from terminal_manager import TerminalManager
@@ -108,11 +107,6 @@ class BridgeRuntime:
         self.auto_execute = bool(enabled)
         self.terminals.config.save_auto_execute(self.auto_execute)
         return self.auto_execute
-
-    def set_completion_sound(self, enabled):
-        return self.completion_sound.set_enabled(
-            enabled
-        )
 
     def toggle_completion_sound(self):
         return self.completion_sound.toggle()

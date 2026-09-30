@@ -136,33 +136,3 @@ class ConfigStore:
             "profile_name": profile_name,
             "plugin_name": plugin_name,
         }
-
-    def clear_company(self):
-        with self._lock:
-            data = self._read()
-            removed = False
-            for key in (
-                "company_name", "openai_organization_id", "tunnel_id",
-                "tunnel_profile_name", "mcp_plugin_name",
-            ):
-                if data.pop(key, None) is not None:
-                    removed = True
-            if data:
-                self._write(data)
-            elif self.path.exists():
-                self.path.unlink()
-            return removed
-
-    def clear_ssh(self):
-        with self._lock:
-            return self._clear_ssh_locked()
-
-    def _clear_ssh_locked(self):
-        data = self._read()
-        removed = bool(data.pop("ssh_host", None) is not None)
-        removed = bool(data.pop("ssh_port", None) is not None) or removed
-        if data:
-            self._write(data)
-        elif self.path.exists():
-            self.path.unlink()
-        return removed

@@ -264,52 +264,6 @@ class WindowsTerminalSession:
 
         self._cancel_recovery_delay = 0.10
 
-        protocol_token = uuid.uuid4().hex[:8]
-
-        self._native_begin_marker_text = (
-            "~B"
-            + protocol_token
-            + "~"
-        )
-
-        self._native_prompt_prefix_text = (
-            "~S"
-            + protocol_token
-            + ":"
-        )
-
-        self._native_status_end_text = ":E~"
-
-        self._native_prompt_end_text = (
-            "~P"
-            + protocol_token
-            + "~"
-        )
-
-        self._native_begin_marker = (
-            self._native_begin_marker_text.encode(
-                "ascii"
-            )
-        )
-
-        self._native_prompt_prefix = (
-            self._native_prompt_prefix_text.encode(
-                "ascii"
-            )
-        )
-
-        self._native_status_end = (
-            self._native_status_end_text.encode(
-                "ascii"
-            )
-        )
-
-        self._native_prompt_end = (
-            self._native_prompt_end_text.encode(
-                "ascii"
-            )
-        )
-
         self._native_redraw_prompt_sequence = (
             b"\x1b[20~"
         )
@@ -2832,30 +2786,6 @@ class WindowsTerminalSession:
             data
         )
 
-    @staticmethod
-    def _transport_for_script(
-        script,
-    ):
-        encoded = base64.b64encode(
-            script.encode(
-                "utf-8"
-            )
-        ).decode(
-            "ascii"
-        )
-
-        return (
-            "$__cb_transport="
-            "[Text.Encoding]::UTF8.GetString("
-            "[Convert]::FromBase64String('"
-            + encoded
-            + "'));"
-            ".([ScriptBlock]::Create("
-            "$__cb_transport));"
-            "Remove-Variable __cb_transport "
-            "-ErrorAction SilentlyContinue"
-        )
-
     def _reader_loop(
         self,
     ):
@@ -3668,23 +3598,6 @@ class WindowsTerminalSession:
                 )
 
         return total
-
-    def send_line(
-        self,
-        line,
-    ):
-        if not isinstance(
-            line,
-            str,
-        ):
-            raise TypeError(
-                "line deve ser str"
-            )
-
-        return self.send(
-            line
-            + "\r"
-        )
 
     def send_ctrl_c(
         self,

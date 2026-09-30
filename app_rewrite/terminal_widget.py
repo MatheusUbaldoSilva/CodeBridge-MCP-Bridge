@@ -139,8 +139,3 @@ class TerminalWidget(QWidget):
         super().resizeEvent(event)
         if self.isVisible():
             QTimer.singleShot(0, self.fit_terminal)
-
-    def focus_terminal(self):
-        self.web.setFocus()
-        self.fit_terminal()
-        self.web.page().runJavaScript("window.cbFocus && window.cbFocus();")

@@ -70,26 +70,6 @@ class TerminalManager:
                 self._log_generation[target] += 1
             self._logs[target] = value
 
-    def log_snapshot(self, target):
-        target = self.normalize_target(target)
-        with self._lock:
-            return self._logs[target]
-
-    def log_delta(self, target, generation, position):
-        target = self.normalize_target(target)
-        with self._lock:
-            current_generation = self._log_generation[target]
-            value = self._logs[target]
-            if generation != current_generation or position > len(value):
-                return current_generation, len(value), value, True
-            return current_generation, len(value), value[position:], False
-
-    def clear_log(self, target):
-        target = self.normalize_target(target)
-        with self._lock:
-            self._logs[target] = ""
-            self._log_generation[target] += 1
-
     def announce(self, target, message):
         target = self.normalize_target(target)
         self._append_log(target, "\n" + str(message).rstrip() + "\n")

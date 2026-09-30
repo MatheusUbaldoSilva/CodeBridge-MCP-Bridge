@@ -1989,22 +1989,6 @@ class LinuxTerminalSession:
             )
         )
 
-    def send_line(
-        self,
-        line,
-    ):
-        if not isinstance(
-            line,
-            str,
-        ):
-            raise TypeError(
-                "line deve ser str"
-            )
-
-        self.send(
-            line + "\n"
-        )
-
     def send_ctrl_c(
         self,
     ):

@@ -245,12 +245,3 @@ class JobStore:
         result = {row["state"]: int(row["total"]) for row in rows}
         result["TOTAL"] = sum(result.values())
         return result
-
-    def list_recent(self, limit=20):
-        limit = max(1, min(int(limit), 100))
-        with self._lock, self._connect() as con:
-            rows = con.execute(
-                "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
-        return [self._row(row) for row in rows]

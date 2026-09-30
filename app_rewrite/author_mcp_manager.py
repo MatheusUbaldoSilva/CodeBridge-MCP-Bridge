@@ -9,7 +9,6 @@ from author_mcp_status import AuthorMCPStatus
 
 
 class AuthorMCPManager:
-    ADAPTER_PORT = 8766
     MCP_PORT = 8765
 
     def __init__(self):

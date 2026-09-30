@@ -23,7 +23,6 @@ class MainWindow(QMainWindow):
         self.runtime = runtime
         self.setWindowTitle(APP_NAME)
         self.resize(980, 720)
-        self._last_logs = {}
         self._ui_events = queue.Queue()
         self._ssh_busy = False
         self._last_chatgpt_timer_state = None
