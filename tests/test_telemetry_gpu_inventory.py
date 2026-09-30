@@ -1,7 +1,7 @@
-import sys
+﻿import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "app_rewrite"
@@ -22,11 +22,19 @@ class GpuInventoryTelemetryTests(unittest.TestCase):
                 "is_primary": True,
             }
         ]
-        with patch.object(
-            telemetry,
-            "discover_windows_gpus",
-            return_value=expected,
-        ) as discover:
+        fake_provider = Mock()
+        with (
+            patch.object(
+                telemetry,
+                "discover_windows_gpus",
+                return_value=expected,
+            ) as discover,
+            patch.object(
+                telemetry,
+                "WindowsGpuTelemetry",
+                return_value=fake_provider,
+            ) as provider,
+        ):
             service = telemetry.TelemetryService(
                 config_store=object(),
                 credential_store=object(),
@@ -41,6 +49,34 @@ class GpuInventoryTelemetryTests(unittest.TestCase):
             expected[0],
         )
         discover.assert_called_once_with()
+        provider.assert_called_once_with(expected)
+        self.assertIs(
+            service._gpu_telemetry,
+            fake_provider,
+        )
+
+    def test_stop_closes_generic_gpu_provider(self):
+        fake_provider = Mock()
+        with (
+            patch.object(
+                telemetry,
+                "discover_windows_gpus",
+                return_value=[],
+            ),
+            patch.object(
+                telemetry,
+                "WindowsGpuTelemetry",
+                return_value=fake_provider,
+            ),
+        ):
+            service = telemetry.TelemetryService(
+                config_store=object(),
+                credential_store=object(),
+            )
+
+        service.stop()
+
+        fake_provider.close.assert_called_once_with()
 
 
 if __name__ == "__main__":

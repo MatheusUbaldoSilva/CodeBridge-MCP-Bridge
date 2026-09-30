@@ -8,6 +8,7 @@ import paramiko
 import psutil
 
 from gpu_inventory import discover_windows_gpus
+from gpu_telemetry_windows import WindowsGpuTelemetry
 
 
 class TelemetryService:
@@ -38,6 +39,11 @@ class TelemetryService:
             ),
             None,
         )
+        self._gpu_telemetry = (
+            WindowsGpuTelemetry(
+                self._gpu_inventory
+            )
+        )
     def start(self):
         if self._threads:
             return False
@@ -55,6 +61,7 @@ class TelemetryService:
             thread.join(timeout=2.0)
         self._threads.clear()
         self._close_linux_client()
+        self._gpu_telemetry.close()
 
     def set_interval(self, seconds):
         value = float(seconds)
@@ -104,6 +111,12 @@ class TelemetryService:
         prev_net = psutil.net_io_counters()
         prev_time = time.monotonic()
         gpu = None
+        gpu_telemetry = {
+            "devices": [],
+            "primary": None,
+            "source": "windows_pdh",
+            "error": None,
+        }
         gpu_at = 0.0
         while not self._stop.is_set():
             started = time.monotonic()
@@ -118,6 +131,10 @@ class TelemetryService:
                 elapsed = max(0.001, now - prev_time)
                 if now - gpu_at >= 2.0:
                     gpu = self._gpu_snapshot()
+                    gpu_telemetry = (
+                        self._gpu_telemetry
+                        .snapshot()
+                    )
                     gpu_at = now
                 payload = {
                     "online": True, "error": None, "timestamp": time.time(),
@@ -134,6 +151,9 @@ class TelemetryService:
                     "net_up_bps": self._rate(net.bytes_sent, prev_net.bytes_sent, elapsed),
                     "uptime": max(0.0, time.time() - psutil.boot_time()),
                     "gpu": gpu,
+                    "gpu_telemetry": copy.deepcopy(
+                        gpu_telemetry
+                    ),
                     "gpu_inventory": copy.deepcopy(
                         self._gpu_inventory
                     ),
