@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox, QFrame, QHBoxLayout, QLabel, QProgressBar,
-    QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
+    QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
 )
 
 
@@ -82,7 +82,6 @@ class TelemetryPanel(QFrame):
         super().__init__(parent)
         self.service = service
         self.kind = kind
-        self._collapsed = False
         self.setObjectName("telemetryPanel")
         self.setMinimumWidth(270)
         self.setMaximumWidth(300)
@@ -93,21 +92,32 @@ class TelemetryPanel(QFrame):
             "QScrollArea{background:#11171d;border:0;}"
             "QScrollArea QWidget{background:#11171d;}"
             "QComboBox{background:#17212a;color:#eef3f6;border:1px solid #3a4a56;padding:3px;}"
-            "QPushButton{background:#17212a;color:#eef3f6;border:1px solid #3a4a56;padding:4px 7px;}"
             "QProgressBar{border:1px solid #44525d;background:#080d11;"
             "height:16px;text-align:center;color:#f3f6f8;} QProgressBar::chunk{background:#3a8f4b;}"
         )
         outer = QVBoxLayout(self)
         outer.setContentsMargins(6, 6, 6, 6)
         header = QHBoxLayout()
-        self.toggle_button = QPushButton("TELEMETRIA ◀")
-        self.toggle_button.clicked.connect(self.toggle)
+        self.title_label = QLabel("MONITOR DO SISTEMA")
+        self.title_label.setStyleSheet(
+            "font-weight:700;font-size:13px;color:#fff;"
+        )
         self.live_label = QLabel("● AO VIVO")
-        self.live_label.setStyleSheet("color:#6dd56d;font-weight:600;")
-        header.addWidget(self.toggle_button)
+        self.live_label.setStyleSheet(
+            "color:#6dd56d;font-weight:600;"
+        )
+        header.addWidget(self.title_label)
         header.addStretch(1)
         header.addWidget(self.live_label)
         outer.addLayout(header)
+
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Plain)
+        separator.setStyleSheet(
+            "color:#33414d;background:#33414d;"
+        )
+        outer.addWidget(separator)
         controls = QHBoxLayout()
         controls.addWidget(QLabel("Atualização:"))
         self.interval_combo = QComboBox()
@@ -183,20 +193,6 @@ class TelemetryPanel(QFrame):
             self.service.set_interval(float(text.rstrip("s")))
         except Exception:
             pass
-
-    def toggle(self):
-        self._collapsed = not self._collapsed
-        self.body.setVisible(not self._collapsed)
-        self.interval_combo.setVisible(not self._collapsed)
-        self.live_label.setVisible(not self._collapsed)
-        if self._collapsed:
-            self.toggle_button.setText("▶")
-            self.setMinimumWidth(36)
-            self.setMaximumWidth(44)
-        else:
-            self.toggle_button.setText("TELEMETRIA ◀")
-            self.setMinimumWidth(270)
-            self.setMaximumWidth(300)
 
     @staticmethod
     def _set_bar(bar, value):

@@ -1,11 +1,16 @@
+import os
 import sys
 import unittest
 from pathlib import Path
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "app_rewrite"
 if str(APP) not in sys.path:
     sys.path.insert(0, str(APP))
+
+from PySide6.QtWidgets import QApplication
 
 from telemetry_widget import (
     TelemetryPanel,
@@ -160,6 +165,63 @@ class GpuViewTests(unittest.TestCase):
 
         self.assertEqual(bar.value, 43)
         self.assertEqual(bar.text, "43%")
+
+
+class FakeTelemetryService:
+    def set_interval(self, value):
+        self.interval = value
+
+    def snapshot(self, kind):
+        return {
+            "online": True,
+            "cpu_percent": 0,
+            "ram_percent": 0,
+            "disk_percent": 0,
+            "gpu_telemetry": {},
+            "primary_gpu": None,
+        }
+
+
+class MonitorSystemHeaderTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = (
+            QApplication.instance()
+            or QApplication([])
+        )
+
+    def test_header_is_fixed_monitor_system_without_collapse_control(self):
+        panel = TelemetryPanel(
+            FakeTelemetryService(),
+            "windows",
+        )
+        try:
+            self.assertEqual(
+                panel.title_label.text(),
+                "MONITOR DO SISTEMA",
+            )
+            self.assertFalse(
+                hasattr(panel, "toggle_button")
+            )
+            self.assertFalse(
+                hasattr(panel, "_collapsed")
+            )
+            self.assertFalse(
+                hasattr(panel, "toggle")
+            )
+            self.assertEqual(
+                panel.minimumWidth(),
+                270,
+            )
+            self.assertEqual(
+                panel.maximumWidth(),
+                300,
+            )
+            self.assertFalse(
+                panel.body.isHidden()
+            )
+        finally:
+            panel.deleteLater()
 
 
 if __name__ == "__main__":
