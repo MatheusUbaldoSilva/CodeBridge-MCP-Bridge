@@ -168,9 +168,6 @@ class GpuViewTests(unittest.TestCase):
 
 
 class FakeTelemetryService:
-    def set_interval(self, value):
-        self.interval = value
-
     def snapshot(self, kind):
         return {
             "online": True,
@@ -208,6 +205,12 @@ class MonitorSystemHeaderTests(unittest.TestCase):
             )
             self.assertFalse(
                 hasattr(panel, "toggle")
+            )
+            self.assertFalse(
+                hasattr(panel, "interval_combo")
+            )
+            self.assertFalse(
+                hasattr(panel, "_change_interval")
             )
             self.assertEqual(
                 panel.minimumWidth(),

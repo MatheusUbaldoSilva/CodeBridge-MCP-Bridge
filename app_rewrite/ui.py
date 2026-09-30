@@ -263,7 +263,7 @@ class MainWindow(QMainWindow):
         self.status_timer.start(350)
         self.telemetry_timer = QTimer(self)
         self.telemetry_timer.timeout.connect(self.refresh_telemetry)
-        self.telemetry_timer.start(1000)
+        self.telemetry_timer.start(500)
         self.refresh()
         self.refresh_telemetry()
     def _update_auto_button(self):

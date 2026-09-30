@@ -12,10 +12,17 @@ from gpu_telemetry_windows import WindowsGpuTelemetry
 
 
 class TelemetryService:
-    def __init__(self, config_store, credential_store, interval=1.0):
+    REFRESH_INTERVAL = 0.5
+    TEMPERATURE_INTERVAL = 5.0
+
+    def __init__(self, config_store, credential_store, interval=None):
         self.config = config_store
         self.credentials = credential_store
-        self.interval = float(interval)
+        self.interval = (
+            self.REFRESH_INTERVAL
+            if interval is None
+            else float(interval)
+        )
         self._stop = threading.Event()
         self._lock = threading.RLock()
         self._threads = []
@@ -66,12 +73,6 @@ class TelemetryService:
         self._close_linux_client()
         self._gpu_telemetry.close()
 
-    def set_interval(self, seconds):
-        value = float(seconds)
-        if value not in (1.0, 2.0, 5.0):
-            raise ValueError("intervalo deve ser 1, 2 ou 5 segundos")
-        self.interval = value
-
     def snapshot(self, kind):
         with self._lock:
             data = self._windows if kind == "windows" else self._linux
@@ -86,6 +87,82 @@ class TelemetryService:
             return 0.0
         return max(0.0, (current - previous) / elapsed)
 
+    @staticmethod
+    def _temperature_cache(snapshot):
+        cache = {}
+        for device in (
+            (snapshot or {}).get("devices")
+            or []
+        ):
+            temperature = device.get(
+                "temperature_c"
+            )
+            luid = device.get("luid")
+            if temperature is None or not luid:
+                continue
+            source = (
+                (
+                    device.get("metric_sources")
+                    or {}
+                ).get("temperature_c")
+                or device.get("telemetry_source")
+                or "provider"
+            )
+            cache[luid] = {
+                "temperature_c": temperature,
+                "source": source,
+            }
+        return (
+            cache,
+            list(
+                (snapshot or {}).get(
+                    "provider_errors"
+                )
+                or []
+            ),
+        )
+
+    @staticmethod
+    def _apply_temperature_cache(
+        snapshot,
+        cache,
+        provider_errors,
+    ):
+        result = copy.deepcopy(snapshot or {})
+        devices = result.get("devices") or []
+        for device in devices:
+            entry = (cache or {}).get(
+                device.get("luid")
+            )
+            if not entry:
+                continue
+            device["temperature_c"] = (
+                entry["temperature_c"]
+            )
+            metric_sources = dict(
+                device.get("metric_sources")
+                or {}
+            )
+            metric_sources["temperature_c"] = (
+                entry["source"]
+            )
+            device["metric_sources"] = (
+                metric_sources
+            )
+
+        result["primary"] = next(
+            (
+                device
+                for device in devices
+                if device.get("is_primary")
+            ),
+            None,
+        )
+        result["provider_errors"] = list(
+            provider_errors or []
+        )
+        return result
+
     def _windows_loop(self):
         psutil.cpu_percent(interval=None)
         prev_disk = psutil.disk_io_counters()
@@ -98,7 +175,9 @@ class TelemetryService:
             "error": None,
             "provider_errors": [],
         }
-        gpu_at = 0.0
+        temperature_cache = {}
+        temperature_errors = []
+        temperature_at = 0.0
         while not self._stop.is_set():
             started = time.monotonic()
             try:
@@ -110,16 +189,32 @@ class TelemetryService:
                 net = psutil.net_io_counters()
                 now = time.monotonic()
                 elapsed = max(0.001, now - prev_time)
-                if now - gpu_at >= 2.0:
-                    generic_gpu = (
-                        self._gpu_telemetry
-                        .snapshot()
-                    )
-                    gpu_telemetry = (
+                generic_gpu = (
+                    self._gpu_telemetry
+                    .snapshot()
+                )
+                if (
+                    now - temperature_at
+                    >= self.TEMPERATURE_INTERVAL
+                ):
+                    enriched_gpu = (
                         self._gpu_provider_manager
                         .enrich(generic_gpu)
                     )
-                    gpu_at = now
+                    (
+                        temperature_cache,
+                        temperature_errors,
+                    ) = self._temperature_cache(
+                        enriched_gpu
+                    )
+                    temperature_at = now
+                gpu_telemetry = (
+                    self._apply_temperature_cache(
+                        generic_gpu,
+                        temperature_cache,
+                        temperature_errors,
+                    )
+                )
                 payload = {
                     "online": True, "error": None, "timestamp": time.time(),
                     "cpu_percent": cpu,

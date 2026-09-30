@@ -1,6 +1,6 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QComboBox, QFrame, QHBoxLayout, QLabel, QProgressBar,
+    QFrame, QHBoxLayout, QLabel, QProgressBar,
     QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
 )
 
@@ -91,7 +91,6 @@ class TelemetryPanel(QFrame):
             "QLabel{color:#dce6ee;background:transparent;}"
             "QScrollArea{background:#11171d;border:0;}"
             "QScrollArea QWidget{background:#11171d;}"
-            "QComboBox{background:#17212a;color:#eef3f6;border:1px solid #3a4a56;padding:3px;}"
             "QProgressBar{border:1px solid #44525d;background:#080d11;"
             "height:16px;text-align:center;color:#f3f6f8;} QProgressBar::chunk{background:#3a8f4b;}"
         )
@@ -118,15 +117,6 @@ class TelemetryPanel(QFrame):
             "color:#33414d;background:#33414d;"
         )
         outer.addWidget(separator)
-        controls = QHBoxLayout()
-        controls.addWidget(QLabel("Atualização:"))
-        self.interval_combo = QComboBox()
-        self.interval_combo.addItems(["1s", "2s", "5s"])
-        self.interval_combo.currentTextChanged.connect(self._change_interval)
-        controls.addWidget(self.interval_combo)
-        controls.addStretch(1)
-        outer.addLayout(controls)
-
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -188,12 +178,6 @@ class TelemetryPanel(QFrame):
         bar.setRange(0, 100)
         self.body_layout.addWidget(bar)
         return bar
-    def _change_interval(self, text):
-        try:
-            self.service.set_interval(float(text.rstrip("s")))
-        except Exception:
-            pass
-
     @staticmethod
     def _set_bar(bar, value):
         value = int(round(max(0.0, min(100.0, float(value or 0)))))
