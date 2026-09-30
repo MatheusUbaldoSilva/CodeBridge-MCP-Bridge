@@ -48,7 +48,6 @@ class AutoSwapTests(unittest.TestCase):
         manager._ensure_session = (
             lambda target: FakeSession()
         )
-        manager.announce = lambda *args: None
 
         result = manager.execute_prepared(
             "CMD",

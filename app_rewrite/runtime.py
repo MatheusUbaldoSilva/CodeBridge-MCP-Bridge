@@ -437,7 +437,6 @@ class BridgeRuntime:
     def submit(self, target, command):
         target = self.terminals.normalize_target(target)
         job = self.store.create(target, command)
-        self.terminals.announce(target, f"[PENDING] aguardando aprovacao\n> {command}")
         return job
 
     def prepare_external(self, request_id, target, command):
@@ -661,7 +660,6 @@ class BridgeRuntime:
 
     def approve(self, job_id):
         job = self.store.approve(job_id)
-        self.terminals.announce(job["target"], "[APPROVED] aguardando preparacao")
         self.engine.wake()
         return job
 

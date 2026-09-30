@@ -1,6 +1,5 @@
 import codecs
 import os
-import re
 import threading
 import time
 
@@ -10,9 +9,6 @@ from credential_store import WindowsCredentialStore
 from linux_terminal_session import LinuxTerminalSession
 from windows_terminal_session import WindowsTerminalSession
 from constants import TERMINAL_ALIASES
-
-
-_ANSI_RE = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))")
 
 
 class TerminalManager:
@@ -28,9 +24,6 @@ class TerminalManager:
         self._prepared_target = None
         self._execution_generation = 0
         self._last_execution_target = None
-        self._logs = {"POWERSHELL5.1": "", "CMD": "", "SSH": ""}
-        self._log_generation = {"POWERSHELL5.1": 0, "CMD": 0, "SSH": 0}
-        self._log_limit = 120000
         self._raw_streams = {"POWERSHELL5.1": "", "CMD": "", "SSH": ""}
         self._raw_generation = {"POWERSHELL5.1": 0, "CMD": 0, "SSH": 0}
         self._raw_base = {"POWERSHELL5.1": 0, "CMD": 0, "SSH": 0}
@@ -49,30 +42,6 @@ class TerminalManager:
             return TERMINAL_ALIASES[key]
         except KeyError as exc:
             raise ValueError(f"target invalido: {target}") from exc
-    @staticmethod
-    def _clean_text(data):
-        if isinstance(data, bytes):
-            text = data.decode("utf-8", errors="replace")
-        else:
-            text = str(data)
-        text = _ANSI_RE.sub("", text).replace("\r\n", "\n").replace("\r", "\n")
-        text = "".join(ch for ch in text if ch in "\n\t" or ord(ch) >= 32)
-        return text
-
-    def _append_log(self, target, data):
-        text = self._clean_text(data)
-        if not text:
-            return
-        with self._lock:
-            value = self._logs[target] + text
-            if len(value) > self._log_limit:
-                value = value[-self._log_limit:]
-                self._log_generation[target] += 1
-            self._logs[target] = value
-
-    def announce(self, target, message):
-        target = self.normalize_target(target)
-        self._append_log(target, "\n" + str(message).rstrip() + "\n")
 
     def _append_raw(self, target, data):
         target = self.normalize_target(target)
@@ -112,7 +81,6 @@ class TerminalManager:
     def _callback(self, target):
         def callback(data):
             self._append_raw(target, data)
-            self._append_log(target, data)
         return callback
     def start(self):
         # Execucoes automatizadas nunca devem abrir pagers/prompts
@@ -197,7 +165,6 @@ class TerminalManager:
             self.ssh_last_error = None
         if old is not None:
             old.close()
-        self.announce("SSH", f"[SSH] Conectado a {host}:{int(port)} como {username}")
         return self.ssh_settings()
 
     def send_input(self, target, data):
@@ -251,7 +218,6 @@ class TerminalManager:
                 raise RuntimeError("outro comando ja possui autoridade sobre os terminais")
             self.active_target = target
             self._prepared_target = target
-        self.announce(target, f"[PREPARED] {target}\n> {command}")
         ok = session.prepare_command(command, character_delay=0.0)
         if not ok:
             self.discard_prepared()
@@ -269,7 +235,6 @@ class TerminalManager:
             self.active_target = target
             self._execution_generation += 1
             self._last_execution_target = target
-        self.announce(target, "[RUNNING] Enter enviado")
         try:
             return session.execute(command, on_output=on_output, prepared=True)
         finally:
@@ -287,7 +252,6 @@ class TerminalManager:
             self.active_target = target
             self._execution_generation += 1
             self._last_execution_target = target
-        self.announce(target, f"[RUNNING] {target}\n> {command}")
         try:
             return session.execute(command, on_output=None, prepared=False)
         finally:
@@ -312,11 +276,6 @@ class TerminalManager:
                     self.active_target = None
                 if self._prepared_target == target:
                     self._prepared_target = None
-
-            self.announce(
-                target,
-                "[RECOVERY] reciclando terminal: " + str(reason),
-            )
 
             try:
                 if target == "POWERSHELL5.1":
@@ -364,11 +323,6 @@ class TerminalManager:
                         )
 
                     self._connect_saved_ssh(config)
-
-                self.announce(
-                    target,
-                    "[RECOVERY] terminal restaurado",
-                )
                 return True
 
             except Exception as exc:
@@ -378,13 +332,6 @@ class TerminalManager:
                         + ": "
                         + str(exc)
                     )
-                self.announce(
-                    target,
-                    "[RECOVERY] falhou: "
-                    + type(exc).__name__
-                    + ": "
-                    + str(exc),
-                )
                 return False
 
             finally:
@@ -470,16 +417,14 @@ class TerminalManager:
             self.active_target = None
         if target is None:
             return False
-        try:
-            if target == "POWERSHELL5.1" and self.windows.is_running:
-                self.windows.send(b"\x1b[21~")
-            elif target == "CMD" and self.cmd.is_running:
-                self.cmd.send(b"\x1b")
-            elif target == "SSH" and self.ssh is not None and self.ssh.is_running:
-                self.ssh.send(b"\x15")
-        finally:
-            self.announce(target, "[CANCELLED] comando preparado descartado")
+        if target == "POWERSHELL5.1" and self.windows.is_running:
+            self.windows.send(b"\x1b[21~")
+        elif target == "CMD" and self.cmd.is_running:
+            self.cmd.send(b"\x1b")
+        elif target == "SSH" and self.ssh is not None and self.ssh.is_running:
+            self.ssh.send(b"\x15")
         return True
+
     def cancel_active(self):
         with self._lock:
             target = self.active_target

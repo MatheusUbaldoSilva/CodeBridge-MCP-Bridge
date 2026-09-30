@@ -106,14 +106,12 @@ class ExecutionEngine:
             if self._is_cancel_requested(job_id):
                 self.store.finish(job_id, "CANCELLED", exit_code=130)
                 terminal_state = "CANCELLED"
-                self.terminals.announce(target, "[CANCELLED] antes do Enter")
                 return
 
             self.store.mark_running(job_id)
             output = self.terminals.execute_prepared(target, command)
             self.store.finish(job_id, "SUCCESS", output=output, exit_code=0)
             terminal_state = "SUCCESS"
-            self.terminals.announce(target, "[SUCCESS] exit_code=0")
         except Exception as exc:
             output = getattr(exc, "output", "") or ""
             exit_code = getattr(exc, "exit_code", None)
@@ -135,7 +133,6 @@ class ExecutionEngine:
             except Exception:
                 pass
             terminal_state = state
-            self.terminals.announce(target, f"[{state}] {name}: {exc}")
         finally:
             if prepared_at is not None and self.terminals.status().get("prepared_target"):
                 try:
