@@ -1,5 +1,4 @@
 import copy
-import subprocess
 import threading
 import time
 from collections import deque
@@ -8,6 +7,10 @@ import paramiko
 import psutil
 
 from gpu_inventory import discover_windows_gpus
+from gpu_providers import (
+    GpuProviderManager,
+    legacy_gpu_snapshot,
+)
 from gpu_telemetry_windows import WindowsGpuTelemetry
 
 
@@ -43,6 +46,9 @@ class TelemetryService:
             WindowsGpuTelemetry(
                 self._gpu_inventory
             )
+        )
+        self._gpu_provider_manager = (
+            GpuProviderManager()
         )
     def start(self):
         if self._threads:
@@ -83,28 +89,6 @@ class TelemetryService:
             return 0.0
         return max(0.0, (current - previous) / elapsed)
 
-    @staticmethod
-    def _gpu_snapshot():
-        command = [
-            "nvidia-smi",
-            "--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu",
-            "--format=csv,noheader,nounits",
-        ]
-        try:
-            result = subprocess.run(
-                command, capture_output=True, text=True, timeout=2,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            )
-            if result.returncode != 0 or not result.stdout.strip():
-                return None
-            parts = [part.strip() for part in result.stdout.splitlines()[0].split(",")]
-            return {
-                "name": parts[0], "percent": float(parts[1]),
-                "used_mb": float(parts[2]), "total_mb": float(parts[3]),
-                "temp_c": float(parts[4]),
-            }
-        except Exception:
-            return None
     def _windows_loop(self):
         psutil.cpu_percent(interval=None)
         prev_disk = psutil.disk_io_counters()
@@ -116,6 +100,7 @@ class TelemetryService:
             "primary": None,
             "source": "windows_pdh",
             "error": None,
+            "provider_errors": [],
         }
         gpu_at = 0.0
         while not self._stop.is_set():
@@ -130,10 +115,16 @@ class TelemetryService:
                 now = time.monotonic()
                 elapsed = max(0.001, now - prev_time)
                 if now - gpu_at >= 2.0:
-                    gpu = self._gpu_snapshot()
-                    gpu_telemetry = (
+                    generic_gpu = (
                         self._gpu_telemetry
                         .snapshot()
+                    )
+                    gpu_telemetry = (
+                        self._gpu_provider_manager
+                        .enrich(generic_gpu)
+                    )
+                    gpu = legacy_gpu_snapshot(
+                        gpu_telemetry
                     )
                     gpu_at = now
                 payload = {
