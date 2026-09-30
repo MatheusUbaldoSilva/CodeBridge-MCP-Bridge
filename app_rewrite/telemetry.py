@@ -7,6 +7,8 @@ from collections import deque
 import paramiko
 import psutil
 
+from gpu_inventory import discover_windows_gpus
+
 
 class TelemetryService:
     def __init__(self, config_store, credential_store, interval=1.0):
@@ -25,6 +27,9 @@ class TelemetryService:
             "linux_ram": deque(maxlen=60),
         }
         self._linux_client = None
+        self._gpu_inventory = (
+            discover_windows_gpus()
+        )
     def start(self):
         if self._threads:
             return False
@@ -121,6 +126,9 @@ class TelemetryService:
                     "net_up_bps": self._rate(net.bytes_sent, prev_net.bytes_sent, elapsed),
                     "uptime": max(0.0, time.time() - psutil.boot_time()),
                     "gpu": gpu,
+                    "gpu_inventory": copy.deepcopy(
+                        self._gpu_inventory
+                    ),
                 }
                 with self._lock:
                     self._windows = payload
