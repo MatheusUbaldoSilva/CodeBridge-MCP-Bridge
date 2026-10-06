@@ -147,6 +147,33 @@ class ExecResult(ProtocolOutcome):
     wait_timeout_ms: int
 
 
+class WaitResult(ProtocolOutcome):
+    protocol: str
+    handshake_confirmed: bool
+    request_id: str
+    response_id: str
+    state: str
+    runtime_state: str
+    execution_id: str
+    target: str
+    exit_code: int | None
+    started_at: str | None
+    finished_at: str | None
+    error_type: str | None
+    error_message: str | None
+    cursor: int
+    next_cursor: int
+    text: str
+    chars: int
+    available_chars: int
+    has_more: bool
+    eof: bool
+    complete: bool
+    timed_out: bool
+    raw_available: bool
+    wait_timeout_ms: int
+
+
 class StopResult(ProtocolOutcome):
     protocol: str
     handshake_confirmed: bool
@@ -555,6 +582,154 @@ def codebridge_exec(
         output_mode=output_mode,
         wait_timeout_ms=wait_timeout_ms,
     )
+
+
+@mcp.tool(
+    name="codebridge_wait",
+    description="Aguarda output novo ou estado terminal de uma execucao existente sem reenviar o comando. Usa cursor incremental e retorna por output, conclusao ou timeout.",
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        idempotent_hint=True,
+        open_world_hint=False,
+    ),
+    structured_output=True,
+)
+def codebridge_wait(
+    execution_id: str,
+    cursor: int = 0,
+    wait_timeout_ms: int = 15000,
+    max_chars: int = 32768,
+) -> WaitResult:
+    execution_id = str(execution_id or "").strip()
+    if not execution_id:
+        raise ValueError("execution_id obrigatorio")
+
+    cursor = max(0, int(cursor or 0))
+    wait_timeout_ms = max(0, min(int(wait_timeout_ms or 0), 120000))
+    max_chars = max(1, min(int(max_chars or 32768), 262144))
+    deadline = time.monotonic() + (wait_timeout_ms / 1000.0)
+    terminal_states = {"FINISHED", "FAILED", "CANCELLED", "INTERRUPTED"}
+
+    while True:
+        output_exchange = ProtocolHTTPClient(timeout=10.0).exchange(
+            "EXECUTION_V2_OUTPUT",
+            {
+                "execution_id": execution_id,
+                "cursor": cursor,
+                "max_chars": max_chars,
+            },
+        )
+        output_payload = output_exchange["payload"]
+
+        if not output_payload.get("operation_ok", True):
+            return WaitResult(
+                protocol="CBMCP/1",
+                handshake_confirmed=True,
+                request_id=output_exchange["request_syn"]["request_id"],
+                response_id=output_exchange["response_syn"]["response_id"],
+                **_outcome_fields(output_payload),
+                state="ERROR",
+                runtime_state=str(output_payload.get("state") or "ERROR"),
+                execution_id=execution_id,
+                target=str(output_payload.get("target") or ""),
+                exit_code=None,
+                started_at=output_payload.get("started_at"),
+                finished_at=output_payload.get("finished_at"),
+                error_type=output_payload.get("error_type"),
+                error_message=output_payload.get("error_message"),
+                cursor=cursor,
+                next_cursor=cursor,
+                text="",
+                chars=0,
+                available_chars=0,
+                has_more=False,
+                eof=False,
+                complete=False,
+                timed_out=False,
+                raw_available=False,
+                wait_timeout_ms=wait_timeout_ms,
+            )
+
+        runtime_state = str(output_payload.get("state") or "RUNNING")
+        state = "RUNNING" if runtime_state in {"CREATED", "RUNNING"} else runtime_state
+        text = str(output_payload.get("text") or "")
+        next_cursor = int(output_payload.get("next_cursor", cursor) or cursor)
+        complete = bool(output_payload.get("complete")) or runtime_state in terminal_states
+        has_more = bool(output_payload.get("has_more"))
+        eof = bool(output_payload.get("eof"))
+
+        result_payload = {}
+        result_exchange = output_exchange
+        if complete:
+            result_exchange = ProtocolHTTPClient(timeout=10.0).exchange(
+                "EXECUTION_V2_RESULT",
+                {"execution_id": execution_id},
+            )
+            result_payload = result_exchange["payload"]
+            if result_payload.get("operation_ok", True):
+                runtime_state = str(result_payload.get("state") or runtime_state)
+                state = "RUNNING" if runtime_state in {"CREATED", "RUNNING"} else runtime_state
+
+        if text or has_more or complete:
+            return WaitResult(
+                protocol="CBMCP/1",
+                handshake_confirmed=True,
+                request_id=result_exchange["request_syn"]["request_id"],
+                response_id=result_exchange["response_syn"]["response_id"],
+                **_outcome_fields(result_payload or output_payload),
+                state=state,
+                runtime_state=runtime_state,
+                execution_id=execution_id,
+                target=str(result_payload.get("target") or output_payload.get("target") or ""),
+                exit_code=result_payload.get("exit_code") if complete else None,
+                started_at=result_payload.get("started_at") or output_payload.get("started_at"),
+                finished_at=result_payload.get("finished_at") or output_payload.get("finished_at"),
+                error_type=result_payload.get("error_type") if complete else None,
+                error_message=result_payload.get("error_message") if complete else None,
+                cursor=cursor,
+                next_cursor=next_cursor,
+                text=text,
+                chars=int(output_payload.get("chars", len(text)) or 0),
+                available_chars=int(output_payload.get("available_chars", len(text)) or 0),
+                has_more=has_more,
+                eof=eof,
+                complete=complete,
+                timed_out=False,
+                raw_available=True,
+                wait_timeout_ms=wait_timeout_ms,
+            )
+
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return WaitResult(
+                protocol="CBMCP/1",
+                handshake_confirmed=True,
+                request_id=output_exchange["request_syn"]["request_id"],
+                response_id=output_exchange["response_syn"]["response_id"],
+                **_outcome_fields(output_payload),
+                state=state,
+                runtime_state=runtime_state,
+                execution_id=execution_id,
+                target=str(output_payload.get("target") or ""),
+                exit_code=None,
+                started_at=output_payload.get("started_at"),
+                finished_at=output_payload.get("finished_at"),
+                error_type=None,
+                error_message=None,
+                cursor=cursor,
+                next_cursor=next_cursor,
+                text="",
+                chars=0,
+                available_chars=int(output_payload.get("available_chars", 0) or 0),
+                has_more=False,
+                eof=eof,
+                complete=False,
+                timed_out=True,
+                raw_available=True,
+                wait_timeout_ms=wait_timeout_ms,
+            )
+
+        time.sleep(min(0.10, remaining))
 
 
 @mcp.tool(
