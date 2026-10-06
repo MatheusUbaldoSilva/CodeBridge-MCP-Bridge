@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 import secrets
@@ -20,6 +21,8 @@ from terminal_manager import TerminalManager
 
 
 class BridgeRuntime:
+    STATUS_AVAILABILITY_CACHE_TTL_SECONDS = 0.5
+
     def __init__(self):
         self.store = JobStore()
         self.terminals = TerminalManager()
@@ -36,6 +39,9 @@ class BridgeRuntime:
         self._external_prepared_command = None
         self._external_workers_lock = threading.RLock()
         self._external_workers = {}
+        self._availability_cache_lock = threading.RLock()
+        self._availability_cache = None
+        self._availability_cache_at = 0.0
         self.auto_execute = self.terminals.config.load_auto_execute()
         self.auto_preview_seconds = 0.35
         self.completion_sound = CompletionSound(
@@ -61,10 +67,40 @@ class BridgeRuntime:
     @property
     def started(self):
         return self._started
+
+    def _invalidate_availability_cache(self):
+        with self._availability_cache_lock:
+            self._availability_cache = None
+            self._availability_cache_at = 0.0
+
+    def _availability_status(self):
+        now = time.monotonic()
+        with self._availability_cache_lock:
+            if (
+                self._availability_cache is not None
+                and (
+                    now - self._availability_cache_at
+                    < self.STATUS_AVAILABILITY_CACHE_TTL_SECONDS
+                )
+            ):
+                return copy.deepcopy(
+                    self._availability_cache
+                )
+
+        fresh = {
+            "author_mcp": self.author_mcp.status(),
+            "secure_tunnel": self.secure_tunnel.status(),
+        }
+        with self._availability_cache_lock:
+            self._availability_cache = copy.deepcopy(fresh)
+            self._availability_cache_at = now
+        return fresh
+
     def start(self):
         if self._started:
             return False
 
+        self._invalidate_availability_cache()
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         migrate_legacy_ssh_once()
         self.external_executions.recover_stale(self.instance_id)
@@ -80,6 +116,7 @@ class BridgeRuntime:
         self._write_runtime_file()
         self.author_mcp.start()
         self.secure_tunnel.start()
+        self._invalidate_availability_cache()
         return True
 
     def _write_runtime_file(self):
@@ -836,8 +873,9 @@ class BridgeRuntime:
             terminals
         )
         counts = self.store.counts()
-        author_mcp = self.author_mcp.status()
-        secure_tunnel = self.secure_tunnel.status()
+        availability = self._availability_status()
+        author_mcp = availability["author_mcp"]
+        secure_tunnel = availability["secure_tunnel"]
         overall = (
             "READY"
             if terminals["powershell"]["online"]
@@ -901,6 +939,7 @@ class BridgeRuntime:
         if not self._started:
             return True
 
+        self._invalidate_availability_cache()
         try:
             self.secure_tunnel.stop()
         finally:
@@ -922,6 +961,7 @@ class BridgeRuntime:
                                 pass
 
         self._started = False
+        self._invalidate_availability_cache()
         try:
             RUNTIME_FILE.unlink(missing_ok=True)
         except OSError:

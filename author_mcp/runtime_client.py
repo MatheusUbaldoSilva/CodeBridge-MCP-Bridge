@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
@@ -8,6 +9,10 @@ from urllib.request import Request, urlopen
 
 DATA_DIR = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "CodeBridge-MCP-Bridge"
 RUNTIME_FILE = DATA_DIR / "runtime.json"
+
+_RUNTIME_CACHE_LOCK = threading.RLock()
+_RUNTIME_CACHE_SIGNATURE = None
+_RUNTIME_CACHE_VALUE = None
 
 
 class CodeBridgeUnavailable(RuntimeError):
@@ -39,14 +44,66 @@ def _http_error_message(exc):
     return f"HTTP {exc.code}: {exc.reason}"
 
 
-def _load_runtime():
-    if not RUNTIME_FILE.is_file():
-        raise CodeBridgeUnavailable("runtime.json nao encontrado")
-    data = json.loads(RUNTIME_FILE.read_text(encoding="utf-8"))
+def _runtime_file_signature():
+    try:
+        stat = RUNTIME_FILE.stat()
+    except FileNotFoundError as exc:
+        _invalidate_runtime_cache()
+        raise CodeBridgeUnavailable(
+            "runtime.json nao encontrado"
+        ) from exc
+    return (
+        int(getattr(stat, "st_ino", 0) or 0),
+        int(stat.st_size),
+        int(stat.st_mtime_ns),
+    )
+
+
+def _invalidate_runtime_cache():
+    global _RUNTIME_CACHE_SIGNATURE, _RUNTIME_CACHE_VALUE
+    with _RUNTIME_CACHE_LOCK:
+        _RUNTIME_CACHE_SIGNATURE = None
+        _RUNTIME_CACHE_VALUE = None
+
+
+def _read_runtime_file():
+    try:
+        data = json.loads(
+            RUNTIME_FILE.read_text(encoding="utf-8")
+        )
+    except FileNotFoundError as exc:
+        _invalidate_runtime_cache()
+        raise CodeBridgeUnavailable(
+            "runtime.json nao encontrado"
+        ) from exc
     for key in ("host", "port", "token"):
         if not data.get(key):
-            raise CodeBridgeUnavailable(f"runtime.json sem {key}")
+            raise CodeBridgeUnavailable(
+                f"runtime.json sem {key}"
+            )
     return data
+
+
+def _load_runtime():
+    global _RUNTIME_CACHE_SIGNATURE, _RUNTIME_CACHE_VALUE
+    signature = _runtime_file_signature()
+    with _RUNTIME_CACHE_LOCK:
+        if (
+            _RUNTIME_CACHE_VALUE is not None
+            and _RUNTIME_CACHE_SIGNATURE == signature
+        ):
+            return dict(_RUNTIME_CACHE_VALUE)
+
+    data = _read_runtime_file()
+    final_signature = _runtime_file_signature()
+    if final_signature != signature:
+        data = _read_runtime_file()
+        final_signature = _runtime_file_signature()
+
+    with _RUNTIME_CACHE_LOCK:
+        _RUNTIME_CACHE_SIGNATURE = final_signature
+        _RUNTIME_CACHE_VALUE = dict(data)
+        return dict(_RUNTIME_CACHE_VALUE)
 
 
 def _get_json(url, token, timeout=3.0):
