@@ -102,18 +102,37 @@ class MigrationCatalogTests(unittest.TestCase):
         )
         self.assertEqual(
             result.migration["stage"],
-            "STABILIZE",
-        )
-        self.assertTrue(
-            result.migration["legacy_tools_published"]
+            "REMOVE",
         )
         self.assertFalse(
+            result.migration["legacy_tools_published"]
+        )
+        self.assertTrue(
             result.migration["legacy_removal_ready"]
         )
         self.assertEqual(
             FakeClient.calls,
             [("STATUS", {})],
         )
+
+    def test_legacy_tool_exports_are_removed(self):
+        removed = [
+            "codebridge_ping",
+            "codebridge_terminal",
+            "codebridge_start",
+            "codebridge_execution_status",
+            "codebridge_v2_start",
+            "codebridge_v2_status",
+            "codebridge_v2_result",
+            "codebridge_v2_output",
+            "codebridge_v2_stop",
+        ]
+        for name in removed:
+            self.assertFalse(
+                hasattr(mcp_server, name),
+                name,
+            )
+
 
     def test_targeted_stop_replaces_v2_stop(self):
         with patch.object(

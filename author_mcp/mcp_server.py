@@ -1,7 +1,7 @@
 import argparse
 import base64
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -11,15 +11,6 @@ from mcp.types import Icon, ToolAnnotations
 from pydantic import BaseModel
 
 from http_client import ProtocolHTTPClient
-
-
-class PingResult(BaseModel):
-    status: str
-    mensagem: str
-    desafio: str
-    executor_conectado: bool
-    timestamp_utc: str
-    turn_control: dict[str, Any] | None = None
 
 
 class ProtocolOutcome(BaseModel):
@@ -97,62 +88,6 @@ class DiscardResult(ProtocolOutcome):
     discarded: bool
     prepared_request_id: str | None
     reason: str | None = None
-
-
-class TerminalDispatchResult(ProtocolOutcome):
-    protocol: str
-    handshake_confirmed: bool
-    request_id: str
-    response_id: str
-    mode: str
-    auto_execute: bool
-    preview_seconds: float
-    prepared: dict[str, Any]
-    execution: dict[str, Any] | None
-
-
-class AsyncStartResult(ProtocolOutcome):
-    protocol: str
-    handshake_confirmed: bool
-    request_id: str
-    response_id: str
-    mode: str
-    auto_execute: bool
-    preview_seconds: float
-    prepared: dict[str, Any]
-    execution: dict[str, Any] | None
-
-
-class ExecutionStatusResult(ProtocolOutcome):
-    protocol: str
-    handshake_confirmed: bool
-    request_id: str
-    response_id: str
-    execution: dict[str, Any]
-
-
-class V2ExecutionEnvelope(ProtocolOutcome):
-    protocol: str
-    handshake_confirmed: bool
-    request_id: str
-    response_id: str
-    execution: dict[str, Any]
-
-
-class V2ExecutionStopResult(ProtocolOutcome):
-    protocol: str
-    handshake_confirmed: bool
-    request_id: str
-    response_id: str
-    stop: dict[str, Any]
-
-
-class V2OutputResult(ProtocolOutcome):
-    protocol: str
-    handshake_confirmed: bool
-    request_id: str
-    response_id: str
-    output: dict[str, Any]
 
 
 class ExecResult(ProtocolOutcome):
@@ -648,35 +583,6 @@ def _exec_result(
 
 
 @mcp.tool(
-    name="codebridge_ping",
-    description="[LEGACY] Diagnostico antigo. Prefira codebridge_status ou codebridge_capabilities.",
-    annotations=ToolAnnotations(read_only_hint=True, open_world_hint=False),
-    structured_output=True,
-)
-def codebridge_ping(desafio: str) -> PingResult:
-    turn_control = None
-    try:
-        exchange = ProtocolHTTPClient().exchange(
-            "STATUS",
-            {},
-        )
-        turn_control = (
-            exchange.get("payload") or {}
-        ).get("turn_control")
-    except Exception:
-        pass
-
-    return PingResult(
-        status="ok",
-        mensagem="CODEBRIDGE_AUTHOR_OK",
-        desafio=desafio,
-        executor_conectado=False,
-        timestamp_utc=datetime.now(timezone.utc).isoformat(),
-        turn_control=turn_control,
-    )
-
-
-@mcp.tool(
     name="codebridge_status",
     description="Consulta somente leitura do estado atual do CodeBridge via handshake CBMCP/1.",
     annotations=ToolAnnotations(read_only_hint=True, open_world_hint=False),
@@ -807,16 +713,16 @@ def codebridge_capabilities() -> CapabilitiesResult:
         preferred_tools=preferred_tools,
         legacy_tools=legacy_tools,
         migration={
-            "stage": "STABILIZE",
-            "legacy_tools_published": True,
-            "legacy_removal_ready": False,
+            "stage": "REMOVE",
+            "legacy_tools_published": False,
+            "legacy_removal_ready": True,
             "removal_gate": (
-                "remove only after connected clients refresh their MCP schema "
-                "and no longer depend on legacy tool names"
+                "passed: fresh MCP client validated the preferred tool surface "
+                "across PowerShell CMD SSH and targeted cancellation"
             ),
             "rollback": (
-                "keep v2 operations available; never reexecute commands "
-                "during fallback"
+                "legacy MCP tools removed; internal v2 operations remain available "
+                "for rollback without command reexecution"
             ),
         },
     )
@@ -905,33 +811,6 @@ def codebridge_prepare(target: str, command: str) -> PrepareResult:
 
 
 @mcp.tool(
-    name="codebridge_terminal",
-    description="[LEGACY] Dispatch antigo. Prefira codebridge_exec para executar ou codebridge_prepare para preparar.",
-    annotations=ToolAnnotations(
-        read_only_hint=False, destructive_hint=True,
-        idempotent_hint=True, open_world_hint=True,
-    ),
-    structured_output=True,
-)
-def codebridge_terminal(target: str, command: str) -> TerminalDispatchResult:
-    exchange = ProtocolHTTPClient(timeout=135.0).exchange(
-        "DISPATCH", {"target": target, "command": command}
-    )
-    payload = exchange["payload"]
-    return TerminalDispatchResult(
-        protocol="CBMCP/1", handshake_confirmed=True,
-        request_id=exchange["request_syn"]["request_id"],
-        response_id=exchange["response_syn"]["response_id"],
-        **_outcome_fields(payload),
-        mode=str(payload.get("mode") or "ERROR"),
-        auto_execute=bool(payload.get("auto_execute")),
-        preview_seconds=float(payload.get("preview_seconds") or 0.0),
-        prepared=payload.get("prepared") or {},
-        execution=payload.get("execution"),
-    )
-
-
-@mcp.tool(
     name="codebridge_execute_prepared",
     description="Envia Enter uma unica vez para o comando preparado e retorna o resultado.",
     annotations=ToolAnnotations(
@@ -978,50 +857,6 @@ def codebridge_discard(request_id: str | None = None) -> DiscardResult:
     exchange = ProtocolHTTPClient().exchange("DISCARD", {"request_id": request_id})
     payload = exchange["payload"]
     return DiscardResult(protocol="CBMCP/1", handshake_confirmed=True, request_id=exchange["request_syn"]["request_id"], response_id=exchange["response_syn"]["response_id"], **_outcome_fields(payload), discarded=bool(payload.get("discarded")), prepared_request_id=payload.get("request_id"), reason=payload.get("reason"))
-
-
-@mcp.tool(
-    name="codebridge_start",
-    description="[LEGACY] Inicio assincrono antigo. Prefira codebridge_exec com wait_timeout_ms=0.",
-    annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True, idempotent_hint=True, open_world_hint=True),
-    structured_output=True,
-)
-def codebridge_start(target: str, command: str) -> AsyncStartResult:
-    exchange = ProtocolHTTPClient(timeout=12.0).exchange(
-        "START_ASYNC", {"target": target, "command": command}
-    )
-    payload = exchange["payload"]
-    return AsyncStartResult(
-        protocol="CBMCP/1", handshake_confirmed=True,
-        request_id=exchange["request_syn"]["request_id"],
-        response_id=exchange["response_syn"]["response_id"],
-        **_outcome_fields(payload),
-        mode=str(payload.get("mode") or "ERROR"),
-        auto_execute=bool(payload.get("auto_execute")),
-        preview_seconds=float(payload.get("preview_seconds") or 0.0),
-        prepared=payload.get("prepared") or {},
-        execution=payload.get("execution"),
-    )
-
-
-@mcp.tool(
-    name="codebridge_execution_status",
-    description="[LEGACY] Consulta antiga. Prefira codebridge_wait com wait_timeout_ms=0.",
-    annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=False),
-    structured_output=True,
-)
-def codebridge_execution_status(execution_id: str, cursor: int = 0, max_chars: int = 65536) -> ExecutionStatusResult:
-    exchange = ProtocolHTTPClient(timeout=10.0).exchange(
-        "EXECUTION_STATUS", {"execution_id": execution_id, "cursor": cursor, "max_chars": max_chars}
-    )
-    payload = exchange["payload"]
-    return ExecutionStatusResult(
-        protocol="CBMCP/1", handshake_confirmed=True,
-        request_id=exchange["request_syn"]["request_id"],
-        response_id=exchange["response_syn"]["response_id"],
-        **_outcome_fields(payload),
-        execution=payload if payload.get("operation_ok", True) else {},
-    )
 
 
 @mcp.tool(
@@ -1322,108 +1157,6 @@ def codebridge_wait(
             "important_sections"
         ],
         wait_timeout_ms=wait_timeout_ms,
-    )
-
-
-@mcp.tool(
-    name="codebridge_v2_start",
-    description="[LEGACY] Rota v2 de inicio. Prefira codebridge_exec.",
-    annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True, idempotent_hint=True, open_world_hint=True),
-    structured_output=True,
-)
-def codebridge_v2_start(target: str, command: str) -> V2ExecutionEnvelope:
-    exchange = ProtocolHTTPClient(timeout=12.0).exchange(
-        "EXECUTION_V2_START", {"target": target, "command": command}
-    )
-    payload = exchange["payload"]
-    return V2ExecutionEnvelope(
-        protocol="CBMCP/1", handshake_confirmed=True,
-        request_id=exchange["request_syn"]["request_id"],
-        response_id=exchange["response_syn"]["response_id"],
-        **_outcome_fields(payload),
-        execution=payload if payload.get("operation_ok", True) else {},
-    )
-
-
-@mcp.tool(
-    name="codebridge_v2_status",
-    description="[LEGACY] Rota v2 de status. Prefira codebridge_wait com wait_timeout_ms=0.",
-    annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=False),
-    structured_output=True,
-)
-def codebridge_v2_status(execution_id: str) -> V2ExecutionEnvelope:
-    exchange = ProtocolHTTPClient(timeout=10.0).exchange(
-        "EXECUTION_V2_STATUS", {"execution_id": execution_id}
-    )
-    payload = exchange["payload"]
-    return V2ExecutionEnvelope(
-        protocol="CBMCP/1", handshake_confirmed=True,
-        request_id=exchange["request_syn"]["request_id"],
-        response_id=exchange["response_syn"]["response_id"],
-        **_outcome_fields(payload),
-        execution=payload if payload.get("operation_ok", True) else {},
-    )
-
-
-@mcp.tool(
-    name="codebridge_v2_result",
-    description="[LEGACY] Rota v2 de resultado. Prefira codebridge_wait.",
-    annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=False),
-    structured_output=True,
-)
-def codebridge_v2_result(execution_id: str) -> V2ExecutionEnvelope:
-    exchange = ProtocolHTTPClient(timeout=10.0).exchange(
-        "EXECUTION_V2_RESULT", {"execution_id": execution_id}
-    )
-    payload = exchange["payload"]
-    return V2ExecutionEnvelope(
-        protocol="CBMCP/1", handshake_confirmed=True,
-
-        request_id=exchange["request_syn"]["request_id"],
-        response_id=exchange["response_syn"]["response_id"],
-        **_outcome_fields(payload),
-        execution=payload if payload.get("operation_ok", True) else {},
-    )
-
-
-@mcp.tool(
-    name="codebridge_v2_output",
-    description="[LEGACY] Rota v2 de output. Prefira codebridge_wait com wait_timeout_ms=0.",
-    annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=False),
-    structured_output=True,
-)
-def codebridge_v2_output(execution_id: str, cursor: int = 0, max_chars: int = 32768) -> V2OutputResult:
-    exchange = ProtocolHTTPClient(timeout=10.0).exchange(
-        "EXECUTION_V2_OUTPUT",
-        {"execution_id": execution_id, "cursor": cursor, "max_chars": max_chars},
-    )
-    payload = exchange["payload"]
-    return V2OutputResult(
-        protocol="CBMCP/1", handshake_confirmed=True,
-        request_id=exchange["request_syn"]["request_id"],
-        response_id=exchange["response_syn"]["response_id"],
-        **_outcome_fields(payload),
-        output=payload if payload.get("operation_ok", True) else {},
-    )
-
-
-@mcp.tool(
-    name="codebridge_v2_stop",
-    description="[LEGACY] Rota v2 de cancelamento. Prefira codebridge_stop(execution_id=...).",
-    annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False),
-    structured_output=True,
-)
-def codebridge_v2_stop(execution_id: str) -> V2ExecutionStopResult:
-    exchange = ProtocolHTTPClient(timeout=10.0).exchange(
-        "EXECUTION_V2_STOP", {"execution_id": execution_id}
-    )
-    payload = exchange["payload"]
-    return V2ExecutionStopResult(
-        protocol="CBMCP/1", handshake_confirmed=True,
-        request_id=exchange["request_syn"]["request_id"],
-        response_id=exchange["response_syn"]["response_id"],
-        **_outcome_fields(payload),
-        stop=payload if payload.get("operation_ok", True) else {},
     )
 
 
