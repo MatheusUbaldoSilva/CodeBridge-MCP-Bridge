@@ -17,6 +17,11 @@ from .execution_inventory import (
     SUMMARY_METADATA_FIELDS,
     build_execution_index_record,
 )
+from .exclusion_policy import (
+    DenyReason,
+    classify_denied_path,
+    is_denied_path,
+)
 from .git_inventory import (
     GIT_FACET_FIELDS,
     READ_ONLY_GIT_OPERATIONS,
@@ -37,6 +42,9 @@ __all__ = [
     "INDEXABLE_EXECUTION_FIELDS",
     "SUMMARY_METADATA_FIELDS",
     "build_execution_index_record",
+    "DenyReason",
+    "classify_denied_path",
+    "is_denied_path",
     "GIT_FACET_FIELDS",
     "READ_ONLY_GIT_OPERATIONS",
     "GitFacet",
