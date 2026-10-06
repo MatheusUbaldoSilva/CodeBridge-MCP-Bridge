@@ -33,6 +33,10 @@ class BridgeRuntime:
         self._phase5b_lock = threading.RLock()
         self._phase5b_workers = {}
         self._phase5b_active_execution_id = None
+        self._execution_signal_condition = threading.Condition(
+            threading.RLock()
+        )
+        self._execution_signal_generation = 0
         self._external_prepare_lock = threading.RLock()
         self._external_prepared_request_id = None
         self._external_prepared_target = None
@@ -339,6 +343,31 @@ class BridgeRuntime:
         result["complete"] = row["state"] in ("FINISHED", "FAILED")
         return result
 
+    def _signal_execution_change(self):
+        with self._execution_signal_condition:
+            self._execution_signal_generation += 1
+            self._execution_signal_condition.notify_all()
+
+    def _execution_signal_snapshot(self):
+        with self._execution_signal_condition:
+            return self._execution_signal_generation
+
+    def _wait_for_execution_change(self, generation, timeout_seconds):
+        timeout_seconds = max(
+            0.0,
+            float(timeout_seconds or 0.0),
+        )
+        with self._execution_signal_condition:
+            if self._execution_signal_generation != generation:
+                return True
+            return self._execution_signal_condition.wait_for(
+                lambda: (
+                    self._execution_signal_generation
+                    != generation
+                ),
+                timeout=timeout_seconds,
+            )
+
     def start_phase5b_local(self, request_id, target, command):
         request_id = str(request_id or "").strip()
         if not request_id:
@@ -369,7 +398,14 @@ class BridgeRuntime:
             try:
                 self.terminals.prepare(target, command)
             except Exception as exc:
-                self.execution_ledger.transition(execution_id, "FAILED", runtime_instance=self.instance_id, error_type=type(exc).__name__, error_message=str(exc))
+                self.execution_ledger.transition(
+                    execution_id,
+                    "FAILED",
+                    runtime_instance=self.instance_id,
+                    error_type=type(exc).__name__,
+                    error_message=str(exc),
+                )
+                self._signal_execution_change()
                 raise
             worker = threading.Thread(target=self._run_phase5b_local, args=(execution_id, target, command), name=f"CodeBridgeV2-{execution_id[-10:]}", daemon=True)
             self._phase5b_workers[execution_id] = worker
@@ -388,11 +424,25 @@ class BridgeRuntime:
                 self.execution_ledger.transition(execution_id, "RUNNING", runtime_instance=self.instance_id)
                 self._phase5b_active_execution_id = execution_id
             def capture_output(text):
-                self.execution_ledger.append_output(execution_id, text)
+                self.execution_ledger.append_output(
+                    execution_id,
+                    text,
+                )
+                self._signal_execution_change()
             try:
                 output = self.terminals.execute_prepared(target, command, on_output=capture_output)
-                self.execution_ledger.sync_output(execution_id, output)
-                self.execution_ledger.transition(execution_id, "FINISHED", runtime_instance=self.instance_id, exit_code=0, output=output)
+                self.execution_ledger.sync_output(
+                    execution_id,
+                    output,
+                )
+                self.execution_ledger.transition(
+                    execution_id,
+                    "FINISHED",
+                    runtime_instance=self.instance_id,
+                    exit_code=0,
+                    output=output,
+                )
+                self._signal_execution_change()
 
             except Exception as exc:
                 output = getattr(exc, "output", "") or ""
@@ -403,7 +453,16 @@ class BridgeRuntime:
                     if cancelled
                     else "FAILED"
                 )
-                self.execution_ledger.transition(execution_id, terminal_state, runtime_instance=self.instance_id, exit_code=getattr(exc, "exit_code", None), error_type=type(exc).__name__, error_message=str(exc), output=output)
+                self.execution_ledger.transition(
+                    execution_id,
+                    terminal_state,
+                    runtime_instance=self.instance_id,
+                    exit_code=getattr(exc, "exit_code", None),
+                    error_type=type(exc).__name__,
+                    error_message=str(exc),
+                    output=output,
+                )
+                self._signal_execution_change()
         finally:
             with self._phase5b_lock:
                 self._phase5b_workers.pop(execution_id, None)
@@ -491,6 +550,71 @@ class BridgeRuntime:
         result["execution_recoverable"] = True
         return result
 
+    def phase5f_wait_execution_output(
+        self,
+        execution_id,
+        cursor=0,
+        max_chars=32768,
+        timeout_ms=15000,
+    ):
+        execution_id = str(execution_id or "").strip()
+        if not execution_id:
+            raise ValueError("execution_id obrigatorio")
+        cursor = max(0, int(cursor or 0))
+        max_chars = max(
+            1,
+            min(int(max_chars or 32768), 262144),
+        )
+        timeout_ms = max(
+            0,
+            min(int(timeout_ms or 0), 120000),
+        )
+        deadline = time.monotonic() + (
+            timeout_ms / 1000.0
+        )
+
+        while True:
+            generation = self._execution_signal_snapshot()
+            result = self.phase5f_execution_output(
+                execution_id,
+                cursor=cursor,
+                max_chars=max_chars,
+            )
+            has_event = bool(
+                result.get("text")
+                or result.get("has_more")
+                or result.get("complete")
+            )
+            if has_event:
+                result["timed_out"] = False
+                result["wait_mode"] = "EVENT"
+                return result
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                result["timed_out"] = True
+                result["wait_mode"] = "EVENT"
+                return result
+
+            signaled = self._wait_for_execution_change(
+                generation,
+                remaining,
+            )
+            if not signaled:
+                # One final read closes the boundary race at timeout.
+                result = self.phase5f_execution_output(
+                    execution_id,
+                    cursor=cursor,
+                    max_chars=max_chars,
+                )
+                result["timed_out"] = not bool(
+                    result.get("text")
+                    or result.get("has_more")
+                    or result.get("complete")
+                )
+                result["wait_mode"] = "EVENT"
+                return result
+
     def stop_phase5d_execution(self, execution_id):
         execution_id = str(execution_id or "").strip()
         if not execution_id:
@@ -510,8 +634,22 @@ class BridgeRuntime:
                     raise RuntimeError("execucao CREATED nao corresponde ao comando preparado")
                 if not self.terminals.discard_prepared():
                     raise RuntimeError("nao foi possivel descartar comando preparado")
-                row = self.execution_ledger.transition(execution_id, "CANCELLED", runtime_instance=self.instance_id, error_type="ExecutionCancelledBeforeStart", error_message="execucao cancelada antes do Enter")
-                return {"execution_id": execution_id, "cancelled": True, "state": row["state"], "reason": "cancelled_before_start"}
+                row = self.execution_ledger.transition(
+                    execution_id,
+                    "CANCELLED",
+                    runtime_instance=self.instance_id,
+                    error_type="ExecutionCancelledBeforeStart",
+                    error_message=(
+                        "execucao cancelada antes do Enter"
+                    ),
+                )
+                self._signal_execution_change()
+                return {
+                    "execution_id": execution_id,
+                    "cancelled": True,
+                    "state": row["state"],
+                    "reason": "cancelled_before_start",
+                }
             if state != "RUNNING":
                 raise RuntimeError(f"estado nao cancelavel: {state}")
             if self._phase5b_active_execution_id != execution_id:

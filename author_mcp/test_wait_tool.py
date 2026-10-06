@@ -23,7 +23,7 @@ class WaitTests(unittest.TestCase):
         FakeClient.calls=[]
 
     def test_partial_output_returns_without_reexecution(self):
-        FakeClient.responses=[ex("EXECUTION_V2_OUTPUT",{
+        FakeClient.responses=[ex("EXECUTION_V2_WAIT",{
             "operation_ok":True,"execution_id":"e1","state":"RUNNING",
             "cursor":7,"next_cursor":12,"text":"hello","chars":5,
             "available_chars":5,"has_more":False,"eof":False,"complete":False
@@ -36,15 +36,16 @@ class WaitTests(unittest.TestCase):
         self.assertEqual(r.text,"hello")
         self.assertFalse(r.complete)
         self.assertFalse(r.timed_out)
-        self.assertEqual([x[0] for x in FakeClient.calls],["EXECUTION_V2_OUTPUT"])
+        self.assertEqual([x[0] for x in FakeClient.calls],["EXECUTION_V2_WAIT"])
 
     def test_timeout_keeps_cursor(self):
-        FakeClient.responses=[ex("EXECUTION_V2_OUTPUT",{
+        FakeClient.responses=[ex("EXECUTION_V2_WAIT",{
             "operation_ok":True,"execution_id":"e2","state":"RUNNING",
             "cursor":9,"next_cursor":9,"text":"","chars":0,
-            "available_chars":0,"has_more":False,"eof":False,"complete":False
+            "available_chars":0,"has_more":False,"eof":False,"complete":False,
+            "timed_out":True,"wait_mode":"EVENT"
         })]
-        with patch.object(mcp_server,"ProtocolHTTPClient",FakeClient), patch.object(mcp_server.time,"monotonic",side_effect=[100.0,100.0]):
+        with patch.object(mcp_server,"ProtocolHTTPClient",FakeClient):
             r=mcp_server.codebridge_wait("e2",cursor=9,wait_timeout_ms=0)
         self.assertTrue(r.timed_out)
         self.assertEqual(r.cursor,9)
@@ -53,7 +54,7 @@ class WaitTests(unittest.TestCase):
 
     def test_failure_returns_terminal_delta_and_metadata(self):
         FakeClient.responses=[
-            ex("EXECUTION_V2_OUTPUT",{
+            ex("EXECUTION_V2_WAIT",{
                 "operation_ok":True,"execution_id":"e3",
                 "target":"POWERSHELL5.1","state":"FAILED",
                 "cursor":0,"next_cursor":3,"text":"bad","chars":3,
@@ -80,12 +81,12 @@ class WaitTests(unittest.TestCase):
         self.assertTrue(r.complete)
         self.assertEqual(
             [call[0] for call in FakeClient.calls],
-            ["EXECUTION_V2_OUTPUT"],
+            ["EXECUTION_V2_WAIT"],
         )
 
     def test_cancelled_is_terminal(self):
         FakeClient.responses=[
-            ex("EXECUTION_V2_OUTPUT",{
+            ex("EXECUTION_V2_WAIT",{
                 "operation_ok":True,"execution_id":"e4","target":"SSH",
                 "state":"CANCELLED","cursor":2,"next_cursor":2,
                 "text":"","chars":0,"available_chars":2,

@@ -928,7 +928,7 @@ def codebridge_exec(
 
 @mcp.tool(
     name="codebridge_wait",
-    description="Aguarda somente o delta novo desde o cursor sem reenviar output acumulado. Retorna cursor_start cursor_end stdout_delta e metadados finais; RAW integral permanece recuperavel pelo execution_id.",
+    description="Aguarda por evento de nova saida ou estado terminal sem polling agressivo e retorna somente o delta desde o cursor. Timeout e RAW integral permanecem suportados.",
     annotations=ToolAnnotations(
         read_only_hint=True,
         idempotent_hint=True,
@@ -948,156 +948,179 @@ def codebridge_wait(
         raise ValueError("execution_id obrigatorio")
 
     cursor = max(0, int(cursor or 0))
-    wait_timeout_ms = max(0, min(int(wait_timeout_ms or 0), 120000))
-    max_chars = max(1, min(int(max_chars or 32768), 262144))
+    wait_timeout_ms = max(
+        0,
+        min(int(wait_timeout_ms or 0), 120000),
+    )
+    max_chars = max(
+        1,
+        min(int(max_chars or 32768), 262144),
+    )
     output_mode = _normalize_output_mode(output_mode)
-    deadline = time.monotonic() + (wait_timeout_ms / 1000.0)
-    terminal_states = {"FINISHED", "FAILED", "CANCELLED", "INTERRUPTED"}
 
-    while True:
-        output_exchange = _safe_exchange(
-            "EXECUTION_V2_OUTPUT",
-            {
-                "execution_id": execution_id,
-                "cursor": cursor,
-                "max_chars": max_chars,
-            },
-            timeout=10.0,
+    output_exchange = _safe_exchange(
+        "EXECUTION_V2_WAIT",
+        {
+            "execution_id": execution_id,
+            "cursor": cursor,
+            "max_chars": max_chars,
+            "timeout_ms": wait_timeout_ms,
+        },
+        timeout=max(
+            10.0,
+            (wait_timeout_ms / 1000.0) + 10.0,
+        ),
+    )
+    output_payload = output_exchange["payload"]
+
+    if not output_payload.get("operation_ok", True):
+        return _wait_error_result(
+            output_exchange,
+            output_payload,
+            execution_id=execution_id,
+            cursor=cursor,
+            wait_timeout_ms=wait_timeout_ms,
+            output_mode=output_mode,
+            raw_available=bool(execution_id),
         )
-        output_payload = output_exchange["payload"]
 
-        if not output_payload.get("operation_ok", True):
-            return _wait_error_result(
-                output_exchange,
-                output_payload,
-                execution_id=execution_id,
-                cursor=cursor,
-                wait_timeout_ms=wait_timeout_ms,
-                output_mode=output_mode,
-                raw_available=bool(execution_id),
+    terminal_states = {
+        "FINISHED",
+        "FAILED",
+        "CANCELLED",
+        "INTERRUPTED",
+    }
+    runtime_state = str(
+        output_payload.get("state") or "RUNNING"
+    )
+    state = (
+        "RUNNING"
+        if runtime_state in {"CREATED", "RUNNING"}
+        else runtime_state
+    )
+    text = str(output_payload.get("text") or "")
+    next_cursor = int(
+        output_payload.get("next_cursor", cursor)
+        or cursor
+    )
+    complete = bool(
+        output_payload.get("complete")
+    ) or runtime_state in terminal_states
+    has_more = bool(output_payload.get("has_more"))
+    eof = bool(output_payload.get("eof"))
+    timed_out = bool(output_payload.get("timed_out"))
+
+    structured_error_type = (
+        output_payload.get("error_type")
+        if complete
+        else None
+    )
+    mode_contract = _result_mode_contract(
+        text,
+        output_mode,
+        execution_id,
+    )
+    returned_delta = mode_contract["stdout"]
+
+    return WaitResult(
+        protocol="CBMCP/1",
+        handshake_confirmed=True,
+        request_id=output_exchange[
+            "request_syn"
+        ]["request_id"],
+        response_id=output_exchange[
+            "response_syn"
+        ]["response_id"],
+        **_outcome_fields(output_payload),
+        state=state,
+        runtime_state=runtime_state,
+        execution_id=execution_id,
+        target=str(output_payload.get("target") or ""),
+        exit_code=(
+            output_payload.get("exit_code")
+            if complete
+            else None
+        ),
+        duration_ms=(
+            _duration_ms(
+                output_payload.get("started_at"),
+                output_payload.get("finished_at"),
             )
-
-        runtime_state = str(output_payload.get("state") or "RUNNING")
-        state = "RUNNING" if runtime_state in {"CREATED", "RUNNING"} else runtime_state
-        text = str(output_payload.get("text") or "")
-        next_cursor = int(output_payload.get("next_cursor", cursor) or cursor)
-        complete = bool(output_payload.get("complete")) or runtime_state in terminal_states
-        has_more = bool(output_payload.get("has_more"))
-        eof = bool(output_payload.get("eof"))
-
-        if text or has_more or complete:
-            structured_error_type = output_payload.get("error_type") if complete else None
-            mode_contract = _result_mode_contract(
-                text,
-                output_mode,
-                execution_id,
+            if complete
+            else None
+        ),
+        started_at=output_payload.get("started_at"),
+        finished_at=output_payload.get("finished_at"),
+        stdout=returned_delta,
+        stderr="",
+        stream_mode="COMBINED",
+        streams_separated=False,
+        error_source=_error_source(
+            structured_error_type
+        ),
+        error_type=structured_error_type,
+        error_message=(
+            output_payload.get("error_message")
+            if complete
+            else None
+        ),
+        failed_command=(
+            output_payload.get("failed_command")
+            if complete
+            else None
+        ),
+        shell_alive=output_payload.get("shell_alive"),
+        execution_recoverable=bool(
+            output_payload.get(
+                "execution_recoverable",
+                bool(execution_id),
             )
-            returned_delta = mode_contract["stdout"]
-            return WaitResult(
-                protocol="CBMCP/1",
-                handshake_confirmed=True,
-                request_id=output_exchange["request_syn"]["request_id"],
-                response_id=output_exchange["response_syn"]["response_id"],
-                **_outcome_fields(output_payload),
-                state=state,
-                runtime_state=runtime_state,
-                execution_id=execution_id,
-                target=str(output_payload.get("target") or ""),
-                exit_code=output_payload.get("exit_code") if complete else None,
-                duration_ms=_duration_ms(
-                    output_payload.get("started_at"),
-                    output_payload.get("finished_at"),
-                ) if complete else None,
-                started_at=output_payload.get("started_at"),
-                finished_at=output_payload.get("finished_at"),
-                stdout=returned_delta,
-                stderr="",
-                stream_mode="COMBINED",
-                streams_separated=False,
-                error_source=_error_source(structured_error_type),
-                error_type=structured_error_type,
-                error_message=output_payload.get("error_message") if complete else None,
-                failed_command=output_payload.get("failed_command") if complete else None,
-                shell_alive=output_payload.get("shell_alive"),
-                execution_recoverable=bool(
-                    output_payload.get("execution_recoverable", bool(execution_id))
-                ),
-                cursor=cursor,
-                next_cursor=next_cursor,
-                cursor_start=cursor,
-                cursor_end=next_cursor,
-                text=returned_delta,
-                stdout_delta=returned_delta,
-                stderr_delta="",
-                chars=int(output_payload.get("chars", len(text)) or 0),
-                available_chars=int(output_payload.get("available_chars", len(text)) or 0),
-                has_more=has_more,
-                eof=eof,
-                complete=complete,
-                timed_out=False,
-                raw_available=True,
-                requested_output_mode=mode_contract["requested_output_mode"],
-                output_mode=mode_contract["output_mode"],
-                compaction_applied=mode_contract["compaction_applied"],
-                stdout_lines=mode_contract["stdout_lines"],
-                stderr_lines=mode_contract["stderr_lines"],
-                stdout_chars=mode_contract["stdout_chars"],
-                stderr_chars=mode_contract["stderr_chars"],
-                returned_stdout_chars=mode_contract["returned_stdout_chars"],
-                important_sections=mode_contract["important_sections"],
-                wait_timeout_ms=wait_timeout_ms,
+        ),
+        cursor=cursor,
+        next_cursor=next_cursor,
+        cursor_start=cursor,
+        cursor_end=next_cursor,
+        text=returned_delta,
+        stdout_delta=returned_delta,
+        stderr_delta="",
+        chars=int(
+            output_payload.get(
+                "chars",
+                len(text),
             )
-
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            return WaitResult(
-                protocol="CBMCP/1",
-                handshake_confirmed=True,
-                request_id=output_exchange["request_syn"]["request_id"],
-                response_id=output_exchange["response_syn"]["response_id"],
-                **_outcome_fields(output_payload),
-                state=state,
-                runtime_state=runtime_state,
-                execution_id=execution_id,
-                target=str(output_payload.get("target") or ""),
-                exit_code=None,
-                duration_ms=None,
-                started_at=output_payload.get("started_at"),
-                finished_at=output_payload.get("finished_at"),
-                **_stream_contract(""),
-                error_source=None,
-                error_type=None,
-                error_message=None,
-                failed_command=None,
-                shell_alive=None,
-                execution_recoverable=bool(execution_id),
-                cursor=cursor,
-                next_cursor=next_cursor,
-                cursor_start=cursor,
-                cursor_end=next_cursor,
-                text="",
-                stdout_delta="",
-                stderr_delta="",
-                chars=0,
-                available_chars=int(output_payload.get("available_chars", 0) or 0),
-                has_more=False,
-                eof=eof,
-                complete=False,
-                timed_out=True,
-                raw_available=True,
-                requested_output_mode=output_mode,
-                output_mode=output_mode,
-                compaction_applied=False,
-                stdout_lines=0,
-                stderr_lines=0,
-                stdout_chars=0,
-                stderr_chars=0,
-                returned_stdout_chars=0,
-                important_sections=[],
-                wait_timeout_ms=wait_timeout_ms,
+            or 0
+        ),
+        available_chars=int(
+            output_payload.get(
+                "available_chars",
+                len(text),
             )
-
-        time.sleep(min(0.10, remaining))
+            or 0
+        ),
+        has_more=has_more,
+        eof=eof,
+        complete=complete,
+        timed_out=timed_out,
+        raw_available=True,
+        requested_output_mode=mode_contract[
+            "requested_output_mode"
+        ],
+        output_mode=mode_contract["output_mode"],
+        compaction_applied=mode_contract[
+            "compaction_applied"
+        ],
+        stdout_lines=mode_contract["stdout_lines"],
+        stderr_lines=mode_contract["stderr_lines"],
+        stdout_chars=mode_contract["stdout_chars"],
+        stderr_chars=mode_contract["stderr_chars"],
+        returned_stdout_chars=mode_contract[
+            "returned_stdout_chars"
+        ],
+        important_sections=mode_contract[
+            "important_sections"
+        ],
+        wait_timeout_ms=wait_timeout_ms,
+    )
 
 
 @mcp.tool(

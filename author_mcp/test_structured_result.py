@@ -74,7 +74,7 @@ class StructuredResultTests(unittest.TestCase):
 
     def test_wait_final_returns_only_delta_with_terminal_metadata(self):
         FakeClient.responses=[
-            ex("EXECUTION_V2_OUTPUT",{
+            ex("EXECUTION_V2_WAIT",{
                 "operation_ok":True,"execution_id":"e3","target":"SSH",
                 "state":"FINISHED","cursor":5,"next_cursor":10,
                 "text":"PART2","chars":5,"available_chars":10,
@@ -100,12 +100,12 @@ class StructuredResultTests(unittest.TestCase):
         self.assertTrue(r.complete)
         self.assertEqual(
             [call[0] for call in FakeClient.calls],
-            ["EXECUTION_V2_OUTPUT"],
+            ["EXECUTION_V2_WAIT"],
         )
 
     def test_wait_partial_returns_only_new_delta(self):
         FakeClient.responses=[
-            ex("EXECUTION_V2_OUTPUT",{
+            ex("EXECUTION_V2_WAIT",{
                 "operation_ok":True,"execution_id":"e4",
                 "target":"POWERSHELL5.1","state":"RUNNING",
                 "cursor":0,"next_cursor":5,"text":"PART1","chars":5,

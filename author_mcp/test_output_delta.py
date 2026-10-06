@@ -6,7 +6,7 @@ import mcp_server
 
 def ex(payload, n=1):
     return {
-        "request_syn":{"request_id":f"req{n}","operation":"EXECUTION_V2_OUTPUT"},
+        "request_syn":{"request_id":f"req{n}","operation":"EXECUTION_V2_WAIT"},
         "response_syn":{"response_id":f"res{n}"},
         "payload":payload,
     }
@@ -47,7 +47,7 @@ class OutputDeltaTests(unittest.TestCase):
         self.assertEqual(r.cursor_end,9010)
         self.assertEqual(
             [call[0] for call in FakeClient.calls],
-            ["EXECUTION_V2_OUTPUT"],
+            ["EXECUTION_V2_WAIT"],
         )
 
     def test_successive_cursors_return_disjoint_deltas(self):

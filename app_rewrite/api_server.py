@@ -65,6 +65,21 @@ class BridgeAPI:
                         return self._send(200, {"ok": True, "status": bridge.runtime.snapshot()})
                     if path == "/v1/ssh/config":
                         return self._send(200, {"ok": True, "ssh": bridge.runtime.terminals.ssh_settings()})
+                    if path.startswith("/v1/phase5f/executions/") and path.endswith("/wait"):
+                        parts = path.strip("/").split("/")
+                        if len(parts) != 5:
+                            return self._send(404, {"ok": False, "error": "not_found"})
+                        query = parse_qs(urlparse(self.path).query)
+                        cursor = int((query.get("cursor") or [0])[0])
+                        max_chars = int((query.get("max_chars") or [32768])[0])
+                        timeout_ms = int((query.get("timeout_ms") or [15000])[0])
+                        result = bridge.runtime.phase5f_wait_execution_output(
+                            parts[3],
+                            cursor=cursor,
+                            max_chars=max_chars,
+                            timeout_ms=timeout_ms,
+                        )
+                        return self._send(200, {"ok": True, "output": result})
                     if path.startswith("/v1/phase5f/executions/") and path.endswith("/output"):
                         parts = path.strip("/").split("/")
                         if len(parts) != 5:

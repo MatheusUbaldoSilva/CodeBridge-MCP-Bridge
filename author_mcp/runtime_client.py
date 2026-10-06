@@ -311,6 +311,35 @@ def codebridge_v2_output(execution_id, cursor=0, max_chars=32768):
     return payload.get("output") or {}
 
 
+def codebridge_v2_wait(
+    execution_id,
+    cursor=0,
+    max_chars=32768,
+    timeout_ms=15000,
+):
+    runtime = _load_runtime()
+    safe_id = quote(str(execution_id), safe="")
+    timeout_ms = max(
+        0,
+        min(int(timeout_ms or 0), 120000),
+    )
+    query = urlencode({
+        "cursor": int(cursor or 0),
+        "max_chars": int(max_chars or 32768),
+        "timeout_ms": timeout_ms,
+    })
+    url = (
+        f"http://{runtime['host']}:{int(runtime['port'])}"
+        f"/v1/phase5f/executions/{safe_id}/wait?{query}"
+    )
+    payload = _get_json(
+        url,
+        runtime["token"],
+        timeout=max(5.0, (timeout_ms / 1000.0) + 5.0),
+    )
+    return payload.get("output") or {}
+
+
 def codebridge_v2_stop(execution_id):
     runtime = _load_runtime()
     safe_id = quote(str(execution_id), safe="")

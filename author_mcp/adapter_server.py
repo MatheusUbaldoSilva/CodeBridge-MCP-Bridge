@@ -11,7 +11,7 @@ from runtime_client import (
     codebridge_execution_status, codebridge_prepare, codebridge_start_async,
     codebridge_status, codebridge_stop, codebridge_turn_control,
     codebridge_v2_output, codebridge_v2_result, codebridge_v2_start,
-    codebridge_v2_status, codebridge_v2_stop,
+    codebridge_v2_status, codebridge_v2_stop, codebridge_v2_wait,
 )
 
 
@@ -66,6 +66,12 @@ class AdapterState:
             "EXECUTION_V2_OUTPUT": lambda payload, request_id=None: codebridge_v2_output(
                 payload.get("execution_id"), payload.get("cursor", 0),
                 payload.get("max_chars", 32768)
+            ),
+            "EXECUTION_V2_WAIT": lambda payload, request_id=None: codebridge_v2_wait(
+                payload.get("execution_id"),
+                payload.get("cursor", 0),
+                payload.get("max_chars", 32768),
+                payload.get("timeout_ms", 15000),
             ),
             "EXECUTION_V2_STOP": lambda payload, request_id=None: codebridge_v2_stop(
                 payload.get("execution_id")
