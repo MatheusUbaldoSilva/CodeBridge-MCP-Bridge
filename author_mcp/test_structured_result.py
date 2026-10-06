@@ -72,42 +72,60 @@ class StructuredResultTests(unittest.TestCase):
         self.assertEqual(r.exit_code,7)
         self.assertEqual(r.stdout,"bad\n")
 
-    def test_wait_final_returns_full_stdout_while_text_remains_delta(self):
+    def test_wait_final_returns_only_delta_with_terminal_metadata(self):
         FakeClient.responses=[
             ex("EXECUTION_V2_OUTPUT",{
-                "operation_ok":True,"execution_id":"e3","state":"FINISHED",
-                "cursor":5,"next_cursor":10,"text":"PART2","chars":5,
-                "available_chars":10,"has_more":False,"eof":True,"complete":True
+                "operation_ok":True,"execution_id":"e3","target":"SSH",
+                "state":"FINISHED","cursor":5,"next_cursor":10,
+                "text":"PART2","chars":5,"available_chars":10,
+                "has_more":False,"eof":True,"complete":True,
+                "exit_code":0,
+                "started_at":"2026-10-06T00:00:00+00:00",
+                "finished_at":"2026-10-06T00:00:02+00:00",
+                "error_type":None,"error_message":None,
+                "shell_alive":True,"execution_recoverable":True,
             },1),
-            ex("EXECUTION_V2_RESULT",{
-                "operation_ok":True,"execution_id":"e3","target":"SSH","state":"FINISHED",
-                "started_at":"2026-10-06T00:00:00+00:00","finished_at":"2026-10-06T00:00:02+00:00",
-                "exit_code":0,"output":"PART1PART2","error_type":None,"error_message":None
-            },2),
         ]
         with patch.object(mcp_server,"ProtocolHTTPClient",FakeClient):
             r=mcp_server.codebridge_wait("e3",cursor=5)
         self.assertEqual(r.text,"PART2")
-        self.assertEqual(r.stdout,"PART1PART2")
+        self.assertEqual(r.stdout,"PART2")
+        self.assertEqual(r.stdout_delta,"PART2")
+        self.assertEqual(r.stderr_delta,"")
+        self.assertEqual(r.cursor_start,5)
+        self.assertEqual(r.cursor_end,10)
         self.assertEqual(r.stderr,"")
         self.assertEqual(r.duration_ms,2000)
         self.assertEqual(r.next_cursor,10)
         self.assertTrue(r.complete)
+        self.assertEqual(
+            [call[0] for call in FakeClient.calls],
+            ["EXECUTION_V2_OUTPUT"],
+        )
 
-    def test_wait_partial_does_not_duplicate_full_stdout(self):
+    def test_wait_partial_returns_only_new_delta(self):
         FakeClient.responses=[
             ex("EXECUTION_V2_OUTPUT",{
-                "operation_ok":True,"execution_id":"e4","state":"RUNNING",
+                "operation_ok":True,"execution_id":"e4",
+                "target":"POWERSHELL5.1","state":"RUNNING",
                 "cursor":0,"next_cursor":5,"text":"PART1","chars":5,
-                "available_chars":5,"has_more":False,"eof":False,"complete":False
+                "available_chars":5,"has_more":False,
+                "eof":False,"complete":False,
+                "started_at":"2026-10-06T00:00:00+00:00",
+                "shell_alive":True,"execution_recoverable":True,
             },1),
         ]
         with patch.object(mcp_server,"ProtocolHTTPClient",FakeClient):
             r=mcp_server.codebridge_wait("e4",cursor=0)
         self.assertEqual(r.text,"PART1")
-        self.assertEqual(r.stdout,"")
+        self.assertEqual(r.stdout,"PART1")
+        self.assertEqual(r.stdout_delta,"PART1")
+        self.assertEqual(r.cursor_start,0)
+        self.assertEqual(r.cursor_end,5)
         self.assertIsNone(r.duration_ms)
         self.assertEqual(r.stream_mode,"COMBINED")
+
+
 
 if __name__=="__main__":
     unittest.main()

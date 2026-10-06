@@ -51,43 +51,61 @@ class WaitTests(unittest.TestCase):
         self.assertEqual(r.next_cursor,9)
         self.assertEqual(r.text,"")
 
-    def test_failure_returns_terminal_result(self):
+    def test_failure_returns_terminal_delta_and_metadata(self):
         FakeClient.responses=[
             ex("EXECUTION_V2_OUTPUT",{
-                "operation_ok":True,"execution_id":"e3","state":"FAILED",
+                "operation_ok":True,"execution_id":"e3",
+                "target":"POWERSHELL5.1","state":"FAILED",
                 "cursor":0,"next_cursor":3,"text":"bad","chars":3,
-                "available_chars":3,"has_more":False,"eof":True,"complete":True
+                "available_chars":3,"has_more":False,
+                "eof":True,"complete":True,
+                "exit_code":7,
+                "error_type":"PowerShellCommandError",
+                "error_message":"falhou",
+                "failed_command":"cmd.exe /c exit 7",
+                "started_at":"2026-10-06T00:00:00+00:00",
+                "finished_at":"2026-10-06T00:00:01+00:00",
+                "shell_alive":True,
+                "execution_recoverable":True,
             },1),
-            ex("EXECUTION_V2_RESULT",{
-                "operation_ok":True,"execution_id":"e3","state":"FAILED",
-                "target":"POWERSHELL5.1","exit_code":7,
-                "error_type":"PowerShellCommandError","error_message":"falhou"
-            },2),
         ]
         with patch.object(mcp_server,"ProtocolHTTPClient",FakeClient):
             r=mcp_server.codebridge_wait("e3")
         self.assertEqual(r.state,"FAILED")
         self.assertEqual(r.exit_code,7)
         self.assertEqual(r.error_type,"PowerShellCommandError")
+        self.assertEqual(r.error_source,"command")
+        self.assertEqual(r.failed_command,"cmd.exe /c exit 7")
+        self.assertEqual(r.stdout_delta,"bad")
         self.assertTrue(r.complete)
+        self.assertEqual(
+            [call[0] for call in FakeClient.calls],
+            ["EXECUTION_V2_OUTPUT"],
+        )
 
     def test_cancelled_is_terminal(self):
         FakeClient.responses=[
             ex("EXECUTION_V2_OUTPUT",{
-                "operation_ok":True,"execution_id":"e4","state":"CANCELLED",
-                "cursor":2,"next_cursor":2,"text":"","chars":0,
-                "available_chars":0,"has_more":False,"eof":True,"complete":True
+                "operation_ok":True,"execution_id":"e4","target":"SSH",
+                "state":"CANCELLED","cursor":2,"next_cursor":2,
+                "text":"","chars":0,"available_chars":2,
+                "has_more":False,"eof":True,"complete":True,
+                "exit_code":130,
+                "error_type":"SSHCommandCancelled",
+                "error_message":"cancelado",
+                "failed_command":"sleep 30",
+                "started_at":"2026-10-06T00:00:00+00:00",
+                "finished_at":"2026-10-06T00:00:01+00:00",
+                "shell_alive":True,
+                "execution_recoverable":True,
             },1),
-            ex("EXECUTION_V2_RESULT",{
-                "operation_ok":True,"execution_id":"e4","state":"CANCELLED",
-                "target":"SSH","exit_code":130,
-                "error_type":"CommandCancelled","error_message":"cancelado"
-            },2),
         ]
         with patch.object(mcp_server,"ProtocolHTTPClient",FakeClient):
             r=mcp_server.codebridge_wait("e4",cursor=2)
         self.assertEqual(r.state,"CANCELLED")
         self.assertEqual(r.next_cursor,2)
+        self.assertEqual(r.cursor_start,2)
+        self.assertEqual(r.cursor_end,2)
         self.assertTrue(r.complete)
 
     def test_invalid_id_rejected(self):

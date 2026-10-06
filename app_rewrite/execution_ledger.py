@@ -232,7 +232,12 @@ class ExecutionLedger:
         max_chars=max(1,min(int(max_chars or 32768),65536))
         if not execution_id: raise ValueError("execution_id obrigatorio")
         with self._lock, self._connect() as con:
-            row=con.execute("SELECT state,output FROM executions WHERE execution_id=?",(execution_id,)).fetchone()
+            row=con.execute(
+                "SELECT target,state,output,exit_code,error_type,error_message,"
+                "failed_command,started_at,finished_at "
+                "FROM executions WHERE execution_id=?",
+                (execution_id,),
+            ).fetchone()
             if row is None: raise KeyError(execution_id)
             chunks=con.execute("SELECT seq,start_offset,text,char_count FROM execution_output_chunks WHERE execution_id=? AND (start_offset+char_count)>? ORDER BY seq",(execution_id,cursor)).fetchall()
             meta=con.execute("SELECT COUNT(*) chunk_count, COALESCE(MAX(start_offset+char_count),0) total_chars FROM execution_output_chunks WHERE execution_id=?",(execution_id,)).fetchone()
@@ -247,7 +252,31 @@ class ExecutionLedger:
         if int(meta["chunk_count"])==0 and (row["output"] or ""):
             legacy=row["output"] or ""; total=len(legacy); text=legacy[cursor:cursor+max_chars]; next_cursor=cursor+len(text)
         terminal=row["state"] in TERMINAL_STATES
-        return {"execution_id":execution_id,"state":row["state"],"cursor":cursor,"next_cursor":next_cursor,"text":text,"chars":len(text),"available_chars":total,"first_seq":first_seq,"last_seq":last_seq,"has_more":next_cursor<total,"eof":bool(terminal and next_cursor>=total),"complete":bool(terminal)}
+        return {
+            "execution_id": execution_id,
+            "target": row["target"],
+            "state": row["state"],
+            "cursor": cursor,
+            "next_cursor": next_cursor,
+            "text": text,
+            "chars": len(text),
+            "available_chars": total,
+            "first_seq": first_seq,
+            "last_seq": last_seq,
+            "has_more": next_cursor < total,
+            "eof": bool(terminal and next_cursor >= total),
+            "complete": bool(terminal),
+            "exit_code": row["exit_code"] if terminal else None,
+            "error_type": row["error_type"] if terminal else None,
+            "error_message": row["error_message"] if terminal else None,
+            "failed_command": (
+                (row["failed_command"] or None)
+                if terminal and row["state"] != "FINISHED"
+                else None
+            ),
+            "started_at": row["started_at"],
+            "finished_at": row["finished_at"] if terminal else None,
+        }
 
     def list_by_state(self, *states):
         normalized = [str(s).strip().upper() for s in states if str(s).strip()]

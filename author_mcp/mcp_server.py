@@ -188,7 +188,11 @@ class WaitResult(ProtocolOutcome):
     execution_recoverable: bool
     cursor: int
     next_cursor: int
+    cursor_start: int
+    cursor_end: int
     text: str
+    stdout_delta: str
+    stderr_delta: str
     chars: int
     available_chars: int
     has_more: bool
@@ -366,7 +370,11 @@ def _wait_error_result(
         ),
         cursor=cursor,
         next_cursor=cursor,
+        cursor_start=cursor,
+        cursor_end=cursor,
         text="",
+        stdout_delta="",
+        stderr_delta="",
         chars=0,
         available_chars=0,
         has_more=False,
@@ -920,7 +928,7 @@ def codebridge_exec(
 
 @mcp.tool(
     name="codebridge_wait",
-    description="Aguarda output novo ou estado terminal sem reenviar o comando e aplica NORMAL COMPACT RAW ao resultado final preservando o RAW pelo execution_id.",
+    description="Aguarda somente o delta novo desde o cursor sem reenviar output acumulado. Retorna cursor_start cursor_end stdout_delta e metadados finais; RAW integral permanece recuperavel pelo execution_id.",
     annotations=ToolAnnotations(
         read_only_hint=True,
         idempotent_hint=True,
@@ -977,69 +985,50 @@ def codebridge_wait(
         has_more = bool(output_payload.get("has_more"))
         eof = bool(output_payload.get("eof"))
 
-        result_payload = {}
-        result_exchange = output_exchange
-        if complete:
-            result_exchange = _safe_exchange(
-                "EXECUTION_V2_RESULT",
-                {"execution_id": execution_id},
-                timeout=10.0,
-            )
-            result_payload = result_exchange["payload"]
-            if not result_payload.get("operation_ok", True):
-                return _wait_error_result(
-                    result_exchange,
-                    result_payload,
-                    execution_id=execution_id,
-                    cursor=cursor,
-                    wait_timeout_ms=wait_timeout_ms,
-                    output_mode=output_mode,
-                    raw_available=True,
-                )
-            if result_payload.get("operation_ok", True):
-                runtime_state = str(result_payload.get("state") or runtime_state)
-                state = "RUNNING" if runtime_state in {"CREATED", "RUNNING"} else runtime_state
-
         if text or has_more or complete:
-            structured_output = (result_payload.get("output") or "") if complete else ""
-            structured_error_type = result_payload.get("error_type") if complete else None
+            structured_error_type = output_payload.get("error_type") if complete else None
             mode_contract = _result_mode_contract(
-                structured_output,
+                text,
                 output_mode,
                 execution_id,
-            ) if complete else _result_mode_contract("", output_mode, execution_id)
+            )
+            returned_delta = mode_contract["stdout"]
             return WaitResult(
                 protocol="CBMCP/1",
                 handshake_confirmed=True,
-                request_id=result_exchange["request_syn"]["request_id"],
-                response_id=result_exchange["response_syn"]["response_id"],
-                **_outcome_fields(result_payload or output_payload),
+                request_id=output_exchange["request_syn"]["request_id"],
+                response_id=output_exchange["response_syn"]["response_id"],
+                **_outcome_fields(output_payload),
                 state=state,
                 runtime_state=runtime_state,
                 execution_id=execution_id,
-                target=str(result_payload.get("target") or output_payload.get("target") or ""),
-                exit_code=result_payload.get("exit_code") if complete else None,
+                target=str(output_payload.get("target") or ""),
+                exit_code=output_payload.get("exit_code") if complete else None,
                 duration_ms=_duration_ms(
-                    result_payload.get("started_at") or output_payload.get("started_at"),
-                    result_payload.get("finished_at") or output_payload.get("finished_at"),
+                    output_payload.get("started_at"),
+                    output_payload.get("finished_at"),
                 ) if complete else None,
-                started_at=result_payload.get("started_at") or output_payload.get("started_at"),
-                finished_at=result_payload.get("finished_at") or output_payload.get("finished_at"),
-                stdout=mode_contract["stdout"],
-                stderr=mode_contract["stderr"],
+                started_at=output_payload.get("started_at"),
+                finished_at=output_payload.get("finished_at"),
+                stdout=returned_delta,
+                stderr="",
                 stream_mode="COMBINED",
                 streams_separated=False,
                 error_source=_error_source(structured_error_type),
                 error_type=structured_error_type,
-                error_message=result_payload.get("error_message") if complete else None,
-                failed_command=result_payload.get("failed_command") if complete else None,
-                shell_alive=result_payload.get("shell_alive") if complete else None,
+                error_message=output_payload.get("error_message") if complete else None,
+                failed_command=output_payload.get("failed_command") if complete else None,
+                shell_alive=output_payload.get("shell_alive"),
                 execution_recoverable=bool(
-                    result_payload.get("execution_recoverable", bool(execution_id))
+                    output_payload.get("execution_recoverable", bool(execution_id))
                 ),
                 cursor=cursor,
                 next_cursor=next_cursor,
-                text=text,
+                cursor_start=cursor,
+                cursor_end=next_cursor,
+                text=returned_delta,
+                stdout_delta=returned_delta,
+                stderr_delta="",
                 chars=int(output_payload.get("chars", len(text)) or 0),
                 available_chars=int(output_payload.get("available_chars", len(text)) or 0),
                 has_more=has_more,
@@ -1084,7 +1073,11 @@ def codebridge_wait(
                 execution_recoverable=bool(execution_id),
                 cursor=cursor,
                 next_cursor=next_cursor,
+                cursor_start=cursor,
+                cursor_end=next_cursor,
                 text="",
+                stdout_delta="",
+                stderr_delta="",
                 chars=0,
                 available_chars=int(output_payload.get("available_chars", 0) or 0),
                 has_more=False,

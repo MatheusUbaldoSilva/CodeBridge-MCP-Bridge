@@ -431,12 +431,28 @@ class BridgeRuntime:
         }
 
     def phase5f_execution_output(self, execution_id, cursor=0, max_chars=32768):
-        execution_id=str(execution_id or "").strip()
+        execution_id = str(execution_id or "").strip()
         if not execution_id:
             raise ValueError("execution_id obrigatorio")
-        return self.execution_ledger.read_output(
-            execution_id, cursor=cursor, max_chars=max_chars
+        result = self.execution_ledger.read_output(
+            execution_id,
+            cursor=cursor,
+            max_chars=max_chars,
         )
+        terminal_status = self.terminals.status()
+        terminal_key = {
+            "POWERSHELL5.1": "powershell",
+            "CMD": "cmd",
+            "SSH": "ssh",
+        }.get(result.get("target"))
+        shell_state = terminal_status.get(terminal_key) if terminal_key else None
+        result["shell_alive"] = (
+            bool(shell_state.get("online"))
+            if isinstance(shell_state, dict)
+            else None
+        )
+        result["execution_recoverable"] = True
+        return result
 
     def stop_phase5d_execution(self, execution_id):
         execution_id = str(execution_id or "").strip()
