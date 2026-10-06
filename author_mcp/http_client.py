@@ -1,7 +1,9 @@
-import json
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
-
+from http_pool import (
+    HTTPPoolDecodeError,
+    HTTPPoolResponseError,
+    HTTPPoolTransportError,
+    SHARED_HTTP_POOL,
+)
 from protocol import (
     PROTOCOL_VERSION,
     ProtocolError,
@@ -18,21 +20,23 @@ class ProtocolHTTPClient:
         self.timeout = float(timeout)
 
     def _post(self, path, payload):
-        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        request = Request(
-            self.base_url + path,
-            data=body,
-            headers={"Content-Type": "application/json; charset=utf-8"},
-            method="POST",
-        )
         try:
-            with urlopen(request, timeout=self.timeout) as response:
-                data = json.loads(response.read().decode("utf-8"))
-        except HTTPError as exc:
-            raw = exc.read().decode("utf-8", errors="replace")
-            raise ProtocolError(f"HTTP {exc.code}: {raw}") from exc
-        except URLError as exc:
-            raise ProtocolError(f"adapter indisponivel: {exc}") from exc
+            data = SHARED_HTTP_POOL.request_json(
+                "POST",
+                self.base_url + path,
+                payload=payload,
+                timeout=self.timeout,
+            )
+        except HTTPPoolResponseError as exc:
+            raise ProtocolError(
+                f"HTTP {exc.status}: {exc.body}"
+            ) from exc
+        except HTTPPoolDecodeError as exc:
+            raise ProtocolError(str(exc)) from exc
+        except HTTPPoolTransportError as exc:
+            raise ProtocolError(
+                f"adapter indisponivel: {exc}"
+            ) from exc
         if not data.get("ok"):
             raise ProtocolError(str(data))
         return data

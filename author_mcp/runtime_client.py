@@ -2,9 +2,14 @@ import json
 import os
 import threading
 from pathlib import Path
-from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
-from urllib.request import Request, urlopen
+
+from http_pool import (
+    HTTPPoolDecodeError,
+    HTTPPoolResponseError,
+    HTTPPoolTransportError,
+    SHARED_HTTP_POOL,
+)
 
 
 DATA_DIR = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "CodeBridge-MCP-Bridge"
@@ -24,10 +29,9 @@ class CodeBridgeRequestError(RuntimeError):
 
 
 def _http_error_message(exc):
-    try:
-        raw = exc.read().decode("utf-8", errors="replace")
-    except Exception:
-        raw = ""
+    raw = str(getattr(exc, "body", "") or "")
+    status = int(getattr(exc, "status", 0) or 0)
+    reason = str(getattr(exc, "reason", "") or "")
     if raw:
         try:
             payload = json.loads(raw)
@@ -39,9 +43,9 @@ def _http_error_message(exc):
                 or payload.get("error")
                 or raw
             )
-            return f"HTTP {exc.code}: {detail}"
-        return f"HTTP {exc.code}: {raw}"
-    return f"HTTP {exc.code}: {exc.reason}"
+            return f"HTTP {status}: {detail}"
+        return f"HTTP {status}: {raw}"
+    return f"HTTP {status}: {reason}"
 
 
 def _runtime_file_signature():
@@ -107,42 +111,44 @@ def _load_runtime():
 
 
 def _get_json(url, token, timeout=3.0):
-    request = Request(url, headers={"Authorization": f"Bearer {token}"})
     try:
-        with urlopen(request, timeout=timeout) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except HTTPError as exc:
+        return SHARED_HTTP_POOL.request_json(
+            "GET",
+            url,
+            headers={
+                "Authorization": f"Bearer {token}"
+            },
+            timeout=timeout,
+        )
+    except HTTPPoolResponseError as exc:
         raise CodeBridgeRequestError(
             _http_error_message(exc)
         ) from exc
-    except (URLError, TimeoutError, OSError) as exc:
-        raise CodeBridgeUnavailable(str(exc)) from exc
-    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+    except HTTPPoolDecodeError as exc:
         raise CodeBridgeRequestError(str(exc)) from exc
+    except HTTPPoolTransportError as exc:
+        raise CodeBridgeUnavailable(str(exc)) from exc
 
 
 def _post_json(url, token, payload, timeout=5.0):
-    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    request = Request(
-        url,
-        data=body,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json; charset=utf-8",
-        },
-        method="POST",
-    )
     try:
-        with urlopen(request, timeout=timeout) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except HTTPError as exc:
+        return SHARED_HTTP_POOL.request_json(
+            "POST",
+            url,
+            payload=payload,
+            headers={
+                "Authorization": f"Bearer {token}"
+            },
+            timeout=timeout,
+        )
+    except HTTPPoolResponseError as exc:
         raise CodeBridgeRequestError(
             _http_error_message(exc)
         ) from exc
-    except (URLError, TimeoutError, OSError) as exc:
-        raise CodeBridgeUnavailable(str(exc)) from exc
-    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+    except HTTPPoolDecodeError as exc:
         raise CodeBridgeRequestError(str(exc)) from exc
+    except HTTPPoolTransportError as exc:
+        raise CodeBridgeUnavailable(str(exc)) from exc
 
 
 def codebridge_status():

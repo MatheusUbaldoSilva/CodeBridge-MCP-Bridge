@@ -190,6 +190,7 @@ def make_server(host=DEFAULT_HOST, port=DEFAULT_PORT, state=None):
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "CodeBridgeAuthorAdapter/0.1"
+        protocol_version = "HTTP/1.1"
 
         def log_message(self, fmt, *args):
             return
