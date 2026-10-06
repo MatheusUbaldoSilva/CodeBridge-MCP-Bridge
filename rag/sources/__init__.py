@@ -11,6 +11,12 @@ from .document_inventory import (
     classify_document_path,
     is_document_source,
 )
+from .execution_inventory import (
+    FORBIDDEN_EXECUTION_CONTENT_FIELDS,
+    INDEXABLE_EXECUTION_FIELDS,
+    SUMMARY_METADATA_FIELDS,
+    build_execution_index_record,
+)
 from .git_inventory import (
     GIT_FACET_FIELDS,
     READ_ONLY_GIT_OPERATIONS,
@@ -27,6 +33,10 @@ __all__ = [
     "DocumentCategory",
     "classify_document_path",
     "is_document_source",
+    "FORBIDDEN_EXECUTION_CONTENT_FIELDS",
+    "INDEXABLE_EXECUTION_FIELDS",
+    "SUMMARY_METADATA_FIELDS",
+    "build_execution_index_record",
     "GIT_FACET_FIELDS",
     "READ_ONLY_GIT_OPERATIONS",
     "GitFacet",
