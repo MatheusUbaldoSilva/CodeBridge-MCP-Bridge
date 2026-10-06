@@ -148,7 +148,15 @@ class ExecResult(ProtocolOutcome):
     raw_available: bool
     cursor: int
     complete: bool
+    requested_output_mode: str
     output_mode: str
+    compaction_applied: bool
+    stdout_lines: int
+    stderr_lines: int
+    stdout_chars: int
+    stderr_chars: int
+    returned_stdout_chars: int
+    important_sections: list[str]
     wait_timeout_ms: int
 
 
@@ -182,6 +190,15 @@ class WaitResult(ProtocolOutcome):
     complete: bool
     timed_out: bool
     raw_available: bool
+    requested_output_mode: str
+    output_mode: str
+    compaction_applied: bool
+    stdout_lines: int
+    stderr_lines: int
+    stdout_chars: int
+    stderr_chars: int
+    returned_stdout_chars: int
+    important_sections: list[str]
     wait_timeout_ms: int
 
 
@@ -273,6 +290,15 @@ def _error_source(error_type):
     return "executor"
 
 
+AUTO_COMPACT_THRESHOLD_CHARS = 12000
+COMPACT_HEAD_CHARS = 2800
+COMPACT_TAIL_CHARS = 2800
+COMPACT_IMPORTANT_MAX = 24
+COMPACT_IMPORTANT_LINE_CHARS = 360
+COMPACT_RESPONSE_MAX_CHARS = 9000
+IMPORTANT_KEYWORDS = ("ERROR", "FAIL", "WARNING", "WARN", "TRACEBACK")
+
+
 def _stream_contract(output):
     return {
         "stdout": str(output or ""),
@@ -282,12 +308,119 @@ def _stream_contract(output):
     }
 
 
+def _normalize_output_mode(output_mode):
+    mode = str(output_mode or "NORMAL").strip().upper()
+    if mode not in {"NORMAL", "COMPACT", "RAW"}:
+        raise ValueError("output_mode deve ser NORMAL COMPACT ou RAW")
+    return mode
+
+
+def _line_count(text):
+    text = str(text or "")
+    if not text:
+        return 0
+    return len(text.splitlines()) or 1
+
+
+def _important_sections(text):
+    sections = []
+    seen = set()
+    for line_number, line in enumerate(str(text or "").splitlines(), start=1):
+        upper = line.upper()
+        if not any(keyword in upper for keyword in IMPORTANT_KEYWORDS):
+            continue
+        clean = line
+        if len(clean) > COMPACT_IMPORTANT_LINE_CHARS:
+            clean = clean[: COMPACT_IMPORTANT_LINE_CHARS - 3] + "..."
+        if clean in seen:
+            continue
+        seen.add(clean)
+        sections.append(f"L{line_number}: {clean}")
+        if len(sections) >= COMPACT_IMPORTANT_MAX:
+            break
+    return sections
+
+
+def _compact_stdout(raw_output, execution_id):
+    raw = str(raw_output or "")
+    important = _important_sections(raw)
+    head = raw[:COMPACT_HEAD_CHARS]
+    tail = raw[-COMPACT_TAIL_CHARS:] if len(raw) > COMPACT_TAIL_CHARS else raw
+    parts = [
+        "[CODEBRIDGE COMPACT]",
+        f"execution_id={execution_id}",
+        f"raw_chars={len(raw)}",
+        f"raw_lines={_line_count(raw)}",
+        "raw_available=true",
+        "",
+        "[HEAD]",
+        head,
+    ]
+    if important:
+        parts.extend(["", "[IMPORTANT]", *important])
+    parts.extend(["", "[TAIL]", tail, "", "[RAW available by execution_id]"])
+    compact = "\n".join(parts)
+    if len(compact) > COMPACT_RESPONSE_MAX_CHARS:
+        compact = compact[: COMPACT_RESPONSE_MAX_CHARS - 28] + "\n[COMPACT response clipped]"
+    return compact, important
+
+
+def _result_mode_contract(raw_output, requested_mode, execution_id):
+    requested = _normalize_output_mode(requested_mode)
+    raw = str(raw_output or "")
+    actual = requested
+    if requested == "NORMAL" and len(raw) > AUTO_COMPACT_THRESHOLD_CHARS:
+        actual = "COMPACT"
+
+    important = _important_sections(raw)
+    returned = raw
+    applied = False
+    if not raw:
+        return {
+            "requested_output_mode": requested,
+            "output_mode": actual,
+            "compaction_applied": False,
+            "stdout": "",
+            "stderr": "",
+            "stdout_lines": 0,
+            "stderr_lines": 0,
+            "stdout_chars": 0,
+            "stderr_chars": 0,
+            "returned_stdout_chars": 0,
+            "important_sections": [],
+        }
+    if actual == "COMPACT":
+        if len(raw) > AUTO_COMPACT_THRESHOLD_CHARS or requested == "COMPACT":
+            returned, important = _compact_stdout(raw, execution_id)
+            applied = returned != raw
+
+    return {
+        "requested_output_mode": requested,
+        "output_mode": actual,
+        "compaction_applied": applied,
+        "stdout": returned,
+        "stderr": "",
+        "stdout_lines": _line_count(raw),
+        "stderr_lines": 0,
+        "stdout_chars": len(raw),
+        "stderr_chars": 0,
+        "returned_stdout_chars": len(returned),
+        "important_sections": important,
+    }
+
+
 def _exec_result(exchange, payload, *, target, output_mode, wait_timeout_ms):
     runtime_state = str(payload.get("state") or "ERROR")
     complete = runtime_state in {"FINISHED", "FAILED", "CANCELLED", "INTERRUPTED"}
     state = "RUNNING" if runtime_state in {"CREATED", "RUNNING"} else runtime_state
     terminal_output = (payload.get("output") or "") if complete else ""
     error_type = payload.get("error_type") if complete else None
+    execution_id = str(payload.get("execution_id") or "")
+    mode_contract = _result_mode_contract(
+        terminal_output,
+        output_mode,
+        execution_id,
+    ) if complete else _result_mode_contract("", output_mode, execution_id)
     return ExecResult(
         protocol="CBMCP/1",
         handshake_confirmed=True,
@@ -296,7 +429,7 @@ def _exec_result(exchange, payload, *, target, output_mode, wait_timeout_ms):
         **_outcome_fields(payload),
         state=state,
         runtime_state=runtime_state,
-        execution_id=str(payload.get("execution_id") or ""),
+        execution_id=execution_id,
         target=str(payload.get("target") or target or ""),
         exit_code=payload.get("exit_code") if complete else None,
         duration_ms=_duration_ms(
@@ -305,15 +438,26 @@ def _exec_result(exchange, payload, *, target, output_mode, wait_timeout_ms):
         ),
         started_at=payload.get("started_at"),
         finished_at=payload.get("finished_at"),
-        output=terminal_output,
-        **_stream_contract(terminal_output),
+        output=mode_contract["stdout"],
+        stdout=mode_contract["stdout"],
+        stderr=mode_contract["stderr"],
+        stream_mode="COMBINED",
+        streams_separated=False,
         error_source=_error_source(error_type),
         error_type=error_type,
         error_message=payload.get("error_message") if complete else None,
         raw_available=bool(payload.get("execution_id")),
         cursor=0,
         complete=complete,
-        output_mode=output_mode,
+        requested_output_mode=mode_contract["requested_output_mode"],
+        output_mode=mode_contract["output_mode"],
+        compaction_applied=mode_contract["compaction_applied"],
+        stdout_lines=mode_contract["stdout_lines"],
+        stderr_lines=mode_contract["stderr_lines"],
+        stdout_chars=mode_contract["stdout_chars"],
+        stderr_chars=mode_contract["stderr_chars"],
+        returned_stdout_chars=mode_contract["returned_stdout_chars"],
+        important_sections=mode_contract["important_sections"],
         wait_timeout_ms=wait_timeout_ms,
     )
 
@@ -530,7 +674,7 @@ def codebridge_execution_status(execution_id: str, cursor: int = 0, max_chars: i
 
 @mcp.tool(
     name="codebridge_exec",
-    description="Executa pelo caminho v2 e aguarda por uma janela curta. Retorna resultado final se concluir ou RUNNING com execution_id sem reenviar o comando.",
+    description="Executa pelo caminho v2 com modos NORMAL COMPACT RAW. NORMAL compacta automaticamente saidas grandes; RAW permanece recuperavel pelo execution_id.",
     annotations=ToolAnnotations(
         read_only_hint=False,
         destructive_hint=True,
@@ -546,11 +690,7 @@ def codebridge_exec(
     output_mode: str = "NORMAL",
 ) -> ExecResult:
     wait_timeout_ms = max(0, min(int(wait_timeout_ms or 0), 10000))
-    output_mode = str(output_mode or "NORMAL").strip().upper()
-    if output_mode != "NORMAL":
-        raise ValueError(
-            "MCP-PROD-001 suporta apenas output_mode=NORMAL; COMPACT/RAW entram em MCP-PROD-004"
-        )
+    output_mode = _normalize_output_mode(output_mode)
 
     start_exchange = ProtocolHTTPClient(timeout=12.0).exchange(
         "EXECUTION_V2_START",
@@ -623,7 +763,7 @@ def codebridge_exec(
 
 @mcp.tool(
     name="codebridge_wait",
-    description="Aguarda output novo ou estado terminal de uma execucao existente sem reenviar o comando. Usa cursor incremental e retorna por output, conclusao ou timeout.",
+    description="Aguarda output novo ou estado terminal sem reenviar o comando e aplica NORMAL COMPACT RAW ao resultado final preservando o RAW pelo execution_id.",
     annotations=ToolAnnotations(
         read_only_hint=True,
         idempotent_hint=True,
@@ -636,6 +776,7 @@ def codebridge_wait(
     cursor: int = 0,
     wait_timeout_ms: int = 15000,
     max_chars: int = 32768,
+    output_mode: str = "NORMAL",
 ) -> WaitResult:
     execution_id = str(execution_id or "").strip()
     if not execution_id:
@@ -644,6 +785,7 @@ def codebridge_wait(
     cursor = max(0, int(cursor or 0))
     wait_timeout_ms = max(0, min(int(wait_timeout_ms or 0), 120000))
     max_chars = max(1, min(int(max_chars or 32768), 262144))
+    output_mode = _normalize_output_mode(output_mode)
     deadline = time.monotonic() + (wait_timeout_ms / 1000.0)
     terminal_states = {"FINISHED", "FAILED", "CANCELLED", "INTERRUPTED"}
 
@@ -687,6 +829,15 @@ def codebridge_wait(
                 complete=False,
                 timed_out=False,
                 raw_available=False,
+                requested_output_mode=output_mode,
+                output_mode=output_mode,
+                compaction_applied=False,
+                stdout_lines=0,
+                stderr_lines=0,
+                stdout_chars=0,
+                stderr_chars=0,
+                returned_stdout_chars=0,
+                important_sections=[],
                 wait_timeout_ms=wait_timeout_ms,
             )
 
@@ -713,6 +864,11 @@ def codebridge_wait(
         if text or has_more or complete:
             structured_output = (result_payload.get("output") or "") if complete else ""
             structured_error_type = result_payload.get("error_type") if complete else None
+            mode_contract = _result_mode_contract(
+                structured_output,
+                output_mode,
+                execution_id,
+            ) if complete else _result_mode_contract("", output_mode, execution_id)
             return WaitResult(
                 protocol="CBMCP/1",
                 handshake_confirmed=True,
@@ -730,7 +886,10 @@ def codebridge_wait(
                 ) if complete else None,
                 started_at=result_payload.get("started_at") or output_payload.get("started_at"),
                 finished_at=result_payload.get("finished_at") or output_payload.get("finished_at"),
-                **_stream_contract(structured_output),
+                stdout=mode_contract["stdout"],
+                stderr=mode_contract["stderr"],
+                stream_mode="COMBINED",
+                streams_separated=False,
                 error_source=_error_source(structured_error_type),
                 error_type=structured_error_type,
                 error_message=result_payload.get("error_message") if complete else None,
@@ -744,6 +903,15 @@ def codebridge_wait(
                 complete=complete,
                 timed_out=False,
                 raw_available=True,
+                requested_output_mode=mode_contract["requested_output_mode"],
+                output_mode=mode_contract["output_mode"],
+                compaction_applied=mode_contract["compaction_applied"],
+                stdout_lines=mode_contract["stdout_lines"],
+                stderr_lines=mode_contract["stderr_lines"],
+                stdout_chars=mode_contract["stdout_chars"],
+                stderr_chars=mode_contract["stderr_chars"],
+                returned_stdout_chars=mode_contract["returned_stdout_chars"],
+                important_sections=mode_contract["important_sections"],
                 wait_timeout_ms=wait_timeout_ms,
             )
 
@@ -777,6 +945,15 @@ def codebridge_wait(
                 complete=False,
                 timed_out=True,
                 raw_available=True,
+                requested_output_mode=output_mode,
+                output_mode=output_mode,
+                compaction_applied=False,
+                stdout_lines=0,
+                stderr_lines=0,
+                stdout_chars=0,
+                stderr_chars=0,
+                returned_stdout_chars=0,
+                important_sections=[],
                 wait_timeout_ms=wait_timeout_ms,
             )
 

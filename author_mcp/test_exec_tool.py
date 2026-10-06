@@ -142,13 +142,15 @@ class CodeBridgeExecTests(unittest.TestCase):
             ["EXECUTION_V2_START"],
         )
 
-    def test_prod_001_rejects_future_output_modes(self):
+    def test_prod_004_accepts_official_output_modes(self):
+        self.assertEqual(mcp_server._normalize_output_mode("normal"), "NORMAL")
+        self.assertEqual(mcp_server._normalize_output_mode("compact"), "COMPACT")
+        self.assertEqual(mcp_server._normalize_output_mode("raw"), "RAW")
+
+    def test_prod_004_rejects_invalid_output_mode(self):
         with self.assertRaises(ValueError):
-            mcp_server.codebridge_exec(
-                "CMD",
-                "echo test",
-                output_mode="COMPACT",
-            )
+            mcp_server._normalize_output_mode("MAGIC")
+
 
 
 
