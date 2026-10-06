@@ -17,6 +17,7 @@ from external_execute_store import ExternalExecuteStore, ExternalExecuteConflict
 from execution_ledger import ExecutionLedger, ExecutionLedgerConflict
 from job_store import JobStore
 from migration import migrate_legacy_ssh_once
+from read_only_batch import execute_read_only_batch
 from terminal_manager import TerminalManager
 
 
@@ -367,6 +368,10 @@ class BridgeRuntime:
                 ),
                 timeout=timeout_seconds,
             )
+
+    def read_only_batch(self, operations):
+        return execute_read_only_batch(operations)
+
 
     def start_phase5b_local(self, request_id, target, command):
         request_id = str(request_id or "").strip()

@@ -208,6 +208,21 @@ def codebridge_turn_control():
     }
 
 
+def codebridge_read_batch(operations):
+    runtime = _load_runtime()
+    url = (
+        f"http://{runtime['host']}:"
+        f"{int(runtime['port'])}/v1/read-only/batch"
+    )
+    payload = _post_json(
+        url,
+        runtime["token"],
+        {"operations": operations},
+        timeout=30.0,
+    )
+    return payload.get("batch") or {}
+
+
 def codebridge_prepare(request_id, target, command):
     runtime = _load_runtime()
     url = f"http://{runtime['host']}:{int(runtime['port'])}/v1/terminal/prepare"

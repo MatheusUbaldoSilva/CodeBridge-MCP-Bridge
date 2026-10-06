@@ -126,6 +126,14 @@ class BridgeAPI:
                     bridge.runtime.ensure_chatgpt_turn(
                         reason=path
                     )
+                    if path == "/v1/read-only/batch":
+                        result = bridge.runtime.read_only_batch(
+                            body.get("operations")
+                        )
+                        return self._send(
+                            200,
+                            {"ok": True, "batch": result},
+                        )
                     if path == "/v1/jobs":
                         job = bridge.runtime.submit(body.get("target"), body.get("command"))
                         return self._send(201, {"ok": True, "job": job})

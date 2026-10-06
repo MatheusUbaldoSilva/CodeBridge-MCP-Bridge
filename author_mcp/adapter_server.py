@@ -12,6 +12,7 @@ from runtime_client import (
     codebridge_status, codebridge_stop, codebridge_turn_control,
     codebridge_v2_output, codebridge_v2_result, codebridge_v2_start,
     codebridge_v2_status, codebridge_v2_stop, codebridge_v2_wait,
+    codebridge_read_batch,
 )
 
 
@@ -34,6 +35,9 @@ class AdapterState:
         self.ledger = PersistentProtocolLedger(ledger_path)
         self.operations = operations or {
             "STATUS": lambda payload, request_id=None: codebridge_status(),
+            "READ_ONLY_BATCH": lambda payload, request_id=None: codebridge_read_batch(
+                payload.get("operations")
+            ),
             "PREPARE": lambda payload, request_id=None: codebridge_prepare(
                 request_id, payload.get("target"), payload.get("command")
             ),

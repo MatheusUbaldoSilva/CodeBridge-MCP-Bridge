@@ -45,6 +45,19 @@ class StatusResult(ProtocolOutcome):
     completion_sound: dict[str, Any] | None
 
 
+class ReadOnlyBatchResult(ProtocolOutcome):
+    protocol: str
+    handshake_confirmed: bool
+    request_id: str
+    response_id: str
+    count: int
+    ok_count: int
+    error_count: int
+    complete: bool
+    read_only: bool
+    items: list[dict[str, Any]]
+
+
 class PrepareResult(ProtocolOutcome):
     protocol: str
     handshake_confirmed: bool
@@ -669,6 +682,50 @@ def codebridge_status() -> StatusResult:
         ),
     )
 
+
+
+@mcp.tool(
+    name="codebridge_read_batch",
+    description=(
+        "Executa em uma unica chamada um lote estritamente somente leitura. "
+        "Kinds permitidos: GIT_STATUS GIT_HEAD GIT_BRANCH VERSION FILE_STAT SHA256. "
+        "Nao aceita comandos arbitrarios nem operacoes mutaveis."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        idempotent_hint=True,
+        open_world_hint=False,
+    ),
+    structured_output=True,
+)
+def codebridge_read_batch(
+    operations: list[dict[str, Any]],
+) -> ReadOnlyBatchResult:
+    exchange = _safe_exchange(
+        "READ_ONLY_BATCH",
+        {"operations": operations},
+        timeout=35.0,
+    )
+    payload = exchange["payload"]
+    if not payload.get("operation_ok", True):
+        raise ValueError(
+            payload.get("error_message")
+            or payload.get("error_type")
+            or "read-only batch falhou"
+        )
+    return ReadOnlyBatchResult(
+        protocol="CBMCP/1",
+        handshake_confirmed=True,
+        request_id=exchange["request_syn"]["request_id"],
+        response_id=exchange["response_syn"]["response_id"],
+        **_outcome_fields(payload),
+        count=int(payload.get("count", 0) or 0),
+        ok_count=int(payload.get("ok_count", 0) or 0),
+        error_count=int(payload.get("error_count", 0) or 0),
+        complete=bool(payload.get("complete")),
+        read_only=bool(payload.get("read_only")),
+        items=list(payload.get("items") or []),
+    )
 
 
 @mcp.tool(
