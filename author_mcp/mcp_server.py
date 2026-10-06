@@ -1,5 +1,6 @@
 import argparse
 import base64
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -123,6 +124,29 @@ class V2OutputResult(ProtocolOutcome):
     output: dict[str, Any]
 
 
+class ExecResult(ProtocolOutcome):
+    protocol: str
+    handshake_confirmed: bool
+    request_id: str
+    response_id: str
+    state: str
+    runtime_state: str
+    execution_id: str
+    target: str
+    exit_code: int | None
+    duration_ms: int | None
+    started_at: str | None
+    finished_at: str | None
+    output: str
+    error_type: str | None
+    error_message: str | None
+    raw_available: bool
+    cursor: int
+    complete: bool
+    output_mode: str
+    wait_timeout_ms: int
+
+
 class StopResult(ProtocolOutcome):
     protocol: str
     handshake_confirmed: bool
@@ -185,6 +209,49 @@ def _outcome_fields(payload):
         "operation_error_message": payload.get("error_message"),
         "turn_control": payload.get("turn_control"),
     }
+
+
+def _duration_ms(started_at, finished_at):
+    if not started_at or not finished_at:
+        return None
+    try:
+        start = datetime.fromisoformat(str(started_at))
+        finish = datetime.fromisoformat(str(finished_at))
+    except (TypeError, ValueError):
+        return None
+    return max(0, int(round((finish - start).total_seconds() * 1000)))
+
+
+def _exec_result(exchange, payload, *, target, output_mode, wait_timeout_ms):
+    runtime_state = str(payload.get("state") or "ERROR")
+    complete = runtime_state in {"FINISHED", "FAILED", "CANCELLED", "INTERRUPTED"}
+    state = "RUNNING" if runtime_state in {"CREATED", "RUNNING"} else runtime_state
+    return ExecResult(
+        protocol="CBMCP/1",
+        handshake_confirmed=True,
+        request_id=exchange["request_syn"]["request_id"],
+        response_id=exchange["response_syn"]["response_id"],
+        **_outcome_fields(payload),
+        state=state,
+        runtime_state=runtime_state,
+        execution_id=str(payload.get("execution_id") or ""),
+        target=str(payload.get("target") or target or ""),
+        exit_code=payload.get("exit_code") if complete else None,
+        duration_ms=_duration_ms(
+            payload.get("started_at"),
+            payload.get("finished_at"),
+        ),
+        started_at=payload.get("started_at"),
+        finished_at=payload.get("finished_at"),
+        output=(payload.get("output") or "") if complete else "",
+        error_type=payload.get("error_type") if complete else None,
+        error_message=payload.get("error_message") if complete else None,
+        raw_available=bool(payload.get("execution_id")),
+        cursor=0,
+        complete=complete,
+        output_mode=output_mode,
+        wait_timeout_ms=wait_timeout_ms,
+    )
 
 
 @mcp.tool(
@@ -394,6 +461,99 @@ def codebridge_execution_status(execution_id: str, cursor: int = 0, max_chars: i
         response_id=exchange["response_syn"]["response_id"],
         **_outcome_fields(payload),
         execution=payload if payload.get("operation_ok", True) else {},
+    )
+
+
+@mcp.tool(
+    name="codebridge_exec",
+    description="Executa pelo caminho v2 e aguarda por uma janela curta. Retorna resultado final se concluir ou RUNNING com execution_id sem reenviar o comando.",
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=False,
+        open_world_hint=True,
+    ),
+    structured_output=True,
+)
+def codebridge_exec(
+    target: str,
+    command: str,
+    wait_timeout_ms: int = 1500,
+    output_mode: str = "NORMAL",
+) -> ExecResult:
+    wait_timeout_ms = max(0, min(int(wait_timeout_ms or 0), 10000))
+    output_mode = str(output_mode or "NORMAL").strip().upper()
+    if output_mode != "NORMAL":
+        raise ValueError(
+            "MCP-PROD-001 suporta apenas output_mode=NORMAL; COMPACT/RAW entram em MCP-PROD-004"
+        )
+
+    start_exchange = ProtocolHTTPClient(timeout=12.0).exchange(
+        "EXECUTION_V2_START",
+        {"target": target, "command": command},
+    )
+    start_payload = start_exchange["payload"]
+    if not start_payload.get("operation_ok", True):
+        return _exec_result(
+            start_exchange,
+            start_payload,
+            target=target,
+            output_mode=output_mode,
+            wait_timeout_ms=wait_timeout_ms,
+        )
+
+    execution_id = str(start_payload.get("execution_id") or "")
+    if not execution_id:
+        return _exec_result(
+            start_exchange,
+            start_payload,
+            target=target,
+            output_mode=output_mode,
+            wait_timeout_ms=wait_timeout_ms,
+        )
+
+    deadline = time.monotonic() + (wait_timeout_ms / 1000.0)
+    last_exchange = start_exchange
+    last_payload = start_payload
+
+    while True:
+        state = str(last_payload.get("state") or "")
+        if state in {"FINISHED", "FAILED", "CANCELLED", "INTERRUPTED"}:
+            break
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return _exec_result(
+                last_exchange,
+                last_payload,
+                target=target,
+                output_mode=output_mode,
+                wait_timeout_ms=wait_timeout_ms,
+             )
+        time.sleep(min(0.05, remaining))
+        last_exchange = ProtocolHTTPClient(timeout=10.0).exchange(
+            "EXECUTION_V2_STATUS",
+            {"execution_id": execution_id},
+         )
+        last_payload = last_exchange["payload"]
+
+    result_exchange = ProtocolHTTPClient(timeout=10.0).exchange(
+        "EXECUTION_V2_RESULT",
+        {"execution_id": execution_id},
+    )
+    result_payload = result_exchange["payload"]
+    status_payload = last_payload
+    merged = dict(status_payload)
+    merged.update(result_payload)
+    merged.setdefault("target", start_payload.get("target") or target)
+    merged.setdefault("started_at", status_payload.get("started_at"))
+    merged.setdefault("finished_at", status_payload.get("finished_at"))
+    merged.setdefault("execution_id", execution_id)
+    return _exec_result(
+        result_exchange,
+        merged,
+        target=target,
+        output_mode=output_mode,
+        wait_timeout_ms=wait_timeout_ms,
     )
 
 
