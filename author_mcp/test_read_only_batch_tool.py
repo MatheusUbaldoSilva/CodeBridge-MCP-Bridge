@@ -29,6 +29,9 @@ class FakeClient:
                 "error_count": 0,
                 "complete": True,
                 "read_only": True,
+                "parallel": True,
+                "workers_used": 2,
+                "max_workers": 8,
                 "items": [
                     {
                         "index": 0,
@@ -80,6 +83,9 @@ class ReadOnlyBatchToolTests(unittest.TestCase):
 
         self.assertTrue(result.read_only)
         self.assertTrue(result.complete)
+        self.assertTrue(result.parallel)
+        self.assertEqual(result.workers_used, 2)
+        self.assertEqual(result.max_workers, 8)
         self.assertEqual(result.count, 2)
         self.assertEqual(result.ok_count, 2)
         self.assertEqual(

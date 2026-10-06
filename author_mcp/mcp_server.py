@@ -55,6 +55,9 @@ class ReadOnlyBatchResult(ProtocolOutcome):
     error_count: int
     complete: bool
     read_only: bool
+    parallel: bool
+    workers_used: int
+    max_workers: int
     items: list[dict[str, Any]]
 
 
@@ -724,6 +727,13 @@ def codebridge_read_batch(
         error_count=int(payload.get("error_count", 0) or 0),
         complete=bool(payload.get("complete")),
         read_only=bool(payload.get("read_only")),
+        parallel=bool(payload.get("parallel")),
+        workers_used=int(
+            payload.get("workers_used", 0) or 0
+        ),
+        max_workers=int(
+            payload.get("max_workers", 0) or 0
+        ),
         items=list(payload.get("items") or []),
     )
 

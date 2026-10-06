@@ -3,6 +3,8 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -17,11 +19,83 @@ import read_only_batch as rob
 
 
 class ReadOnlyBatchTests(unittest.TestCase):
+    def test_parallel_execution_preserves_order_and_worker_limit(self):
+        operations = [
+            {"id": str(index), "kind": "VERSION"}
+            for index in range(12)
+        ]
+        lock = threading.Lock()
+        state = {
+            "active": 0,
+            "max_active": 0,
+        }
+
+        def fake_execute(item):
+            with lock:
+                state["active"] += 1
+                state["max_active"] = max(
+                    state["max_active"],
+                    state["active"],
+                )
+            try:
+                # Deliberately make earlier items slower so completion order
+                # differs from input order.
+                time.sleep(
+                    0.025
+                    + (11 - item["index"]) * 0.002
+                )
+                return {"value": item["id"]}
+            finally:
+                with lock:
+                    state["active"] -= 1
+
+        started = time.perf_counter()
+        with patch.object(
+            rob,
+            "_execute_item",
+            side_effect=fake_execute,
+        ):
+            result = rob.execute_read_only_batch(
+                operations
+            )
+        elapsed = time.perf_counter() - started
+
+        self.assertTrue(result["parallel"])
+        self.assertEqual(result["workers_used"], 8)
+        self.assertEqual(result["max_workers"], 8)
+        self.assertGreater(state["max_active"], 1)
+        self.assertLessEqual(state["max_active"], 8)
+        self.assertEqual(
+            [item["id"] for item in result["items"]],
+            [str(index) for index in range(12)],
+        )
+        self.assertEqual(
+            [item["result"]["value"] for item in result["items"]],
+            [str(index) for index in range(12)],
+        )
+        self.assertLess(elapsed, 0.30)
+
+    def test_single_item_avoids_thread_pool(self):
+        with patch.object(
+            rob,
+            "ThreadPoolExecutor",
+        ) as pool:
+            result = rob.execute_read_only_batch([
+                {"id": "one", "kind": "VERSION"}
+            ])
+        pool.assert_not_called()
+        self.assertFalse(result["parallel"])
+        self.assertEqual(result["workers_used"], 1)
+        self.assertEqual(result["max_workers"], 8)
+
     def test_rejects_unknown_kind_before_execution(self):
         with patch.object(
             rob,
             "_execute_item",
-        ) as execute:
+        ) as execute, patch.object(
+            rob,
+            "ThreadPoolExecutor",
+        ) as pool:
             with self.assertRaises(
                 rob.ReadOnlyBatchValidationError
             ):
@@ -29,6 +103,7 @@ class ReadOnlyBatchTests(unittest.TestCase):
                     {"kind": "DELETE_FILE", "path": "x"}
                 ])
         execute.assert_not_called()
+        pool.assert_not_called()
 
     def test_rejects_command_field_before_execution(self):
         with patch.object(

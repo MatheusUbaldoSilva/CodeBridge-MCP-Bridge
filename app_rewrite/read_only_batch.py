@@ -1,6 +1,7 @@
 import hashlib
 import os
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from constants import APP_NAME, APP_VERSION
@@ -15,6 +16,7 @@ READ_ONLY_BATCH_KINDS = frozenset({
     "SHA256",
 })
 READ_ONLY_BATCH_MAX_ITEMS = 32
+READ_ONLY_BATCH_MAX_WORKERS = 8
 READ_ONLY_BATCH_MAX_PATH_CHARS = 4096
 READ_ONLY_BATCH_MAX_ID_CHARS = 128
 READ_ONLY_BATCH_MAX_GIT_OUTPUT_CHARS = 262144
@@ -253,34 +255,59 @@ def _execute_item(item):
     raise AssertionError(f"kind nao implementado: {kind}")
 
 
-def execute_read_only_batch(operations):
-    validated = _validate_operations(operations)
-    items = []
-    ok_count = 0
-    for item in validated:
-        base = {
-            "index": item["index"],
-            "id": item["id"],
-            "kind": item["kind"],
-            "ok": False,
-            "result": None,
-            "error_type": None,
-            "error_message": None,
-        }
-        try:
-            base["result"] = _execute_item(item)
-            base["ok"] = True
-            ok_count += 1
-        except Exception as exc:
-            base["error_type"] = type(exc).__name__
-            base["error_message"] = str(exc)
-        items.append(base)
+def _execute_item_safe(item):
+    base = {
+        "index": item["index"],
+        "id": item["id"],
+        "kind": item["kind"],
+        "ok": False,
+        "result": None,
+        "error_type": None,
+        "error_message": None,
+    }
+    try:
+        base["result"] = _execute_item(item)
+        base["ok"] = True
+    except Exception as exc:
+        base["error_type"] = type(exc).__name__
+        base["error_message"] = str(exc)
+    return base
 
+
+def execute_read_only_batch(operations):
+    # Validate the complete batch before any worker starts. This is the
+    # security boundary that guarantees only allowlisted reads can run.
+    validated = _validate_operations(operations)
+    worker_count = min(
+        len(validated),
+        READ_ONLY_BATCH_MAX_WORKERS,
+    )
+
+    if worker_count == 1:
+        items = [_execute_item_safe(validated[0])]
+    else:
+        with ThreadPoolExecutor(
+            max_workers=worker_count,
+            thread_name_prefix="CodeBridgeReadOnly",
+        ) as executor:
+            # executor.map executes concurrently but yields results in the
+            # same order as the validated input.
+            items = list(
+                executor.map(
+                    _execute_item_safe,
+                    validated,
+                )
+            )
+
+    ok_count = sum(1 for item in items if item["ok"])
     return {
         "count": len(items),
         "ok_count": ok_count,
         "error_count": len(items) - ok_count,
         "complete": True,
         "read_only": True,
+        "parallel": worker_count > 1,
+        "workers_used": worker_count,
+        "max_workers": READ_ONLY_BATCH_MAX_WORKERS,
         "items": items,
     }
