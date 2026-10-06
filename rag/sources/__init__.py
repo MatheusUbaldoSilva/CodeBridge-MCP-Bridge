@@ -11,6 +11,13 @@ from .document_inventory import (
     classify_document_path,
     is_document_source,
 )
+from .git_inventory import (
+    GIT_FACET_FIELDS,
+    READ_ONLY_GIT_OPERATIONS,
+    GitFacet,
+    fields_for_git_facet,
+    is_read_only_git_operation,
+)
 
 __all__ = [
     "ALLOWED_CODE_EXTENSIONS",
@@ -20,4 +27,9 @@ __all__ = [
     "DocumentCategory",
     "classify_document_path",
     "is_document_source",
+    "GIT_FACET_FIELDS",
+    "READ_ONLY_GIT_OPERATIONS",
+    "GitFacet",
+    "fields_for_git_facet",
+    "is_read_only_git_operation",
 ]
