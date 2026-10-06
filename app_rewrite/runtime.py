@@ -321,7 +321,14 @@ class BridgeRuntime:
             if status.get("active_target") or status.get("prepared_target"):
                 raise RuntimeError("terminal ocupado ou ja possui comando preparado")
             execution_id = "exec_" + secrets.token_hex(16)
-            row, _ = self.execution_ledger.create(execution_id, request_id, target, digest, self.instance_id)
+            row, _ = self.execution_ledger.create(
+                execution_id,
+                request_id,
+                target,
+                digest,
+                self.instance_id,
+                failed_command=command,
+            )
             try:
                 self.terminals.prepare(target, command)
             except Exception as exc:
@@ -391,6 +398,18 @@ class BridgeRuntime:
         if row is None:
             raise KeyError(execution_id)
         terminal = row["state"] in ("FINISHED", "FAILED", "CANCELLED", "INTERRUPTED")
+        terminal_status = self.terminals.status()
+        terminal_key = {
+            "POWERSHELL5.1": "powershell",
+            "CMD": "cmd",
+            "SSH": "ssh",
+        }.get(row["target"])
+        shell_state = terminal_status.get(terminal_key) if terminal_key else None
+        shell_alive = (
+            bool(shell_state.get("online"))
+            if isinstance(shell_state, dict)
+            else None
+        )
         return {
             "execution_id": row["execution_id"],
             "target": row["target"],
@@ -400,6 +419,13 @@ class BridgeRuntime:
             "exit_code": row.get("exit_code") if terminal else None,
             "error_type": row.get("error_type") if terminal else None,
             "error_message": row.get("error_message") if terminal else None,
+            "failed_command": (
+                (row.get("failed_command") or None)
+                if terminal and row["state"] != "FINISHED"
+                else None
+            ),
+            "shell_alive": shell_alive,
+            "execution_recoverable": True,
             "started_at": row.get("started_at"),
             "finished_at": row.get("finished_at") if terminal else None,
         }

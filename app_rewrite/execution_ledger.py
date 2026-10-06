@@ -55,6 +55,7 @@ class ExecutionLedger:
                     request_id TEXT NOT NULL UNIQUE,
                     target TEXT NOT NULL,
                     command_hash TEXT NOT NULL,
+                    failed_command TEXT,
                     state TEXT NOT NULL,
                     runtime_instance TEXT,
                     started_at TEXT,
@@ -69,6 +70,8 @@ class ExecutionLedger:
             columns = {row["name"] for row in con.execute("PRAGMA table_info(executions)")}
             if "output" not in columns:
                 con.execute("ALTER TABLE executions ADD COLUMN output TEXT NOT NULL DEFAULT ''")
+            if "failed_command" not in columns:
+                con.execute("ALTER TABLE executions ADD COLUMN failed_command TEXT")
             con.execute(
                 "CREATE INDEX IF NOT EXISTS idx_executions_state ON executions(state)"
             )
@@ -102,11 +105,12 @@ class ExecutionLedger:
         return self._row(row)
 
     def create(self, execution_id, request_id, target, command_hash,
-               runtime_instance=None):
+               runtime_instance=None, failed_command=None):
         execution_id = str(execution_id or "").strip()
         request_id = str(request_id or "").strip()
         target = str(target or "").strip()
         command_hash = str(command_hash or "").strip()
+        failed_command = None if failed_command is None else str(failed_command)
         if not all((execution_id, request_id, target, command_hash)):
             raise ValueError("execution_id, request_id, target e command_hash obrigatorios")
         now = utc_now()
@@ -131,10 +135,10 @@ class ExecutionLedger:
                 return self._row(row), False
             con.execute(
                 "INSERT INTO executions("
-                "execution_id,request_id,target,command_hash,state,runtime_instance,"
-                "created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+                "execution_id,request_id,target,command_hash,failed_command,state,runtime_instance,"
+                "created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
                 (
-                    execution_id, request_id, target, command_hash, "CREATED",
+                    execution_id, request_id, target, command_hash, failed_command, "CREATED",
                     runtime_instance, now, now,
                 ),
             )
@@ -142,7 +146,8 @@ class ExecutionLedger:
         return self.get(execution_id), True
 
     def transition(self, execution_id, new_state, *, runtime_instance=None,
-                   exit_code=None, error_type=None, error_message=None, output=None):
+                   exit_code=None, error_type=None, error_message=None, output=None,
+                   failed_command=None):
         new_state = str(new_state or "").strip().upper()
         if new_state not in VALID_STATES:
             raise ValueError(f"state invalido: {new_state}")
@@ -167,17 +172,25 @@ class ExecutionLedger:
                 started_at = now
             if new_state in TERMINAL_STATES and not finished_at:
                 finished_at = now
+            stored_failed_command = (
+                row["failed_command"]
+                if failed_command is None
+                else str(failed_command or "")
+            )
             if new_state == "FINISHED":
                 error_type = None
                 error_message = None
+                stored_failed_command = ""
             stored_output = row["output"] if output is None else str(output or "")
             con.execute(
                 "UPDATE executions SET state=?,runtime_instance=COALESCE(?,runtime_instance),"
-                "started_at=?,finished_at=?,exit_code=?,error_type=?,error_message=?,output=?,updated_at=? "
+                "started_at=?,finished_at=?,exit_code=?,error_type=?,error_message=?,"
+                "failed_command=?,output=?,updated_at=? "
                 "WHERE execution_id=?",
                 (
                     new_state, runtime_instance, started_at, finished_at, exit_code,
-                    error_type, error_message, stored_output, now, execution_id,
+                    error_type, error_message, stored_failed_command, stored_output,
+                    now, execution_id,
                 ),
             )
             con.commit()

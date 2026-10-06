@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
@@ -11,6 +12,31 @@ RUNTIME_FILE = DATA_DIR / "runtime.json"
 
 class CodeBridgeUnavailable(RuntimeError):
     pass
+
+
+class CodeBridgeRequestError(RuntimeError):
+    pass
+
+
+def _http_error_message(exc):
+    try:
+        raw = exc.read().decode("utf-8", errors="replace")
+    except Exception:
+        raw = ""
+    if raw:
+        try:
+            payload = json.loads(raw)
+        except Exception:
+            payload = None
+        if isinstance(payload, dict):
+            detail = (
+                payload.get("message")
+                or payload.get("error")
+                or raw
+            )
+            return f"HTTP {exc.code}: {detail}"
+        return f"HTTP {exc.code}: {raw}"
+    return f"HTTP {exc.code}: {exc.reason}"
 
 
 def _load_runtime():
@@ -28,8 +54,14 @@ def _get_json(url, token, timeout=3.0):
     try:
         with urlopen(request, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8"))
-    except Exception as exc:
+    except HTTPError as exc:
+        raise CodeBridgeRequestError(
+            _http_error_message(exc)
+        ) from exc
+    except (URLError, TimeoutError, OSError) as exc:
         raise CodeBridgeUnavailable(str(exc)) from exc
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise CodeBridgeRequestError(str(exc)) from exc
 
 
 def _post_json(url, token, payload, timeout=5.0):
@@ -46,8 +78,14 @@ def _post_json(url, token, payload, timeout=5.0):
     try:
         with urlopen(request, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8"))
-    except Exception as exc:
+    except HTTPError as exc:
+        raise CodeBridgeRequestError(
+            _http_error_message(exc)
+        ) from exc
+    except (URLError, TimeoutError, OSError) as exc:
         raise CodeBridgeUnavailable(str(exc)) from exc
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise CodeBridgeRequestError(str(exc)) from exc
 
 
 def codebridge_status():

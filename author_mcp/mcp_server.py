@@ -145,6 +145,9 @@ class ExecResult(ProtocolOutcome):
     error_source: str | None
     error_type: str | None
     error_message: str | None
+    failed_command: str | None
+    shell_alive: bool | None
+    execution_recoverable: bool
     raw_available: bool
     cursor: int
     complete: bool
@@ -180,6 +183,9 @@ class WaitResult(ProtocolOutcome):
     error_source: str | None
     error_type: str | None
     error_message: str | None
+    failed_command: str | None
+    shell_alive: bool | None
+    execution_recoverable: bool
     cursor: int
     next_cursor: int
     text: str
@@ -277,16 +283,130 @@ def _duration_ms(started_at, finished_at):
     return max(0, int(round((finish - start).total_seconds() * 1000)))
 
 
+def _exception_source(exc):
+    message = str(exc or "").lower()
+    name = type(exc).__name__.lower()
+    cause = getattr(exc, "__cause__", None)
+    cause_name = type(cause).__name__.lower() if cause is not None else ""
+    if (
+        "adapter indisponivel" in message
+        or "timed out" in message
+        or "timeout" in name
+        or "timeout" in cause_name
+        or "connectionrefused" in cause_name
+        or "urlerror" in cause_name
+        or "connection reset" in message
+        or "connection refused" in message
+    ):
+        return "transport"
+    return "mcp"
+
+
+def _safe_exchange(operation, payload, *, timeout):
+    try:
+        return ProtocolHTTPClient(timeout=timeout).exchange(operation, payload)
+    except Exception as exc:
+        source = _exception_source(exc)
+        error_type = "TransportError" if source == "transport" else "MCPProtocolError"
+        now = int(time.time() * 1000)
+        execution_id = str((payload or {}).get("execution_id") or "")
+        return {
+            "request_syn": {
+                "request_id": f"req_local_error_{now}",
+                "operation": operation,
+            },
+            "response_syn": {
+                "response_id": f"res_local_error_{now}",
+            },
+            "payload": {
+                "operation_ok": False,
+                "state": "ERROR",
+                "execution_id": execution_id,
+                "error_source": source,
+                "error_type": error_type,
+                "error_message": str(exc),
+                "execution_recoverable": bool(execution_id),
+            },
+        }
+
+
+def _wait_error_result(
+    exchange,
+    payload,
+    *,
+    execution_id,
+    cursor,
+    wait_timeout_ms,
+    output_mode,
+    raw_available,
+):
+    error_type = payload.get("error_type")
+    return WaitResult(
+        protocol="CBMCP/1",
+        handshake_confirmed=True,
+        request_id=exchange["request_syn"]["request_id"],
+        response_id=exchange["response_syn"]["response_id"],
+        **_outcome_fields(payload),
+        state="ERROR",
+        runtime_state="ERROR",
+        execution_id=execution_id,
+        target=str(payload.get("target") or ""),
+        exit_code=None,
+        duration_ms=None,
+        started_at=payload.get("started_at"),
+        finished_at=payload.get("finished_at"),
+        **_stream_contract(""),
+        error_source=payload.get("error_source") or _error_source(error_type) or "mcp",
+        error_type=error_type,
+        error_message=payload.get("error_message"),
+        failed_command=payload.get("failed_command"),
+        shell_alive=payload.get("shell_alive"),
+        execution_recoverable=bool(
+            payload.get("execution_recoverable", bool(execution_id))
+        ),
+        cursor=cursor,
+        next_cursor=cursor,
+        text="",
+        chars=0,
+        available_chars=0,
+        has_more=False,
+        eof=False,
+        complete=False,
+        timed_out=False,
+        raw_available=bool(raw_available),
+        requested_output_mode=output_mode,
+        output_mode=output_mode,
+        compaction_applied=False,
+        stdout_lines=0,
+        stderr_lines=0,
+        stdout_chars=0,
+        stderr_chars=0,
+        returned_stdout_chars=0,
+        important_sections=[],
+        wait_timeout_ms=wait_timeout_ms,
+    )
+
+
 def _error_source(error_type):
     if not error_type:
         return None
     name = str(error_type).strip().lower()
+    if (
+        "transport" in name
+        or "unavailable" in name
+        or "urlerror" in name
+        or "timeout" in name
+        or "connection" in name
+    ):
+        return "transport"
+    if "commanderror" in name or "commandcancel" in name:
+        return "command"
+    if "sessioninterrupted" in name or "shell" in name or "terminal" in name:
+        return "shell"
+    if "protocol" in name or "handshake" in name or "mcp" in name:
+        return "mcp"
     if "command" in name or "cancel" in name:
         return "command"
-    if "session" in name or "terminal" in name or "shell" in name:
-        return "shell"
-    if "protocol" in name or "http" in name or "mcp" in name:
-        return "mcp"
     return "executor"
 
 
@@ -409,13 +529,32 @@ def _result_mode_contract(raw_output, requested_mode, execution_id):
     }
 
 
-def _exec_result(exchange, payload, *, target, output_mode, wait_timeout_ms):
+def _exec_result(
+    exchange,
+    payload,
+    *,
+    target,
+    output_mode,
+    wait_timeout_ms,
+    command=None,
+):
     runtime_state = str(payload.get("state") or "ERROR")
     complete = runtime_state in {"FINISHED", "FAILED", "CANCELLED", "INTERRUPTED"}
     state = "RUNNING" if runtime_state in {"CREATED", "RUNNING"} else runtime_state
     terminal_output = (payload.get("output") or "") if complete else ""
-    error_type = payload.get("error_type") if complete else None
+    error_type = payload.get("error_type")
     execution_id = str(payload.get("execution_id") or "")
+    failed_command = payload.get("failed_command")
+    if (
+        not failed_command
+        and command
+        and runtime_state not in {"CREATED", "RUNNING", "FINISHED"}
+    ):
+        failed_command = command
+    shell_alive = payload.get("shell_alive")
+    execution_recoverable = bool(
+        payload.get("execution_recoverable", bool(execution_id))
+    )
     mode_contract = _result_mode_contract(
         terminal_output,
         output_mode,
@@ -445,7 +584,10 @@ def _exec_result(exchange, payload, *, target, output_mode, wait_timeout_ms):
         streams_separated=False,
         error_source=_error_source(error_type),
         error_type=error_type,
-        error_message=payload.get("error_message") if complete else None,
+        error_message=payload.get("error_message"),
+        failed_command=failed_command,
+        shell_alive=shell_alive,
+        execution_recoverable=execution_recoverable,
         raw_available=bool(payload.get("execution_id")),
         cursor=0,
         complete=complete,
@@ -692,9 +834,10 @@ def codebridge_exec(
     wait_timeout_ms = max(0, min(int(wait_timeout_ms or 0), 10000))
     output_mode = _normalize_output_mode(output_mode)
 
-    start_exchange = ProtocolHTTPClient(timeout=12.0).exchange(
+    start_exchange = _safe_exchange(
         "EXECUTION_V2_START",
         {"target": target, "command": command},
+        timeout=12.0,
     )
     start_payload = start_exchange["payload"]
     if not start_payload.get("operation_ok", True):
@@ -704,6 +847,7 @@ def codebridge_exec(
             target=target,
             output_mode=output_mode,
             wait_timeout_ms=wait_timeout_ms,
+            command=command,
         )
 
     execution_id = str(start_payload.get("execution_id") or "")
@@ -714,6 +858,7 @@ def codebridge_exec(
             target=target,
             output_mode=output_mode,
             wait_timeout_ms=wait_timeout_ms,
+            command=command,
         )
 
     deadline = time.monotonic() + (wait_timeout_ms / 1000.0)
@@ -734,15 +879,26 @@ def codebridge_exec(
                 wait_timeout_ms=wait_timeout_ms,
              )
         time.sleep(min(0.05, remaining))
-        last_exchange = ProtocolHTTPClient(timeout=10.0).exchange(
+        last_exchange = _safe_exchange(
             "EXECUTION_V2_STATUS",
             {"execution_id": execution_id},
-         )
+            timeout=10.0,
+        )
         last_payload = last_exchange["payload"]
+        if not last_payload.get("operation_ok", True):
+            return _exec_result(
+                last_exchange,
+                last_payload,
+                target=target,
+                output_mode=output_mode,
+                wait_timeout_ms=wait_timeout_ms,
+                command=command,
+            )
 
-    result_exchange = ProtocolHTTPClient(timeout=10.0).exchange(
+    result_exchange = _safe_exchange(
         "EXECUTION_V2_RESULT",
         {"execution_id": execution_id},
+        timeout=10.0,
     )
     result_payload = result_exchange["payload"]
     status_payload = last_payload
@@ -758,6 +914,7 @@ def codebridge_exec(
         target=target,
         output_mode=output_mode,
         wait_timeout_ms=wait_timeout_ms,
+        command=command,
     )
 
 
@@ -790,55 +947,26 @@ def codebridge_wait(
     terminal_states = {"FINISHED", "FAILED", "CANCELLED", "INTERRUPTED"}
 
     while True:
-        output_exchange = ProtocolHTTPClient(timeout=10.0).exchange(
+        output_exchange = _safe_exchange(
             "EXECUTION_V2_OUTPUT",
             {
                 "execution_id": execution_id,
                 "cursor": cursor,
                 "max_chars": max_chars,
             },
+            timeout=10.0,
         )
         output_payload = output_exchange["payload"]
 
         if not output_payload.get("operation_ok", True):
-            return WaitResult(
-                protocol="CBMCP/1",
-                handshake_confirmed=True,
-                request_id=output_exchange["request_syn"]["request_id"],
-                response_id=output_exchange["response_syn"]["response_id"],
-                **_outcome_fields(output_payload),
-                state="ERROR",
-                runtime_state=str(output_payload.get("state") or "ERROR"),
+            return _wait_error_result(
+                output_exchange,
+                output_payload,
                 execution_id=execution_id,
-                target=str(output_payload.get("target") or ""),
-                exit_code=None,
-                duration_ms=None,
-                started_at=output_payload.get("started_at"),
-                finished_at=output_payload.get("finished_at"),
-                **_stream_contract(""),
-                error_source="mcp",
-                error_type=output_payload.get("error_type"),
-                error_message=output_payload.get("error_message"),
                 cursor=cursor,
-                next_cursor=cursor,
-                text="",
-                chars=0,
-                available_chars=0,
-                has_more=False,
-                eof=False,
-                complete=False,
-                timed_out=False,
-                raw_available=False,
-                requested_output_mode=output_mode,
-                output_mode=output_mode,
-                compaction_applied=False,
-                stdout_lines=0,
-                stderr_lines=0,
-                stdout_chars=0,
-                stderr_chars=0,
-                returned_stdout_chars=0,
-                important_sections=[],
                 wait_timeout_ms=wait_timeout_ms,
+                output_mode=output_mode,
+                raw_available=bool(execution_id),
             )
 
         runtime_state = str(output_payload.get("state") or "RUNNING")
@@ -852,11 +980,22 @@ def codebridge_wait(
         result_payload = {}
         result_exchange = output_exchange
         if complete:
-            result_exchange = ProtocolHTTPClient(timeout=10.0).exchange(
+            result_exchange = _safe_exchange(
                 "EXECUTION_V2_RESULT",
                 {"execution_id": execution_id},
+                timeout=10.0,
             )
             result_payload = result_exchange["payload"]
+            if not result_payload.get("operation_ok", True):
+                return _wait_error_result(
+                    result_exchange,
+                    result_payload,
+                    execution_id=execution_id,
+                    cursor=cursor,
+                    wait_timeout_ms=wait_timeout_ms,
+                    output_mode=output_mode,
+                    raw_available=True,
+                )
             if result_payload.get("operation_ok", True):
                 runtime_state = str(result_payload.get("state") or runtime_state)
                 state = "RUNNING" if runtime_state in {"CREATED", "RUNNING"} else runtime_state
@@ -893,6 +1032,11 @@ def codebridge_wait(
                 error_source=_error_source(structured_error_type),
                 error_type=structured_error_type,
                 error_message=result_payload.get("error_message") if complete else None,
+                failed_command=result_payload.get("failed_command") if complete else None,
+                shell_alive=result_payload.get("shell_alive") if complete else None,
+                execution_recoverable=bool(
+                    result_payload.get("execution_recoverable", bool(execution_id))
+                ),
                 cursor=cursor,
                 next_cursor=next_cursor,
                 text=text,
@@ -935,6 +1079,9 @@ def codebridge_wait(
                 error_source=None,
                 error_type=None,
                 error_message=None,
+                failed_command=None,
+                shell_alive=None,
+                execution_recoverable=bool(execution_id),
                 cursor=cursor,
                 next_cursor=next_cursor,
                 text="",
