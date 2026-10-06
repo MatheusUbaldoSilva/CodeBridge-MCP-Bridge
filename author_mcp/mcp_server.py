@@ -138,6 +138,11 @@ class ExecResult(ProtocolOutcome):
     started_at: str | None
     finished_at: str | None
     output: str
+    stdout: str
+    stderr: str
+    stream_mode: str
+    streams_separated: bool
+    error_source: str | None
     error_type: str | None
     error_message: str | None
     raw_available: bool
@@ -157,8 +162,14 @@ class WaitResult(ProtocolOutcome):
     execution_id: str
     target: str
     exit_code: int | None
+    duration_ms: int | None
     started_at: str | None
     finished_at: str | None
+    stdout: str
+    stderr: str
+    stream_mode: str
+    streams_separated: bool
+    error_source: str | None
     error_type: str | None
     error_message: str | None
     cursor: int
@@ -249,10 +260,34 @@ def _duration_ms(started_at, finished_at):
     return max(0, int(round((finish - start).total_seconds() * 1000)))
 
 
+def _error_source(error_type):
+    if not error_type:
+        return None
+    name = str(error_type).strip().lower()
+    if "command" in name or "cancel" in name:
+        return "command"
+    if "session" in name or "terminal" in name or "shell" in name:
+        return "shell"
+    if "protocol" in name or "http" in name or "mcp" in name:
+        return "mcp"
+    return "executor"
+
+
+def _stream_contract(output):
+    return {
+        "stdout": str(output or ""),
+        "stderr": "",
+        "stream_mode": "COMBINED",
+        "streams_separated": False,
+    }
+
+
 def _exec_result(exchange, payload, *, target, output_mode, wait_timeout_ms):
     runtime_state = str(payload.get("state") or "ERROR")
     complete = runtime_state in {"FINISHED", "FAILED", "CANCELLED", "INTERRUPTED"}
     state = "RUNNING" if runtime_state in {"CREATED", "RUNNING"} else runtime_state
+    terminal_output = (payload.get("output") or "") if complete else ""
+    error_type = payload.get("error_type") if complete else None
     return ExecResult(
         protocol="CBMCP/1",
         handshake_confirmed=True,
@@ -270,8 +305,10 @@ def _exec_result(exchange, payload, *, target, output_mode, wait_timeout_ms):
         ),
         started_at=payload.get("started_at"),
         finished_at=payload.get("finished_at"),
-        output=(payload.get("output") or "") if complete else "",
-        error_type=payload.get("error_type") if complete else None,
+        output=terminal_output,
+        **_stream_contract(terminal_output),
+        error_source=_error_source(error_type),
+        error_type=error_type,
         error_message=payload.get("error_message") if complete else None,
         raw_available=bool(payload.get("execution_id")),
         cursor=0,
@@ -633,8 +670,11 @@ def codebridge_wait(
                 execution_id=execution_id,
                 target=str(output_payload.get("target") or ""),
                 exit_code=None,
+                duration_ms=None,
                 started_at=output_payload.get("started_at"),
                 finished_at=output_payload.get("finished_at"),
+                **_stream_contract(""),
+                error_source="mcp",
                 error_type=output_payload.get("error_type"),
                 error_message=output_payload.get("error_message"),
                 cursor=cursor,
@@ -671,6 +711,8 @@ def codebridge_wait(
                 state = "RUNNING" if runtime_state in {"CREATED", "RUNNING"} else runtime_state
 
         if text or has_more or complete:
+            structured_output = (result_payload.get("output") or "") if complete else ""
+            structured_error_type = result_payload.get("error_type") if complete else None
             return WaitResult(
                 protocol="CBMCP/1",
                 handshake_confirmed=True,
@@ -682,9 +724,15 @@ def codebridge_wait(
                 execution_id=execution_id,
                 target=str(result_payload.get("target") or output_payload.get("target") or ""),
                 exit_code=result_payload.get("exit_code") if complete else None,
+                duration_ms=_duration_ms(
+                    result_payload.get("started_at") or output_payload.get("started_at"),
+                    result_payload.get("finished_at") or output_payload.get("finished_at"),
+                ) if complete else None,
                 started_at=result_payload.get("started_at") or output_payload.get("started_at"),
                 finished_at=result_payload.get("finished_at") or output_payload.get("finished_at"),
-                error_type=result_payload.get("error_type") if complete else None,
+                **_stream_contract(structured_output),
+                error_source=_error_source(structured_error_type),
+                error_type=structured_error_type,
                 error_message=result_payload.get("error_message") if complete else None,
                 cursor=cursor,
                 next_cursor=next_cursor,
@@ -712,8 +760,11 @@ def codebridge_wait(
                 execution_id=execution_id,
                 target=str(output_payload.get("target") or ""),
                 exit_code=None,
+                duration_ms=None,
                 started_at=output_payload.get("started_at"),
                 finished_at=output_payload.get("finished_at"),
+                **_stream_contract(""),
+                error_source=None,
                 error_type=None,
                 error_message=None,
                 cursor=cursor,

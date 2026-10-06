@@ -393,12 +393,14 @@ class BridgeRuntime:
         terminal = row["state"] in ("FINISHED", "FAILED", "CANCELLED", "INTERRUPTED")
         return {
             "execution_id": row["execution_id"],
+            "target": row["target"],
             "state": row["state"],
             "ready": terminal,
             "output": row.get("output") or "" if terminal else "",
             "exit_code": row.get("exit_code") if terminal else None,
             "error_type": row.get("error_type") if terminal else None,
             "error_message": row.get("error_message") if terminal else None,
+            "started_at": row.get("started_at"),
             "finished_at": row.get("finished_at") if terminal else None,
         }
 
