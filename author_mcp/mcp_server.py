@@ -45,6 +45,21 @@ class StatusResult(ProtocolOutcome):
     completion_sound: dict[str, Any] | None
 
 
+class CapabilitiesResult(ProtocolOutcome):
+    protocol: str
+    handshake_confirmed: bool
+    request_id: str
+    response_id: str
+    app: str | None
+    version: str | None
+    targets: list[str]
+    features: dict[str, bool]
+    limits: dict[str, Any]
+    preferred_tools: list[str]
+    legacy_tools: list[dict[str, Any]]
+    migration: dict[str, Any]
+
+
 class ReadOnlyBatchResult(ProtocolOutcome):
     protocol: str
     handshake_confirmed: bool
@@ -234,6 +249,10 @@ class StopResult(ProtocolOutcome):
     request_id: str
     response_id: str
     cancelled: bool
+    execution_id: str | None = None
+    state: str | None = None
+    reason: str | None = None
+    targeted: bool = False
 
 
 class ExecuteResult(ProtocolOutcome):
@@ -630,7 +649,7 @@ def _exec_result(
 
 @mcp.tool(
     name="codebridge_ping",
-    description="Diagnostico simples do MCP autoral sem acessar terminais.",
+    description="[LEGACY] Diagnostico antigo. Prefira codebridge_status ou codebridge_capabilities.",
     annotations=ToolAnnotations(read_only_hint=True, open_world_hint=False),
     structured_output=True,
 )
@@ -685,6 +704,122 @@ def codebridge_status() -> StatusResult:
         ),
     )
 
+
+
+@mcp.tool(
+    name="codebridge_capabilities",
+    description=(
+        "Descobre capacidades, limites e politica de migracao da instalacao "
+        "CodeBridge sem executar comandos."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        idempotent_hint=True,
+        open_world_hint=False,
+    ),
+    structured_output=True,
+)
+def codebridge_capabilities() -> CapabilitiesResult:
+    exchange = ProtocolHTTPClient().exchange("STATUS", {})
+    payload = exchange["payload"]
+    preferred_tools = [
+        "codebridge_status",
+        "codebridge_capabilities",
+        "codebridge_exec",
+        "codebridge_wait",
+        "codebridge_stop",
+        "codebridge_read_batch",
+        "codebridge_prepare",
+        "codebridge_execute_prepared",
+        "codebridge_discard",
+    ]
+    legacy_tools = [
+        {
+            "name": "codebridge_ping",
+            "replacement": "codebridge_status / codebridge_capabilities",
+        },
+        {
+            "name": "codebridge_terminal",
+            "replacement": "codebridge_exec or codebridge_prepare",
+        },
+        {
+            "name": "codebridge_start",
+            "replacement": "codebridge_exec(wait_timeout_ms=0)",
+        },
+        {
+            "name": "codebridge_execution_status",
+            "replacement": "codebridge_wait(wait_timeout_ms=0)",
+        },
+        {
+            "name": "codebridge_v2_start",
+            "replacement": "codebridge_exec",
+        },
+        {
+            "name": "codebridge_v2_status",
+            "replacement": "codebridge_wait(wait_timeout_ms=0)",
+        },
+        {
+            "name": "codebridge_v2_result",
+            "replacement": "codebridge_wait",
+        },
+        {
+            "name": "codebridge_v2_output",
+            "replacement": "codebridge_wait(wait_timeout_ms=0)",
+        },
+        {
+            "name": "codebridge_v2_stop",
+            "replacement": "codebridge_stop(execution_id=...)",
+        },
+    ]
+    return CapabilitiesResult(
+        protocol="CBMCP/1",
+        handshake_confirmed=True,
+        request_id=exchange["request_syn"]["request_id"],
+        response_id=exchange["response_syn"]["response_id"],
+        **_outcome_fields(payload),
+        app=payload.get("app"),
+        version=payload.get("version"),
+        targets=["POWERSHELL5.1", "CMD", "SSH"],
+        features={
+            "async_execution": True,
+            "wait": True,
+            "event_driven_wait": True,
+            "stream_output": True,
+            "prepare": True,
+            "cancel": True,
+            "targeted_cancel": True,
+            "raw_output": True,
+            "structured_errors": True,
+            "compact_output": True,
+            "output_delta": True,
+            "hot_connection": True,
+            "read_only_batch": True,
+            "parallel_read_only": True,
+        },
+        limits={
+            "exec_wait_timeout_max_ms": 10000,
+            "wait_timeout_max_ms": 120000,
+            "wait_max_chars": 262144,
+            "compact_response_max_chars": 9000,
+            "read_batch_max_items": 32,
+            "read_batch_max_workers": 8,
+        },
+        preferred_tools=preferred_tools,
+        legacy_tools=legacy_tools,
+        migration={
+            "stage": "STABILIZE",
+            "legacy_tools_published": True,
+            "legacy_removal_ready": False,
+            "removal_gate": (
+                "remove only after connected clients refresh their MCP schema "
+                "and no longer depend on legacy tool names"
+            ),
+            "rollback": (
+                "keep v2 operations available; never reexecute commands "
+                "during fallback"
+            ),
+        },
+    )
 
 
 @mcp.tool(
@@ -771,7 +906,7 @@ def codebridge_prepare(target: str, command: str) -> PrepareResult:
 
 @mcp.tool(
     name="codebridge_terminal",
-    description="Envia target + comando ao terminal real. Respeita o Auto do CodeBridge: OFF prepara sem Enter; ON prepara, exibe e executa.",
+    description="[LEGACY] Dispatch antigo. Prefira codebridge_exec para executar ou codebridge_prepare para preparar.",
     annotations=ToolAnnotations(
         read_only_hint=False, destructive_hint=True,
         idempotent_hint=True, open_world_hint=True,
@@ -847,7 +982,7 @@ def codebridge_discard(request_id: str | None = None) -> DiscardResult:
 
 @mcp.tool(
     name="codebridge_start",
-    description="Inicia execucao assincrona no terminal real. AUTO OFF apenas prepara; AUTO ON retorna rapidamente e executa em background.",
+    description="[LEGACY] Inicio assincrono antigo. Prefira codebridge_exec com wait_timeout_ms=0.",
     annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True, idempotent_hint=True, open_world_hint=True),
     structured_output=True,
 )
@@ -871,7 +1006,7 @@ def codebridge_start(target: str, command: str) -> AsyncStartResult:
 
 @mcp.tool(
     name="codebridge_execution_status",
-    description="Consulta estado e novos trechos de saida de uma execucao sem reenviar o comando.",
+    description="[LEGACY] Consulta antiga. Prefira codebridge_wait com wait_timeout_ms=0.",
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=False),
     structured_output=True,
 )
@@ -1192,7 +1327,7 @@ def codebridge_wait(
 
 @mcp.tool(
     name="codebridge_v2_start",
-    description="Inicia execucao assincrona persistente em PowerShell 5.1, CMD ou SSH e retorna execution_id rapidamente.",
+    description="[LEGACY] Rota v2 de inicio. Prefira codebridge_exec.",
     annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True, idempotent_hint=True, open_world_hint=True),
     structured_output=True,
 )
@@ -1212,7 +1347,7 @@ def codebridge_v2_start(target: str, command: str) -> V2ExecutionEnvelope:
 
 @mcp.tool(
     name="codebridge_v2_status",
-    description="Consulta estado persistente pelo execution_id sem reenviar o comando.",
+    description="[LEGACY] Rota v2 de status. Prefira codebridge_wait com wait_timeout_ms=0.",
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=False),
     structured_output=True,
 )
@@ -1232,7 +1367,7 @@ def codebridge_v2_status(execution_id: str) -> V2ExecutionEnvelope:
 
 @mcp.tool(
     name="codebridge_v2_result",
-    description="Retorna resultado persistido quando a execucao atingir estado terminal.",
+    description="[LEGACY] Rota v2 de resultado. Prefira codebridge_wait.",
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=False),
     structured_output=True,
 )
@@ -1253,7 +1388,7 @@ def codebridge_v2_result(execution_id: str) -> V2ExecutionEnvelope:
 
 @mcp.tool(
     name="codebridge_v2_output",
-    description="Le a saida persistida em blocos por cursor, sem reenviar o comando.",
+    description="[LEGACY] Rota v2 de output. Prefira codebridge_wait com wait_timeout_ms=0.",
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=False),
     structured_output=True,
 )
@@ -1274,7 +1409,7 @@ def codebridge_v2_output(execution_id: str, cursor: int = 0, max_chars: int = 32
 
 @mcp.tool(
     name="codebridge_v2_stop",
-    description="Cancela somente a execucao identificada pelo execution_id.",
+    description="[LEGACY] Rota v2 de cancelamento. Prefira codebridge_stop(execution_id=...).",
     annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False),
     structured_output=True,
 )
@@ -1294,12 +1429,37 @@ def codebridge_v2_stop(execution_id: str) -> V2ExecutionStopResult:
 
 @mcp.tool(
     name="codebridge_stop",
-    description="Interrompe com Ctrl+C a execucao ativa ou descarta um comando apenas preparado.",
-    annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False),
+    description=(
+        "Cancela de forma direcionada quando execution_id e informado. "
+        "Sem execution_id preserva o comportamento compativel de interromper "
+        "a execucao ativa ou descartar comando preparado."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    ),
     structured_output=True,
 )
-def codebridge_stop() -> StopResult:
-    exchange = ProtocolHTTPClient().exchange("STOP", {})
+def codebridge_stop(
+    execution_id: str | None = None,
+) -> StopResult:
+    execution_id = str(execution_id or "").strip() or None
+    operation = (
+        "EXECUTION_V2_STOP"
+        if execution_id
+        else "STOP"
+    )
+    request_payload = (
+        {"execution_id": execution_id}
+        if execution_id
+        else {}
+    )
+    exchange = ProtocolHTTPClient(timeout=10.0).exchange(
+        operation,
+        request_payload,
+    )
     payload = exchange["payload"]
     return StopResult(
         protocol="CBMCP/1",
@@ -1308,6 +1468,13 @@ def codebridge_stop() -> StopResult:
         response_id=exchange["response_syn"]["response_id"],
         **_outcome_fields(payload),
         cancelled=bool(payload.get("cancelled")),
+        execution_id=(
+            payload.get("execution_id")
+            or execution_id
+        ),
+        state=payload.get("state"),
+        reason=payload.get("reason"),
+        targeted=bool(execution_id),
     )
 
 
