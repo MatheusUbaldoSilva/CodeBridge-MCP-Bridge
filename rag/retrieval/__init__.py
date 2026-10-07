@@ -10,6 +10,12 @@ from .code_semantic import (
     retrieve_code_to_code,
     retrieve_nl_to_code,
 )
+from .hybrid_code import (
+    CODE_VECTOR_RETRIEVAL_MODE,
+    CodeHybridCandidates,
+    collect_code_hybrid_candidates,
+    search_code_vector,
+)
 from .hybrid_text import (
     TEXT_VECTOR_RETRIEVAL_MODE,
     TextHybridCandidates,
@@ -20,6 +26,10 @@ from .hybrid_text import (
 __all__ = [
     "retrieve_code_to_code",
     "retrieve_nl_to_code",
+    "CODE_VECTOR_RETRIEVAL_MODE",
+    "CodeHybridCandidates",
+    "collect_code_hybrid_candidates",
+    "search_code_vector",
     "TEXT_VECTOR_RETRIEVAL_MODE",
     "TextHybridCandidates",
     "collect_text_hybrid_candidates",
