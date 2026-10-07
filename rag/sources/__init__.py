@@ -36,6 +36,13 @@ from .git_state import (
     attach_git_head_state_to_metadata,
     capture_git_head_state,
 )
+from .git_provenance import (
+    GitFileProvenance,
+    GitProvenanceError,
+    attach_git_provenance_to_chunk,
+    attach_git_provenance_to_metadata,
+    capture_git_file_provenance,
+)
 
 __all__ = [
     "ALLOWED_CODE_EXTENSIONS",
@@ -62,4 +69,9 @@ __all__ = [
     "attach_git_head_state_to_chunk",
     "attach_git_head_state_to_metadata",
     "capture_git_head_state",
+    "GitFileProvenance",
+    "GitProvenanceError",
+    "attach_git_provenance_to_chunk",
+    "attach_git_provenance_to_metadata",
+    "capture_git_file_provenance",
 ]
