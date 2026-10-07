@@ -64,6 +64,24 @@ from .code_backend_policy import (
     LlamaCppCodeBackendProbe,
     probe_llama_cpp_code_backend,
 )
+from .code_embedding import (
+    CODE_CORPUS_SOURCE_TYPES,
+    CODE_CORPUS_TASKS,
+    CODE_EMBEDDING_BATCH_SIZE,
+    CODE_EMBEDDING_DETERMINISM_MIN_COSINE,
+    CODE_EMBEDDING_DIMENSION,
+    CODE_EMBEDDING_NORM_TARGET,
+    CODE_EMBEDDING_NORM_TOLERANCE,
+    CodeChunkEmbedding,
+    CodeEmbeddingClient,
+    CodeEmbeddingError,
+    CodeEmbeddingProtocolError,
+    CodeEmbeddingRole,
+    CodeEmbeddingStateError,
+    CodeEmbeddingValidationError,
+    CodeEmbeddingVector,
+    code_embeddings_are_deterministic,
+)
 from .code_lifecycle import (
     CodeModelLifecycle,
     build_code_server_config,
@@ -121,6 +139,22 @@ from .lifecycle import (
 )
 
 __all__ = [
+    "CODE_CORPUS_SOURCE_TYPES",
+    "CODE_CORPUS_TASKS",
+    "CODE_EMBEDDING_BATCH_SIZE",
+    "CODE_EMBEDDING_DETERMINISM_MIN_COSINE",
+    "CODE_EMBEDDING_DIMENSION",
+    "CODE_EMBEDDING_NORM_TARGET",
+    "CODE_EMBEDDING_NORM_TOLERANCE",
+    "CodeChunkEmbedding",
+    "CodeEmbeddingClient",
+    "CodeEmbeddingError",
+    "CodeEmbeddingProtocolError",
+    "CodeEmbeddingRole",
+    "CodeEmbeddingStateError",
+    "CodeEmbeddingValidationError",
+    "CodeEmbeddingVector",
+    "code_embeddings_are_deterministic",
     "DEFAULT_CODE_MODEL_SUBDIR",
     "install_selected_code_model",
     "resolve_code_model_directory",
