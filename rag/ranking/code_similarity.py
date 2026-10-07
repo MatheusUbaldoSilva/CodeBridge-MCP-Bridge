@@ -1,4 +1,4 @@
-"""Deterministic cosine ranking for NL -> code candidates — RAG-007-D."""
+"""Deterministic cosine ranking for code semantic candidates — RAG-007-D/E."""
 
 from __future__ import annotations
 
@@ -15,25 +15,32 @@ from rag.models.code_embedding import (
 from rag.models.embedding import cosine_similarity
 
 
-CODE_NL_RETRIEVAL_MODE = "CODE_VECTOR_IN_MEMORY"
+CODE_VECTOR_RETRIEVAL_MODE = "CODE_VECTOR_IN_MEMORY"
+# Backward-compatible public name frozen by RAG-007-D.
+CODE_NL_RETRIEVAL_MODE = CODE_VECTOR_RETRIEVAL_MODE
 CODE_NL_TASK_MODE = "NL2CODE"
+CODE_CODE_TASK_MODE = "CODE2CODE"
 
 
-def rank_nl_to_code(
+def _rank_code_task(
     query_embedding: CodeEmbeddingVector,
     chunks: Sequence[Chunk],
     chunk_embeddings: Sequence[CodeChunkEmbedding],
     *,
+    task: CodeRetrievalTask,
+    task_mode: str,
     top_k: int,
 ) -> Tuple[SearchResult, ...]:
     if not isinstance(query_embedding, CodeEmbeddingVector):
         raise ValueError("query_embedding must be CodeEmbeddingVector")
+    if not isinstance(task, CodeRetrievalTask):
+        raise ValueError("task must be CodeRetrievalTask")
     if (
-        query_embedding.task is not CodeRetrievalTask.NL2CODE
+        query_embedding.task is not task
         or query_embedding.role is not CodeEmbeddingRole.QUERY
     ):
         raise ValueError(
-            "NL -> code ranking requires an NL2CODE QUERY embedding"
+            f"{task.value} ranking requires a matching QUERY embedding"
         )
     if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k < 1:
         raise ValueError("top_k must be >= 1")
@@ -47,7 +54,7 @@ def rank_nl_to_code(
         if not isinstance(chunk, Chunk):
             raise ValueError("chunks must contain only Chunk values")
         if chunk.metadata.source_type is not SourceType.CODE:
-            raise ValueError("NL -> code ranking accepts only SourceType.CODE")
+            raise ValueError("code semantic ranking accepts only SourceType.CODE")
         if chunk.chunk_id in seen_ids:
             raise ValueError("chunk_id values must be unique")
         seen_ids.add(chunk.chunk_id)
@@ -62,8 +69,8 @@ def rank_nl_to_code(
             raise ValueError("document identity does not match chunk")
         if embedded.metadata != chunk.metadata:
             raise ValueError("chunk embedding provenance does not match chunk")
-        if embedded.task is not CodeRetrievalTask.NL2CODE:
-            raise ValueError("candidate embedding must use NL2CODE task")
+        if embedded.task is not task:
+            raise ValueError("candidate embedding task does not match query task")
         if embedded.embedding.role is not CodeEmbeddingRole.PASSAGE:
             raise ValueError("candidate embedding must use PASSAGE role")
 
@@ -98,24 +105,53 @@ def rank_nl_to_code(
         )
     )
 
-    results = []
-    for rank, item in enumerate(scored[:top_k], start=1):
-        chunk = item[4]
-        score = item[5]
-        results.append(
-            SearchResult(
-                chunk_id=chunk.chunk_id,
-                document_id=chunk.document_id,
-                content=chunk.content,
-                metadata=chunk.metadata,
-                score=score,
-                rank=rank,
-                retrieval_modes=(
-                    CODE_NL_RETRIEVAL_MODE,
-                    CODE_NL_TASK_MODE,
-                ),
-                stale=False,
-            )
+    return tuple(
+        SearchResult(
+            chunk_id=item[4].chunk_id,
+            document_id=item[4].document_id,
+            content=item[4].content,
+            metadata=item[4].metadata,
+            score=item[5],
+            rank=rank,
+            retrieval_modes=(
+                CODE_VECTOR_RETRIEVAL_MODE,
+                task_mode,
+            ),
+            stale=False,
         )
+        for rank, item in enumerate(scored[:top_k], start=1)
+    )
 
-    return tuple(results)
+
+def rank_nl_to_code(
+    query_embedding: CodeEmbeddingVector,
+    chunks: Sequence[Chunk],
+    chunk_embeddings: Sequence[CodeChunkEmbedding],
+    *,
+    top_k: int,
+) -> Tuple[SearchResult, ...]:
+    return _rank_code_task(
+        query_embedding,
+        chunks,
+        chunk_embeddings,
+        task=CodeRetrievalTask.NL2CODE,
+        task_mode=CODE_NL_TASK_MODE,
+        top_k=top_k,
+    )
+
+
+def rank_code_to_code(
+    query_embedding: CodeEmbeddingVector,
+    chunks: Sequence[Chunk],
+    chunk_embeddings: Sequence[CodeChunkEmbedding],
+    *,
+    top_k: int,
+) -> Tuple[SearchResult, ...]:
+    return _rank_code_task(
+        query_embedding,
+        chunks,
+        chunk_embeddings,
+        task=CodeRetrievalTask.CODE2CODE,
+        task_mode=CODE_CODE_TASK_MODE,
+        top_k=top_k,
+    )
