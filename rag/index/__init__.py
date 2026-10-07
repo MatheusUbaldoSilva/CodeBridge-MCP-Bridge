@@ -1,5 +1,20 @@
 """Storage backends for the CodeBridge RAG layer."""
 
+from .fts5 import (
+    FTS_INDEXED_FIELDS,
+    FTS_LAYOUT_VERSION,
+    FTS_METADATA_FIELDS,
+    FTS_TABLE,
+    REQUIRED_FTS_TRIGGERS,
+    RagFts5IntegrityError,
+    RagFts5UnavailableError,
+    fts5_available,
+    fts5_table_exists,
+    fts5_trigger_names,
+    initialize_fts5,
+    rebuild_fts5,
+    verify_fts5_integrity,
+)
 from .sqlite_schema import (
     DEFAULT_DATABASE_FILENAME,
     REQUIRED_TABLES,
@@ -12,6 +27,19 @@ from .sqlite_schema import (
 )
 
 __all__ = [
+    "FTS_INDEXED_FIELDS",
+    "FTS_LAYOUT_VERSION",
+    "FTS_METADATA_FIELDS",
+    "FTS_TABLE",
+    "REQUIRED_FTS_TRIGGERS",
+    "RagFts5IntegrityError",
+    "RagFts5UnavailableError",
+    "fts5_available",
+    "fts5_table_exists",
+    "fts5_trigger_names",
+    "initialize_fts5",
+    "rebuild_fts5",
+    "verify_fts5_integrity",
     "DEFAULT_DATABASE_FILENAME",
     "REQUIRED_TABLES",
     "SCHEMA_VERSION",
