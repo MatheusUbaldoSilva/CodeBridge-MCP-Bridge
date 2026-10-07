@@ -15,6 +15,11 @@ from .fts5 import (
     rebuild_fts5,
     verify_fts5_integrity,
 )
+from .lexical_search import (
+    LexicalSearchHit,
+    RagLexicalQueryError,
+    search_lexical,
+)
 from .sqlite_schema import (
     DEFAULT_DATABASE_FILENAME,
     REQUIRED_TABLES,
@@ -40,6 +45,9 @@ __all__ = [
     "initialize_fts5",
     "rebuild_fts5",
     "verify_fts5_integrity",
+    "LexicalSearchHit",
+    "RagLexicalQueryError",
+    "search_lexical",
     "DEFAULT_DATABASE_FILENAME",
     "REQUIRED_TABLES",
     "SCHEMA_VERSION",
