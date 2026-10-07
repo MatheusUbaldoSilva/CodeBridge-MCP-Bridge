@@ -7,6 +7,12 @@ from .code_fallback import (
     SafeCodeChunkingResult,
     safe_chunk_code,
 )
+from .code_lines import (
+    CodeLineAccuracyError,
+    CodeLineAccuracyReport,
+    source_line_slice,
+    validate_code_line_accuracy,
+)
 from .code_parser import (
     CodeLanguage,
     CodeParseError,
@@ -52,6 +58,10 @@ __all__ = [
     "ParserMode",
     "SafeCodeChunkingResult",
     "safe_chunk_code",
+    "CodeLineAccuracyError",
+    "CodeLineAccuracyReport",
+    "source_line_slice",
+    "validate_code_line_accuracy",
     "CodeLanguage",
     "CodeParseError",
     "CodeParseResult",
