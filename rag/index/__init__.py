@@ -1,5 +1,17 @@
 """Storage backends for the CodeBridge RAG layer."""
 
+from .embedding_cache import (
+    DEFAULT_TEXT_EMBEDDING_CACHE_FILENAME,
+    TEXT_EMBEDDING_CACHE_SCHEMA_VERSION,
+    TEXT_EMBEDDING_CACHE_TABLE,
+    TextEmbeddingCache,
+    TextEmbeddingCacheError,
+    TextEmbeddingCacheIntegrityError,
+    TextEmbeddingCacheVersionError,
+    connect_text_embedding_cache,
+    initialize_text_embedding_cache,
+    resolve_text_embedding_cache_path,
+)
 from .fts5 import (
     FTS_INDEXED_FIELDS,
     FTS_LAYOUT_VERSION,
@@ -38,6 +50,16 @@ from .sqlite_schema import (
 )
 
 __all__ = [
+    "DEFAULT_TEXT_EMBEDDING_CACHE_FILENAME",
+    "TEXT_EMBEDDING_CACHE_SCHEMA_VERSION",
+    "TEXT_EMBEDDING_CACHE_TABLE",
+    "TextEmbeddingCache",
+    "TextEmbeddingCacheError",
+    "TextEmbeddingCacheIntegrityError",
+    "TextEmbeddingCacheVersionError",
+    "connect_text_embedding_cache",
+    "initialize_text_embedding_cache",
+    "resolve_text_embedding_cache_path",
     "FTS_INDEXED_FIELDS",
     "FTS_LAYOUT_VERSION",
     "FTS_METADATA_FIELDS",

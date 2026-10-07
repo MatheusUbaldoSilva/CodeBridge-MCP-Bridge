@@ -465,21 +465,46 @@ class RagTextEmbeddingTests(unittest.TestCase):
                 values=tuple(values),
             )
 
-    def test_no_cache_or_vector_store_is_implemented_here(self):
+    def test_cache_integration_keeps_storage_and_vector_index_outside_model(self):
+        import ast
         import rag.models.embedding as module
 
         source = Path(
             module.__file__
         ).read_text(
             encoding="utf-8"
-        ).lower()
+        )
+        tree = ast.parse(source)
 
-        self.assertNotIn("sqlite", source)
-        self.assertNotIn("qdrant", source)
-        self.assertNotIn("cache", source.replace(
-            "cache vectors",
-            ""
-        ))
+        imported_modules = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported_modules.update(
+                    alias.name
+                    for alias in node.names
+                )
+            elif isinstance(node, ast.ImportFrom):
+                if node.module:
+                    imported_modules.add(
+                        node.module
+                    )
+
+        self.assertNotIn(
+            "sqlite3",
+            imported_modules,
+        )
+        self.assertFalse(
+            any(
+                name == "rag.index"
+                or name.startswith("rag.index.")
+                for name in imported_modules
+            )
+        )
+
+        lowered = source.lower()
+        self.assertNotIn("qdrant", lowered)
+        self.assertNotIn("hnsw", lowered)
+        self.assertNotIn("create virtual table", lowered)
 
 
 if __name__ == "__main__":

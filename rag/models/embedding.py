@@ -8,9 +8,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import hashlib
 import json
 import math
-from typing import Callable, Iterable, List, Mapping, Sequence, Tuple
+from typing import (
+    Callable,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+)
 from urllib.request import Request, urlopen
 
 from rag.contracts import Chunk, SourceMetadata, SourceType
@@ -24,6 +34,22 @@ TEXT_EMBEDDING_NORM_TARGET = 1.0
 TEXT_EMBEDDING_NORM_TOLERANCE = 1e-3
 TEXT_EMBEDDING_DETERMINISM_MIN_COSINE = 0.9999
 TEXT_EMBEDDING_BATCH_SIZE = 1
+
+_CACHE_NAMESPACE_PAYLOAD = "|".join(
+    (
+        "RAG_TEXT_EMBEDDING_CACHE_V1",
+        SELECTED_TEXT_BACKEND.model_repository,
+        str(SELECTED_TEXT_BACKEND.artifact_pin.revision),
+        str(SELECTED_TEXT_BACKEND.artifact_pin.sha256),
+        str(SELECTED_TEXT_BACKEND.artifact_pin.quantization),
+        SELECTED_TEXT_BACKEND.pooling,
+        SELECTED_TEXT_BACKEND.document_prefix,
+        str(TEXT_EMBEDDING_DIMENSION),
+    )
+)
+TEXT_EMBEDDING_CACHE_NAMESPACE = hashlib.sha256(
+    _CACHE_NAMESPACE_PAYLOAD.encode("utf-8")
+).hexdigest()
 
 TEXT_DOCUMENT_SOURCE_TYPES: Tuple[SourceType, ...] = (
     SourceType.DOCUMENTATION,
@@ -85,6 +111,35 @@ class TextEmbeddingVector:
         )
 
 
+class DocumentEmbeddingCacheProtocol(Protocol):
+    def get(
+        self,
+        *,
+        namespace: str,
+        chunk_sha256: str,
+        dimension: int,
+    ) -> Optional[Tuple[float, ...]]:
+        ...
+
+    def put(
+        self,
+        *,
+        namespace: str,
+        chunk_sha256: str,
+        dimension: int,
+        values: Sequence[float],
+    ) -> None:
+        ...
+
+
+def chunk_content_sha256(content: str) -> str:
+    if not isinstance(content, str):
+        raise ValueError("content must be a string")
+    return hashlib.sha256(
+        content.encode("utf-8")
+    ).hexdigest()
+
+
 @dataclass(frozen=True)
 class DocumentChunkEmbedding:
     chunk_id: str
@@ -102,6 +157,32 @@ class DocumentChunkEmbedding:
         if self.embedding.role is not TextEmbeddingRole.DOCUMENT:
             raise ValueError(
                 "document chunk embedding must use DOCUMENT role"
+            )
+
+
+@dataclass(frozen=True)
+class CachedDocumentChunkEmbedding:
+    result: DocumentChunkEmbedding
+    chunk_sha256: str
+    cache_hit: bool
+
+    def __post_init__(self) -> None:
+        if not isinstance(
+            self.result,
+            DocumentChunkEmbedding,
+        ):
+            raise ValueError(
+                "result must be DocumentChunkEmbedding"
+            )
+        if (
+            len(self.chunk_sha256) != 64
+            or any(
+                char not in "0123456789abcdef"
+                for char in self.chunk_sha256
+            )
+        ):
+            raise ValueError(
+                "chunk_sha256 must be 64 lowercase hexadecimal characters"
             )
 
 
@@ -387,6 +468,22 @@ class TextEmbeddingClient:
             for text in items
         )
 
+    def _validate_text_chunk(
+        self,
+        chunk: Chunk,
+    ) -> None:
+        if not isinstance(chunk, Chunk):
+            raise ValueError(
+                "chunks must contain only Chunk values"
+            )
+        if (
+            chunk.metadata.source_type
+            not in TEXT_DOCUMENT_SOURCE_TYPES
+        ):
+            raise TextEmbeddingValidationError(
+                "chunk source_type is outside the text-model corpus"
+            )
+
     def embed_document_chunks(
         self,
         chunks: Iterable[Chunk],
@@ -396,17 +493,7 @@ class TextEmbeddingClient:
         ] = []
 
         for chunk in chunks:
-            if not isinstance(chunk, Chunk):
-                raise ValueError(
-                    "chunks must contain only Chunk values"
-                )
-            if (
-                chunk.metadata.source_type
-                not in TEXT_DOCUMENT_SOURCE_TYPES
-            ):
-                raise TextEmbeddingValidationError(
-                    "chunk source_type is outside the text-model corpus"
-                )
+            self._validate_text_chunk(chunk)
 
             results.append(
                 DocumentChunkEmbedding(
@@ -416,6 +503,78 @@ class TextEmbeddingClient:
                     embedding=self.embed_document(
                         chunk.content
                     ),
+                )
+            )
+
+        return tuple(results)
+
+
+    def embed_document_chunks_cached(
+        self,
+        chunks: Iterable[Chunk],
+        cache: DocumentEmbeddingCacheProtocol,
+    ) -> Tuple[CachedDocumentChunkEmbedding, ...]:
+        results: List[
+            CachedDocumentChunkEmbedding
+        ] = []
+
+        if not hasattr(cache, "get") or not hasattr(
+            cache,
+            "put",
+        ):
+            raise ValueError(
+                "cache must provide get and put methods"
+            )
+
+        for chunk in chunks:
+            self._validate_text_chunk(chunk)
+            chunk_sha = chunk_content_sha256(
+                chunk.content
+            )
+
+            cached_values = cache.get(
+                namespace=TEXT_EMBEDDING_CACHE_NAMESPACE,
+                chunk_sha256=chunk_sha,
+                dimension=TEXT_EMBEDDING_DIMENSION,
+            )
+
+            if cached_values is None:
+                vector = self.embed_document(
+                    chunk.content
+                )
+                cache.put(
+                    namespace=TEXT_EMBEDDING_CACHE_NAMESPACE,
+                    chunk_sha256=chunk_sha,
+                    dimension=TEXT_EMBEDDING_DIMENSION,
+                    values=vector.values,
+                )
+                cache_hit = False
+            else:
+                try:
+                    vector = TextEmbeddingVector(
+                        role=TextEmbeddingRole.DOCUMENT,
+                        values=tuple(
+                            cached_values
+                        ),
+                    )
+                except ValueError as exc:
+                    raise TextEmbeddingValidationError(
+                        f"cached embedding is invalid: {exc}"
+                    ) from exc
+                self._validate_vector(vector)
+                cache_hit = True
+
+            result = DocumentChunkEmbedding(
+                chunk_id=chunk.chunk_id,
+                document_id=chunk.document_id,
+                metadata=chunk.metadata,
+                embedding=vector,
+            )
+            results.append(
+                CachedDocumentChunkEmbedding(
+                    result=result,
+                    chunk_sha256=chunk_sha,
+                    cache_hit=cache_hit,
                 )
             )
 
