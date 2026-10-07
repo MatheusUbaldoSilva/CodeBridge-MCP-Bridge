@@ -125,6 +125,7 @@ def attach_source_provenance(
     git_branch: Optional[str] = None,
     git_commit: Optional[str] = None,
     git_provenance_commit: Optional[str] = None,
+    git_worktree_status: Optional[str] = None,
     source_id: Optional[str] = None,
 ) -> Tuple[Chunk, ...]:
     """Return immutable Chunk contracts with verified source provenance.
@@ -183,6 +184,7 @@ def attach_source_provenance(
             git_branch=git_branch,
             git_commit=git_commit,
             git_provenance_commit=git_provenance_commit,
+            git_worktree_status=git_worktree_status,
             sha256=digest,
             indexed_at=captured_at,
             source_id=source_id,

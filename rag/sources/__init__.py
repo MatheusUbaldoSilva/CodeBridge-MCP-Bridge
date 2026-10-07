@@ -43,6 +43,14 @@ from .git_provenance import (
     attach_git_provenance_to_metadata,
     capture_git_file_provenance,
 )
+from .git_worktree import (
+    GitPathState,
+    GitPathStatus,
+    GitWorktreeError,
+    attach_git_path_state_to_chunk,
+    attach_git_path_state_to_metadata,
+    capture_git_path_state,
+)
 
 __all__ = [
     "ALLOWED_CODE_EXTENSIONS",
@@ -74,4 +82,10 @@ __all__ = [
     "attach_git_provenance_to_chunk",
     "attach_git_provenance_to_metadata",
     "capture_git_file_provenance",
+    "GitPathState",
+    "GitPathStatus",
+    "GitWorktreeError",
+    "attach_git_path_state_to_chunk",
+    "attach_git_path_state_to_metadata",
+    "capture_git_path_state",
 ]

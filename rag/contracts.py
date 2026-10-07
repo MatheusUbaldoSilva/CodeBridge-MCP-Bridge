@@ -61,6 +61,7 @@ class SourceMetadata:
     git_branch: Optional[str] = None
     git_commit: Optional[str] = None
     git_provenance_commit: Optional[str] = None
+    git_worktree_status: Optional[str] = None
     sha256: Optional[str] = None
     indexed_at: Optional[str] = None
     source_id: Optional[str] = None
