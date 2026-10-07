@@ -53,6 +53,15 @@ from .qdrant_local import (
     open_qdrant_local,
     resolve_qdrant_local_path,
 )
+from .vector_namespace import (
+    EXAMPLE_PROJECT_NAMESPACES,
+    PROJECT_NAMESPACE_PAYLOAD_KEY,
+    PROJECT_NAMESPACE_PATTERN,
+    ProjectNamespace,
+    build_project_namespace_filter,
+    require_project_namespace,
+    vector_payload_with_namespace,
+)
 from .vector_backend_policy import (
     CandidateDecision,
     SELECTED_VECTOR_BACKEND,
@@ -122,6 +131,13 @@ __all__ = [
     "ensure_vector_collections",
     "open_qdrant_local",
     "resolve_qdrant_local_path",
+    "EXAMPLE_PROJECT_NAMESPACES",
+    "PROJECT_NAMESPACE_PAYLOAD_KEY",
+    "PROJECT_NAMESPACE_PATTERN",
+    "ProjectNamespace",
+    "build_project_namespace_filter",
+    "require_project_namespace",
+    "vector_payload_with_namespace",
     "CandidateDecision",
     "SELECTED_VECTOR_BACKEND",
     "SELECTED_VECTOR_PACKAGE",
