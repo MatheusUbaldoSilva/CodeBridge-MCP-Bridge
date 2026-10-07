@@ -34,6 +34,19 @@ from .backend_policy import (
     TextEmbeddingBackendPolicy,
     selected_backend_evaluation,
 )
+from .lifecycle import (
+    LlamaServerConfig,
+    ModelLifecycleError,
+    ModelLifecycleSnapshot,
+    ModelLifecycleState,
+    ModelLifecycleStateError,
+    ModelLoadError,
+    ModelUnloadError,
+    TextModelLifecycle,
+    build_llama_server_argv,
+    find_free_loopback_port,
+    probe_http_health,
+)
 
 __all__ = [
     "DEFAULT_MODEL_SUBDIR",
@@ -63,4 +76,15 @@ __all__ = [
     "ModelArtifactPin",
     "TextEmbeddingBackendPolicy",
     "selected_backend_evaluation",
+    "LlamaServerConfig",
+    "ModelLifecycleError",
+    "ModelLifecycleSnapshot",
+    "ModelLifecycleState",
+    "ModelLifecycleStateError",
+    "ModelLoadError",
+    "ModelUnloadError",
+    "TextModelLifecycle",
+    "build_llama_server_argv",
+    "find_free_loopback_port",
+    "probe_http_health",
 ]
