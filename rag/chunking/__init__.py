@@ -9,6 +9,11 @@ from .code_parser import (
     detect_code_language,
     parse_code_source,
 )
+from .code_units import (
+    CodeUnitDraft,
+    CodeUnitKind,
+    chunk_code_units,
+)
 from .markdown import (
     MarkdownChunkDraft,
     MarkdownChunkKind,
@@ -37,6 +42,9 @@ __all__ = [
     "UnsupportedCodeLanguageError",
     "detect_code_language",
     "parse_code_source",
+    "CodeUnitDraft",
+    "CodeUnitKind",
+    "chunk_code_units",
     "MarkdownChunkDraft",
     "MarkdownChunkKind",
     "chunk_markdown",
