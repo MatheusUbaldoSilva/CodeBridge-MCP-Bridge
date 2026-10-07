@@ -38,6 +38,17 @@ from .lexical_search import (
     RagLexicalQueryError,
     search_lexical,
 )
+from .manifest import (
+    DEFAULT_MANIFEST_FILENAME,
+    MANIFEST_SCHEMA_VERSION,
+    IndexManifest,
+    ManifestEntry,
+    ManifestError,
+    ManifestIndexKind,
+    load_index_manifest,
+    manifest_entry_key,
+    save_index_manifest,
+)
 from .qdrant_local import (
     CODE_VECTOR_COLLECTION,
     DEFAULT_QDRANT_LOCAL_SUBDIR,
@@ -126,6 +137,15 @@ __all__ = [
     "LexicalSearchHit",
     "RagLexicalQueryError",
     "search_lexical",
+    "DEFAULT_MANIFEST_FILENAME",
+    "MANIFEST_SCHEMA_VERSION",
+    "IndexManifest",
+    "ManifestEntry",
+    "ManifestError",
+    "ManifestIndexKind",
+    "load_index_manifest",
+    "manifest_entry_key",
+    "save_index_manifest",
     "CODE_VECTOR_COLLECTION",
     "DEFAULT_QDRANT_LOCAL_SUBDIR",
     "QDRANT_DISTANCE",
