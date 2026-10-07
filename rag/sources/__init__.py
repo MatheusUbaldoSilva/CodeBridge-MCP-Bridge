@@ -29,6 +29,13 @@ from .git_inventory import (
     fields_for_git_facet,
     is_read_only_git_operation,
 )
+from .git_state import (
+    GitHeadState,
+    GitStateError,
+    attach_git_head_state_to_chunk,
+    attach_git_head_state_to_metadata,
+    capture_git_head_state,
+)
 
 __all__ = [
     "ALLOWED_CODE_EXTENSIONS",
@@ -50,4 +57,9 @@ __all__ = [
     "GitFacet",
     "fields_for_git_facet",
     "is_read_only_git_operation",
+    "GitHeadState",
+    "GitStateError",
+    "attach_git_head_state_to_chunk",
+    "attach_git_head_state_to_metadata",
+    "capture_git_head_state",
 ]
