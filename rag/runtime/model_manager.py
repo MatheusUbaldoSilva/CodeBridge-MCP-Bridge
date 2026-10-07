@@ -1,4 +1,4 @@
-"""Local model manager for CodeBridge RAG — RAG-008-B/C/D
+"""Local model manager for CodeBridge RAG — RAG-008-B/C/D/E
 
 RAG-008-B establishes initial mutual exclusion between text and code models
 
@@ -6,7 +6,9 @@ RAG-008-C adds a configurable cooperative idle timeout
 
 RAG-008-D serializes model state transitions so model loads cannot overlap
 
-Structured failure policy and hybrid simultaneous residency remain out of scope
+RAG-008-E adds MCP-safe structured operation results and lexical fallback signaling
+
+Hybrid simultaneous residency remains out of scope
 """
 
 from __future__ import annotations
@@ -18,10 +20,22 @@ import threading
 import time
 from typing import Any, Callable, Optional, Protocol
 
+from .query_classifier import QueryRoute
+
 
 class ManagedModel(str, Enum):
     TEXT = "TEXT"
     CODE = "CODE"
+
+
+class ModelManagerOperation(str, Enum):
+    ACTIVATE = "ACTIVATE"
+    UNLOAD = "UNLOAD"
+
+
+class ModelManagerErrorType(str, Enum):
+    ACTIVATION_FAILED = "ACTIVATION_FAILED"
+    UNLOAD_FAILED = "UNLOAD_FAILED"
 
 
 class ManagedRuntime(Protocol):
@@ -47,6 +61,54 @@ class ModelManagerSnapshot:
             raise ValueError("CODE active_model requires code_loaded")
         if self.active_model is None and (self.text_loaded or self.code_loaded):
             raise ValueError("resident model requires active_model")
+
+
+@dataclass(frozen=True)
+class ModelManagerOperationResult:
+    ok: bool
+    operation: ModelManagerOperation
+    requested_model: Optional[ManagedModel]
+    active_model: Optional[ManagedModel]
+    value: Any = None
+    error_type: Optional[ModelManagerErrorType] = None
+    error_message: Optional[str] = None
+    cause_type: Optional[str] = None
+    cleanup_errors: tuple[str, ...] = ()
+    fallback_route: Optional[QueryRoute] = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.operation, ModelManagerOperation):
+            raise ValueError("operation must be ModelManagerOperation")
+        if self.requested_model is not None and not isinstance(
+            self.requested_model,
+            ManagedModel,
+        ):
+            raise ValueError("requested_model must be ManagedModel when provided")
+        if self.active_model is not None and not isinstance(
+            self.active_model,
+            ManagedModel,
+        ):
+            raise ValueError("active_model must be ManagedModel when provided")
+        if self.ok:
+            if self.error_type is not None or self.error_message is not None:
+                raise ValueError("successful result cannot contain an error")
+            if self.fallback_route is not None:
+                raise ValueError("successful result cannot request fallback")
+        else:
+            if not isinstance(self.error_type, ModelManagerErrorType):
+                raise ValueError("failed result requires error_type")
+            if not isinstance(self.error_message, str) or not self.error_message:
+                raise ValueError("failed result requires error_message")
+            if self.active_model is not None:
+                raise ValueError("failed result cannot declare an active model")
+            if self.fallback_route is not QueryRoute.LEXICAL_ONLY:
+                raise ValueError("failed result must preserve lexical fallback")
+        if any(not isinstance(item, str) or not item for item in self.cleanup_errors):
+            raise ValueError("cleanup_errors must contain non-empty strings")
+
+    @property
+    def resources_released(self) -> bool:
+        return not self.cleanup_errors
 
 
 Clock = Callable[[], float]
@@ -211,6 +273,105 @@ class ExclusiveModelManager:
         finally:
             self._active_model = None
             self._last_activity_at = None
+
+    @_serialized
+    def activate_safe(
+        self,
+        model: ManagedModel,
+        *,
+        load_kwargs: Optional[dict[str, Any]] = None,
+        unload_kwargs: Optional[dict[str, Any]] = None,
+    ) -> ModelManagerOperationResult:
+        if not isinstance(model, ManagedModel):
+            raise ValueError("model must be ManagedModel")
+
+        try:
+            value = self.activate(
+                model,
+                load_kwargs=load_kwargs,
+                unload_kwargs=unload_kwargs,
+            )
+        except Exception as exc:
+            cleanup_errors = self._cleanup_all_runtimes(
+                unload_kwargs=unload_kwargs,
+            )
+            return ModelManagerOperationResult(
+                ok=False,
+                operation=ModelManagerOperation.ACTIVATE,
+                requested_model=model,
+                active_model=None,
+                error_type=ModelManagerErrorType.ACTIVATION_FAILED,
+                error_message=str(exc) or type(exc).__name__,
+                cause_type=type(exc).__name__,
+                cleanup_errors=cleanup_errors,
+                fallback_route=QueryRoute.LEXICAL_ONLY,
+            )
+
+        return ModelManagerOperationResult(
+            ok=True,
+            operation=ModelManagerOperation.ACTIVATE,
+            requested_model=model,
+            active_model=self._active_model,
+            value=value,
+        )
+
+    @_serialized
+    def unload_active_safe(
+        self,
+        *,
+        unload_kwargs: Optional[dict[str, Any]] = None,
+    ) -> ModelManagerOperationResult:
+        requested = self._active_model
+
+        try:
+            value = self.unload_active(unload_kwargs=unload_kwargs)
+        except Exception as exc:
+            cleanup_errors = self._cleanup_all_runtimes(
+                unload_kwargs=unload_kwargs,
+            )
+            return ModelManagerOperationResult(
+                ok=False,
+                operation=ModelManagerOperation.UNLOAD,
+                requested_model=requested,
+                active_model=None,
+                error_type=ModelManagerErrorType.UNLOAD_FAILED,
+                error_message=str(exc) or type(exc).__name__,
+                cause_type=type(exc).__name__,
+                cleanup_errors=cleanup_errors,
+                fallback_route=QueryRoute.LEXICAL_ONLY,
+            )
+
+        return ModelManagerOperationResult(
+            ok=True,
+            operation=ModelManagerOperation.UNLOAD,
+            requested_model=requested,
+            active_model=None,
+            value=value,
+        )
+
+    def _cleanup_all_runtimes(
+        self,
+        *,
+        unload_kwargs: Optional[dict[str, Any]] = None,
+    ) -> tuple[str, ...]:
+        unload_args = dict(unload_kwargs or {})
+        errors = []
+
+        for label, runtime in (
+            ("TEXT", self._text_runtime),
+            ("CODE", self._code_runtime),
+        ):
+            try:
+                runtime.unload(**unload_args)
+            except Exception as exc:
+                message = str(exc) or type(exc).__name__
+                errors.append(
+                    f"{label}:{type(exc).__name__}:{message}"
+                )
+
+        self._active_model = None
+        self._last_activity_at = None
+        return tuple(errors)
 
     def _record_activity(self) -> float:
         value = float(self._clock())

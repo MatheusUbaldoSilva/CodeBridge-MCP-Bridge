@@ -7,6 +7,9 @@ from .model_manager import (
     ExclusiveModelManager,
     ManagedModel,
     ManagedRuntime,
+    ModelManagerErrorType,
+    ModelManagerOperation,
+    ModelManagerOperationResult,
     ModelManagerSnapshot,
 )
 from .query_classifier import (
@@ -19,6 +22,9 @@ __all__ = [
     "ExclusiveModelManager",
     "ManagedModel",
     "ManagedRuntime",
+    "ModelManagerErrorType",
+    "ModelManagerOperation",
+    "ModelManagerOperationResult",
     "ModelManagerSnapshot",
     "QueryClassification",
     "QueryRoute",
