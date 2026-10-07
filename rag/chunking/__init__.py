@@ -9,6 +9,11 @@ from .code_parser import (
     detect_code_language,
     parse_code_source,
 )
+from .code_symbols import (
+    CodeSymbol,
+    CodeSymbolKind,
+    extract_code_symbols,
+)
 from .code_units import (
     CodeUnitDraft,
     CodeUnitKind,
@@ -42,6 +47,9 @@ __all__ = [
     "UnsupportedCodeLanguageError",
     "detect_code_language",
     "parse_code_source",
+    "CodeSymbol",
+    "CodeSymbolKind",
+    "extract_code_symbols",
     "CodeUnitDraft",
     "CodeUnitKind",
     "chunk_code_units",
