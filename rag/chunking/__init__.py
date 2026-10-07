@@ -1,5 +1,14 @@
-"""Text chunking helpers for CodeBridge RAG."""
+"""Text and code chunking helpers for CodeBridge RAG."""
 
+from .code_parser import (
+    CodeLanguage,
+    CodeParseError,
+    CodeParseResult,
+    ParserBackend,
+    UnsupportedCodeLanguageError,
+    detect_code_language,
+    parse_code_source,
+)
 from .markdown import (
     MarkdownChunkDraft,
     MarkdownChunkKind,
@@ -21,6 +30,13 @@ from .text_log import (
 )
 
 __all__ = [
+    "CodeLanguage",
+    "CodeParseError",
+    "CodeParseResult",
+    "ParserBackend",
+    "UnsupportedCodeLanguageError",
+    "detect_code_language",
+    "parse_code_source",
     "MarkdownChunkDraft",
     "MarkdownChunkKind",
     "chunk_markdown",
