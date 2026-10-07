@@ -260,3 +260,69 @@ def remove_missing_file(
         removed_entry=entry,
         removed_chunk_ids=removed_chunk_ids,
     )
+
+
+@dataclass(frozen=True)
+class ModelInvalidationOutcome:
+    manifest: IndexManifest
+    invalidated_entries: Tuple[ManifestEntry, ...]
+    removed_chunk_ids: Tuple[str, ...]
+
+
+ModelDeleteChunksCallback = Callable[
+    [str, ManifestIndexKind, Tuple[str, ...]],
+    None,
+]
+
+
+def invalidate_model_version(
+    manifest: IndexManifest,
+    *,
+    project_id: str,
+    index_kind: ManifestIndexKind,
+    current_model_version: str,
+    delete_chunks: ModelDeleteChunksCallback,
+) -> ModelInvalidationOutcome:
+    """Invalidate only entries in one embedding space with stale model version."""
+
+    if not isinstance(manifest, IndexManifest):
+        raise ValueError("manifest must be IndexManifest")
+    if not isinstance(index_kind, ManifestIndexKind):
+        raise ValueError("index_kind must be ManifestIndexKind")
+    if not isinstance(current_model_version, str) or not current_model_version.strip():
+        raise ValueError("current_model_version must be non-empty")
+    if not callable(delete_chunks):
+        raise ValueError("delete_chunks must be callable")
+
+    target_version = current_model_version.strip()
+    invalidated = tuple(
+        entry
+        for entry in manifest.entries
+        if entry.project_id == project_id
+        and entry.index_kind is index_kind
+        and entry.model_version != target_version
+    )
+
+    removed_chunks = []
+    updated = manifest
+
+    for entry in invalidated:
+        chunks = tuple(entry.chunk_ids)
+        if chunks:
+            delete_chunks(
+                entry.project_id,
+                entry.index_kind,
+                chunks,
+            )
+            removed_chunks.extend(chunks)
+        updated = updated.remove(
+            entry.project_id,
+            entry.index_kind,
+            entry.path,
+        )
+
+    return ModelInvalidationOutcome(
+        manifest=updated,
+        invalidated_entries=invalidated,
+        removed_chunk_ids=tuple(removed_chunks),
+    )

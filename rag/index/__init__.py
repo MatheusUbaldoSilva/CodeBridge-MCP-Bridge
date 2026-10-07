@@ -40,9 +40,11 @@ from .lexical_search import (
 )
 from .incremental import (
     ChangedFileReindexOutcome,
+    ModelInvalidationOutcome,
     RemovedFileOutcome,
     SourceFileSnapshot,
     capture_source_file_snapshot,
+    invalidate_model_version,
     manifest_entry_content_unchanged,
     reindex_changed_file,
     remove_missing_file,
@@ -148,9 +150,11 @@ __all__ = [
     "RagLexicalQueryError",
     "search_lexical",
     "ChangedFileReindexOutcome",
+    "ModelInvalidationOutcome",
     "RemovedFileOutcome",
     "SourceFileSnapshot",
     "capture_source_file_snapshot",
+    "invalidate_model_version",
     "manifest_entry_content_unchanged",
     "reindex_changed_file",
     "remove_missing_file",
