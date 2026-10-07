@@ -16,6 +16,10 @@ from .hybrid_code import (
     collect_code_hybrid_candidates,
     search_code_vector,
 )
+from .hybrid_query import (
+    HybridQueryCandidates,
+    collect_hybrid_query_candidates,
+)
 from .hybrid_text import (
     TEXT_VECTOR_RETRIEVAL_MODE,
     TextHybridCandidates,
@@ -30,6 +34,8 @@ __all__ = [
     "CodeHybridCandidates",
     "collect_code_hybrid_candidates",
     "search_code_vector",
+    "HybridQueryCandidates",
+    "collect_hybrid_query_candidates",
     "TEXT_VECTOR_RETRIEVAL_MODE",
     "TextHybridCandidates",
     "collect_text_hybrid_candidates",
