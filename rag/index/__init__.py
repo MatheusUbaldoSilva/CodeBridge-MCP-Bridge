@@ -38,6 +38,12 @@ from .lexical_search import (
     RagLexicalQueryError,
     search_lexical,
 )
+from .incremental import (
+    SourceFileSnapshot,
+    capture_source_file_snapshot,
+    manifest_entry_content_unchanged,
+    should_skip_file_reprocessing,
+)
 from .manifest import (
     DEFAULT_MANIFEST_FILENAME,
     MANIFEST_SCHEMA_VERSION,
@@ -137,6 +143,10 @@ __all__ = [
     "LexicalSearchHit",
     "RagLexicalQueryError",
     "search_lexical",
+    "SourceFileSnapshot",
+    "capture_source_file_snapshot",
+    "manifest_entry_content_unchanged",
+    "should_skip_file_reprocessing",
     "DEFAULT_MANIFEST_FILENAME",
     "MANIFEST_SCHEMA_VERSION",
     "IndexManifest",
