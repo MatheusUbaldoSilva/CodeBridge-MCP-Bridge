@@ -10,6 +10,10 @@ from .overlap import (
     OverlapReason,
     apply_controlled_overlap,
 )
+from .provenance import (
+    attach_source_provenance,
+    source_sha256,
+)
 from .text_log import (
     TextLogChunkDraft,
     TextLogChunkKind,
@@ -23,6 +27,8 @@ __all__ = [
     "ControlledOverlapChunk",
     "OverlapReason",
     "apply_controlled_overlap",
+    "attach_source_provenance",
+    "source_sha256",
     "TextLogChunkDraft",
     "TextLogChunkKind",
     "chunk_text_log",
