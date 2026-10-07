@@ -1,5 +1,6 @@
 import argparse
 import base64
+import importlib
 import time
 from datetime import datetime
 from pathlib import Path
@@ -34,6 +35,17 @@ class StatusResult(ProtocolOutcome):
     executor: dict[str, Any] | None
     auto_execute: bool
     completion_sound: dict[str, Any] | None
+
+
+class RagStatusResult(ProtocolOutcome):
+    available: bool
+    index: dict[str, Any]
+    projects: list[dict[str, Any]]
+    models: dict[str, dict[str, Any]]
+    backend: dict[str, Any]
+    last_indexed_at: str | None
+    error_type: str | None = None
+    error_message: str | None = None
 
 
 class CapabilitiesResult(ProtocolOutcome):
@@ -611,6 +623,52 @@ def codebridge_status() -> StatusResult:
     )
 
 
+@mcp.tool(
+    name="codebridge_rag_status",
+    description=(
+        "Consulta somente leitura do estado do RAG local incluindo indice "
+        "projetos modelos backend CPU/GPU e ultima indexacao."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        idempotent_hint=True,
+        open_world_hint=False,
+    ),
+    structured_output=True,
+)
+def codebridge_rag_status() -> RagStatusResult:
+    try:
+        bridge = importlib.import_module("rag_bridge")
+        payload = bridge.get_rag_status()
+    except Exception as exc:
+        return RagStatusResult(
+            operation_ok=False,
+            operation_error_type=type(exc).__name__,
+            operation_error_message=str(exc),
+            available=False,
+            index={},
+            projects=[],
+            models={},
+            backend={},
+            last_indexed_at=None,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+        )
+
+    return RagStatusResult(
+        operation_ok=True,
+        operation_error_type=None,
+        operation_error_message=None,
+        available=True,
+        index=dict(payload.get("index") or {}),
+        projects=list(payload.get("projects") or []),
+        models=dict(payload.get("models") or {}),
+        backend=dict(payload.get("backend") or {}),
+        last_indexed_at=payload.get("last_indexed_at"),
+        error_type=None,
+        error_message=None,
+    )
+
 
 @mcp.tool(
     name="codebridge_capabilities",
@@ -630,6 +688,7 @@ def codebridge_capabilities() -> CapabilitiesResult:
     payload = exchange["payload"]
     preferred_tools = [
         "codebridge_status",
+        "codebridge_rag_status",
         "codebridge_capabilities",
         "codebridge_exec",
         "codebridge_wait",

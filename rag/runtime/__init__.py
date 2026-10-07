@@ -17,6 +17,14 @@ from .query_classifier import (
     QueryRoute,
     classify_query,
 )
+from .status import (
+    ModelRuntimeStatus,
+    RagStatusSnapshot,
+    build_rag_status,
+    resolve_rag_manifest_path,
+    resolve_rag_sqlite_path,
+    resolve_rag_state_directory,
+)
 
 __all__ = [
     "ExclusiveModelManager",
@@ -29,4 +37,10 @@ __all__ = [
     "QueryClassification",
     "QueryRoute",
     "classify_query",
+    "ModelRuntimeStatus",
+    "RagStatusSnapshot",
+    "build_rag_status",
+    "resolve_rag_manifest_path",
+    "resolve_rag_sqlite_path",
+    "resolve_rag_state_directory",
 ]
