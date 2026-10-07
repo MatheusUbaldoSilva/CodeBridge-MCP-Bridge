@@ -192,3 +192,71 @@ def reindex_changed_file(
         entry=updated_entry,
         retired_chunk_ids=retired,
     )
+
+
+@dataclass(frozen=True)
+class RemovedFileOutcome:
+    manifest: IndexManifest
+    removed_entry: ManifestEntry
+    removed_chunk_ids: Tuple[str, ...]
+
+
+DeleteChunksCallback = Callable[
+    [str, ManifestIndexKind, Tuple[str, ...]],
+    None,
+]
+
+
+def remove_missing_file(
+    manifest: IndexManifest,
+    entry: ManifestEntry,
+    *,
+    project_root: str | Path,
+    delete_chunks: DeleteChunksCallback,
+) -> RemovedFileOutcome:
+    """Remove one missing file entry and its orphaned chunk ids."""
+
+    if not isinstance(manifest, IndexManifest):
+        raise ValueError("manifest must be IndexManifest")
+    if not isinstance(entry, ManifestEntry):
+        raise ValueError("entry must be ManifestEntry")
+    if not callable(delete_chunks):
+        raise ValueError("delete_chunks must be callable")
+
+    registered = manifest.get(
+        entry.project_id,
+        entry.index_kind,
+        entry.path,
+    )
+    if registered != entry:
+        raise ValueError("entry must match the manifest state")
+
+    root = Path(project_root).expanduser().resolve()
+    source = (root / entry.path).resolve()
+    try:
+        source.relative_to(root)
+    except ValueError as exc:
+        raise ValueError("entry path must stay inside project_root") from exc
+
+    if source.exists():
+        raise ValueError("remove_missing_file requires a missing source file")
+
+    removed_chunk_ids = tuple(entry.chunk_ids)
+    if removed_chunk_ids:
+        delete_chunks(
+            entry.project_id,
+            entry.index_kind,
+            removed_chunk_ids,
+        )
+
+    updated_manifest = manifest.remove(
+        entry.project_id,
+        entry.index_kind,
+        entry.path,
+    )
+
+    return RemovedFileOutcome(
+        manifest=updated_manifest,
+        removed_entry=entry,
+        removed_chunk_ids=removed_chunk_ids,
+    )

@@ -40,10 +40,12 @@ from .lexical_search import (
 )
 from .incremental import (
     ChangedFileReindexOutcome,
+    RemovedFileOutcome,
     SourceFileSnapshot,
     capture_source_file_snapshot,
     manifest_entry_content_unchanged,
     reindex_changed_file,
+    remove_missing_file,
     should_skip_file_reprocessing,
 )
 from .manifest import (
@@ -146,10 +148,12 @@ __all__ = [
     "RagLexicalQueryError",
     "search_lexical",
     "ChangedFileReindexOutcome",
+    "RemovedFileOutcome",
     "SourceFileSnapshot",
     "capture_source_file_snapshot",
     "manifest_entry_content_unchanged",
     "reindex_changed_file",
+    "remove_missing_file",
     "should_skip_file_reprocessing",
     "DEFAULT_MANIFEST_FILENAME",
     "MANIFEST_SCHEMA_VERSION",
