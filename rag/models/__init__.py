@@ -3,11 +3,29 @@
 Importing this package must remain side-effect free.
 """
 
+from .artifact_install import (
+    DEFAULT_MODEL_SUBDIR,
+    ArtifactVerification,
+    ModelArtifactIntegrityError,
+    ModelDownloadConsentError,
+    ModelInstallResult,
+    build_huggingface_artifact_url,
+    install_selected_text_model,
+    install_verified_artifact,
+    resolve_model_directory,
+    resolve_selected_model_path,
+    verify_model_artifact,
+)
 from .backend_policy import (
     BACKEND_EVALUATIONS,
     SELECTED_TEXT_BACKEND,
+    TEXT_MODEL_FILENAME,
     TEXT_MODEL_FAMILY,
     TEXT_MODEL_LICENSE,
+    TEXT_MODEL_QUANTIZATION,
+    TEXT_MODEL_REVISION,
+    TEXT_MODEL_SHA256,
+    TEXT_MODEL_SIZE_BYTES,
     TEXT_RETRIEVAL_REPOSITORY,
     BackendEvaluation,
     DistributionMode,
@@ -18,10 +36,26 @@ from .backend_policy import (
 )
 
 __all__ = [
+    "DEFAULT_MODEL_SUBDIR",
+    "ArtifactVerification",
+    "ModelArtifactIntegrityError",
+    "ModelDownloadConsentError",
+    "ModelInstallResult",
+    "build_huggingface_artifact_url",
+    "install_selected_text_model",
+    "install_verified_artifact",
+    "resolve_model_directory",
+    "resolve_selected_model_path",
+    "verify_model_artifact",
     "BACKEND_EVALUATIONS",
     "SELECTED_TEXT_BACKEND",
+    "TEXT_MODEL_FILENAME",
     "TEXT_MODEL_FAMILY",
     "TEXT_MODEL_LICENSE",
+    "TEXT_MODEL_QUANTIZATION",
+    "TEXT_MODEL_REVISION",
+    "TEXT_MODEL_SHA256",
+    "TEXT_MODEL_SIZE_BYTES",
     "TEXT_RETRIEVAL_REPOSITORY",
     "BackendEvaluation",
     "DistributionMode",

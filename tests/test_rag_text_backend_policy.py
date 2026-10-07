@@ -140,12 +140,14 @@ class RagTextBackendPolicyTests(unittest.TestCase):
             DistributionMode.BUNDLED_SIDECAR,
         )
 
-    def test_rag_006_a_does_not_pin_or_download_model_artifact(self):
+    def test_rag_006_b_pins_artifact_but_keeps_auto_download_off(self):
         pin = SELECTED_TEXT_BACKEND.artifact_pin
-        self.assertIsNone(pin.revision)
-        self.assertIsNone(pin.filename)
-        self.assertIsNone(pin.sha256)
-        self.assertIsNone(pin.size_bytes)
+        self.assertTrue(pin.is_fully_pinned)
+        self.assertIsNotNone(pin.revision)
+        self.assertIsNotNone(pin.filename)
+        self.assertIsNotNone(pin.sha256)
+        self.assertIsNotNone(pin.size_bytes)
+        self.assertIsNotNone(pin.quantization)
         self.assertFalse(pin.download_allowed)
         self.assertFalse(
             SELECTED_TEXT_BACKEND.auto_download_allowed

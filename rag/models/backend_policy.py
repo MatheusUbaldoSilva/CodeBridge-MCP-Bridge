@@ -1,8 +1,7 @@
-"""Inference backend decision for Jina v5 text retrieval — RAG-006-A.
+"""Inference backend decision for Jina v5 text retrieval.
 
-This module is policy only.
-Importing it must not discover hardware, start a process, open a socket,
-install a package, or download a model.
+RAG-006-A selected the backend.
+RAG-006-B pins the exact model artifact while keeping automatic download off.
 """
 
 from __future__ import annotations
@@ -47,13 +46,46 @@ class ModelArtifactPin:
     filename: Optional[str] = None
     sha256: Optional[str] = None
     size_bytes: Optional[int] = None
+    quantization: Optional[str] = None
     download_allowed: bool = False
 
     def __post_init__(self) -> None:
         if self.size_bytes is not None and self.size_bytes < 1:
             raise ValueError("size_bytes must be >= 1 when provided")
-        if self.sha256 is not None and len(self.sha256) != 64:
-            raise ValueError("sha256 must contain exactly 64 characters")
+        if self.sha256 is not None:
+            value = self.sha256.lower()
+            if (
+                len(value) != 64
+                or any(char not in "0123456789abcdef" for char in value)
+            ):
+                raise ValueError(
+                    "sha256 must contain exactly 64 hexadecimal characters"
+                )
+        if self.revision is not None:
+            value = self.revision.lower()
+            if (
+                len(value) != 40
+                or any(char not in "0123456789abcdef" for char in value)
+            ):
+                raise ValueError(
+                    "revision must be an immutable 40-character commit SHA"
+                )
+        if self.filename is not None and not self.filename.strip():
+            raise ValueError("filename must be non-empty when provided")
+        if self.quantization is not None and not self.quantization.strip():
+            raise ValueError("quantization must be non-empty when provided")
+
+    @property
+    def is_fully_pinned(self) -> bool:
+        return all(
+            (
+                self.revision,
+                self.filename,
+                self.sha256,
+                self.size_bytes,
+                self.quantization,
+            )
+        )
 
 
 @dataclass(frozen=True)
@@ -111,6 +143,15 @@ TEXT_RETRIEVAL_REPOSITORY = (
     "jinaai/jina-embeddings-v5-text-small-retrieval"
 )
 TEXT_MODEL_LICENSE = "CC-BY-NC-4.0"
+
+TEXT_MODEL_REVISION = "e9137ac0a9d41c851de69bea36babc029b7f5fc9"
+TEXT_MODEL_FILENAME = "v5-small-retrieval-Q4_K_M.gguf"
+TEXT_MODEL_SHA256 = (
+    "9440cf89f3e8a7a31a42e11b87e106dd5b344af4e0e3b6b21a96136cc8686e21"
+)
+TEXT_MODEL_SIZE_BYTES = 396705152
+TEXT_MODEL_QUANTIZATION = "Q4_K_M"
+
 
 BACKEND_EVALUATIONS: Tuple[BackendEvaluation, ...] = (
     BackendEvaluation(
@@ -179,7 +220,14 @@ SELECTED_TEXT_BACKEND = TextEmbeddingBackendPolicy(
     model_bundling_allowed=False,
     model_license=TEXT_MODEL_LICENSE,
     commercial_license_review_required=True,
-    artifact_pin=ModelArtifactPin(),
+    artifact_pin=ModelArtifactPin(
+        revision=TEXT_MODEL_REVISION,
+        filename=TEXT_MODEL_FILENAME,
+        sha256=TEXT_MODEL_SHA256,
+        size_bytes=TEXT_MODEL_SIZE_BYTES,
+        quantization=TEXT_MODEL_QUANTIZATION,
+        download_allowed=False,
+    ),
 )
 
 
