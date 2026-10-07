@@ -1,5 +1,7 @@
+import subprocess
 import sys
 import unittest
+from pathlib import Path
 
 from rag.index.vector_backend_policy import (
     CandidateDecision,
@@ -17,9 +19,24 @@ from rag.index.vector_backend_policy import (
 )
 
 
+ROOT = Path(__file__).resolve().parents[1]
+
+
 class RagVectorBackendPolicyTests(unittest.TestCase):
     def test_policy_import_does_not_load_qdrant_client(self):
-        self.assertNotIn("qdrant_client", sys.modules)
+        script = (
+            "import sys; "
+            "import rag.index.vector_backend_policy; "
+            "print('LOADED=' + str('qdrant_client' in sys.modules))"
+        )
+        completed = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        self.assertIn("LOADED=False", completed.stdout)
 
     def test_three_candidates_are_compared(self):
         self.assertEqual(
