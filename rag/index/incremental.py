@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 import hashlib
 from pathlib import Path, PurePosixPath
 from typing import Callable, Iterable, Tuple
@@ -325,4 +326,60 @@ def invalidate_model_version(
         manifest=updated,
         invalidated_entries=invalidated,
         removed_chunk_ids=tuple(removed_chunks),
+    )
+
+
+class ExistingFileAction(str, Enum):
+    UNCHANGED = "UNCHANGED"
+    REINDEXED = "REINDEXED"
+
+
+@dataclass(frozen=True)
+class ExistingFileReconcileOutcome:
+    action: ExistingFileAction
+    manifest: IndexManifest
+    entry: ManifestEntry
+    retired_chunk_ids: Tuple[str, ...] = ()
+
+
+def reconcile_existing_file(
+    manifest: IndexManifest,
+    entry: ManifestEntry,
+    snapshot: SourceFileSnapshot,
+    *,
+    current_model_version: str,
+    rechunk: RechunkCallback,
+    reembed: ReembedCallback,
+) -> ExistingFileReconcileOutcome:
+    """Reconcile one existing file without repeating unchanged work."""
+
+    if not isinstance(current_model_version, str) or not current_model_version.strip():
+        raise ValueError("current_model_version must be non-empty")
+    version = current_model_version.strip()
+    if entry.model_version != version:
+        raise ValueError(
+            "model version mismatch must be invalidated before file reconciliation"
+        )
+
+    if should_skip_file_reprocessing(entry, snapshot):
+        return ExistingFileReconcileOutcome(
+            action=ExistingFileAction.UNCHANGED,
+            manifest=manifest,
+            entry=entry,
+            retired_chunk_ids=(),
+        )
+
+    changed = reindex_changed_file(
+        manifest,
+        entry,
+        snapshot,
+        model_version=version,
+        rechunk=rechunk,
+        reembed=reembed,
+    )
+    return ExistingFileReconcileOutcome(
+        action=ExistingFileAction.REINDEXED,
+        manifest=changed.manifest,
+        entry=changed.entry,
+        retired_chunk_ids=changed.retired_chunk_ids,
     )
