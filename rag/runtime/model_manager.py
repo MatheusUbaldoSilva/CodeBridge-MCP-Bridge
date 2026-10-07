@@ -1,15 +1,18 @@
-"""Mutually exclusive local model activation for CodeBridge RAG — RAG-008-B
+"""Local model manager for CodeBridge RAG — RAG-008-B/C
 
-This phase deliberately implements only initial mutual exclusion
+RAG-008-B establishes initial mutual exclusion between text and code models
 
-It does not implement idle timeout concurrency control structured failure policy or hybrid execution
+RAG-008-C adds a configurable cooperative idle timeout
+
+This module does not implement concurrency control structured failure policy or hybrid simultaneous residency
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Optional, Protocol
+import time
+from typing import Any, Callable, Optional, Protocol
 
 
 class ManagedModel(str, Enum):
@@ -42,13 +45,17 @@ class ModelManagerSnapshot:
             raise ValueError("resident model requires active_model")
 
 
+Clock = Callable[[], float]
+
+
 class ExclusiveModelManager:
     """Coordinates one text runtime and one code runtime
 
     Switching models always unloads the currently active runtime before loading
     the requested runtime
 
-    The manager intentionally has no locks and no timeout policy in RAG-008-B
+    Idle timeout is cooperative in RAG-008-C
+    callers explicitly invoke unload_if_idle instead of starting background threads
     """
 
     def __init__(
@@ -56,16 +63,36 @@ class ExclusiveModelManager:
         *,
         text_runtime: ManagedRuntime,
         code_runtime: ManagedRuntime,
+        idle_timeout_seconds: Optional[float] = None,
+        clock: Clock = time.monotonic,
     ) -> None:
         if text_runtime is code_runtime:
             raise ValueError("text_runtime and code_runtime must be distinct")
+        if idle_timeout_seconds is not None and float(idle_timeout_seconds) <= 0:
+            raise ValueError("idle_timeout_seconds must be > 0 when configured")
+        if not callable(clock):
+            raise ValueError("clock must be callable")
+
         self._text_runtime = text_runtime
         self._code_runtime = code_runtime
         self._active_model: Optional[ManagedModel] = None
+        self._idle_timeout_seconds = (
+            None if idle_timeout_seconds is None else float(idle_timeout_seconds)
+        )
+        self._clock = clock
+        self._last_activity_at: Optional[float] = None
 
     @property
     def active_model(self) -> Optional[ManagedModel]:
         return self._active_model
+
+    @property
+    def idle_timeout_seconds(self) -> Optional[float]:
+        return self._idle_timeout_seconds
+
+    @property
+    def last_activity_at(self) -> Optional[float]:
+        return self._last_activity_at
 
     def snapshot(self) -> ModelManagerSnapshot:
         return ModelManagerSnapshot(
@@ -89,12 +116,15 @@ class ExclusiveModelManager:
 
         if self._active_model is model:
             runtime = self._runtime_for(model)
-            return runtime.load(**load_args)
+            result = runtime.load(**load_args)
+            self._record_activity()
+            return result
 
         if self._active_model is not None:
             current = self._runtime_for(self._active_model)
             current.unload(**unload_args)
             self._active_model = None
+            self._last_activity_at = None
 
         target = self._runtime_for(model)
 
@@ -102,10 +132,44 @@ class ExclusiveModelManager:
             result = target.load(**load_args)
         except Exception:
             self._active_model = None
+            self._last_activity_at = None
             raise
 
         self._active_model = model
+        self._record_activity()
         return result
+
+    def touch(self) -> float:
+        if self._active_model is None:
+            raise RuntimeError("cannot mark activity without an active model")
+        return self._record_activity()
+
+    def idle_seconds(self, *, now: Optional[float] = None) -> Optional[float]:
+        if self._active_model is None or self._last_activity_at is None:
+            return None
+
+        current = self._resolve_now(now)
+        return max(0.0, current - self._last_activity_at)
+
+    def unload_if_idle(
+        self,
+        *,
+        now: Optional[float] = None,
+        unload_kwargs: Optional[dict[str, Any]] = None,
+    ) -> bool:
+        if self._idle_timeout_seconds is None:
+            return False
+        if self._active_model is None or self._last_activity_at is None:
+            return False
+
+        idle_for = self.idle_seconds(now=now)
+        assert idle_for is not None
+
+        if idle_for < self._idle_timeout_seconds:
+            return False
+
+        self.unload_active(unload_kwargs=unload_kwargs)
+        return True
 
     def unload_active(
         self,
@@ -113,6 +177,7 @@ class ExclusiveModelManager:
         unload_kwargs: Optional[dict[str, Any]] = None,
     ) -> Any:
         if self._active_model is None:
+            self._last_activity_at = None
             return None
 
         unload_args = dict(unload_kwargs or {})
@@ -123,6 +188,17 @@ class ExclusiveModelManager:
             return runtime.unload(**unload_args)
         finally:
             self._active_model = None
+            self._last_activity_at = None
+
+    def _record_activity(self) -> float:
+        value = float(self._clock())
+        self._last_activity_at = value
+        return value
+
+    def _resolve_now(self, now: Optional[float]) -> float:
+        if now is None:
+            return float(self._clock())
+        return float(now)
 
     def _runtime_for(self, model: ManagedModel) -> ManagedRuntime:
         if model is ManagedModel.TEXT:
