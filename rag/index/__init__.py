@@ -39,9 +39,11 @@ from .lexical_search import (
     search_lexical,
 )
 from .incremental import (
+    ChangedFileReindexOutcome,
     SourceFileSnapshot,
     capture_source_file_snapshot,
     manifest_entry_content_unchanged,
+    reindex_changed_file,
     should_skip_file_reprocessing,
 )
 from .manifest import (
@@ -143,9 +145,11 @@ __all__ = [
     "LexicalSearchHit",
     "RagLexicalQueryError",
     "search_lexical",
+    "ChangedFileReindexOutcome",
     "SourceFileSnapshot",
     "capture_source_file_snapshot",
     "manifest_entry_content_unchanged",
+    "reindex_changed_file",
     "should_skip_file_reprocessing",
     "DEFAULT_MANIFEST_FILENAME",
     "MANIFEST_SCHEMA_VERSION",

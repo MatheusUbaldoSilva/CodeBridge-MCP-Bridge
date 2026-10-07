@@ -5,8 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 from pathlib import Path, PurePosixPath
+from typing import Callable, Iterable, Tuple
 
-from .manifest import ManifestEntry
+from .manifest import IndexManifest, ManifestEntry, ManifestIndexKind
 
 
 @dataclass(frozen=True)
@@ -98,3 +99,96 @@ def should_skip_file_reprocessing(
     """Return True only when the authoritative content SHA is unchanged."""
 
     return manifest_entry_content_unchanged(entry, snapshot)
+
+
+@dataclass(frozen=True)
+class ChangedFileReindexOutcome:
+    manifest: IndexManifest
+    entry: ManifestEntry
+    retired_chunk_ids: Tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.manifest, IndexManifest):
+            raise ValueError("manifest must be IndexManifest")
+        if not isinstance(self.entry, ManifestEntry):
+            raise ValueError("entry must be ManifestEntry")
+        if any(
+            not isinstance(item, str) or not item
+            for item in self.retired_chunk_ids
+        ):
+            raise ValueError("retired_chunk_ids must contain non-empty strings")
+
+
+RechunkCallback = Callable[[SourceFileSnapshot], Iterable[str]]
+ReembedCallback = Callable[
+    [SourceFileSnapshot, Tuple[str, ...], ManifestIndexKind, str],
+    None,
+]
+
+
+def reindex_changed_file(
+    manifest: IndexManifest,
+    previous_entry: ManifestEntry,
+    snapshot: SourceFileSnapshot,
+    *,
+    model_version: str,
+    rechunk: RechunkCallback,
+    reembed: ReembedCallback,
+) -> ChangedFileReindexOutcome:
+    """Rechunk and reembed exactly one changed manifest entry."""
+
+    if not isinstance(manifest, IndexManifest):
+        raise ValueError("manifest must be IndexManifest")
+    if not isinstance(previous_entry, ManifestEntry):
+        raise ValueError("previous_entry must be ManifestEntry")
+    if not isinstance(snapshot, SourceFileSnapshot):
+        raise ValueError("snapshot must be SourceFileSnapshot")
+    if previous_entry.path != snapshot.path:
+        raise ValueError("previous_entry and snapshot paths must match")
+    if previous_entry.sha256 == snapshot.sha256:
+        raise ValueError("reindex_changed_file requires changed content SHA")
+    if not isinstance(model_version, str) or not model_version.strip():
+        raise ValueError("model_version must be non-empty")
+    if not callable(rechunk):
+        raise ValueError("rechunk must be callable")
+    if not callable(reembed):
+        raise ValueError("reembed must be callable")
+
+    new_chunk_ids = tuple(rechunk(snapshot))
+    if any(
+        not isinstance(item, str) or not item.strip()
+        for item in new_chunk_ids
+    ):
+        raise ValueError("rechunk must return non-empty chunk ids")
+    if len(set(new_chunk_ids)) != len(new_chunk_ids):
+        raise ValueError("rechunk must return unique chunk ids")
+
+    reembed(
+        snapshot,
+        new_chunk_ids,
+        previous_entry.index_kind,
+        model_version.strip(),
+    )
+
+    updated_entry = ManifestEntry(
+        project_id=previous_entry.project_id,
+        index_kind=previous_entry.index_kind,
+        path=snapshot.path,
+        size=snapshot.size,
+        mtime_ns=snapshot.mtime_ns,
+        sha256=snapshot.sha256,
+        chunk_ids=new_chunk_ids,
+        model_version=model_version.strip(),
+    )
+
+    retired = tuple(
+        chunk_id
+        for chunk_id in previous_entry.chunk_ids
+        if chunk_id not in set(new_chunk_ids)
+    )
+
+    return ChangedFileReindexOutcome(
+        manifest=manifest.upsert(updated_entry),
+        entry=updated_entry,
+        retired_chunk_ids=retired,
+    )
