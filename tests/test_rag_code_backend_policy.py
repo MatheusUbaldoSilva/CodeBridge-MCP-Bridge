@@ -15,6 +15,11 @@ from rag.models.code_backend_policy import (
     CODE_GGUF_REPOSITORY,
     CODE_LLAMA_CPP_DOCUMENTED_DIMENSION,
     CODE_MAX_CONTEXT_TOKENS,
+    CODE_MODEL_FILENAME,
+    CODE_MODEL_QUANTIZATION,
+    CODE_MODEL_REVISION,
+    CODE_MODEL_SHA256,
+    CODE_MODEL_SIZE_BYTES,
     CODE_REFERENCE_EMBEDDING_DIMENSION,
     CODE_RECOMMENDED_CONTEXT_TOKENS,
     CODE_RECOMMENDED_UBATCH_SIZE,
@@ -89,9 +94,15 @@ class RagCodeBackendPolicyTests(unittest.TestCase):
             SELECTED_CODE_BACKEND.dimension_probe_required
         )
 
-    def test_artifact_is_not_pinned_or_downloadable_in_007_a(self):
+    def test_rag_007_b_pins_q8_artifact_but_keeps_auto_download_off(self):
         pin = SELECTED_CODE_BACKEND.artifact_pin
-        self.assertFalse(pin.is_fully_pinned)
+        self.assertTrue(pin.is_fully_pinned)
+        self.assertEqual(pin.revision, CODE_MODEL_REVISION)
+        self.assertEqual(pin.filename, CODE_MODEL_FILENAME)
+        self.assertEqual(pin.sha256, CODE_MODEL_SHA256)
+        self.assertEqual(pin.size_bytes, CODE_MODEL_SIZE_BYTES)
+        self.assertEqual(pin.quantization, CODE_MODEL_QUANTIZATION)
+        self.assertEqual(CODE_MODEL_QUANTIZATION, "Q8_0")
         self.assertFalse(pin.download_allowed)
         self.assertFalse(
             SELECTED_CODE_BACKEND.auto_download_allowed

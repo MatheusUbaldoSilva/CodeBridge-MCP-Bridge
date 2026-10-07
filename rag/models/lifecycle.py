@@ -52,6 +52,8 @@ class LlamaServerConfig:
     port: int = 0
     gpu_layers: int = 99
     device: Optional[str] = None
+    context_size: Optional[int] = None
+    ubatch_size: Optional[int] = None
     pooling: str = "last"
     health_path: str = "/health"
     log_path: Optional[Path] = None
@@ -59,7 +61,7 @@ class LlamaServerConfig:
     def __post_init__(self) -> None:
         if self.host != "127.0.0.1":
             raise ValueError(
-                "RAG text model server must bind to 127.0.0.1"
+                "RAG model server must bind to 127.0.0.1"
             )
         if not isinstance(self.port, int) or isinstance(self.port, bool):
             raise ValueError("port must be an integer")
@@ -87,6 +89,13 @@ class LlamaServerConfig:
                 raise ValueError(
                     "device none requires gpu_layers=0"
                 )
+        for field_name in ("context_size", "ubatch_size"):
+            value = getattr(self, field_name)
+            if value is not None:
+                if not isinstance(value, int) or isinstance(value, bool):
+                    raise ValueError(f"{field_name} must be an integer when provided")
+                if value < 1:
+                    raise ValueError(f"{field_name} must be >= 1 when provided")
         if self.pooling != "last":
             raise ValueError("RAG-006-C requires last-token pooling")
         if not self.health_path.startswith("/"):
@@ -159,6 +168,10 @@ def build_llama_server_argv(
         "--port",
         str(resolved_port),
     ]
+    if config.context_size is not None:
+        argv.extend(("--ctx-size", str(config.context_size)))
+    if config.ubatch_size is not None:
+        argv.extend(("--ubatch-size", str(config.ubatch_size)))
     if config.device is not None:
         argv.extend(
             (

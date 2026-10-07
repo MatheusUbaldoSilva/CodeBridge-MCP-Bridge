@@ -1,7 +1,7 @@
 """Backend contract for Jina Code Embeddings 1.5B — RAG-007-A.
 
 Importing this module has no network, model-download, or process side effects.
-The exact downloadable GGUF artifact is intentionally NOT pinned in RAG-007-A.
+RAG-007-A selected the backend. RAG-007-B pins the exact Q8_0 artifact while keeping automatic download off.
 """
 
 from __future__ import annotations
@@ -23,6 +23,14 @@ CODE_MODEL_FAMILY = "jinaai/jina-code-embeddings-1.5b"
 CODE_GGUF_REPOSITORY = "jinaai/jina-code-embeddings-1.5b-GGUF"
 CODE_BASE_MODEL = "Qwen/Qwen2.5-Coder-1.5B"
 CODE_MODEL_LICENSE = "CC-BY-NC-4.0"
+
+CODE_MODEL_REVISION = "67f160ae7d22bb80dc6273cedcc67c027f430c9d"
+CODE_MODEL_FILENAME = "jina-code-embeddings-1.5b-Q8_0.gguf"
+CODE_MODEL_SHA256 = (
+    "3a09a8817b852b5a4faaa6ebb1a5590322746d2b570b578d0b7e3b6e849062aa"
+)
+CODE_MODEL_SIZE_BYTES = 1646569888
+CODE_MODEL_QUANTIZATION = "Q8_0"
 
 CODE_REFERENCE_EMBEDDING_DIMENSION = 1536
 CODE_LLAMA_CPP_DOCUMENTED_DIMENSION = 896
@@ -191,6 +199,11 @@ SELECTED_CODE_BACKEND = CodeEmbeddingBackendPolicy(
     model_license=CODE_MODEL_LICENSE,
     commercial_license_review_required=True,
     artifact_pin=ModelArtifactPin(
+        revision=CODE_MODEL_REVISION,
+        filename=CODE_MODEL_FILENAME,
+        sha256=CODE_MODEL_SHA256,
+        size_bytes=CODE_MODEL_SIZE_BYTES,
+        quantization=CODE_MODEL_QUANTIZATION,
         download_allowed=False,
     ),
 )

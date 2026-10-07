@@ -34,6 +34,12 @@ from .backend_policy import (
     TextEmbeddingBackendPolicy,
     selected_backend_evaluation,
 )
+from .code_artifact_install import (
+    DEFAULT_CODE_MODEL_SUBDIR,
+    install_selected_code_model,
+    resolve_code_model_directory,
+    resolve_selected_code_model_path,
+)
 from .code_backend_policy import (
     CODE_BASE_MODEL,
     CODE_GGUF_REPOSITORY,
@@ -41,6 +47,11 @@ from .code_backend_policy import (
     CODE_MAX_CONTEXT_TOKENS,
     CODE_MODEL_FAMILY,
     CODE_MODEL_LICENSE,
+    CODE_MODEL_REVISION,
+    CODE_MODEL_FILENAME,
+    CODE_MODEL_SHA256,
+    CODE_MODEL_SIZE_BYTES,
+    CODE_MODEL_QUANTIZATION,
     CODE_RECOMMENDED_CONTEXT_TOKENS,
     CODE_RECOMMENDED_UBATCH_SIZE,
     CODE_REFERENCE_EMBEDDING_DIMENSION,
@@ -52,6 +63,10 @@ from .code_backend_policy import (
     CodeTaskInstruction,
     LlamaCppCodeBackendProbe,
     probe_llama_cpp_code_backend,
+)
+from .code_lifecycle import (
+    CodeModelLifecycle,
+    build_code_server_config,
 )
 from .embedding import (
     TEXT_DOCUMENT_SOURCE_TYPES,
@@ -106,12 +121,21 @@ from .lifecycle import (
 )
 
 __all__ = [
+    "DEFAULT_CODE_MODEL_SUBDIR",
+    "install_selected_code_model",
+    "resolve_code_model_directory",
+    "resolve_selected_code_model_path",
     "CODE_BASE_MODEL",
     "CODE_GGUF_REPOSITORY",
     "CODE_LLAMA_CPP_DOCUMENTED_DIMENSION",
     "CODE_MAX_CONTEXT_TOKENS",
     "CODE_MODEL_FAMILY",
     "CODE_MODEL_LICENSE",
+    "CODE_MODEL_REVISION",
+    "CODE_MODEL_FILENAME",
+    "CODE_MODEL_SHA256",
+    "CODE_MODEL_SIZE_BYTES",
+    "CODE_MODEL_QUANTIZATION",
     "CODE_RECOMMENDED_CONTEXT_TOKENS",
     "CODE_RECOMMENDED_UBATCH_SIZE",
     "CODE_REFERENCE_EMBEDDING_DIMENSION",
@@ -123,6 +147,8 @@ __all__ = [
     "CodeTaskInstruction",
     "LlamaCppCodeBackendProbe",
     "probe_llama_cpp_code_backend",
+    "CodeModelLifecycle",
+    "build_code_server_config",
     "DEFAULT_MODEL_SUBDIR",
     "ArtifactVerification",
     "ModelArtifactIntegrityError",
