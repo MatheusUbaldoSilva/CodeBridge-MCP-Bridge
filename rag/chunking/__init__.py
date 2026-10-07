@@ -1,5 +1,12 @@
 """Text and code chunking helpers for CodeBridge RAG."""
 
+from .code_fallback import (
+    CodeFallbackChunkDraft,
+    FallbackReason,
+    ParserMode,
+    SafeCodeChunkingResult,
+    safe_chunk_code,
+)
 from .code_parser import (
     CodeLanguage,
     CodeParseError,
@@ -40,6 +47,11 @@ from .text_log import (
 )
 
 __all__ = [
+    "CodeFallbackChunkDraft",
+    "FallbackReason",
+    "ParserMode",
+    "SafeCodeChunkingResult",
+    "safe_chunk_code",
     "CodeLanguage",
     "CodeParseError",
     "CodeParseResult",
