@@ -43,7 +43,7 @@ class RagExclusionPolicyTests(unittest.TestCase):
             "installer/CodeBridge.exe",
             "native/helper.dll",
             "lib/module.so",
-            "cache/data.bin",
+            "artifacts/data.bin",
             "assets/icon.png",
             "assets/sound.mp3",
             "archive/source.zip",
