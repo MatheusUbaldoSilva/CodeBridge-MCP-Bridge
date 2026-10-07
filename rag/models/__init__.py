@@ -56,6 +56,16 @@ from .embedding import (
     cosine_similarity,
     embeddings_are_deterministic,
 )
+from .fallback import (
+    FallbackRuntimeSnapshot,
+    ModelExecutionMode,
+    ModelFallbackError,
+    ModelFallbackExhaustedError,
+    TextModelFallbackManager,
+    build_cpu_fallback_config,
+    build_gpu_config,
+    discover_llama_devices,
+)
 from .lifecycle import (
     LlamaServerConfig,
     ModelLifecycleError,
@@ -118,6 +128,14 @@ __all__ = [
     "chunk_content_sha256",
     "cosine_similarity",
     "embeddings_are_deterministic",
+    "FallbackRuntimeSnapshot",
+    "ModelExecutionMode",
+    "ModelFallbackError",
+    "ModelFallbackExhaustedError",
+    "TextModelFallbackManager",
+    "build_cpu_fallback_config",
+    "build_gpu_config",
+    "discover_llama_devices",
     "LlamaServerConfig",
     "ModelLifecycleError",
     "ModelLifecycleSnapshot",

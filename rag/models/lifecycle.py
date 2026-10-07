@@ -51,6 +51,7 @@ class LlamaServerConfig:
     host: str = "127.0.0.1"
     port: int = 0
     gpu_layers: int = 99
+    device: Optional[str] = None
     pooling: str = "last"
     health_path: str = "/health"
     log_path: Optional[Path] = None
@@ -71,6 +72,21 @@ class LlamaServerConfig:
             raise ValueError("gpu_layers must be an integer")
         if self.gpu_layers < 0:
             raise ValueError("gpu_layers must be >= 0")
+        if self.device is not None:
+            if (
+                not isinstance(self.device, str)
+                or not self.device.strip()
+            ):
+                raise ValueError(
+                    "device must be a non-empty string when provided"
+                )
+            if (
+                self.device == "none"
+                and self.gpu_layers != 0
+            ):
+                raise ValueError(
+                    "device none requires gpu_layers=0"
+                )
         if self.pooling != "last":
             raise ValueError("RAG-006-C requires last-token pooling")
         if not self.health_path.startswith("/"):
@@ -131,7 +147,7 @@ def build_llama_server_argv(
             "resolved_port must be between 1 and 65535"
         )
 
-    return (
+    argv = [
         str(config.executable_path),
         "-m",
         str(config.model_path),
@@ -142,9 +158,21 @@ def build_llama_server_argv(
         config.host,
         "--port",
         str(resolved_port),
-        "-ngl",
-        str(config.gpu_layers),
+    ]
+    if config.device is not None:
+        argv.extend(
+            (
+                "--device",
+                config.device,
+            )
+        )
+    argv.extend(
+        (
+            "-ngl",
+            str(config.gpu_layers),
+        )
     )
+    return tuple(argv)
 
 
 class TextModelLifecycle:
