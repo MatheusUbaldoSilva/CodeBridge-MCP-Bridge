@@ -1,16 +1,20 @@
-"""Local model manager for CodeBridge RAG — RAG-008-B/C
+"""Local model manager for CodeBridge RAG — RAG-008-B/C/D
 
 RAG-008-B establishes initial mutual exclusion between text and code models
 
 RAG-008-C adds a configurable cooperative idle timeout
 
-This module does not implement concurrency control structured failure policy or hybrid simultaneous residency
+RAG-008-D serializes model state transitions so model loads cannot overlap
+
+Structured failure policy and hybrid simultaneous residency remain out of scope
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from functools import wraps
+import threading
 import time
 from typing import Any, Callable, Optional, Protocol
 
@@ -48,6 +52,15 @@ class ModelManagerSnapshot:
 Clock = Callable[[], float]
 
 
+def _serialized(method):
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._operation_lock:
+            return method(self, *args, **kwargs)
+
+    return wrapper
+
+
 class ExclusiveModelManager:
     """Coordinates one text runtime and one code runtime
 
@@ -81,8 +94,10 @@ class ExclusiveModelManager:
         )
         self._clock = clock
         self._last_activity_at: Optional[float] = None
+        self._operation_lock = threading.RLock()
 
     @property
+    @_serialized
     def active_model(self) -> Optional[ManagedModel]:
         return self._active_model
 
@@ -91,9 +106,11 @@ class ExclusiveModelManager:
         return self._idle_timeout_seconds
 
     @property
+    @_serialized
     def last_activity_at(self) -> Optional[float]:
         return self._last_activity_at
 
+    @_serialized
     def snapshot(self) -> ModelManagerSnapshot:
         return ModelManagerSnapshot(
             active_model=self._active_model,
@@ -101,6 +118,7 @@ class ExclusiveModelManager:
             code_loaded=self._active_model is ManagedModel.CODE,
         )
 
+    @_serialized
     def activate(
         self,
         model: ManagedModel,
@@ -139,11 +157,13 @@ class ExclusiveModelManager:
         self._record_activity()
         return result
 
+    @_serialized
     def touch(self) -> float:
         if self._active_model is None:
             raise RuntimeError("cannot mark activity without an active model")
         return self._record_activity()
 
+    @_serialized
     def idle_seconds(self, *, now: Optional[float] = None) -> Optional[float]:
         if self._active_model is None or self._last_activity_at is None:
             return None
@@ -151,6 +171,7 @@ class ExclusiveModelManager:
         current = self._resolve_now(now)
         return max(0.0, current - self._last_activity_at)
 
+    @_serialized
     def unload_if_idle(
         self,
         *,
@@ -171,6 +192,7 @@ class ExclusiveModelManager:
         self.unload_active(unload_kwargs=unload_kwargs)
         return True
 
+    @_serialized
     def unload_active(
         self,
         *,
