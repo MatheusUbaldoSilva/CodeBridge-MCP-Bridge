@@ -15,6 +15,12 @@ from .fts5 import (
     rebuild_fts5,
     verify_fts5_integrity,
 )
+from .lexical_ranking import (
+    LEXICAL_BM25_WEIGHTS,
+    LEXICAL_RETRIEVAL_MODE,
+    lexical_score_from_bm25,
+    search_lexical_ranked,
+)
 from .lexical_search import (
     LexicalSearchHit,
     RagLexicalQueryError,
@@ -45,6 +51,10 @@ __all__ = [
     "initialize_fts5",
     "rebuild_fts5",
     "verify_fts5_integrity",
+    "LEXICAL_BM25_WEIGHTS",
+    "LEXICAL_RETRIEVAL_MODE",
+    "lexical_score_from_bm25",
+    "search_lexical_ranked",
     "LexicalSearchHit",
     "RagLexicalQueryError",
     "search_lexical",
