@@ -128,8 +128,9 @@ def attach_source_provenance(
 ) -> Tuple[Chunk, ...]:
     """Return immutable Chunk contracts with verified source provenance.
 
-    chunk_ids are supplied by the caller on purpose. RAG-003-D must not freeze
-    the deterministic ID policy reserved for RAG-009-D.
+    chunk_ids are supplied by the caller on purpose. The deterministic ID
+    policy is frozen in RAG-009-D at rag.index.vector_ids while this low-level
+    provenance helper remains compatible with explicit caller-supplied IDs.
     """
 
     if not isinstance(drafts, Sequence):

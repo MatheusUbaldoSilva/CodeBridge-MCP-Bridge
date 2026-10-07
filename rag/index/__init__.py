@@ -53,6 +53,14 @@ from .qdrant_local import (
     open_qdrant_local,
     resolve_qdrant_local_path,
 )
+from .vector_ids import (
+    VECTOR_ID_NAMESPACE,
+    deterministic_chunk_id,
+    deterministic_document_id,
+    deterministic_vector_point_id,
+    expected_vector_dimension,
+    upsert_vector_chunk,
+)
 from .vector_namespace import (
     EXAMPLE_PROJECT_NAMESPACES,
     PROJECT_NAMESPACE_PAYLOAD_KEY,
@@ -131,6 +139,12 @@ __all__ = [
     "ensure_vector_collections",
     "open_qdrant_local",
     "resolve_qdrant_local_path",
+    "VECTOR_ID_NAMESPACE",
+    "deterministic_chunk_id",
+    "deterministic_document_id",
+    "deterministic_vector_point_id",
+    "expected_vector_dimension",
+    "upsert_vector_chunk",
     "EXAMPLE_PROJECT_NAMESPACES",
     "PROJECT_NAMESPACE_PAYLOAD_KEY",
     "PROJECT_NAMESPACE_PATTERN",
