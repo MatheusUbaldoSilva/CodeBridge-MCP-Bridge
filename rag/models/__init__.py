@@ -56,6 +56,12 @@ from .embedding import (
     cosine_similarity,
     embeddings_are_deterministic,
 )
+from .benchmark import (
+    TextRuntimeBenchmark,
+    benchmark_text_runtime,
+    nvidia_total_memory_used_mib,
+    windows_process_working_set_bytes,
+)
 from .fallback import (
     FallbackRuntimeSnapshot,
     ModelExecutionMode,
@@ -128,6 +134,10 @@ __all__ = [
     "chunk_content_sha256",
     "cosine_similarity",
     "embeddings_are_deterministic",
+    "TextRuntimeBenchmark",
+    "benchmark_text_runtime",
+    "nvidia_total_memory_used_mib",
+    "windows_process_working_set_bytes",
     "FallbackRuntimeSnapshot",
     "ModelExecutionMode",
     "ModelFallbackError",
