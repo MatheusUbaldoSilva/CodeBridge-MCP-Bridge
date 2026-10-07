@@ -7,8 +7,14 @@ from .code_similarity import (
     rank_code_to_code,
     rank_nl_to_code,
 )
+from .rrf import (
+    DEFAULT_RRF_K,
+    reciprocal_rank_fusion,
+)
 
 __all__ = [
     "rank_code_to_code",
     "rank_nl_to_code",
+    "DEFAULT_RRF_K",
+    "reciprocal_rank_fusion",
 ]
