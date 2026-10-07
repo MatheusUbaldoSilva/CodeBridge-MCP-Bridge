@@ -51,6 +51,12 @@ from .git_worktree import (
     attach_git_path_state_to_metadata,
     capture_git_path_state,
 )
+from .staleness import (
+    StalenessEvaluation,
+    StalenessStatus,
+    evaluate_source_staleness,
+    mark_search_result_staleness,
+)
 
 __all__ = [
     "ALLOWED_CODE_EXTENSIONS",
@@ -88,4 +94,8 @@ __all__ = [
     "attach_git_path_state_to_chunk",
     "attach_git_path_state_to_metadata",
     "capture_git_path_state",
+    "StalenessEvaluation",
+    "StalenessStatus",
+    "evaluate_source_staleness",
+    "mark_search_result_staleness",
 ]
