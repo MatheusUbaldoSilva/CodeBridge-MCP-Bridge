@@ -10,6 +10,7 @@ draft line range is checked against the real source before a Chunk is emitted.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 import hashlib
 from pathlib import PurePosixPath
@@ -20,6 +21,34 @@ from rag.contracts import Chunk, SourceMetadata, SourceType
 
 
 _WINDOWS_DRIVE_RE = re.compile(r"^[A-Za-z]:/")
+
+
+@dataclass(frozen=True)
+class ChunkOriginRecord:
+    chunk_id: str
+    document_id: str
+    project_id: str
+    source_type: SourceType
+    path: str
+    line_start: int
+    line_end: int
+    sha256: str
+    indexed_at: str
+    source_id: Optional[str] = None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "chunk_id": self.chunk_id,
+            "document_id": self.document_id,
+            "project_id": self.project_id,
+            "source_type": self.source_type.value,
+            "path": self.path,
+            "line_start": self.line_start,
+            "line_end": self.line_end,
+            "sha256": self.sha256,
+            "indexed_at": self.indexed_at,
+            "source_id": self.source_id,
+        }
 
 
 def _required_text(value: str, field_name: str) -> str:
@@ -53,6 +82,42 @@ def _validate_indexed_at(value: str) -> str:
     if parsed.tzinfo is None:
         raise ValueError("indexed_at must include timezone information")
     return text
+
+
+def require_chunk_origin(chunk: Chunk) -> ChunkOriginRecord:
+    """Validate and return the minimum immutable origin of an indexable chunk."""
+
+    if not isinstance(chunk, Chunk):
+        raise ValueError("chunk must be Chunk")
+
+    metadata = chunk.metadata
+    if metadata.path is None:
+        raise ValueError("chunk origin requires path")
+    normalized_path = _normalized_relative_path(metadata.path)
+    if normalized_path != metadata.path.replace("\\", "/"):
+        raise ValueError("chunk origin path must be canonical")
+
+    if metadata.line_start is None or metadata.line_end is None:
+        raise ValueError("chunk origin requires line_start and line_end")
+    if metadata.sha256 is None:
+        raise ValueError("chunk origin requires source sha256")
+    if metadata.indexed_at is None:
+        raise ValueError("chunk origin requires indexed_at")
+
+    captured_at = _validate_indexed_at(metadata.indexed_at)
+
+    return ChunkOriginRecord(
+        chunk_id=chunk.chunk_id,
+        document_id=chunk.document_id,
+        project_id=metadata.project_id,
+        source_type=metadata.source_type,
+        path=normalized_path,
+        line_start=metadata.line_start,
+        line_end=metadata.line_end,
+        sha256=metadata.sha256.lower(),
+        indexed_at=captured_at,
+        source_id=metadata.source_id,
+    )
 
 
 def source_sha256(source_text: str) -> str:
@@ -190,14 +255,14 @@ def attach_source_provenance(
             source_id=source_id,
         )
 
-        chunks.append(
-            Chunk(
-                chunk_id=cid,
-                document_id=doc_id,
-                content=content,
-                metadata=metadata,
-                ordinal=ordinal,
-            )
+        chunk = Chunk(
+            chunk_id=cid,
+            document_id=doc_id,
+            content=content,
+            metadata=metadata,
+            ordinal=ordinal,
         )
+        require_chunk_origin(chunk)
+        chunks.append(chunk)
 
     return tuple(chunks)

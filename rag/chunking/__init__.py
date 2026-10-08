@@ -43,7 +43,9 @@ from .overlap import (
     apply_controlled_overlap,
 )
 from .provenance import (
+    ChunkOriginRecord,
     attach_source_provenance,
+    require_chunk_origin,
     source_sha256,
 )
 from .text_log import (
@@ -81,7 +83,9 @@ __all__ = [
     "ControlledOverlapChunk",
     "OverlapReason",
     "apply_controlled_overlap",
+    "ChunkOriginRecord",
     "attach_source_provenance",
+    "require_chunk_origin",
     "source_sha256",
     "TextLogChunkDraft",
     "TextLogChunkKind",
