@@ -23,6 +23,10 @@ from .metrics import (
     evaluate_ranked_paths,
     measure_latency_ms,
 )
+from .soak import (
+    SoakResult,
+    run_storage_retrieval_soak,
+)
 
 __all__ = [
     "BenchmarkCorpusStats",
@@ -42,4 +46,6 @@ __all__ = [
     "directory_size_bytes",
     "evaluate_ranked_paths",
     "measure_latency_ms",
+    "SoakResult",
+    "run_storage_retrieval_soak",
 ]
