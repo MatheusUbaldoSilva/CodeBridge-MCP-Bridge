@@ -1,0 +1,34 @@
+{
+  "benchmark": "RAG-014-C_LEXICAL_BASELINE",
+  "scope": "LEXICAL_ONLY",
+  "query_count": 100,
+  "corpus": {
+    "documents": 177,
+    "chunks": 6901,
+    "denied": 2966,
+    "unsupported": 2
+  },
+  "metrics": {
+    "query_count": 100,
+    "recall_at_5": 0.0,
+    "recall_at_10": 0.0,
+    "mrr": 0.0
+  },
+  "latency": {
+    "index_build_ms": 1228.4271999960765,
+    "cold_query_ms": 0.8009000448510051,
+    "warm_query_mean_ms": 0.1150170003529638,
+    "warm_query_median_ms": 0.08764999802224338,
+    "warm_query_p95_ms": 0.22610003361478448
+  },
+  "resources": {
+    "ram_rss_bytes": 38805504,
+    "vram_device_used_mib": 137,
+    "index_size_bytes": 11653120
+  },
+  "limitations": [
+    "lexical baseline only",
+    "does not measure text/code semantic embeddings",
+    "does not satisfy final RAG-014-C hybrid metric requirement"
+  ]
+}
