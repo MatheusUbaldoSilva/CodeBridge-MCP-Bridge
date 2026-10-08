@@ -1,0 +1,29 @@
+{
+  "benchmark": "RAG-016-C_CPU_ONLY",
+  "execution_mode": "CPU_ONLY",
+  "executable_path": "C:\\llama\\llama-server.exe",
+  "device": "none",
+  "gpu_layers": 0,
+  "text": {
+    "model": "jina-v5-text-small-retrieval",
+    "pid": 12996,
+    "dimension": 1024,
+    "norm": 1.0000000382873502,
+    "load_seconds": 9.150344300025608,
+    "embedding_ms": 271.2502999929711,
+    "unload_ms": 351.07909998623654,
+    "working_set_bytes": 4756385792,
+    "nvidia_compute_present": false
+  },
+  "code": {
+    "model": "jina-code-embeddings-1.5b",
+    "pid": 256,
+    "dimension": 1536,
+    "norm": 0.9999999796870912,
+    "load_seconds": 4.681611600040924,
+    "embedding_ms": 252.51700001535937,
+    "unload_ms": 195.2311000204645,
+    "working_set_bytes": 2144837632,
+    "nvidia_compute_present": false
+  }
+}

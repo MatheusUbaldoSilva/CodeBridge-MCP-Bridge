@@ -33,6 +33,12 @@ from .restart import (
     prepare_restart_probe,
     verify_restart_probe,
 )
+from .cpu_canary import (
+    CpuModelCanaryResult,
+    CpuOnlyCanaryResult,
+    nvidia_compute_pids,
+    run_cpu_only_canary,
+)
 
 __all__ = [
     "BenchmarkCorpusStats",
@@ -58,4 +64,8 @@ __all__ = [
     "RestartProbe",
     "prepare_restart_probe",
     "verify_restart_probe",
+    "CpuModelCanaryResult",
+    "CpuOnlyCanaryResult",
+    "nvidia_compute_pids",
+    "run_cpu_only_canary",
 ]
