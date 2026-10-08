@@ -57,6 +57,13 @@ from .staleness import (
     evaluate_source_staleness,
     mark_search_result_staleness,
 )
+from .secret_detection import (
+    SensitiveContentFinding,
+    SensitiveContentKind,
+    SensitiveContentScan,
+    contains_sensitive_content,
+    scan_sensitive_content,
+)
 
 __all__ = [
     "ALLOWED_CODE_EXTENSIONS",
@@ -98,4 +105,9 @@ __all__ = [
     "StalenessStatus",
     "evaluate_source_staleness",
     "mark_search_result_staleness",
+    "SensitiveContentFinding",
+    "SensitiveContentKind",
+    "SensitiveContentScan",
+    "contains_sensitive_content",
+    "scan_sensitive_content",
 ]

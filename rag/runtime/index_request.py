@@ -16,6 +16,7 @@ from rag.index.vector_namespace import require_project_namespace
 from rag.sources.code_inventory import is_code_source
 from rag.sources.document_inventory import is_document_source
 from rag.sources.exclusion_policy import classify_denied_path
+from rag.sources.secret_detection import scan_sensitive_content
 
 
 class RagIndexScope(str, Enum):
@@ -54,6 +55,7 @@ class RagIndexPlan:
     candidates: Tuple[RagIndexCandidate, ...]
     denied_count: int
     unsupported_count: int
+    sensitive_count: int = 0
 
     @property
     def candidate_count(self) -> int:
@@ -77,6 +79,7 @@ class RagIndexPlan:
             "code_candidate_count": self.code_candidate_count,
             "denied_count": self.denied_count,
             "unsupported_count": self.unsupported_count,
+            "sensitive_count": self.sensitive_count,
             "candidates": [
                 {
                     "path": item.path,
@@ -179,6 +182,7 @@ def plan_rag_index(
     candidates = []
     denied_count = 0
     unsupported_count = 0
+    sensitive_count = 0
     seen = set()
 
     for file_path in sorted(filesystem_paths):
@@ -202,6 +206,15 @@ def plan_rag_index(
             unsupported_count += 1
             continue
 
+        content = file_path.read_text(
+            encoding="utf-8",
+            errors="replace",
+        )
+        if scan_sensitive_content(content, max_findings=1).sensitive:
+            denied_count += 1
+            sensitive_count += 1
+            continue
+
         candidates.append(
             RagIndexCandidate(
                 path=relative,
@@ -223,6 +236,7 @@ def plan_rag_index(
         candidates=tuple(candidates),
         denied_count=denied_count,
         unsupported_count=unsupported_count,
+        sensitive_count=sensitive_count,
     )
 
 
