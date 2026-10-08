@@ -1,0 +1,29 @@
+{
+  "benchmark": "RAG-016-E_EXECUTOR_SURVIVAL",
+  "before": {
+    "overall": "READY",
+    "api_online": true,
+    "executor_running": true
+  },
+  "model_failure": {
+    "result_file": "benchmarks/rag016_model_failure_latest.json",
+    "expected_failures": 2,
+    "both_final_state": "UNLOADED",
+    "model_process_alive": false
+  },
+  "after": {
+    "overall": "READY",
+    "api_online": true,
+    "powershell_online": true,
+    "cmd_online": true,
+    "ssh_online": true,
+    "executor_running": true,
+    "executor_active_job_id": null,
+    "command": {
+      "target": "POWERSHELL5.1",
+      "output": "RAG016E_EXECUTOR_AFTER_OK",
+      "state": "FINISHED",
+      "exit_code": 0
+    }
+  }
+}

@@ -44,6 +44,11 @@ from .gpu_canary import (
     GpuModelCanaryResult,
     run_gpu_canary,
 )
+from .model_failure import (
+    FailedModelProbe,
+    ModelFailureCanaryResult,
+    run_model_failure_canary,
+)
 
 __all__ = [
     "BenchmarkCorpusStats",
@@ -76,4 +81,7 @@ __all__ = [
     "GpuCanaryResult",
     "GpuModelCanaryResult",
     "run_gpu_canary",
+    "FailedModelProbe",
+    "ModelFailureCanaryResult",
+    "run_model_failure_canary",
 ]

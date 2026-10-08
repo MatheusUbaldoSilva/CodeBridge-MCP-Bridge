@@ -1,0 +1,23 @@
+{
+  "benchmark": "RAG-016-E_MODEL_FAILURE",
+  "executable_path": "C:\\llama\\llama-server.exe",
+  "failure_count": 2,
+  "failures": [
+    {
+      "model_kind": "TEXT",
+      "expected_error": "text model artifact is missing or failed pinned verification",
+      "elapsed_ms": 0.09769998723641038,
+      "final_state": "UNLOADED",
+      "process_alive": false,
+      "pid": null
+    },
+    {
+      "model_kind": "CODE",
+      "expected_error": "code model artifact is missing or failed pinned verification",
+      "elapsed_ms": 0.046600005589425564,
+      "final_state": "UNLOADED",
+      "process_alive": false,
+      "pid": null
+    }
+  ]
+}
