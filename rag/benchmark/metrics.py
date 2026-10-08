@@ -96,8 +96,11 @@ def directory_size_bytes(path: str | Path) -> int:
     return total
 
 
-def current_process_rss_bytes() -> int:
-    """Return current process RSS without adding a benchmark dependency."""
+def process_rss_bytes(pid: int) -> int:
+    """Return process RSS without adding a benchmark dependency."""
+
+    if not isinstance(pid, int) or pid < 1:
+        raise ValueError("pid must be an integer >= 1")
 
     if __import__("os").name == "nt":
         import ctypes
@@ -117,31 +120,46 @@ def current_process_rss_bytes() -> int:
                 ("PeakPagefileUsage", ctypes.c_size_t),
             ]
 
-        counters = PROCESS_MEMORY_COUNTERS()
-        counters.cb = ctypes.sizeof(counters)
-        get_current_process = ctypes.windll.kernel32.GetCurrentProcess
-        get_current_process.restype = wintypes.HANDLE
-        handle = get_current_process()
-        get_memory_info = ctypes.windll.psapi.GetProcessMemoryInfo
-        get_memory_info.argtypes = [
-            wintypes.HANDLE,
-            ctypes.POINTER(PROCESS_MEMORY_COUNTERS),
-            wintypes.DWORD,
-        ]
-        get_memory_info.restype = wintypes.BOOL
-        ok = get_memory_info(
-            handle,
-            ctypes.byref(counters),
-            counters.cb,
-        )
-        if not ok:
-            raise RuntimeError("GetProcessMemoryInfo failed")
-        return int(counters.WorkingSetSize)
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        PROCESS_VM_READ = 0x0010
+        access = PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ
+        open_process = ctypes.windll.kernel32.OpenProcess
+        open_process.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        open_process.restype = wintypes.HANDLE
+        handle = open_process(access, False, pid)
+        if not handle:
+            raise RuntimeError(f"OpenProcess failed for pid {pid}")
+        try:
+            counters = PROCESS_MEMORY_COUNTERS()
+            counters.cb = ctypes.sizeof(counters)
+            get_memory_info = ctypes.windll.psapi.GetProcessMemoryInfo
+            get_memory_info.argtypes = [
+                wintypes.HANDLE,
+                ctypes.POINTER(PROCESS_MEMORY_COUNTERS),
+                wintypes.DWORD,
+            ]
+            get_memory_info.restype = wintypes.BOOL
+            ok = get_memory_info(
+                handle,
+                ctypes.byref(counters),
+                counters.cb,
+            )
+            if not ok:
+                raise RuntimeError("GetProcessMemoryInfo failed")
+            return int(counters.WorkingSetSize)
+        finally:
+            ctypes.windll.kernel32.CloseHandle(handle)
 
+    if pid != __import__("os").getpid():
+        raise RuntimeError("cross-process RSS probe is only implemented on Windows")
     import resource
 
     value = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
     return value * 1024
+
+
+def current_process_rss_bytes() -> int:
+    return process_rss_bytes(__import__("os").getpid())
 
 
 def current_vram_used_mib() -> int | None:

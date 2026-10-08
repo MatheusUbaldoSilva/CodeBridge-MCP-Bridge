@@ -1,6 +1,6 @@
-# RAG-014-C — Métricas do benchmark
+# RAG-014-C — Métricas do benchmark real
 
-Data 2026-10-07
+Data 2026-10-08
 
 Projeto CodeBridge 2.0 MCP Bridge
 
@@ -8,281 +8,384 @@ Branch `rag-014-benchmark`
 
 ## Estado
 
-`RAG-014-C EM PROGRESSO`
+`RAG-014-C ✅ FECHADO`
 
-A infraestrutura de medição está pronta
+O benchmark semântico real foi executado com os componentes reais do RAG
 
-Foi executado um baseline lexical real com corpus autorizado e chunking de produção
+- chunkers de produção
+- SQLite + FTS5
+- Qdrant Local
+- Jina Text 1024D
+- Jina Code 1536D
+- classificador determinístico
+- rotas TEXT CODE e HYBRID
+- Reciprocal Rank Fusion
+- deduplicação
+- 100 consultas do dataset RAG-014-A
+- ground truth manual do RAG-014-B
 
-O resultado ainda não é usado como prova de qualidade semântica porque o índice persistente de produção continua vazio e o executor semântico de produção ainda não está registrado
+Nenhum resultado lexical foi renomeado como semântico
 
-## Métricas exigidas pelo handoff
+## Correção de integridade anterior
 
-RAG-014-C exige medir
+Antes da execução quatro consultas do bucket logs apontavam somente para RAW que a própria política de segurança impede de indexar
 
-- Recall@5
-- Recall@10
-- MRR
-- latência cold
-- latência warm
-- RAM
-- VRAM
-- tamanho do índice
-
-Todas essas métricas já possuem suporte de coleta no harness
-
-## Harness
-
-Criado
-
-`rag/benchmark/metrics.py`
-
-Métricas de retrieval
-
-`evaluate_ranked_paths()`
-
-Contrato
-
-`RetrievalMetrics`
-
-Campos
-
-```text
-query_count
-recall_at_5
-recall_at_10
-mrr
-```
-
-## Medição de recursos
-
-Criado suporte para
-
-- RSS do processo atual
-- VRAM device-wide via nvidia-smi quando disponível
-- tamanho total de arquivos do índice
-
-RAM no Windows usa
-
-`GetProcessMemoryInfo`
-
-via ctypes
-
-Nenhuma dependência nova é exigida somente para benchmark
-
-## Corpus lexical de benchmark
-
-Criado
-
-`rag/benchmark/corpus.py`
-
-O corpus usa componentes reais do projeto
-
-- `plan_rag_index`
-- denylist real
-- allowlist real
-- `chunk_markdown`
-- `chunk_text_log`
-- `safe_chunk_code`
-- IDs determinísticos
-- SQLite oficial
-- FTS5 oficial
-- ranking lexical oficial
-
-Paths principais usados
-
-```text
-rag
-author_mcp
-docs
-```
-
-RAW negado não é incluído
-
-## Integridade do ground truth
-
-Antes da medição foi detectado que quatro perguntas do bucket logs apontavam somente para arquivos RAW negados
-
-Isso foi corrigido no commit
+Correção
 
 `e205317 fix(rag-014): require retrievable benchmark ground truth`
 
-Depois da correção
+Auditoria após correção
 
 ```text
 UNRETRIEVABLE 0
 []
 ```
 
-Portanto todas as 100 perguntas possuem ao menos uma fonte esperada que pode realmente entrar no índice autorizado
+Portanto as 100 consultas possuem pelo menos uma fonte esperada elegível para indexação
 
-## Baseline lexical executado
+## Baseline lexical de controle
 
-Runner
-
-`benchmarks/run_rag014_lexical_baseline.py`
-
-Resultado versionável
+Arquivo
 
 `benchmarks/rag014_lexical_baseline_latest.json`
 
-Corpus observado
+O baseline usa somente FTS5 literal phrase
+
+Resultado observado
 
 ```text
-documents=177
-chunks=6901
-denied=2966
-unsupported=2
+Recall@5  = 0.000
+Recall@10 = 0.000
+MRR       = 0.000
 ```
 
-## Qualidade lexical observada
+Esse baseline é preservado como controle
+
+Ele demonstra que perguntas naturais não devem ser avaliadas como se o fallback lexical literal fosse busca semântica
+
+## Benchmark semântico real
+
+Runner
+
+`benchmarks/run_rag014_semantic_benchmark.py`
+
+Resultado
+
+`benchmarks/rag014_semantic_benchmark_latest.json`
+
+Tempo total observado da execução
+
+aproximadamente 343.68 segundos
+
+## Corpus
 
 ```text
-query_count=100
-Recall@5=0.000
-Recall@10=0.000
-MRR=0.000
+documents   = 179
+chunks      = 6994
+denied      = 2967
+unsupported = 2
 ```
 
-Esse resultado não é um bug na fórmula de métricas
-
-O caminho FTS5 atual usa literal phrase semantics para a query inteira
-
-As 100 perguntas do benchmark são perguntas naturais e não frases copiadas literalmente dos arquivos
-
-Portanto o baseline demonstra exatamente por que o fallback lexical sozinho não pode ser tratado como prova de qualidade do RAG
-
-## Latência lexical observada
-
-Execução mais recente
+Distribuição vetorial efetivamente indexada
 
 ```text
-index_build_ms=1228.4272
-cold_query_ms=0.8009
-warm_query_mean_ms=0.1150
-warm_query_median_ms=0.08765
-warm_query_p95_ms=0.2261
+text chunks = 5959
+code chunks = 1035
 ```
 
-Esses valores medem somente o baseline lexical local
+As fontes negadas continuam fora do benchmark
 
-Não incluem
-
-- load de modelo
-- embedding de query
-- busca vetorial
-- troca TEXT/CODE
-- RRF híbrido
-
-Logo não podem ser publicados como latência final do RAG híbrido
-
-## Recursos observados
+## Rotas das 100 consultas
 
 ```text
-RAM RSS=38805504 bytes
-VRAM device-wide=137 MiB
-índice SQLite lexical=11653120 bytes
+TEXT   = 65
+CODE   = 30
+HYBRID = 5
 ```
 
-Convertendo aproximadamente
+A rota foi definida pelo classificador determinístico do RAG-008-A
+
+Nenhum LLM escolheu a rota
+
+## Métricas de qualidade observadas
 
 ```text
-RAM RSS ≈ 37.0 MiB
-índice lexical ≈ 11.1 MiB
+Recall@5  = 0.460000
+Recall@10 = 0.480000
+MRR       = 0.325778
 ```
 
-A VRAM de 137 MiB é somente o estado device-wide observado durante esse baseline
+Interpretação
 
-Nenhum modelo semântico foi carregado pelo runner
+46 das 100 consultas encontraram pelo menos uma fonte esperada até posição 5
 
-## Estado do índice persistente de produção
+48 das 100 encontraram fonte esperada até posição 10
 
-Auditoria imediatamente anterior ao benchmark
+O MRR observado foi aproximadamente 0.326
+
+Esses números são o resultado real atual
+
+Não foram ajustados ou arredondados para parecer melhores
+
+## Pipeline medido
 
 ```text
-state=EMPTY
-manifest_exists=false
-manifest_entries=0
-sqlite_exists=false
-qdrant_exists=false
+query
+↓
+classificador
+├── TEXT
+│   ├── FTS5
+│   └── Jina Text 1024D → Qdrant
+│
+├── CODE
+│   ├── FTS5
+│   └── Jina Code 1536D → Qdrant
+│
+└── HYBRID
+    ├── FTS5
+    ├── Jina Text 1024D → Qdrant
+    └── Jina Code 1536D → Qdrant
+
+rankings
+↓
+RRF k=60
+↓
+dedup
+↓
+top 10
 ```
 
-Modelos
+## Modelos reais
+
+Text
+
+`jinaai/jina-embeddings-v5-text-small`
+
+Code
+
+`jinaai/jina-code-embeddings-1.5b`
+
+Backend
+
+`C:\llama\llama-server.exe`
+
+Execução observada
+
+GPU `CUDA0`
+
+Os modelos foram carregados sequencialmente
+
+Não permaneceram residentes ao mesmo tempo
+
+## Latência observada
+
+Cold estimate
 
 ```text
-text installed=true
-code installed=true
+3271.871 ms
 ```
 
-Backend vetorial
+Definição congelada para esta execução
+
+`model load da rota da primeira query + query embedding + retrieval`
+
+Warm end-to-end aproximado sem custo de troca de modelo
 
 ```text
-QDRANT_LOCAL
-qdrant-client 1.19.1
+mean   = 87.957 ms
+median = 81.823 ms
+p95    = 140.112 ms
 ```
 
-## Bloqueio real encontrado
+Retrieval após embedding
 
-A superfície MCP possui `codebridge_rag_index`
+```text
+mean = 53.681 ms
+```
 
-Porém o bridge de produção mantém o executor de indexação como callback opcional
+Query embedding
 
-`_RAG_INDEX_EXECUTOR`
+```text
+Jina Text mean = 27.298 ms
+Jina Code mean = 43.334 ms
+```
 
-e não existe registro de executor de produção no runtime atual
+Model load durante fase de queries
 
-Da mesma forma o search service aceita executor semântico opcional
+```text
+Text = 2424.971 ms
+Code = 3046.665 ms
+```
 
-Sem ele a busca cai explicitamente para
+Observação HYBRID
 
-`LEXICAL_ONLY`
+A métrica warm soma os dois embeddings e o retrieval
 
-Por isso fechar RAG-014-C agora como benchmark híbrido seria incorreto
+O custo de trocar fisicamente TEXT → CODE não foi escondido
 
-## O que já está provado
+Ele permanece separado nos tempos de model load
 
-- cálculo de Recall@5 correto
-- cálculo de Recall@10 correto
-- cálculo de MRR correto
-- coleta de cold latency
-- coleta de warm latency
-- coleta de RAM
-- coleta de VRAM
-- coleta de tamanho de índice
-- construção real de corpus lexical
-- chunking real
+## Indexação vetorial real
+
+### Text
+
+```text
+chunks                  = 5959
+model load              = 1948.326 ms
+embedding + Qdrant      = 220857.116 ms
+llama peak RSS          = 4195241984 bytes
+VRAM before             = 137 MiB
+VRAM loaded             = 4352 MiB
+VRAM after unload       = 137 MiB
+VRAM delta              = 4215 MiB
+```
+
+### Code
+
+```text
+chunks                  = 1035
+model load              = 5163.275 ms
+embedding + Qdrant      = 97056.710 ms
+llama peak RSS          = 4947095552 bytes
+VRAM before             = 137 MiB
+VRAM loaded             = 3254 MiB
+VRAM after unload       = 137 MiB
+VRAM delta              = 3117 MiB
+```
+
+Nos dois casos a VRAM voltou ao baseline observado após unload
+
+## Memória
+
+Pico observado do processo llama-server
+
+```text
+4947095552 bytes
+≈ 4.61 GiB
+```
+
+RSS do runner Python ao final
+
+```text
+91963392 bytes
+≈ 87.7 MiB
+```
+
+Máximo delta de VRAM
+
+```text
+4215 MiB
+```
+
+## Tamanho do índice temporário real
+
+```text
+SQLite      = 11808768 bytes
+Qdrant      = 78791713 bytes
+total       = 90600481 bytes
+```
+
+Total aproximado
+
+`86.4 MiB`
+
+## Processo antigo encontrado
+
+Antes do benchmark existia um llama-server antigo
+
+```text
+PID 2732
+porta 19109
+```
+
+Uma chamada real confirmou que era Jina Code 1536D
+
+O Remote Desktop não conseguiu encerrá-lo por acesso negado
+
+O próprio CodeBridge executou
+
+`taskkill /PID 2732 /F`
+
+Resultado
+
+`ÊXITO`
+
+Depois disso os probes reais de Text e Code foram executados com load → embedding → unload antes do benchmark completo
+
+## Probes reais antes do benchmark
+
+Text
+
+```text
+load ≈ 4.862 s
+dimension = 1024
+norm ≈ 0.999999996
+unload ≈ 109 ms
+```
+
+Code
+
+```text
+load ≈ 3.223 s
+dimension = 1536
+norm ≈ 1.000000031
+unload ≈ 221 ms
+```
+
+## Infraestrutura adicionada
+
+`rag/benchmark/metrics.py`
+
+- Recall@5
+- Recall@10
+- MRR
+- latência
+- RSS
+- VRAM
+- tamanho de índice
+- RSS por PID no Windows sem dependência psutil
+
+`rag/benchmark/corpus.py`
+
+- corpus usando políticas reais
+- chunkers reais
+- IDs determinísticos
+- SQLite real
 - FTS5 real
-- 100 queries reais
-- ground truth recuperável
-- baseline lexical executado
 
-## O que ainda falta para fechar RAG-014-C
+`benchmarks/run_rag014_semantic_benchmark.py`
 
-Executar as mesmas 100 queries pelo caminho semântico/híbrido real
+- indexação text real
+- indexação code real
+- Qdrant Local
+- embeddings de queries
+- routing
+- RRF
+- dedup
+- métricas
+- recursos
 
-Isso exige primeiro um índice persistente válido com
+## Resultado do critério RAG-014-C
 
-- SQLite FTS5
-- Qdrant text
-- Qdrant code
+As métricas exigidas pelo handoff foram medidas
 
-e executor semântico real conectado ao search service
+- Recall@5 ✅
+- Recall@10 ✅
+- MRR ✅
+- cold latency ✅
+- warm latency ✅
+- RAM ✅
+- VRAM ✅
+- tamanho do índice ✅
 
-Somente depois serão registrados
+O fato de as métricas de qualidade estarem abaixo do threshold não invalida a medição
 
-- Recall@5 híbrido
-- Recall@10 híbrido
-- MRR híbrido
-- cold latency híbrida
-- warm latency híbrida
-- RAM com modelos
-- VRAM com modelos
-- tamanho SQLite + Qdrant
+Essa decisão pertence ao RAG-014-D
 
-## Regra
+## Próximo passo
 
-O baseline lexical fica preservado como controle
+`RAG-014-D — Critério mínimo e gate de go-live`
 
-Ele não será renomeado nem reinterpretado como resultado semântico
+O benchmark será comparado aos thresholds congelados
 
-RAG-014-C permanece aberto até existir medição híbrida real
+O sistema não será liberado para produção apenas porque executou sem erro
