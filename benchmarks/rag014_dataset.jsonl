@@ -78,14 +78,14 @@
 {"id":"rag014-078","category":"git","query":"How is the provenance commit associated with a file when possible","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-079","category":"git","query":"What information does the Git working tree state capture for a path","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-080","category":"git","query":"How does the RAG decide that Git related context may be stale after the working tree changes","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-081","category":"logs","query":"What does the phase4 restart log show about the application restart sequence","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-082","category":"logs","query":"What error information is present in the MCP transition error log","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-083","category":"logs","query":"What is recorded in restart_app_phase5 log around the phase 5 restart","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-081","category":"logs","query":"Why are raw restart and transition log files excluded from direct RAG indexing","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-082","category":"logs","query":"Which raw execution fields are forbidden from automatic RAG indexing even when they contain errors","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-083","category":"logs","query":"Which structured execution metadata is allowed into the RAG instead of a raw restart transcript","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-084","category":"logs","query":"How are execution logs classified as indexable versus forbidden content","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-085","category":"logs","query":"Which execution summary metadata fields are allowed into the RAG index","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-086","category":"logs","query":"How are text and log files chunked differently from Markdown documents","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-087","category":"logs","query":"How does log chunk overlap avoid losing context at chunk boundaries","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-088","category":"logs","query":"What log evidence would indicate the MCP server failed during a transition","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-088","category":"logs","query":"How are execution failures represented as structured errors without copying raw stdout or stderr into the RAG","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-089","category":"logs","query":"How are terminal execution outputs represented without indexing forbidden raw sensitive fields","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-090","category":"logs","query":"Which repository log files are denied or allowed by the source exclusion policy","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-091","category":"ptbr_code","query":"onde fica o código que descarrega o modelo depois de ficar ocioso","language":"pt-BR","ground_truth_status":"PENDING_RAG_014_B"}

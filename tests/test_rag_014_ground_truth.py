@@ -2,6 +2,10 @@ import json
 import unittest
 from pathlib import Path
 
+from rag.sources.code_inventory import is_code_source
+from rag.sources.document_inventory import is_document_source
+from rag.sources.exclusion_policy import classify_denied_path
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASET = ROOT / "benchmarks" / "rag014_dataset.jsonl"
@@ -46,6 +50,22 @@ class Rag014GroundTruthTests(unittest.TestCase):
                 if not (ROOT / relative).exists():
                     missing.append((row["id"], relative))
         self.assertEqual(missing, [])
+
+    def test_every_query_has_an_index_eligible_expected_source(self):
+        for row in self.ground_truth:
+            eligible = [
+                path
+                for path in row["expected_paths"]
+                if classify_denied_path(path) is None
+                and (
+                    is_document_source(path)
+                    or is_code_source(path)
+                )
+            ]
+            self.assertTrue(
+                eligible,
+                f"{row['id']} has no index-eligible expected source",
+            )
 
     def test_annotation_is_explicitly_manual(self):
         self.assertTrue(
