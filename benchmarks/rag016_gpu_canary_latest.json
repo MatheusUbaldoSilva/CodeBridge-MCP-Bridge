@@ -1,0 +1,43 @@
+{
+  "benchmark": "RAG-016-D_GPU",
+  "execution_mode": "GPU",
+  "executable_path": "C:\\llama\\llama-server.exe",
+  "discovered_devices": [
+    "CUDA0"
+  ],
+  "selected_device": "CUDA0",
+  "text": {
+    "model": "jina-v5-text-small-retrieval",
+    "device": "CUDA0",
+    "gpu_layers": 99,
+    "pid": 10012,
+    "dimension": 1024,
+    "norm": 1.0000000362747592,
+    "load_seconds": 1.919674800010398,
+    "embedding_ms": 117.82270000549033,
+    "unload_ms": 91.65680001024157,
+    "working_set_bytes": 839483392,
+    "nvidia_compute_present": true,
+    "vram_before_mib": 160,
+    "vram_loaded_mib": 4375,
+    "vram_after_mib": 160,
+    "vram_delta_mib": 4215
+  },
+  "code": {
+    "model": "jina-code-embeddings-1.5b",
+    "device": "CUDA0",
+    "gpu_layers": 99,
+    "pid": 12896,
+    "dimension": 1536,
+    "norm": 1.0000000277464334,
+    "load_seconds": 2.9798464000341482,
+    "embedding_ms": 104.1745999827981,
+    "unload_ms": 211.2353999982588,
+    "working_set_bytes": 2109947904,
+    "nvidia_compute_present": true,
+    "vram_before_mib": 160,
+    "vram_loaded_mib": 3277,
+    "vram_after_mib": 160,
+    "vram_delta_mib": 3117
+  }
+}

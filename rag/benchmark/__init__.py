@@ -39,6 +39,11 @@ from .cpu_canary import (
     nvidia_compute_pids,
     run_cpu_only_canary,
 )
+from .gpu_canary import (
+    GpuCanaryResult,
+    GpuModelCanaryResult,
+    run_gpu_canary,
+)
 
 __all__ = [
     "BenchmarkCorpusStats",
@@ -68,4 +73,7 @@ __all__ = [
     "CpuOnlyCanaryResult",
     "nvidia_compute_pids",
     "run_cpu_only_canary",
+    "GpuCanaryResult",
+    "GpuModelCanaryResult",
+    "run_gpu_canary",
 ]
