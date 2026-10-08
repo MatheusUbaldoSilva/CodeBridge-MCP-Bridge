@@ -6,6 +6,12 @@ from .corpus import (
     build_lexical_benchmark_index,
     lexical_ranked_paths,
 )
+from .gate import (
+    RagGoLiveDecision,
+    RagGoLiveObservation,
+    RagGoLiveThresholds,
+    evaluate_go_live,
+)
 from .metrics import (
     ResourceSnapshot,
     RetrievalMetrics,
@@ -23,6 +29,10 @@ __all__ = [
     "DEFAULT_BENCHMARK_PATHS",
     "build_lexical_benchmark_index",
     "lexical_ranked_paths",
+    "RagGoLiveDecision",
+    "RagGoLiveObservation",
+    "RagGoLiveThresholds",
+    "evaluate_go_live",
     "ResourceSnapshot",
     "RetrievalMetrics",
     "capture_resource_snapshot",
