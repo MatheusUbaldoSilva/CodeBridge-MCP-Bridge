@@ -8,10 +8,22 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
-from typing import Any
+from typing import Any, Callable, Optional
 
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+_RAG_INDEX_EXECUTOR: Optional[Callable[[Any], dict[str, object]]] = None
+
+
+def register_rag_index_executor(
+    executor: Optional[Callable[[Any], dict[str, object]]],
+) -> None:
+    global _RAG_INDEX_EXECUTOR
+    if executor is not None and not callable(executor):
+        raise ValueError("executor must be callable or None")
+    _RAG_INDEX_EXECUTOR = executor
 
 
 def _ensure_project_root() -> None:
@@ -26,3 +38,29 @@ def get_rag_status() -> dict[str, Any]:
     from rag.runtime.status import build_rag_status
 
     return build_rag_status().to_dict()
+
+
+def index_rag(
+    *,
+    project_id: str,
+    project_root: str,
+    scope: str = "BOTH",
+    paths: Optional[list[str]] = None,
+    execute: bool = False,
+) -> dict[str, Any]:
+    _ensure_project_root()
+
+    from rag.runtime.index_request import (
+        RagIndexScope,
+        run_explicit_rag_index,
+    )
+
+    result = run_explicit_rag_index(
+        project_id,
+        project_root,
+        scope=RagIndexScope(scope),
+        paths=tuple(paths or ()),
+        execute=bool(execute),
+        executor=_RAG_INDEX_EXECUTOR,
+    )
+    return result.to_dict()

@@ -3,6 +3,16 @@
 Imports in this package must remain side effect free.
 """
 
+from .index_request import (
+    RagIndexAction,
+    RagIndexCandidate,
+    RagIndexExecutionUnavailableError,
+    RagIndexOperationResult,
+    RagIndexPlan,
+    RagIndexScope,
+    plan_rag_index,
+    run_explicit_rag_index,
+)
 from .model_manager import (
     ExclusiveModelManager,
     ManagedModel,
@@ -27,6 +37,14 @@ from .status import (
 )
 
 __all__ = [
+    "RagIndexAction",
+    "RagIndexCandidate",
+    "RagIndexExecutionUnavailableError",
+    "RagIndexOperationResult",
+    "RagIndexPlan",
+    "RagIndexScope",
+    "plan_rag_index",
+    "run_explicit_rag_index",
     "ExclusiveModelManager",
     "ManagedModel",
     "ManagedRuntime",

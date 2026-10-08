@@ -48,6 +48,15 @@ class RagStatusResult(ProtocolOutcome):
     error_message: str | None = None
 
 
+class RagIndexResult(ProtocolOutcome):
+    action: str | None
+    executed: bool
+    plan: dict[str, Any]
+    execution: dict[str, Any] | None = None
+    error_type: str | None = None
+    error_message: str | None = None
+
+
 class CapabilitiesResult(ProtocolOutcome):
     protocol: str
     handshake_confirmed: bool
@@ -671,6 +680,65 @@ def codebridge_rag_status() -> RagStatusResult:
 
 
 @mcp.tool(
+    name="codebridge_rag_index",
+    description=(
+        "Planeja ou executa indexacao RAG somente quando solicitada explicitamente. "
+        "execute=false e o modo seguro padrao e nao inicia trabalho pesado."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        idempotent_hint=False,
+        open_world_hint=False,
+    ),
+    structured_output=True,
+)
+def codebridge_rag_index(
+    project_id: str,
+    project_root: str,
+    scope: str = "BOTH",
+    paths: list[str] | None = None,
+    execute: bool = False,
+) -> RagIndexResult:
+    try:
+        bridge = importlib.import_module("rag_bridge")
+        payload = bridge.index_rag(
+            project_id=project_id,
+            project_root=project_root,
+            scope=scope,
+            paths=paths,
+            execute=execute,
+        )
+    except Exception as exc:
+        return RagIndexResult(
+            operation_ok=False,
+            operation_error_type=type(exc).__name__,
+            operation_error_message=str(exc),
+            action="EXECUTE" if execute else "PLAN",
+            executed=False,
+            plan={},
+            execution=None,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+        )
+
+    return RagIndexResult(
+        operation_ok=True,
+        operation_error_type=None,
+        operation_error_message=None,
+        action=str(payload.get("action") or "PLAN"),
+        executed=bool(payload.get("executed")),
+        plan=dict(payload.get("plan") or {}),
+        execution=(
+            dict(payload["execution"])
+            if isinstance(payload.get("execution"), dict)
+            else None
+        ),
+        error_type=None,
+        error_message=None,
+    )
+
+
+@mcp.tool(
     name="codebridge_capabilities",
     description=(
         "Descobre capacidades, limites e politica de migracao da instalacao "
@@ -689,6 +757,7 @@ def codebridge_capabilities() -> CapabilitiesResult:
     preferred_tools = [
         "codebridge_status",
         "codebridge_rag_status",
+        "codebridge_rag_index",
         "codebridge_capabilities",
         "codebridge_exec",
         "codebridge_wait",
