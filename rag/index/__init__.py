@@ -64,6 +64,10 @@ from .manifest import (
     manifest_entry_key,
     save_index_manifest,
 )
+from .purge import (
+    ProjectIndexDeletionResult,
+    delete_project_index,
+)
 from .qdrant_local import (
     CODE_VECTOR_COLLECTION,
     DEFAULT_QDRANT_LOCAL_SUBDIR,
@@ -174,6 +178,8 @@ __all__ = [
     "load_index_manifest",
     "manifest_entry_key",
     "save_index_manifest",
+    "ProjectIndexDeletionResult",
+    "delete_project_index",
     "CODE_VECTOR_COLLECTION",
     "DEFAULT_QDRANT_LOCAL_SUBDIR",
     "QDRANT_DISTANCE",

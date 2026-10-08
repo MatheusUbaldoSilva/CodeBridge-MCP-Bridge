@@ -199,6 +199,16 @@ class IndexManifest:
             )
         )
 
+    def remove_project(self, project_id: str) -> "IndexManifest":
+        namespace = require_project_namespace(project_id)
+        return IndexManifest(
+            entries=tuple(
+                item
+                for item in self.entries
+                if item.project_id != namespace
+            )
+        )
+
     def to_dict(self) -> dict[str, object]:
         return {
             "schema_version": MANIFEST_SCHEMA_VERSION,
