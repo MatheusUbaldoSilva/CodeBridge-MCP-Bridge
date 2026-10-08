@@ -27,6 +27,12 @@ from .soak import (
     SoakResult,
     run_storage_retrieval_soak,
 )
+from .restart import (
+    RESTART_BASELINE_FILENAME,
+    RestartProbe,
+    prepare_restart_probe,
+    verify_restart_probe,
+)
 
 __all__ = [
     "BenchmarkCorpusStats",
@@ -48,4 +54,8 @@ __all__ = [
     "measure_latency_ms",
     "SoakResult",
     "run_storage_retrieval_soak",
+    "RESTART_BASELINE_FILENAME",
+    "RestartProbe",
+    "prepare_restart_probe",
+    "verify_restart_probe",
 ]

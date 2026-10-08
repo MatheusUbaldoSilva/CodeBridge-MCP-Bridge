@@ -1,0 +1,20 @@
+{
+  "benchmark": "RAG-016-B_RESTART",
+  "stage": "verify",
+  "project_id": "codebridge",
+  "documents": 190,
+  "chunks": 7639,
+  "text_vector_points": 1,
+  "code_vector_points": 1,
+  "query_text": "RAG 014 B",
+  "signature": [
+    "chunk:cf0e0282c59142c2009163378fdec23accfe334ffc65eb251c165bfde6be948c",
+    "chunk:ed081b9ccd1da94e6a71fa828b5382c10f6c685b9c85a908392dae53878c75d5",
+    "chunk:fe60ba78cf9a670249ebe00c919416052691bc8e4fab67e786983e67eb5546f8",
+    "chunk:3c5456b46717a3336129608c031ae8a771c853f1756767180f4c1ac503ebd2c3",
+    "chunk:37e16117aef345c2286ab246cff90e1b9fd8aa9ebaf4fe8a6f77c2a49c516ab9",
+    "chunk:135fdc26c53e1f66f889551934207506a749afc77ae3220d7fb0fbabfeae0b3a",
+    "chunk:741efdae2ea8337953ab712821e313b54031cac03ef9c3a450a418cc46aeccda",
+    "chunk:aa481c565ea3ed2905551eab8d83e7495dccd67f0bc2c63cdf24524d58db368e"
+  ]
+}

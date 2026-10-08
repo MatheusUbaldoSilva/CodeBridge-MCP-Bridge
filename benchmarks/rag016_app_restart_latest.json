@@ -1,0 +1,19 @@
+﻿{
+    "started_at":  "2026-10-08T20:41:33.1311396-03:00",
+    "finished_at":  "2026-10-08T20:41:50.6518870-03:00",
+    "author_mcp_before":  2752,
+    "executor_before":  2328,
+    "main_before":  1720,
+    "executor_closed":  true,
+    "main_closed":  true,
+    "author_mcp_during":  2752,
+    "launched_pid":  12452,
+    "author_mcp_after":  9612,
+    "executor_after":  12340,
+    "main_after":  12452,
+    "executor_pid_changed":  true,
+    "main_pid_changed":  true,
+    "author_mcp_preserved":  false,
+    "executor_health":  "{\"ok\": true, \"protocol\": \"CBMCP/1\", \"pid\": 12340, \"operations\": [\"DISCARD\", \"DISPATCH\", \"EXECUTE_PREPARED\", \"EXECUTION_STATUS\", \"EXECUTION_V2_OUTPUT\", \"EXECUTION_V2_RESULT\", \"EXECUTION_V2_START\", \"EXECUTION_V2_STATUS\", \"EXECUTION_V2_STOP\", \"EXECUTION_V2_WAIT\", \"PREPARE\", \"READ_ONLY_BATCH\", \"START_ASYNC\", \"STATUS\", \"STOP\"]}",
+    "companion_health":  "{\"ok\": true, \"service\": \"chatgpt-companion\"}"
+}
