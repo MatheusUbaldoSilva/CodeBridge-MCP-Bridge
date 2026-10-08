@@ -57,6 +57,16 @@ class RagIndexResult(ProtocolOutcome):
     error_message: str | None = None
 
 
+class RagSearchContextResult(ProtocolOutcome):
+    requested_route: str | None
+    effective_route: str | None
+    fallback_reason: str | None
+    result_count: int
+    results: list[dict[str, Any]]
+    error_type: str | None = None
+    error_message: str | None = None
+
+
 class CapabilitiesResult(ProtocolOutcome):
     protocol: str
     handshake_confirmed: bool
@@ -739,6 +749,65 @@ def codebridge_rag_index(
 
 
 @mcp.tool(
+    name="codebridge_search_context",
+    description=(
+        "Busca contexto RAG por query projeto tipos de fonte top_k path e branch. "
+        "Quando o executor semantico nao estiver registrado usa fallback FTS5 explicito."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        idempotent_hint=True,
+        open_world_hint=False,
+    ),
+    structured_output=True,
+)
+def codebridge_search_context(
+    query: str,
+    project: str,
+    source_types: list[str] | None = None,
+    top_k: int = 10,
+    path_filter: str | None = None,
+    branch: str | None = None,
+) -> RagSearchContextResult:
+    try:
+        bridge = importlib.import_module("rag_bridge")
+        payload = bridge.search_rag_context(
+            query=query,
+            project_id=project,
+            source_types=source_types,
+            top_k=top_k,
+            path_filter=path_filter,
+            branch=branch,
+        )
+    except Exception as exc:
+        return RagSearchContextResult(
+            operation_ok=False,
+            operation_error_type=type(exc).__name__,
+            operation_error_message=str(exc),
+            requested_route=None,
+            effective_route=None,
+            fallback_reason=None,
+            result_count=0,
+            results=[],
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+        )
+
+    return RagSearchContextResult(
+        operation_ok=True,
+        operation_error_type=None,
+        operation_error_message=None,
+        requested_route=str(payload.get("requested_route") or ""),
+        effective_route=str(payload.get("effective_route") or ""),
+        fallback_reason=payload.get("fallback_reason"),
+        result_count=int(payload.get("result_count") or 0),
+        results=list(payload.get("results") or []),
+        error_type=None,
+        error_message=None,
+    )
+
+
+@mcp.tool(
     name="codebridge_capabilities",
     description=(
         "Descobre capacidades, limites e politica de migracao da instalacao "
@@ -758,6 +827,7 @@ def codebridge_capabilities() -> CapabilitiesResult:
         "codebridge_status",
         "codebridge_rag_status",
         "codebridge_rag_index",
+        "codebridge_search_context",
         "codebridge_capabilities",
         "codebridge_exec",
         "codebridge_wait",

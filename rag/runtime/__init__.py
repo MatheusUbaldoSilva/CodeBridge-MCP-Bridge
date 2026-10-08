@@ -27,6 +27,13 @@ from .query_classifier import (
     QueryRoute,
     classify_query,
 )
+from .search_service import (
+    RagSearchContextResult,
+    RagSearchIndexUnavailableError,
+    search_context,
+    search_result_to_dict,
+    source_metadata_to_dict,
+)
 from .status import (
     ModelRuntimeStatus,
     RagStatusSnapshot,
@@ -55,6 +62,11 @@ __all__ = [
     "QueryClassification",
     "QueryRoute",
     "classify_query",
+    "RagSearchContextResult",
+    "RagSearchIndexUnavailableError",
+    "search_context",
+    "search_result_to_dict",
+    "source_metadata_to_dict",
     "ModelRuntimeStatus",
     "RagStatusSnapshot",
     "build_rag_status",

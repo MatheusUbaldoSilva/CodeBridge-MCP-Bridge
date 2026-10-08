@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 _RAG_INDEX_EXECUTOR: Optional[Callable[[Any], dict[str, object]]] = None
+_RAG_SEARCH_EXECUTOR: Optional[Callable[[Any, Any], tuple[Any, ...]]] = None
 
 
 def register_rag_index_executor(
@@ -24,6 +25,15 @@ def register_rag_index_executor(
     if executor is not None and not callable(executor):
         raise ValueError("executor must be callable or None")
     _RAG_INDEX_EXECUTOR = executor
+
+
+def register_rag_search_executor(
+    executor: Optional[Callable[[Any, Any], tuple[Any, ...]]],
+) -> None:
+    global _RAG_SEARCH_EXECUTOR
+    if executor is not None and not callable(executor):
+        raise ValueError("executor must be callable or None")
+    _RAG_SEARCH_EXECUTOR = executor
 
 
 def _ensure_project_root() -> None:
@@ -62,5 +72,30 @@ def index_rag(
         paths=tuple(paths or ()),
         execute=bool(execute),
         executor=_RAG_INDEX_EXECUTOR,
+    )
+    return result.to_dict()
+
+
+def search_rag_context(
+    *,
+    query: str,
+    project_id: str,
+    source_types: Optional[list[str]] = None,
+    top_k: int = 10,
+    path_filter: Optional[str] = None,
+    branch: Optional[str] = None,
+) -> dict[str, Any]:
+    _ensure_project_root()
+
+    from rag.runtime.search_service import search_context
+
+    result = search_context(
+        query=query,
+        project_id=project_id,
+        source_types=tuple(source_types or ()),
+        top_k=top_k,
+        path_filter=path_filter,
+        branch=branch,
+        semantic_executor=_RAG_SEARCH_EXECUTOR,
     )
     return result.to_dict()
