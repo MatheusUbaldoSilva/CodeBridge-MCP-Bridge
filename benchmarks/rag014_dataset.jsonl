@@ -1,0 +1,100 @@
+{"id":"rag014-001","category":"code","query":"Where is the deterministic query classifier that chooses TEXT CODE HYBRID or LEXICAL_ONLY","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-002","category":"code","query":"How does the model manager prevent the text and code models from being resident at the same time","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-003","category":"code","query":"Where is the configurable idle timeout implemented for local embedding models","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-004","category":"code","query":"How are concurrent model load and unload transitions serialized","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-005","category":"code","query":"Where does the safe model activation return a lexical fallback after a runtime failure","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-006","category":"code","query":"How is a deterministic document id generated for a vector indexed source","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-007","category":"code","query":"How is a deterministic chunk id derived from document ordinal and content","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-008","category":"code","query":"Where is the UUID v5 point id for Qdrant generated","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-009","category":"code","query":"How does the vector namespace filter isolate one project inside a shared collection","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-010","category":"code","query":"Where are the text and code Qdrant collection dimensions validated","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-011","category":"code","query":"How does the text vector retriever convert Qdrant points into SearchResult objects","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-012","category":"code","query":"How does the code vector retriever validate a 1536 dimensional query vector","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-013","category":"code","query":"Where does a HYBRID query collect lexical text vector and code vector candidates","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-014","category":"code","query":"How is Reciprocal Rank Fusion implemented and what value of k is used","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-015","category":"code","query":"Where are near duplicate ranked chunks suppressed after fusion","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-016","category":"code","query":"How does the staleness checker compare the indexed SHA with the current source SHA","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-017","category":"code","query":"Where does incremental indexing skip a file whose content SHA has not changed","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-018","category":"code","query":"How are orphan chunks removed when a source file disappears","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-019","category":"code","query":"Where is model version change handled so only the corresponding vector index is invalidated","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-020","category":"code","query":"How does the MCP bridge expose the read only RAG status operation","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-021","category":"code","query":"Where is explicit RAG indexing gated by execute false versus execute true","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-022","category":"code","query":"How does search_context fall back when the semantic executor is unavailable","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-023","category":"code","query":"Where does get_context enforce project scoped authorized chunk retrieval","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-024","category":"code","query":"How are public RAG exceptions classified into stable structured error contracts","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-025","category":"code","query":"Where is Git HEAD and branch metadata attached to an immutable Chunk","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-026","category":"docs","query":"What backend was selected for persistent vector storage and why","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-027","category":"docs","query":"What are the frozen dimensions of the text and code embedding collections","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-028","category":"docs","query":"Why was sqlite vec rejected as the initial vector backend","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-029","category":"docs","query":"Why was LanceDB not selected for the first CodeBridge desktop vector index","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-030","category":"docs","query":"What does the RAG 009 closeout prove about idempotent reindexing","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-031","category":"docs","query":"What are the canonical project namespace examples defined for the vector index","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-032","category":"docs","query":"What rules define a valid project namespace","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-033","category":"docs","query":"What does RAG 010 A combine before ranking fusion","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-034","category":"docs","query":"What does RAG 010 B add for code retrieval","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-035","category":"docs","query":"What is the role of RAG 010 C HYBRID queries","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-036","category":"docs","query":"Why does RAG 010 D use Reciprocal Rank Fusion instead of raw score addition","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-037","category":"docs","query":"What near duplicate policy and threshold were frozen in RAG 010 E","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-038","category":"docs","query":"What metrics were observed in the RAG 010 retrieval benchmark","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-039","category":"docs","query":"What does the RAG 011 closeout say about Git provenance and staleness","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-040","category":"docs","query":"What does the RAG 012 manifest persist for incremental indexing","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-041","category":"docs","query":"When should an unchanged file be skipped according to RAG 012","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-042","category":"docs","query":"What happens to chunks when a source file is removed","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-043","category":"docs","query":"How does RAG 012 handle embedding model version changes","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-044","category":"docs","query":"Which four MCP tools are proposed and implemented in RAG 013","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-045","category":"docs","query":"Why is codebridge_rag_index safe by default","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-046","category":"docs","query":"What inputs are accepted by codebridge_search_context","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-047","category":"docs","query":"What authorization boundary is documented for codebridge_get_context","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-048","category":"docs","query":"Which RAG error categories were frozen in RAG 013 E","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-049","category":"docs","query":"How was real MCP integration proven for RAG 013","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-050","category":"docs","query":"What query distribution is required by the RAG 014 benchmark handoff","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-051","category":"errors_audits","query":"What structured error should be returned when a local embedding model cannot load","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-052","category":"errors_audits","query":"How is an unavailable RAG index represented at the public MCP boundary","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-053","category":"errors_audits","query":"What happens when get_context requests a chunk that does not exist","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-054","category":"errors_audits","query":"How is an invalid project or source scope reported by the RAG runtime","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-055","category":"errors_audits","query":"What happens when a stale result is requested without allow_stale","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-056","category":"errors_audits","query":"How are cleanup failures preserved when safe model activation also fails","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-057","category":"errors_audits","query":"What invariant prevents the model manager from declaring text and code loaded together","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-058","category":"errors_audits","query":"What error is raised when an existing Qdrant collection has the wrong vector dimension","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-059","category":"errors_audits","query":"How is a conflicting project_namespace in a vector payload rejected","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-060","category":"errors_audits","query":"What happens when the same chunk id appears in RRF with conflicting content","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-061","category":"errors_audits","query":"How does the Git state reader report a directory that is not a repository","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-062","category":"errors_audits","query":"What is the behavior when Git HEAD does not resolve to a canonical 40 character SHA","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-063","category":"errors_audits","query":"How does staleness distinguish a changed file from the SHA stored at index time","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-064","category":"errors_audits","query":"What audit proves RAG 010 was closed with a clean synchronized Git branch","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-065","category":"errors_audits","query":"What audit proves RAG 013 real MCP calls returned structured output rather than protocol errors","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-066","category":"errors_audits","query":"How was the Python 3.13 sqlite ResourceWarning around Qdrant local persistence handled","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-067","category":"errors_audits","query":"What validation rejects a text query vector with the wrong embedding dimension","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-068","category":"errors_audits","query":"What validation rejects a code query vector with the wrong embedding dimension","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-069","category":"errors_audits","query":"How is an invalid idle timeout value rejected in the model manager","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-070","category":"errors_audits","query":"What happens when an unload operation fails through the safe model manager API","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-071","category":"git","query":"How is the current Git repository root discovered before capturing metadata","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-072","category":"git","query":"How is detached HEAD represented when attaching Git metadata to a chunk","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-073","category":"git","query":"How is the last relevant commit for a source file determined","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-074","category":"git","query":"How are modified uncommitted paths detected without confusing them with indexed content","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-075","category":"git","query":"How does the system preserve the indexed Git commit separately from the current HEAD","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-076","category":"git","query":"Which Git operations are explicitly treated as read only by the RAG source inventory","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-077","category":"git","query":"How is Git branch metadata stored inside SourceMetadata","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-078","category":"git","query":"How is the provenance commit associated with a file when possible","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-079","category":"git","query":"What information does the Git working tree state capture for a path","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-080","category":"git","query":"How does the RAG decide that Git related context may be stale after the working tree changes","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-081","category":"logs","query":"What does the phase4 restart log show about the application restart sequence","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-082","category":"logs","query":"What error information is present in the MCP transition error log","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-083","category":"logs","query":"What is recorded in restart_app_phase5 log around the phase 5 restart","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-084","category":"logs","query":"How are execution logs classified as indexable versus forbidden content","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-085","category":"logs","query":"Which execution summary metadata fields are allowed into the RAG index","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-086","category":"logs","query":"How are text and log files chunked differently from Markdown documents","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-087","category":"logs","query":"How does log chunk overlap avoid losing context at chunk boundaries","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-088","category":"logs","query":"What log evidence would indicate the MCP server failed during a transition","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-089","category":"logs","query":"How are terminal execution outputs represented without indexing forbidden raw sensitive fields","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-090","category":"logs","query":"Which repository log files are denied or allowed by the source exclusion policy","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-091","category":"ptbr_code","query":"onde fica o código que descarrega o modelo depois de ficar ocioso","language":"pt-BR","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-092","category":"ptbr_code","query":"onde controla o cancelamento e a limpeza quando o carregamento do modelo falha","language":"pt-BR","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-093","category":"ptbr_code","query":"qual função monta o filtro de namespace do projeto no Qdrant","language":"pt-BR","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-094","category":"ptbr_code","query":"onde o código decide se a consulta é texto código híbrida ou somente lexical","language":"pt-BR","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-095","category":"ptbr_code","query":"onde acontece a fusão dos rankings usando reciprocal rank fusion","language":"pt-BR","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-096","category":"ptbr_code","query":"qual parte remove resultados quase duplicados antes do top k","language":"pt-BR","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-097","category":"ptbr_code","query":"onde verifica se o SHA do arquivo mudou depois que foi indexado","language":"pt-BR","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-098","category":"ptbr_code","query":"onde pega o HEAD e a branch atual do Git para anexar ao chunk","language":"pt-BR","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-099","category":"ptbr_code","query":"qual função expõe a busca de contexto como tool MCP","language":"pt-BR","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-100","category":"ptbr_code","query":"onde fica o fallback para FTS5 quando a busca semântica não está disponível","language":"pt-BR","ground_truth_status":"PENDING_RAG_014_B"}
