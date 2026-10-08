@@ -3,6 +3,12 @@
 Imports in this package must remain side effect free.
 """
 
+from .errors import (
+    RagPublicError,
+    RagPublicErrorType,
+    RagStaleResultError,
+    classify_rag_error,
+)
 from .context_service import (
     GetContextResult,
     RagContextIndexUnavailableError,
@@ -52,6 +58,10 @@ from .status import (
 )
 
 __all__ = [
+    "RagPublicError",
+    "RagPublicErrorType",
+    "RagStaleResultError",
+    "classify_rag_error",
     "GetContextResult",
     "RagContextIndexUnavailableError",
     "RagContextInvalidScopeError",

@@ -46,6 +46,7 @@ class RagStatusResult(ProtocolOutcome):
     last_indexed_at: str | None
     error_type: str | None = None
     error_message: str | None = None
+    retryable: bool | None = None
 
 
 class RagIndexResult(ProtocolOutcome):
@@ -55,6 +56,7 @@ class RagIndexResult(ProtocolOutcome):
     execution: dict[str, Any] | None = None
     error_type: str | None = None
     error_message: str | None = None
+    retryable: bool | None = None
 
 
 class RagSearchContextResult(ProtocolOutcome):
@@ -65,6 +67,7 @@ class RagSearchContextResult(ProtocolOutcome):
     results: list[dict[str, Any]]
     error_type: str | None = None
     error_message: str | None = None
+    retryable: bool | None = None
 
 
 class RagGetContextResult(ProtocolOutcome):
@@ -73,6 +76,7 @@ class RagGetContextResult(ProtocolOutcome):
     items: list[dict[str, Any]]
     error_type: str | None = None
     error_message: str | None = None
+    retryable: bool | None = None
 
 
 class CapabilitiesResult(ProtocolOutcome):
@@ -650,6 +654,21 @@ def codebridge_status() -> StatusResult:
     )
 
 
+def _rag_public_error(exc: BaseException) -> dict[str, Any]:
+    try:
+        bridge = importlib.import_module("rag_bridge")
+        payload = bridge.format_rag_error(exc)
+        if isinstance(payload, dict):
+            return payload
+    except Exception:
+        pass
+    return {
+        "error_type": type(exc).__name__,
+        "error_message": str(exc) or type(exc).__name__,
+        "retryable": False,
+    }
+
+
 @mcp.tool(
     name="codebridge_rag_status",
     description=(
@@ -668,18 +687,20 @@ def codebridge_rag_status() -> RagStatusResult:
         bridge = importlib.import_module("rag_bridge")
         payload = bridge.get_rag_status()
     except Exception as exc:
+        error = _rag_public_error(exc)
         return RagStatusResult(
             operation_ok=False,
-            operation_error_type=type(exc).__name__,
-            operation_error_message=str(exc),
+            operation_error_type=str(error["error_type"]),
+            operation_error_message=str(error["error_message"]),
             available=False,
             index={},
             projects=[],
             models={},
             backend={},
             last_indexed_at=None,
-            error_type=type(exc).__name__,
-            error_message=str(exc),
+            error_type=str(error["error_type"]),
+            error_message=str(error["error_message"]),
+            retryable=bool(error["retryable"]),
         )
 
     return RagStatusResult(
@@ -694,6 +715,7 @@ def codebridge_rag_status() -> RagStatusResult:
         last_indexed_at=payload.get("last_indexed_at"),
         error_type=None,
         error_message=None,
+        retryable=None,
     )
 
 
@@ -727,16 +749,18 @@ def codebridge_rag_index(
             execute=execute,
         )
     except Exception as exc:
+        error = _rag_public_error(exc)
         return RagIndexResult(
             operation_ok=False,
-            operation_error_type=type(exc).__name__,
-            operation_error_message=str(exc),
+            operation_error_type=str(error["error_type"]),
+            operation_error_message=str(error["error_message"]),
             action="EXECUTE" if execute else "PLAN",
             executed=False,
             plan={},
             execution=None,
-            error_type=type(exc).__name__,
-            error_message=str(exc),
+            error_type=str(error["error_type"]),
+            error_message=str(error["error_message"]),
+            retryable=bool(error["retryable"]),
         )
 
     return RagIndexResult(
@@ -753,6 +777,7 @@ def codebridge_rag_index(
         ),
         error_type=None,
         error_message=None,
+        retryable=None,
     )
 
 
@@ -788,17 +813,19 @@ def codebridge_search_context(
             branch=branch,
         )
     except Exception as exc:
+        error = _rag_public_error(exc)
         return RagSearchContextResult(
             operation_ok=False,
-            operation_error_type=type(exc).__name__,
-            operation_error_message=str(exc),
+            operation_error_type=str(error["error_type"]),
+            operation_error_message=str(error["error_message"]),
             requested_route=None,
             effective_route=None,
             fallback_reason=None,
             result_count=0,
             results=[],
-            error_type=type(exc).__name__,
-            error_message=str(exc),
+            error_type=str(error["error_type"]),
+            error_message=str(error["error_message"]),
+            retryable=bool(error["retryable"]),
         )
 
     return RagSearchContextResult(
@@ -812,6 +839,7 @@ def codebridge_search_context(
         results=list(payload.get("results") or []),
         error_type=None,
         error_message=None,
+        retryable=None,
     )
 
 
@@ -832,6 +860,8 @@ def codebridge_get_context(
     project: str,
     chunk_ids: list[str],
     include_document_content: bool = False,
+    project_root: str | None = None,
+    allow_stale: bool = False,
 ) -> RagGetContextResult:
     try:
         bridge = importlib.import_module("rag_bridge")
@@ -839,17 +869,21 @@ def codebridge_get_context(
             project_id=project,
             chunk_ids=chunk_ids,
             include_document_content=include_document_content,
+            project_root=project_root,
+            allow_stale=allow_stale,
         )
     except Exception as exc:
+        error = _rag_public_error(exc)
         return RagGetContextResult(
             operation_ok=False,
-            operation_error_type=type(exc).__name__,
-            operation_error_message=str(exc),
+            operation_error_type=str(error["error_type"]),
+            operation_error_message=str(error["error_message"]),
             project_id=project,
             count=0,
             items=[],
-            error_type=type(exc).__name__,
-            error_message=str(exc),
+            error_type=str(error["error_type"]),
+            error_message=str(error["error_message"]),
+            retryable=bool(error["retryable"]),
         )
 
     return RagGetContextResult(

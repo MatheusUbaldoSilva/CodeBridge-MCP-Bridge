@@ -7,9 +7,12 @@ from pathlib import Path
 import sqlite3
 from typing import Iterable, Optional, Tuple
 
+from rag.contracts import SourceMetadata, SourceType
 from rag.index.vector_namespace import require_project_namespace
+from rag.runtime.errors import RagStaleResultError
 from rag.runtime.status import resolve_rag_sqlite_path
 from rag.sources.exclusion_policy import classify_denied_path
+from rag.sources.staleness import evaluate_source_staleness
 
 
 MAX_CONTEXT_SELECTION = 100
@@ -118,6 +121,8 @@ def get_context(
     project_id: str,
     chunk_ids: Iterable[str],
     include_document_content: bool = False,
+    project_root: Optional[str | Path] = None,
+    allow_stale: bool = False,
     sqlite_path: Optional[str | Path] = None,
 ) -> GetContextResult:
     project = require_project_namespace(project_id)
@@ -172,6 +177,22 @@ def get_context(
                     raise RagContextInvalidScopeError(
                         f"selected chunk path is no longer authorized: "
                         f"{source_path} ({denied.value})"
+                    )
+
+            if project_root is not None and source_path is not None and row[11] is not None:
+                metadata = SourceMetadata(
+                    project_id=project,
+                    source_type=SourceType(str(row[3])),
+                    path=str(source_path),
+                    sha256=str(row[11]),
+                )
+                evaluation = evaluate_source_staleness(
+                    project_root,
+                    metadata,
+                )
+                if evaluation.stale and not allow_stale:
+                    raise RagStaleResultError(
+                        f"selected chunk is stale: {row[0]} ({evaluation.reason})"
                     )
 
             items.append(

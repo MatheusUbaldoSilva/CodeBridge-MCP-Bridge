@@ -103,7 +103,7 @@ print(json.dumps(result))
             self.assertEqual(result["action"], "EXECUTE")
             self.assertEqual(
                 result["error_type"],
-                "RagIndexExecutionUnavailableError",
+                "EXECUTOR_UNAVAILABLE",
             )
 
     def test_explicit_execute_invokes_registered_executor_once(self):

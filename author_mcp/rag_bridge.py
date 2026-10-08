@@ -42,6 +42,12 @@ def _ensure_project_root() -> None:
         sys.path.insert(0, value)
 
 
+def format_rag_error(exc: BaseException) -> dict[str, Any]:
+    _ensure_project_root()
+    from rag.runtime.errors import classify_rag_error
+    return classify_rag_error(exc).to_dict()
+
+
 def get_rag_status() -> dict[str, Any]:
     _ensure_project_root()
 
@@ -106,6 +112,8 @@ def get_rag_context(
     project_id: str,
     chunk_ids: list[str],
     include_document_content: bool = False,
+    project_root: Optional[str] = None,
+    allow_stale: bool = False,
 ) -> dict[str, Any]:
     _ensure_project_root()
 
@@ -115,5 +123,7 @@ def get_rag_context(
         project_id=project_id,
         chunk_ids=tuple(chunk_ids),
         include_document_content=include_document_content,
+        project_root=project_root,
+        allow_stale=allow_stale,
     )
     return result.to_dict()

@@ -150,7 +150,7 @@ print(json.dumps(result))
             self.assertFalse(result["operation_ok"])
             self.assertEqual(
                 result["error_type"],
-                "RagSearchIndexUnavailableError",
+                "INDEX_UNAVAILABLE",
             )
             self.assertEqual(result["results"], [])
             self.assertEqual(result["result_count"], 0)

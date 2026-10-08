@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import subprocess
@@ -120,9 +121,88 @@ print(json.dumps(result))
             self.assertFalse(result["operation_ok"])
             self.assertEqual(
                 result["error_type"],
-                "RagContextSourceMissingError",
+                "SOURCE_MISSING",
             )
             self.assertEqual(result["items"], [])
+
+    def test_stale_selected_result_returns_public_stale_error(self):
+        with tempfile.TemporaryDirectory() as td:
+            local = Path(td) / "local"
+            self.make_index(local)
+            database = (
+                local
+                / "CodeBridge"
+                / "rag"
+                / DEFAULT_DATABASE_FILENAME
+            )
+            old_sha = hashlib.sha256(b"old content").hexdigest()
+            connection = connect_rag_index(database)
+            connection.execute(
+                "UPDATE rag_chunks SET sha256 = ? WHERE chunk_id = 'chunk-1'",
+                (old_sha,),
+            )
+            connection.commit()
+            connection.close()
+
+            project_root = Path(td) / "project"
+            source = project_root / "src" / "main.py"
+            source.parent.mkdir(parents=True)
+            source.write_text("new content", encoding="utf-8")
+
+            script = r"""
+import json
+import sys
+import mcp_server
+
+result = mcp_server.codebridge_get_context(
+    project="codebridge",
+    chunk_ids=["chunk-1"],
+    project_root=sys.argv[1],
+).model_dump()
+print(json.dumps(result))
+"""
+            env = os.environ.copy()
+            env["LOCALAPPDATA"] = str(local)
+            completed = subprocess.run(
+                [str(MCP_PYTHON), "-c", script, str(project_root)],
+                cwd=str(AUTHOR_MCP),
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            result = json.loads(completed.stdout)
+
+            self.assertFalse(result["operation_ok"])
+            self.assertEqual(result["error_type"], "STALE_RESULT")
+            self.assertFalse(result["retryable"])
+
+    def test_invalid_selection_returns_public_invalid_scope_error(self):
+        with tempfile.TemporaryDirectory() as td:
+            local = Path(td) / "local"
+            self.make_index(local)
+            script = r"""
+import json
+import mcp_server
+result = mcp_server.codebridge_get_context(
+    project="codebridge",
+    chunk_ids=[],
+).model_dump()
+print(json.dumps(result))
+"""
+            env = os.environ.copy()
+            env["LOCALAPPDATA"] = str(local)
+            completed = subprocess.run(
+                [str(MCP_PYTHON), "-c", script],
+                cwd=str(AUTHOR_MCP),
+                env=env,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            result = json.loads(completed.stdout)
+            self.assertFalse(result["operation_ok"])
+            self.assertEqual(result["error_type"], "INVALID_SCOPE")
 
 
 if __name__ == "__main__":
