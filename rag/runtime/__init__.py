@@ -3,6 +3,14 @@
 Imports in this package must remain side effect free.
 """
 
+from .context_service import (
+    GetContextResult,
+    RagContextIndexUnavailableError,
+    RagContextInvalidScopeError,
+    RagContextSourceMissingError,
+    RetrievedContext,
+    get_context,
+)
 from .index_request import (
     RagIndexAction,
     RagIndexCandidate,
@@ -44,6 +52,12 @@ from .status import (
 )
 
 __all__ = [
+    "GetContextResult",
+    "RagContextIndexUnavailableError",
+    "RagContextInvalidScopeError",
+    "RagContextSourceMissingError",
+    "RetrievedContext",
+    "get_context",
     "RagIndexAction",
     "RagIndexCandidate",
     "RagIndexExecutionUnavailableError",

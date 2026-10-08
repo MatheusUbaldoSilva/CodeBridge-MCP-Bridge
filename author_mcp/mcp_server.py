@@ -67,6 +67,14 @@ class RagSearchContextResult(ProtocolOutcome):
     error_message: str | None = None
 
 
+class RagGetContextResult(ProtocolOutcome):
+    project_id: str | None
+    count: int
+    items: list[dict[str, Any]]
+    error_type: str | None = None
+    error_message: str | None = None
+
+
 class CapabilitiesResult(ProtocolOutcome):
     protocol: str
     handshake_confirmed: bool
@@ -808,6 +816,55 @@ def codebridge_search_context(
 
 
 @mcp.tool(
+    name="codebridge_get_context",
+    description=(
+        "Recupera conteudo autorizado de chunks RAG selecionados dentro de um projeto. "
+        "Nao aceita paths arbitrarios e consulta somente o indice local."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        idempotent_hint=True,
+        open_world_hint=False,
+    ),
+    structured_output=True,
+)
+def codebridge_get_context(
+    project: str,
+    chunk_ids: list[str],
+    include_document_content: bool = False,
+) -> RagGetContextResult:
+    try:
+        bridge = importlib.import_module("rag_bridge")
+        payload = bridge.get_rag_context(
+            project_id=project,
+            chunk_ids=chunk_ids,
+            include_document_content=include_document_content,
+        )
+    except Exception as exc:
+        return RagGetContextResult(
+            operation_ok=False,
+            operation_error_type=type(exc).__name__,
+            operation_error_message=str(exc),
+            project_id=project,
+            count=0,
+            items=[],
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+        )
+
+    return RagGetContextResult(
+        operation_ok=True,
+        operation_error_type=None,
+        operation_error_message=None,
+        project_id=str(payload.get("project_id") or project),
+        count=int(payload.get("count") or 0),
+        items=list(payload.get("items") or []),
+        error_type=None,
+        error_message=None,
+    )
+
+
+@mcp.tool(
     name="codebridge_capabilities",
     description=(
         "Descobre capacidades, limites e politica de migracao da instalacao "
@@ -828,6 +885,7 @@ def codebridge_capabilities() -> CapabilitiesResult:
         "codebridge_rag_status",
         "codebridge_rag_index",
         "codebridge_search_context",
+        "codebridge_get_context",
         "codebridge_capabilities",
         "codebridge_exec",
         "codebridge_wait",

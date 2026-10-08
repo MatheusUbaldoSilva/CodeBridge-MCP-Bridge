@@ -99,3 +99,21 @@ def search_rag_context(
         semantic_executor=_RAG_SEARCH_EXECUTOR,
     )
     return result.to_dict()
+
+
+def get_rag_context(
+    *,
+    project_id: str,
+    chunk_ids: list[str],
+    include_document_content: bool = False,
+) -> dict[str, Any]:
+    _ensure_project_root()
+
+    from rag.runtime.context_service import get_context
+
+    result = get_context(
+        project_id=project_id,
+        chunk_ids=tuple(chunk_ids),
+        include_document_content=include_document_content,
+    )
+    return result.to_dict()
