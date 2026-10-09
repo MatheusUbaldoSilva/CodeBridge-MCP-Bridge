@@ -1,0 +1,93 @@
+{
+  "sample_count": 3,
+  "production_gate": "BLOCKED",
+  "measurements": [
+    {
+      "query": "How is Git provenance attached to a source file?",
+      "elapsed_ms": 13894.403599901125,
+      "stage_ms": {
+        "build_rag_status": 9.830099996179342,
+        "resolve_rag_sqlite_path": 0.010899966582655907,
+        "resolve_qdrant_local_path": 0.003300025127828121,
+        "embed_text": 4445.84489997942,
+        "embed_code": 5687.532699899748,
+        "open_qdrant_local": 3540.4717000201344,
+        "search_lexical_ranked": 47.87040001247078,
+        "search_text_vector": 132.41269998252392,
+        "search_code_vector": 17.205300042405725,
+        "rerank_documents": 0.1952000893652439
+      },
+      "stage_calls": {
+        "build_rag_status": 1,
+        "resolve_rag_sqlite_path": 1,
+        "resolve_qdrant_local_path": 1,
+        "embed_text": 1,
+        "embed_code": 1,
+        "open_qdrant_local": 1,
+        "search_lexical_ranked": 1,
+        "search_text_vector": 1,
+        "search_code_vector": 1,
+        "rerank_documents": 1
+      },
+      "results": 10
+    },
+    {
+      "query": "What happens when get_context requests an invalid chunk?",
+      "elapsed_ms": 6932.740300078876,
+      "stage_ms": {
+        "build_rag_status": 19.47389997076243,
+        "resolve_rag_sqlite_path": 0.019000028260052204,
+        "resolve_qdrant_local_path": 0.007300055585801601,
+        "embed_text": 1816.2078999448568,
+        "embed_code": 2355.509700020775,
+        "open_qdrant_local": 2512.4117999803275,
+        "search_lexical_ranked": 40.05219996906817,
+        "search_text_vector": 164.42080005072057,
+        "search_code_vector": 14.604500029236078,
+        "rerank_documents": 0.17449993174523115
+      },
+      "stage_calls": {
+        "build_rag_status": 1,
+        "resolve_rag_sqlite_path": 1,
+        "resolve_qdrant_local_path": 1,
+        "embed_text": 1,
+        "embed_code": 1,
+        "open_qdrant_local": 1,
+        "search_lexical_ranked": 1,
+        "search_text_vector": 1,
+        "search_code_vector": 1,
+        "rerank_documents": 1
+      },
+      "results": 10
+    },
+    {
+      "query": "How does the system track the current Git branch?",
+      "elapsed_ms": 4875.654999981634,
+      "stage_ms": {
+        "build_rag_status": 9.350400068797171,
+        "resolve_rag_sqlite_path": 0.010400079190731049,
+        "resolve_qdrant_local_path": 0.0032999087125062943,
+        "embed_text": 1258.7334000272676,
+        "embed_code": 1794.1822001012042,
+        "open_qdrant_local": 1651.71410003677,
+        "search_lexical_ranked": 27.235599933192134,
+        "search_text_vector": 108.67610003333539,
+        "search_code_vector": 15.702500008046627,
+        "rerank_documents": 0.26750005781650543
+      },
+      "stage_calls": {
+        "build_rag_status": 1,
+        "resolve_rag_sqlite_path": 1,
+        "resolve_qdrant_local_path": 1,
+        "embed_text": 1,
+        "embed_code": 1,
+        "open_qdrant_local": 1,
+        "search_lexical_ranked": 1,
+        "search_text_vector": 1,
+        "search_code_vector": 1,
+        "rerank_documents": 1
+      },
+      "results": 10
+    }
+  ]
+}

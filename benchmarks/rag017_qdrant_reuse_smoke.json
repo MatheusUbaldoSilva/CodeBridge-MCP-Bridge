@@ -1,0 +1,10 @@
+{
+  "sample_count": 3,
+  "elapsed_ms": [
+    7502.237300039269,
+    3445.2582999365404,
+    3521.136000053957
+  ],
+  "gate": "BLOCKED",
+  "note": "diagnostic prototype, shared client not production safe"
+}
