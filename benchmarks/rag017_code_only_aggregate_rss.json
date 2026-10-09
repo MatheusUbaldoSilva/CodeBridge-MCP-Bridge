@@ -1,0 +1,7 @@
+{
+  "sample_count": 273,
+  "peak_combined_parent_plus_model_rss_mib": 2048.35,
+  "all_embeddings_1536": true,
+  "gate": "BLOCKED",
+  "caveat": "sampled combined parent Python and owned model working sets; does not include other system processes, GPU memory or one-off transient peaks"
+}

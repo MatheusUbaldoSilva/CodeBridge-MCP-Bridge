@@ -1,0 +1,11 @@
+{
+  "cold_ms": 3949.371,
+  "warm_count": 60,
+  "workers": 3,
+  "warm_p95_ms": 272.665,
+  "warm_max_ms": 308.616,
+  "warm_median_ms": 172.933,
+  "all_count_10": false,
+  "production_gate": "BLOCKED",
+  "remark": "60 warm measurements in one process on shared local Qdrant, repeated query templates, not independent quality holdout"
+}
