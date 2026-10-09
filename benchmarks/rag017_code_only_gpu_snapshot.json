@@ -1,0 +1,8 @@
+{
+  "before_mib": 88,
+  "loaded_mib": 3204,
+  "after_queries_mib": 3204,
+  "after_unload_mib": 88,
+  "capacity_mib": 6144,
+  "production_gate": "BLOCKED"
+}

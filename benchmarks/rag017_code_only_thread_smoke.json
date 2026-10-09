@@ -1,0 +1,17 @@
+{
+  "warmup": {
+    "ms": 9020.0,
+    "count": 7
+  },
+  "concurrent": [
+    {
+      "ms": 85.47,
+      "count": 10
+    },
+    {
+      "ms": 187.21,
+      "count": 10
+    }
+  ],
+  "status": "experimental"
+}
