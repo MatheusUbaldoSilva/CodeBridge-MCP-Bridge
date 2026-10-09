@@ -1,0 +1,2489 @@
+{
+  "stage": "RAG-017-D",
+  "status": "DIAGNOSTIC",
+  "counts": {
+    "expected_in_vector_top10": 48,
+    "expected_absent_vector_top10": 52
+  },
+  "route_breakdown": {
+    "('CODE', 'expected_in_vector_top10')": 22,
+    "('TEXT', 'expected_absent_vector_top10')": 43,
+    "('HYBRID', 'expected_in_vector_top10')": 4,
+    "('TEXT', 'expected_in_vector_top10')": 22,
+    "('CODE', 'expected_absent_vector_top10')": 8,
+    "('HYBRID', 'expected_absent_vector_top10')": 1
+  },
+  "note": "Top10 chunk-level path lists; source may exist after rank 10; absence here is not proof of embedding quality or non-indexation.",
+  "queries": [
+    {
+      "id": "rag014-001",
+      "route": "CODE",
+      "expected": [
+        "rag/runtime/query_classifier.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/retrieval/hybrid_query.py",
+        "rag/runtime/query_classifier.py",
+        "rag/runtime/query_classifier.py",
+        "rag/runtime/query_classifier.py",
+        "rag/runtime/query_classifier.py",
+        "rag/retrieval/hybrid_text.py",
+        "rag/retrieval/hybrid_query.py",
+        "rag/retrieval/hybrid_query.py",
+        "rag/retrieval/hybrid_text.py",
+        "rag/retrieval/hybrid_query.py"
+      ],
+      "top10_unique_path_count": 3,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-002",
+      "route": "CODE",
+      "expected": [
+        "rag/runtime/model_manager.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/runtime/model_manager.py",
+        "rag/runtime/model_manager.py",
+        "rag/models/code_lifecycle.py",
+        "rag/runtime/model_manager.py",
+        "rag/models/fallback.py",
+        "rag/runtime/model_manager.py",
+        "rag/runtime/model_manager.py",
+        "rag/runtime/model_manager.py",
+        "rag/models/lifecycle.py",
+        "rag/runtime/model_manager.py"
+      ],
+      "top10_unique_path_count": 4,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-003",
+      "route": "CODE",
+      "expected": [
+        "rag/runtime/model_manager.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/runtime/model_manager.py",
+        "rag/models/benchmark.py",
+        "rag/runtime/model_manager.py",
+        "rag/runtime/status.py",
+        "author_mcp/http_client.py",
+        "rag/runtime/model_manager.py",
+        "author_mcp/test_runtime_client_wait.py",
+        "rag/runtime/model_manager.py",
+        "rag/models/fallback.py",
+        "rag/benchmark/cpu_canary.py"
+      ],
+      "top10_unique_path_count": 7,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-004",
+      "route": "TEXT",
+      "expected": [
+        "rag/runtime/model_manager.py"
+      ],
+      "text_top10": [
+        "docs/RAG_008_CLOSEOUT.md",
+        "docs/RAG_008_D_CONCURRENCY.md",
+        "docs/RAG_008_D_CONCURRENCY.md",
+        "docs/RAG_008_CLOSEOUT.md",
+        "docs/RAG_008_CLOSEOUT.md",
+        "docs/RAG_008_D_CONCURRENCY.md",
+        "docs/RAG_008_CLOSEOUT.md",
+        "docs/RAG_006_C_ON_DEMAND_LIFECYCLE.md",
+        "docs/RAG_008_CLOSEOUT.md",
+        "docs/RAG_016_C_CPU_ONLY.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 4,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-005",
+      "route": "CODE",
+      "expected": [
+        "rag/runtime/model_manager.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/models/fallback.py",
+        "rag/models/fallback.py",
+        "rag/models/fallback.py",
+        "rag/runtime/model_manager.py",
+        "rag/models/lifecycle.py",
+        "rag/models/fallback.py",
+        "rag/benchmark/model_failure.py",
+        "rag/benchmark/model_failure.py",
+        "rag/models/fallback.py",
+        "rag/benchmark/model_failure.py"
+      ],
+      "top10_unique_path_count": 4,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-006",
+      "route": "TEXT",
+      "expected": [
+        "rag/index/vector_ids.py"
+      ],
+      "text_top10": [
+        "docs/RAG_009_D_DETERMINISTIC_IDS.md",
+        "docs/RAG_009_D_DETERMINISTIC_IDS.md",
+        "docs/RAG_009_D_DETERMINISTIC_IDS.md",
+        "docs/RAG_006_D_TEXT_EMBEDDING.md",
+        "docs/RAG_003_D_CHUNK_PROVENANCE.md",
+        "docs/RAG_005_A_SQLITE_SCHEMA.md",
+        "docs/RAG_009_D_DETERMINISTIC_IDS.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_006_E_TEXT_EMBEDDING_CACHE.md",
+        "docs/RAG_005_C_LEXICAL_SEARCH.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 7,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-007",
+      "route": "CODE",
+      "expected": [
+        "rag/index/vector_ids.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/index/vector_ids.py",
+        "rag/index/vector_ids.py",
+        "rag/contracts.py",
+        "rag/index/vector_ids.py",
+        "rag/models/embedding.py",
+        "rag/index/lexical_search.py",
+        "rag/models/embedding.py",
+        "rag/models/embedding.py",
+        "rag/chunking/provenance.py",
+        "rag/contracts.py"
+      ],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-008",
+      "route": "CODE",
+      "expected": [
+        "rag/index/vector_ids.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/index/vector_ids.py",
+        "rag/index/vector_ids.py",
+        "author_mcp/protocol.py",
+        "rag/index/vector_ids.py",
+        "rag/benchmark/soak.py",
+        "rag/index/vector_ids.py",
+        "rag/benchmark/restart.py",
+        "rag/index/vector_ids.py",
+        "rag/benchmark/restart.py",
+        "rag/index/qdrant_local.py"
+      ],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-009",
+      "route": "TEXT",
+      "expected": [
+        "rag/index/vector_namespace.py"
+      ],
+      "text_top10": [
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/RAG_015_B_SCOPE.md",
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_009_CLOSEOUT.md",
+        "docs/RAG_008_CLOSEOUT.md",
+        "docs/RAG_015_E_PROJECT_DELETION.md",
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_015_CLOSEOUT.md",
+        "docs/RAG_009_CLOSEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 7,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-010",
+      "route": "CODE",
+      "expected": [
+        "rag/index/qdrant_local.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/index/vector_ids.py",
+        "rag/index/qdrant_local.py",
+        "rag/index/qdrant_local.py",
+        "rag/index/qdrant_local.py",
+        "rag/index/qdrant_local.py",
+        "rag/index/qdrant_local.py",
+        "rag/index/vector_ids.py",
+        "rag/benchmark/soak.py",
+        "rag/index/qdrant_local.py",
+        "rag/models/code_embedding.py"
+      ],
+      "top10_unique_path_count": 4,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-011",
+      "route": "TEXT",
+      "expected": [
+        "rag/retrieval/hybrid_text.py"
+      ],
+      "text_top10": [
+        "docs/RAG_010_A_TEXT_HYBRID.md",
+        "docs/RAG_010_A_TEXT_HYBRID.md",
+        "docs/RAG_010_C_HYBRID_QUERY.md",
+        "docs/RAG_010_A_TEXT_HYBRID.md",
+        "docs/RAG_010_B_CODE_HYBRID.md",
+        "docs/RAG_010_A_TEXT_HYBRID.md",
+        "docs/RAG_005_CLOSEOUT.md",
+        "docs/RAG_005_D_LEXICAL_RANKING.md",
+        "docs/RAG_010_C_HYBRID_QUERY.md",
+        "docs/RAG_010_A_TEXT_HYBRID.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-012",
+      "route": "CODE",
+      "expected": [
+        "rag/retrieval/hybrid_code.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/models/code_embedding.py",
+        "rag/models/embedding.py",
+        "rag/retrieval/hybrid_code.py",
+        "rag/retrieval/hybrid_text.py",
+        "rag/index/vector_ids.py",
+        "rag/index/qdrant_local.py",
+        "rag/models/code_embedding.py",
+        "rag/benchmark/restart.py",
+        "rag/retrieval/code_semantic.py",
+        "rag/retrieval/code_semantic.py"
+      ],
+      "top10_unique_path_count": 8,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-013",
+      "route": "CODE",
+      "expected": [
+        "rag/retrieval/hybrid_query.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/retrieval/hybrid_query.py",
+        "rag/retrieval/hybrid_text.py",
+        "rag/retrieval/hybrid_code.py",
+        "rag/retrieval/hybrid_query.py",
+        "rag/retrieval/hybrid_text.py",
+        "rag/retrieval/hybrid_code.py",
+        "rag/retrieval/hybrid_text.py",
+        "rag/retrieval/hybrid_query.py",
+        "rag/retrieval/__init__.py",
+        "rag/retrieval/hybrid_code.py"
+      ],
+      "top10_unique_path_count": 4,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-014",
+      "route": "TEXT",
+      "expected": [
+        "rag/ranking/rrf.py"
+      ],
+      "text_top10": [
+        "docs/RAG_010_D_RRF.md",
+        "docs/RAG_010_D_RRF.md",
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/RAG_010_D_RRF.md",
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_010_D_RRF.md",
+        "docs/RAG_010_C_HYBRID_QUERY.md",
+        "docs/HANDOFF_RAG_017_024_KNOWLEDGE_MANAGEMENT_UI_2026-10-08.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-015",
+      "route": "TEXT",
+      "expected": [
+        "rag/ranking/dedup.py"
+      ],
+      "text_top10": [
+        "docs/RAG_010_E_DEDUP.md",
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/RAG_010_D_RRF.md",
+        "docs/RAG_010_D_RRF.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_010_E_DEDUP.md",
+        "docs/RAG_010_E_DEDUP.md",
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/RAG_010_E_DEDUP.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 4,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-016",
+      "route": "TEXT",
+      "expected": [
+        "rag/sources/staleness.py"
+      ],
+      "text_top10": [
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_013_E_ERROR_CONTRACTS.md",
+        "docs/RAG_011_CLOSEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 4,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-017",
+      "route": "CODE",
+      "expected": [
+        "rag/index/incremental.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/index/incremental.py",
+        "rag/index/incremental.py",
+        "rag/index/incremental.py",
+        "rag/index/incremental.py",
+        "rag/index/incremental.py",
+        "rag/index/incremental.py",
+        "rag/index/incremental.py",
+        "rag/sources/staleness.py",
+        "author_mcp/runtime_client.py",
+        "rag/runtime/status.py"
+      ],
+      "top10_unique_path_count": 4,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-018",
+      "route": "TEXT",
+      "expected": [
+        "rag/index/incremental.py"
+      ],
+      "text_top10": [
+        "docs/RAG_012_D_REMOVED_FILE.md",
+        "docs/RAG_016_G_HANDOFF.md",
+        "docs/RAG_012_CLOSEOUT.md",
+        "docs/RAG_012_D_REMOVED_FILE.md",
+        "docs/RAG_012_D_REMOVED_FILE.md",
+        "docs/RAG_012_CLOSEOUT.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_012_D_REMOVED_FILE.md",
+        "docs/RAG_012_D_REMOVED_FILE.md",
+        "docs/RAG_012_D_REMOVED_FILE.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 4,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-019",
+      "route": "CODE",
+      "expected": [
+        "rag/index/incremental.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/index/incremental.py",
+        "rag/index/incremental.py",
+        "rag/models/lifecycle.py",
+        "rag/index/incremental.py",
+        "rag/runtime/model_manager.py",
+        "rag/runtime/model_manager.py",
+        "rag/runtime/model_manager.py",
+        "rag/runtime/model_manager.py",
+        "rag/runtime/model_manager.py",
+        "rag/runtime/model_manager.py"
+      ],
+      "top10_unique_path_count": 3,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-020",
+      "route": "TEXT",
+      "expected": [
+        "author_mcp/mcp_server.py"
+      ],
+      "text_top10": [
+        "docs/RAG_013_A_RAG_STATUS.md",
+        "docs/RAG_016_E_MODEL_FAILURE.md",
+        "docs/RAG_013_CLOSEOUT.md",
+        "docs/RAG_013_A_RAG_STATUS.md",
+        "docs/RAG_013_A_RAG_STATUS.md",
+        "docs/RAG_013_A_RAG_STATUS.md",
+        "docs/RAG_013_C_SEARCH_CONTEXT.md",
+        "docs/RAG_013_B_RAG_INDEX.md",
+        "docs/RAG_013_B_RAG_INDEX.md",
+        "docs/RAG_013_D_GET_CONTEXT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-021",
+      "route": "CODE",
+      "expected": [
+        "author_mcp/mcp_server.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/runtime/index_request.py",
+        "rag/runtime/index_request.py",
+        "rag/runtime/index_request.py",
+        "rag/runtime/index_request.py",
+        "rag/runtime/index_request.py",
+        "rag/runtime/index_request.py",
+        "rag/runtime/index_request.py",
+        "rag/runtime/index_request.py",
+        "author_mcp/mcp_server.py",
+        "rag/runtime/index_request.py"
+      ],
+      "top10_unique_path_count": 2,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-022",
+      "route": "TEXT",
+      "expected": [
+        "author_mcp/rag_bridge.py",
+        "rag/runtime/search_service.py"
+      ],
+      "text_top10": [
+        "docs/HANDOFF_RAG_017_024_KNOWLEDGE_MANAGEMENT_UI_2026-10-08.md",
+        "docs/RAG_013_C_SEARCH_CONTEXT.md",
+        "docs/RAG_013_C_SEARCH_CONTEXT.md",
+        "docs/RAG_013_CLOSEOUT.md",
+        "docs/RAG_013_CLOSEOUT.md",
+        "docs/RAG_013_C_SEARCH_CONTEXT.md",
+        "docs/RAG_013_C_SEARCH_CONTEXT.md",
+        "docs/RAG_013_CLOSEOUT.md",
+        "docs/RAG_014_B_GROUND_TRUTH.md",
+        "docs/RAG_013_C_SEARCH_CONTEXT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 4,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-023",
+      "route": "CODE",
+      "expected": [
+        "rag/runtime/context_service.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/runtime/context_service.py",
+        "author_mcp/mcp_server.py",
+        "author_mcp/rag_bridge.py",
+        "rag/runtime/context_service.py",
+        "rag/runtime/context_service.py",
+        "rag/runtime/context_service.py",
+        "rag/index/vector_namespace.py",
+        "rag/runtime/context_service.py",
+        "author_mcp/mcp_server.py",
+        "rag/runtime/context_service.py"
+      ],
+      "top10_unique_path_count": 4,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-024",
+      "route": "CODE",
+      "expected": [
+        "rag/runtime/errors.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/runtime/errors.py",
+        "rag/runtime/errors.py",
+        "rag/runtime/errors.py",
+        "rag/runtime/errors.py",
+        "author_mcp/mcp_server.py",
+        "rag/runtime/errors.py",
+        "author_mcp/rag_bridge.py",
+        "rag/runtime/errors.py",
+        "rag/index/fts5.py",
+        "rag/index/sqlite_schema.py"
+      ],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-025",
+      "route": "HYBRID",
+      "expected": [
+        "rag/sources/git_state.py"
+      ],
+      "text_top10": [
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md"
+      ],
+      "code_top10": [
+        "rag/sources/git_state.py",
+        "rag/sources/git_state.py",
+        "rag/sources/git_worktree.py",
+        "rag/sources/git_state.py",
+        "rag/sources/git_worktree.py",
+        "rag/sources/git_state.py",
+        "rag/sources/git_provenance.py",
+        "rag/sources/git_state.py",
+        "rag/sources/git_state.py",
+        "rag/sources/git_worktree.py"
+      ],
+      "top10_unique_path_count": 8,
+      "top10_chunk_count": 20,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-026",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_009_A_VECTOR_BACKEND.md"
+      ],
+      "text_top10": [
+        "docs/RAG_009_A_VECTOR_BACKEND.md",
+        "docs/RAG_009_A_VECTOR_BACKEND.md",
+        "docs/RAG_009_CLOSEOUT.md",
+        "docs/RAG_007_E_CODE_TO_CODE.md",
+        "docs/RAG_008_CLOSEOUT.md",
+        "docs/RAG_009_CLOSEOUT.md",
+        "docs/RAG_009_B_COLLECTIONS.md",
+        "docs/RAG_016_C_CPU_ONLY.md",
+        "docs/RAG_004_A_LANGUAGE_PARSERS.md",
+        "docs/RAG_004_A_LANGUAGE_PARSERS.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 7,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-027",
+      "route": "CODE",
+      "expected": [
+        "docs/RAG_009_B_COLLECTIONS.md"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/index/vector_ids.py",
+        "rag/models/code_embedding.py",
+        "rag/models/embedding.py",
+        "rag/models/code_embedding.py",
+        "rag/models/code_embedding.py",
+        "rag/models/embedding.py",
+        "rag/index/qdrant_local.py",
+        "rag/models/embedding.py",
+        "rag/models/code_embedding.py",
+        "rag/index/embedding_cache.py"
+      ],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-028",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_009_A_VECTOR_BACKEND.md"
+      ],
+      "text_top10": [
+        "docs/RAG_009_A_VECTOR_BACKEND.md",
+        "docs/RAG_009_A_VECTOR_BACKEND.md",
+        "docs/RAG_009_A_VECTOR_BACKEND.md",
+        "docs/RAG_009_A_VECTOR_BACKEND.md",
+        "docs/RAG_009_CLOSEOUT.md",
+        "docs/RAG_009_A_VECTOR_BACKEND.md",
+        "docs/RAG_009_A_VECTOR_BACKEND.md",
+        "docs/RAG_006_CLOSEOUT.md",
+        "docs/RAG_013_E_ERROR_CONTRACTS.md",
+        "docs/RAG_010_CLOSEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-029",
+      "route": "CODE",
+      "expected": [
+        "docs/RAG_009_A_VECTOR_BACKEND.md"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/index/vector_backend_policy.py",
+        "rag/retrieval/hybrid_code.py",
+        "rag/retrieval/hybrid_text.py",
+        "rag/index/vector_backend_policy.py",
+        "rag/index/vector_backend_policy.py",
+        "rag/retrieval/hybrid_code.py",
+        "rag/benchmark/restart.py",
+        "rag/benchmark/corpus.py",
+        "rag/benchmark/soak.py",
+        "rag/index/qdrant_local.py"
+      ],
+      "top10_unique_path_count": 7,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-030",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_009_CLOSEOUT.md",
+        "docs/RAG_009_D_DETERMINISTIC_IDS.md"
+      ],
+      "text_top10": [
+        "docs/RAG_009_D_DETERMINISTIC_IDS.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_009_B_COLLECTIONS.md",
+        "docs/RAG_009_D_DETERMINISTIC_IDS.md",
+        "docs/RAG_009_D_DETERMINISTIC_IDS.md",
+        "docs/RAG_012_IDEMPOTENCE.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_012_E_MODEL_VERSION.md",
+        "docs/RAG_012_CLOSEOUT.md",
+        "docs/RAG_012_IDEMPOTENCE.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-031",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_009_C_NAMESPACES.md"
+      ],
+      "text_top10": [
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_009_CLOSEOUT.md",
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_010_A_TEXT_HYBRID.md",
+        "docs/RAG_012_A_MANIFEST.md",
+        "docs/RAG_009_CLOSEOUT.md",
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_009_C_NAMESPACES.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 4,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-032",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_009_C_NAMESPACES.md"
+      ],
+      "text_top10": [
+        "docs/RAG_009_CLOSEOUT.md",
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_015_E_PROJECT_DELETION.md",
+        "docs/RAG_010_A_TEXT_HYBRID.md",
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_015_E_PROJECT_DELETION.md",
+        "docs/RAG_015_B_SCOPE.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-033",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_010_A_TEXT_HYBRID.md"
+      ],
+      "text_top10": [
+        "docs/RAG_010_C_HYBRID_QUERY.md",
+        "docs/RAG_010_A_TEXT_HYBRID.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_010_D_RRF.md",
+        "docs/RAG_010_C_HYBRID_QUERY.md",
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/HANDOFF_RAG_017_024_KNOWLEDGE_MANAGEMENT_UI_2026-10-08.md",
+        "docs/RAG_010_B_CODE_HYBRID.md",
+        "docs/RAG_010_A_TEXT_HYBRID.md",
+        "docs/RAG_010_CLOSEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 7,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-034",
+      "route": "CODE",
+      "expected": [
+        "docs/RAG_010_B_CODE_HYBRID.md"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/retrieval/__init__.py",
+        "author_mcp/mcp_server.py",
+        "rag/retrieval/hybrid_code.py",
+        "rag/runtime/index_request.py",
+        "rag/runtime/index_request.py",
+        "rag/runtime/status.py",
+        "rag/runtime/index_request.py",
+        "rag/runtime/status.py",
+        "rag/runtime/errors.py",
+        "rag/runtime/index_request.py"
+      ],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-035",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_010_C_HYBRID_QUERY.md"
+      ],
+      "text_top10": [
+        "docs/RAG_010_C_HYBRID_QUERY.md",
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_010_C_HYBRID_QUERY.md",
+        "docs/RAG_008_CLOSEOUT.md",
+        "docs/RAG_007_CLOSEOUT.md",
+        "docs/RAG_009_CLOSEOUT.md",
+        "docs/RAG_009_B_COLLECTIONS.md",
+        "docs/RAG_010_B_CODE_HYBRID.md",
+        "docs/RAG_009_CLOSEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 8,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-036",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_010_D_RRF.md"
+      ],
+      "text_top10": [
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/RAG_010_D_RRF.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/RAG_010_D_RRF.md",
+        "docs/RAG_010_D_RRF.md",
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/RAG_010_A_TEXT_HYBRID.md",
+        "docs/HANDOFF_RAG_017_024_KNOWLEDGE_MANAGEMENT_UI_2026-10-08.md",
+        "docs/RAG_010_C_HYBRID_QUERY.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-037",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_010_E_DEDUP.md"
+      ],
+      "text_top10": [
+        "docs/RAG_010_E_DEDUP.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_010_A_TEXT_HYBRID.md",
+        "docs/RAG_010_C_HYBRID_QUERY.md",
+        "docs/RAG_010_E_DEDUP.md",
+        "docs/RAG_MODULE_LAYOUT.md",
+        "docs/RAG_006_E_TEXT_EMBEDDING_CACHE.md",
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/RAG_008_E_FAILURE_POLICY.md",
+        "docs/RAG_006_D_TEXT_EMBEDDING.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 9,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-038",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_010_RETRIEVAL_BENCHMARK.md"
+      ],
+      "text_top10": [
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_010_RETRIEVAL_BENCHMARK.md",
+        "docs/RAG_010_C_HYBRID_QUERY.md",
+        "docs/RAG_010_RETRIEVAL_BENCHMARK.md",
+        "docs/RAG_010_RETRIEVAL_BENCHMARK.md",
+        "docs/RAG_010_RETRIEVAL_BENCHMARK.md",
+        "docs/RAG_016_G_HANDOFF.md",
+        "docs/RAG_016_F_GIT_AUDIT.md",
+        "docs/RAG_014_C_METRICS.md",
+        "docs/RAG_010_CLOSEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 7,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-039",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_011_CLOSEOUT.md"
+      ],
+      "text_top10": [
+        "docs/RAG_009_CLOSEOUT.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_014_A_DATASET.md",
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_012_CLOSEOUT.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 9,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-040",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_012_A_MANIFEST.md"
+      ],
+      "text_top10": [
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_009_CLOSEOUT.md",
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/RAG_012_A_MANIFEST.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_012_CLOSEOUT.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 7,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-041",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_012_B_UNCHANGED.md"
+      ],
+      "text_top10": [
+        "docs/RAG_012_CLOSEOUT.md",
+        "docs/RAG_012_C_CHANGED_FILE.md",
+        "docs/RAG_012_B_UNCHANGED.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_012_B_UNCHANGED.md",
+        "docs/RAG_012_B_UNCHANGED.md",
+        "docs/RAG_012_CLOSEOUT.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_012_A_MANIFEST.md",
+        "docs/RAG_016_G_HANDOFF.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 7,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-042",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_012_D_REMOVED_FILE.md"
+      ],
+      "text_top10": [
+        "docs/RAG_012_D_REMOVED_FILE.md",
+        "docs/RAG_012_CLOSEOUT.md",
+        "docs/RAG_016_G_HANDOFF.md",
+        "docs/RAG_012_D_REMOVED_FILE.md",
+        "docs/RAG_012_D_REMOVED_FILE.md",
+        "docs/RAG_012_D_REMOVED_FILE.md",
+        "docs/RAG_012_D_REMOVED_FILE.md",
+        "docs/RAG_005_A_SQLITE_SCHEMA.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_005_B_FTS5.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-043",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_012_E_MODEL_VERSION.md"
+      ],
+      "text_top10": [
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_010_C_HYBRID_QUERY.md",
+        "docs/RAG_012_E_MODEL_VERSION.md",
+        "docs/RAG_012_A_MANIFEST.md",
+        "docs/RAG_012_D_REMOVED_FILE.md",
+        "docs/RAG_012_C_CHANGED_FILE.md",
+        "docs/RAG_012_B_UNCHANGED.md",
+        "docs/RAG_006_D_TEXT_EMBEDDING.md",
+        "docs/RAG_006_E_TEXT_EMBEDDING_CACHE.md",
+        "docs/RAG_012_CLOSEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 10,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-044",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_013_CLOSEOUT.md"
+      ],
+      "text_top10": [
+        "docs/RAG_012_CLOSEOUT.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_012_CLOSEOUT.md",
+        "docs/RAG_013_CLOSEOUT.md",
+        "docs/RAG_MODULE_LAYOUT.md",
+        "docs/RAG_013_MCP_INTEGRATION.md",
+        "docs/RAG_013_CLOSEOUT.md",
+        "docs/RAG_013_CLOSEOUT.md",
+        "docs/RAG_013_CLOSEOUT.md",
+        "docs/HANDOFF_RAG_017_024_KNOWLEDGE_MANAGEMENT_UI_2026-10-08.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-045",
+      "route": "CODE",
+      "expected": [
+        "docs/RAG_013_B_RAG_INDEX.md"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/runtime/index_request.py",
+        "author_mcp/mcp_server.py",
+        "author_mcp/mcp_server.py",
+        "rag/runtime/index_request.py",
+        "rag/__init__.py",
+        "rag/runtime/index_request.py",
+        "rag/runtime/context_service.py",
+        "rag/runtime/__init__.py",
+        "rag/runtime/index_request.py",
+        "rag/runtime/index_request.py"
+      ],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-046",
+      "route": "CODE",
+      "expected": [
+        "docs/RAG_013_C_SEARCH_CONTEXT.md"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "author_mcp/mcp_server.py",
+        "rag/retrieval/__init__.py",
+        "rag/runtime/search_service.py",
+        "author_mcp/test_exec_tool.py",
+        "rag/sources/__init__.py",
+        "rag/runtime/index_request.py",
+        "author_mcp/mcp_server.py",
+        "author_mcp/rag_bridge.py",
+        "author_mcp/mcp_server.py",
+        "rag/__init__.py"
+      ],
+      "top10_unique_path_count": 8,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-047",
+      "route": "CODE",
+      "expected": [
+        "docs/RAG_013_D_GET_CONTEXT.md"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "author_mcp/mcp_server.py",
+        "author_mcp/mcp_server.py",
+        "author_mcp/mcp_server.py",
+        "author_mcp/runtime_client.py",
+        "author_mcp/runtime_client.py",
+        "author_mcp/test_exec_tool.py",
+        "rag/runtime/context_service.py",
+        "author_mcp/mcp_server.py",
+        "author_mcp/test_migration_catalog.py",
+        "author_mcp/runtime_client.py"
+      ],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-048",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_013_E_ERROR_CONTRACTS.md"
+      ],
+      "text_top10": [
+        "docs/RAG_012_CLOSEOUT.md",
+        "docs/RAG_013_A_RAG_STATUS.md",
+        "docs/RAG_016_F_GIT_AUDIT.md",
+        "docs/RAG_013_E_ERROR_CONTRACTS.md",
+        "docs/RAG_013_E_ERROR_CONTRACTS.md",
+        "docs/RAG_008_C_IDLE_TIMEOUT.md",
+        "docs/RAG_013_CLOSEOUT.md",
+        "docs/RAG_013_B_RAG_INDEX.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_013_CLOSEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 8,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-049",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_013_MCP_INTEGRATION.md"
+      ],
+      "text_top10": [
+        "docs/RAG_013_MCP_INTEGRATION.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_013_MCP_INTEGRATION.md",
+        "docs/RAG_013_MCP_INTEGRATION.md",
+        "docs/RAG_013_MCP_INTEGRATION.md",
+        "docs/RAG_014_B_GROUND_TRUTH.md",
+        "docs/RAG_013_CLOSEOUT.md",
+        "docs/RAG_013_MCP_INTEGRATION.md",
+        "docs/RAG_014_B_GROUND_TRUTH.md",
+        "docs/RAG_012_CLOSEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-050",
+      "route": "TEXT",
+      "expected": [
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md"
+      ],
+      "text_top10": [
+        "docs/HANDOFF_RAG_017_024_KNOWLEDGE_MANAGEMENT_UI_2026-10-08.md",
+        "docs/RAG_014_C_METRICS.md",
+        "docs/RAG_014_A_DATASET.md",
+        "docs/RAG_016_G_HANDOFF.md",
+        "docs/RAG_014_A_DATASET.md",
+        "docs/HANDOFF_RAG_017_024_KNOWLEDGE_MANAGEMENT_UI_2026-10-08.md",
+        "docs/RAG_006_G_BENCHMARK.md",
+        "docs/RAG_010_RETRIEVAL_BENCHMARK.md",
+        "docs/RAG_016_G_HANDOFF.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 7,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-051",
+      "route": "TEXT",
+      "expected": [
+        "rag/runtime/errors.py"
+      ],
+      "text_top10": [
+        "docs/RAG_013_E_ERROR_CONTRACTS.md",
+        "docs/RAG_013_E_ERROR_CONTRACTS.md",
+        "docs/RAG_013_E_ERROR_CONTRACTS.md",
+        "docs/RAG_006_F_CPU_FALLBACK.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_013_E_ERROR_CONTRACTS.md",
+        "docs/RAG_013_CLOSEOUT.md",
+        "docs/RAG_013_E_ERROR_CONTRACTS.md",
+        "docs/RAG_016_E_MODEL_FAILURE.md",
+        "docs/RAG_006_F_CPU_FALLBACK.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-052",
+      "route": "TEXT",
+      "expected": [
+        "rag/runtime/errors.py"
+      ],
+      "text_top10": [
+        "docs/RAG_013_CLOSEOUT.md",
+        "docs/RAG_006_E_TEXT_EMBEDDING_CACHE.md",
+        "docs/RAG_013_D_GET_CONTEXT.md",
+        "docs/RAG_015_E_PROJECT_DELETION.md",
+        "docs/RAG_005_B_FTS5.md",
+        "docs/RAG_013_B_RAG_INDEX.md",
+        "docs/RAG_005_B_FTS5.md",
+        "docs/RAG_005_A_SQLITE_SCHEMA.md",
+        "docs/RAG_013_B_RAG_INDEX.md",
+        "docs/RAG_013_B_RAG_INDEX.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 7,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-053",
+      "route": "TEXT",
+      "expected": [
+        "rag/runtime/context_service.py",
+        "rag/runtime/errors.py"
+      ],
+      "text_top10": [
+        "docs/RAG_013_MCP_INTEGRATION.md",
+        "docs/RAG_015_D_CHUNK_ORIGIN.md",
+        "docs/RAG_015_C_PATH_TRAVERSAL.md",
+        "docs/RAG_013_D_GET_CONTEXT.md",
+        "docs/RAG_013_D_GET_CONTEXT.md",
+        "docs/RAG_015_CLOSEOUT.md",
+        "docs/RAG_015_B_SCOPE.md",
+        "docs/RAG_015_D_CHUNK_ORIGIN.md",
+        "docs/RAG_013_D_GET_CONTEXT.md",
+        "docs/RAG_013_D_GET_CONTEXT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-054",
+      "route": "CODE",
+      "expected": [
+        "rag/runtime/errors.py",
+        "rag/runtime/index_request.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/runtime/context_service.py",
+        "rag/runtime/context_service.py",
+        "rag/runtime/index_request.py",
+        "rag/runtime/errors.py",
+        "author_mcp/rag_bridge.py",
+        "rag/runtime/index_request.py",
+        "rag/runtime/errors.py",
+        "rag/runtime/errors.py",
+        "rag/runtime/context_service.py",
+        "rag/index/sqlite_schema.py"
+      ],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-055",
+      "route": "TEXT",
+      "expected": [
+        "rag/runtime/context_service.py",
+        "rag/runtime/errors.py"
+      ],
+      "text_top10": [
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_005_D_LEXICAL_RANKING.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_013_E_ERROR_CONTRACTS.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_013_E_ERROR_CONTRACTS.md",
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_009_D_DETERMINISTIC_IDS.md",
+        "docs/RAG_011_CLOSEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-056",
+      "route": "TEXT",
+      "expected": [
+        "rag/runtime/model_manager.py"
+      ],
+      "text_top10": [
+        "docs/RAG_008_E_FAILURE_POLICY.md",
+        "docs/RAG_008_CLOSEOUT.md",
+        "docs/RAG_016_E_MODEL_FAILURE.md",
+        "docs/RAG_008_E_FAILURE_POLICY.md",
+        "docs/RAG_008_E_FAILURE_POLICY.md",
+        "docs/RAG_016_E_MODEL_FAILURE.md",
+        "docs/RAG_008_E_FAILURE_POLICY.md",
+        "docs/RAG_008_CLOSEOUT.md",
+        "docs/RAG_016_E_MODEL_FAILURE.md",
+        "docs/RAG_008_E_FAILURE_POLICY.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 3,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-057",
+      "route": "CODE",
+      "expected": [
+        "rag/runtime/model_manager.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/runtime/model_manager.py",
+        "rag/runtime/model_manager.py",
+        "rag/models/fallback.py",
+        "rag/models/code_lifecycle.py",
+        "rag/runtime/model_manager.py",
+        "rag/models/lifecycle.py",
+        "rag/runtime/index_request.py",
+        "rag/runtime/model_manager.py",
+        "rag/runtime/model_manager.py",
+        "rag/runtime/model_manager.py"
+      ],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-058",
+      "route": "TEXT",
+      "expected": [
+        "rag/index/qdrant_local.py"
+      ],
+      "text_top10": [
+        "docs/RAG_009_D_DETERMINISTIC_IDS.md",
+        "docs/RAG_009_B_COLLECTIONS.md",
+        "docs/RAG_009_B_COLLECTIONS.md",
+        "docs/RAG_010_C_HYBRID_QUERY.md",
+        "docs/RAG_009_CLOSEOUT.md",
+        "docs/RAG_015_E_PROJECT_DELETION.md",
+        "docs/RAG_009_B_COLLECTIONS.md",
+        "docs/RAG_009_D_DETERMINISTIC_IDS.md",
+        "docs/RAG_006_D_TEXT_EMBEDDING.md",
+        "docs/RAG_009_CLOSEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-059",
+      "route": "TEXT",
+      "expected": [
+        "rag/index/vector_namespace.py"
+      ],
+      "text_top10": [
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_009_CLOSEOUT.md",
+        "docs/RAG_009_C_NAMESPACES.md",
+        "docs/RAG_015_B_SCOPE.md",
+        "docs/RAG_009_D_DETERMINISTIC_IDS.md",
+        "docs/RAG_009_CLOSEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 4,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-060",
+      "route": "TEXT",
+      "expected": [
+        "rag/ranking/rrf.py"
+      ],
+      "text_top10": [
+        "docs/RAG_010_D_RRF.md",
+        "docs/RAG_009_D_DETERMINISTIC_IDS.md",
+        "docs/RAG_010_E_DEDUP.md",
+        "docs/RAG_010_E_DEDUP.md",
+        "docs/RAG_010_D_RRF.md",
+        "docs/RAG_015_D_CHUNK_ORIGIN.md",
+        "docs/RAG_012_C_CHANGED_FILE.md",
+        "docs/RAG_009_D_DETERMINISTIC_IDS.md",
+        "docs/RAG_010_D_RRF.md",
+        "docs/RAG_010_D_RRF.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-061",
+      "route": "TEXT",
+      "expected": [
+        "rag/sources/git_state.py"
+      ],
+      "text_top10": [
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_015_C_PATH_TRAVERSAL.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 4,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-062",
+      "route": "TEXT",
+      "expected": [
+        "rag/sources/git_state.py"
+      ],
+      "text_top10": [
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_014_A_DATASET.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 3,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-063",
+      "route": "CODE",
+      "expected": [
+        "rag/sources/staleness.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/index/incremental.py",
+        "rag/sources/staleness.py",
+        "rag/index/incremental.py",
+        "rag/sources/staleness.py",
+        "rag/sources/staleness.py",
+        "rag/sources/staleness.py",
+        "rag/index/incremental.py",
+        "rag/index/incremental.py",
+        "rag/index/incremental.py",
+        "rag/sources/staleness.py"
+      ],
+      "top10_unique_path_count": 2,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-064",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_010_CLOSEOUT.md"
+      ],
+      "text_top10": [
+        "docs/RAG_016_E_MODEL_FAILURE.md",
+        "docs/RAG_007_G_MEMORY.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_016_G_HANDOFF.md",
+        "docs/RAG_013_MCP_INTEGRATION.md",
+        "docs/RAG_016_F_GIT_AUDIT.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/HANDOFF_RAG_017_024_KNOWLEDGE_MANAGEMENT_UI_2026-10-08.md",
+        "docs/RAG_016_G_HANDOFF.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 9,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-065",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_013_MCP_INTEGRATION.md"
+      ],
+      "text_top10": [
+        "docs/RAG_013_MCP_INTEGRATION.md",
+        "docs/RAG_013_CLOSEOUT.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_001_CLOSEOUT.md",
+        "docs/RAG_016_F_GIT_AUDIT.md",
+        "docs/RAG_013_CLOSEOUT.md",
+        "docs/RAG_004_CLOSEOUT.md",
+        "docs/RAG_016_E_MODEL_FAILURE.md",
+        "docs/RAG_012_CLOSEOUT.md",
+        "docs/RAG_013_E_ERROR_CONTRACTS.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 9,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-066",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_009_B_COLLECTIONS.md",
+        "rag/index/qdrant_local.py"
+      ],
+      "text_top10": [
+        "docs/RAG_009_CLOSEOUT.md",
+        "docs/RAG_009_B_COLLECTIONS.md",
+        "docs/RAG_009_A_VECTOR_BACKEND.md",
+        "docs/RAG_016_B_RESTART.md",
+        "docs/RAG_016_B_RESTART.md",
+        "docs/RAG_009_B_COLLECTIONS.md",
+        "docs/RAG_016_B_RESTART.md",
+        "docs/RAG_009_CLOSEOUT.md",
+        "docs/RAG_006_E_TEXT_EMBEDDING_CACHE.md",
+        "docs/RAG_016_F_GIT_AUDIT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-067",
+      "route": "TEXT",
+      "expected": [
+        "rag/retrieval/hybrid_text.py"
+      ],
+      "text_top10": [
+        "docs/RAG_006_D_TEXT_EMBEDDING.md",
+        "docs/RAG_010_C_HYBRID_QUERY.md",
+        "docs/RAG_009_D_DETERMINISTIC_IDS.md",
+        "docs/RAG_009_B_COLLECTIONS.md",
+        "docs/RAG_006_D_TEXT_EMBEDDING.md",
+        "docs/RAG_007_A_CODE_BACKEND.md",
+        "docs/RAG_006_D_TEXT_EMBEDDING.md",
+        "docs/RAG_014_C_METRICS.md",
+        "docs/RAG_006_D_TEXT_EMBEDDING.md",
+        "docs/RAG_006_D_TEXT_EMBEDDING.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-068",
+      "route": "CODE",
+      "expected": [
+        "rag/retrieval/hybrid_code.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/models/code_embedding.py",
+        "rag/index/vector_ids.py",
+        "rag/models/code_embedding.py",
+        "rag/models/embedding.py",
+        "rag/models/code_embedding.py",
+        "rag/models/code_embedding.py",
+        "rag/models/code_embedding.py",
+        "rag/models/code_embedding.py",
+        "rag/models/embedding.py",
+        "rag/retrieval/code_semantic.py"
+      ],
+      "top10_unique_path_count": 4,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-069",
+      "route": "TEXT",
+      "expected": [
+        "rag/runtime/model_manager.py"
+      ],
+      "text_top10": [
+        "docs/RAG_008_C_IDLE_TIMEOUT.md",
+        "docs/RAG_008_C_IDLE_TIMEOUT.md",
+        "docs/RAG_008_C_IDLE_TIMEOUT.md",
+        "docs/RAG_008_C_IDLE_TIMEOUT.md",
+        "docs/RAG_008_C_IDLE_TIMEOUT.md",
+        "docs/RAG_008_C_IDLE_TIMEOUT.md",
+        "docs/RAG_008_A_QUERY_CLASSIFIER.md",
+        "docs/RAG_008_CLOSEOUT.md",
+        "docs/RAG_008_CLOSEOUT.md",
+        "docs/RAG_008_C_IDLE_TIMEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 3,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-070",
+      "route": "TEXT",
+      "expected": [
+        "rag/runtime/model_manager.py"
+      ],
+      "text_top10": [
+        "docs/RAG_008_E_FAILURE_POLICY.md",
+        "docs/RAG_008_E_FAILURE_POLICY.md",
+        "docs/RAG_008_CLOSEOUT.md",
+        "docs/RAG_008_E_FAILURE_POLICY.md",
+        "docs/RAG_006_C_ON_DEMAND_LIFECYCLE.md",
+        "docs/RAG_008_D_CONCURRENCY.md",
+        "docs/RAG_006_F_CPU_FALLBACK.md",
+        "docs/RAG_008_B_MUTUAL_EXCLUSION.md",
+        "docs/RAG_008_E_FAILURE_POLICY.md",
+        "docs/RAG_008_CLOSEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-071",
+      "route": "TEXT",
+      "expected": [
+        "rag/sources/git_state.py"
+      ],
+      "text_top10": [
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_015_C_PATH_TRAVERSAL.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-072",
+      "route": "TEXT",
+      "expected": [
+        "rag/sources/git_state.py"
+      ],
+      "text_top10": [
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_CLOSEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 4,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-073",
+      "route": "TEXT",
+      "expected": [
+        "rag/sources/git_provenance.py"
+      ],
+      "text_top10": [
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_003_D_CHUNK_PROVENANCE.md",
+        "docs/RAG_002_C_GIT_SOURCES.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-074",
+      "route": "TEXT",
+      "expected": [
+        "rag/sources/git_worktree.py"
+      ],
+      "text_top10": [
+        "docs/RAG_002_C_GIT_SOURCES.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_010_A_TEXT_HYBRID.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_015_C_PATH_TRAVERSAL.md",
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_012_CLOSEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-075",
+      "route": "HYBRID",
+      "expected": [
+        "rag/sources/git_state.py",
+        "rag/sources/staleness.py"
+      ],
+      "text_top10": [
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_014_A_DATASET.md",
+        "docs/RAG_002_C_GIT_SOURCES.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md"
+      ],
+      "code_top10": [
+        "rag/sources/git_state.py",
+        "rag/sources/git_state.py",
+        "rag/sources/git_state.py",
+        "rag/sources/git_state.py",
+        "rag/sources/git_worktree.py",
+        "rag/sources/git_worktree.py",
+        "rag/sources/git_provenance.py",
+        "rag/sources/git_state.py",
+        "rag/sources/git_worktree.py",
+        "rag/sources/git_state.py"
+      ],
+      "top10_unique_path_count": 8,
+      "top10_chunk_count": 20,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-076",
+      "route": "TEXT",
+      "expected": [
+        "rag/sources/git_inventory.py"
+      ],
+      "text_top10": [
+        "docs/RAG_002_C_GIT_SOURCES.md",
+        "docs/RAG_002_C_GIT_SOURCES.md",
+        "docs/RAG_002_CLOSEOUT.md",
+        "docs/RAG_002_CLOSEOUT.md",
+        "docs/RAG_CONTRACT.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_002_C_GIT_SOURCES.md",
+        "docs/RAG_CONTRACT.md",
+        "docs/RAG_013_CLOSEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-077",
+      "route": "TEXT",
+      "expected": [
+        "rag/contracts.py",
+        "rag/sources/git_state.py"
+      ],
+      "text_top10": [
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_003_D_CHUNK_PROVENANCE.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-078",
+      "route": "TEXT",
+      "expected": [
+        "rag/sources/git_provenance.py"
+      ],
+      "text_top10": [
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_015_C_PATH_TRAVERSAL.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 3,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-079",
+      "route": "TEXT",
+      "expected": [
+        "rag/sources/git_worktree.py"
+      ],
+      "text_top10": [
+        "docs/RAG_015_C_PATH_TRAVERSAL.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_002_C_GIT_SOURCES.md",
+        "docs/RAG_010_A_TEXT_HYBRID.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_005_A_SQLITE_SCHEMA.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-080",
+      "route": "TEXT",
+      "expected": [
+        "rag/sources/staleness.py"
+      ],
+      "text_top10": [
+        "docs/RAG_002_C_GIT_SOURCES.md",
+        "docs/RAG_CONTRACT.md",
+        "docs/RAG_009_CLOSEOUT.md",
+        "docs/RAG_002_C_GIT_SOURCES.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_002_C_GIT_SOURCES.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_014_A_DATASET.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-081",
+      "route": "HYBRID",
+      "expected": [
+        "docs/RAG_002_E_EXCLUSIONS.md",
+        "rag/sources/exclusion_policy.py"
+      ],
+      "text_top10": [
+        "docs/RAG_014_DATASET_CORRECTION.md",
+        "docs/RAG_014_A_DATASET.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_012_CLOSEOUT.md",
+        "docs/RAG_CONTRACT.md",
+        "docs/RAG_013_B_RAG_INDEX.md",
+        "docs/RAG_006_E_TEXT_EMBEDDING_CACHE.md",
+        "docs/RAG_005_CLOSEOUT.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_014_C_METRICS.md"
+      ],
+      "code_top10": [
+        "rag/chunking/text_log.py",
+        "rag/benchmark/restart.py",
+        "rag/runtime/index_request.py",
+        "rag/runtime/status.py",
+        "rag/runtime/status.py",
+        "rag/sources/execution_inventory.py",
+        "rag/benchmark/corpus.py",
+        "rag/runtime/index_request.py",
+        "author_mcp/mcp_server.py",
+        "rag/runtime/index_request.py"
+      ],
+      "top10_unique_path_count": 17,
+      "top10_chunk_count": 20,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-082",
+      "route": "CODE",
+      "expected": [
+        "docs/RAG_002_D_EXECUTION_SOURCES.md",
+        "rag/sources/execution_inventory.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/runtime/index_request.py",
+        "rag/runtime/index_request.py",
+        "author_mcp/mcp_server.py",
+        "rag/sources/execution_inventory.py",
+        "rag/runtime/errors.py",
+        "rag/runtime/search_service.py",
+        "rag/runtime/errors.py",
+        "rag/runtime/errors.py",
+        "rag/runtime/context_service.py",
+        "rag/runtime/index_request.py"
+      ],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-083",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_002_D_EXECUTION_SOURCES.md",
+        "rag/sources/execution_inventory.py"
+      ],
+      "text_top10": [
+        "docs/RAG_CONTRACT.md",
+        "docs/RAG_002_D_EXECUTION_SOURCES.md",
+        "docs/RAG_CONTRACT.md",
+        "docs/RAG_013_B_RAG_INDEX.md",
+        "docs/RAG_014_DATASET_CORRECTION.md",
+        "docs/RAG_MODULE_LAYOUT.md",
+        "docs/RAG_016_B_RESTART.md",
+        "docs/RAG_002_D_EXECUTION_SOURCES.md",
+        "docs/RAG_001_CLOSEOUT.md",
+        "docs/RAG_MODULE_LAYOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 7,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-084",
+      "route": "HYBRID",
+      "expected": [
+        "rag/sources/execution_inventory.py"
+      ],
+      "text_top10": [
+        "docs/RAG_014_C_METRICS.md",
+        "docs/RAG_014_DATASET_CORRECTION.md",
+        "docs/RAG_014_A_DATASET.md",
+        "docs/RAG_015_CLOSEOUT.md",
+        "docs/HANDOFF_RAG_017_024_KNOWLEDGE_MANAGEMENT_UI_2026-10-08.md",
+        "docs/RAG_013_E_ERROR_CONTRACTS.md",
+        "docs/RAG_007_C_CODE_EMBEDDING.md",
+        "docs/RAG_006_CLOSEOUT.md",
+        "docs/RAG_006_D_TEXT_EMBEDDING.md",
+        "docs/RAG_002_D_EXECUTION_SOURCES.md"
+      ],
+      "code_top10": [
+        "rag/runtime/index_request.py",
+        "rag/sources/execution_inventory.py",
+        "rag/chunking/text_log.py",
+        "rag/contracts.py",
+        "rag/index/manifest.py",
+        "rag/sources/execution_inventory.py",
+        "rag/index/incremental.py",
+        "rag/runtime/index_request.py",
+        "rag/sources/exclusion_policy.py",
+        "rag/sources/exclusion_policy.py"
+      ],
+      "top10_unique_path_count": 17,
+      "top10_chunk_count": 20,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-085",
+      "route": "TEXT",
+      "expected": [
+        "rag/sources/execution_inventory.py"
+      ],
+      "text_top10": [
+        "docs/RAG_CONTRACT.md",
+        "docs/RAG_013_B_RAG_INDEX.md",
+        "docs/RAG_005_CLOSEOUT.md",
+        "docs/RAG_006_E_TEXT_EMBEDDING_CACHE.md",
+        "docs/RAG_013_B_RAG_INDEX.md",
+        "docs/RAG_013_B_RAG_INDEX.md",
+        "docs/RAG_013_B_RAG_INDEX.md",
+        "docs/RAG_015_C_PATH_TRAVERSAL.md",
+        "docs/RAG_013_B_RAG_INDEX.md",
+        "docs/RAG_013_B_RAG_INDEX.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-086",
+      "route": "HYBRID",
+      "expected": [
+        "rag/chunking/markdown.py",
+        "rag/chunking/text_log.py"
+      ],
+      "text_top10": [
+        "docs/RAG_003_B_TEXT_LOG_CHUNKING.md",
+        "docs/RAG_003_B_TEXT_LOG_CHUNKING.md",
+        "docs/RAG_003_CLOSEOUT.md",
+        "docs/RAG_003_B_TEXT_LOG_CHUNKING.md",
+        "docs/RAG_003_B_TEXT_LOG_CHUNKING.md",
+        "docs/RAG_003_CLOSEOUT.md",
+        "docs/RAG_003_A_MARKDOWN_CHUNKING.md",
+        "docs/RAG_003_B_TEXT_LOG_CHUNKING.md",
+        "docs/RAG_003_B_TEXT_LOG_CHUNKING.md",
+        "docs/RAG_015_B_SCOPE.md"
+      ],
+      "code_top10": [
+        "rag/chunking/markdown.py",
+        "rag/chunking/text_log.py",
+        "rag/benchmark/corpus.py",
+        "rag/chunking/markdown.py",
+        "rag/chunking/text_log.py",
+        "rag/chunking/markdown.py",
+        "rag/chunking/text_log.py",
+        "rag/chunking/markdown.py",
+        "rag/chunking/markdown.py",
+        "rag/models/embedding.py"
+      ],
+      "top10_unique_path_count": 8,
+      "top10_chunk_count": 20,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-087",
+      "route": "TEXT",
+      "expected": [
+        "rag/chunking/overlap.py",
+        "rag/chunking/text_log.py"
+      ],
+      "text_top10": [
+        "docs/RAG_003_C_CONTROLLED_OVERLAP.md",
+        "docs/RAG_003_CLOSEOUT.md",
+        "docs/RAG_003_B_TEXT_LOG_CHUNKING.md",
+        "docs/RAG_003_C_CONTROLLED_OVERLAP.md",
+        "docs/RAG_003_B_TEXT_LOG_CHUNKING.md",
+        "docs/RAG_003_C_CONTROLLED_OVERLAP.md",
+        "docs/RAG_003_CLOSEOUT.md",
+        "docs/RAG_003_CLOSEOUT.md",
+        "docs/RAG_012_D_REMOVED_FILE.md",
+        "docs/RAG_003_CLOSEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 4,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-088",
+      "route": "TEXT",
+      "expected": [
+        "docs/RAG_002_D_EXECUTION_SOURCES.md",
+        "rag/sources/execution_inventory.py"
+      ],
+      "text_top10": [
+        "docs/RAG_013_E_ERROR_CONTRACTS.md",
+        "docs/RAG_013_E_ERROR_CONTRACTS.md",
+        "docs/RAG_CONTRACT.md",
+        "docs/RAG_013_B_RAG_INDEX.md",
+        "docs/RAG_016_G_HANDOFF.md",
+        "docs/RAG_016_E_MODEL_FAILURE.md",
+        "docs/RAG_CONTRACT.md",
+        "docs/RAG_CONTRACT.md",
+        "docs/RAG_013_E_ERROR_CONTRACTS.md",
+        "docs/RAG_MODULE_LAYOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-089",
+      "route": "TEXT",
+      "expected": [
+        "rag/sources/execution_inventory.py"
+      ],
+      "text_top10": [
+        "docs/RAG_014_DATASET_CORRECTION.md",
+        "docs/RAG_002_D_EXECUTION_SOURCES.md",
+        "docs/RAG_002_D_EXECUTION_SOURCES.md",
+        "docs/RAG_002_CLOSEOUT.md",
+        "docs/RAG_CONTRACT.md",
+        "docs/RAG_005_C_LEXICAL_SEARCH.md",
+        "docs/HANDOFF_RAG_017_024_KNOWLEDGE_MANAGEMENT_UI_2026-10-08.md",
+        "docs/RAG_005_B_FTS5.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_002_D_EXECUTION_SOURCES.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 8,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-090",
+      "route": "TEXT",
+      "expected": [
+        "rag/sources/exclusion_policy.py",
+        "rag/sources/execution_inventory.py"
+      ],
+      "text_top10": [
+        "docs/RAG_002_CLOSEOUT.md",
+        "docs/RAG_002_E_EXCLUSIONS.md",
+        "docs/RAG_002_CLOSEOUT.md",
+        "docs/RAG_014_DATASET_CORRECTION.md",
+        "docs/RAG_MODULE_LAYOUT.md",
+        "docs/RAG_015_E_PROJECT_DELETION.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/HANDOFF_RAG_017_024_KNOWLEDGE_MANAGEMENT_UI_2026-10-08.md",
+        "docs/HANDOFF_RAG_017_024_KNOWLEDGE_MANAGEMENT_UI_2026-10-08.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 7,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-091",
+      "route": "CODE",
+      "expected": [
+        "rag/runtime/model_manager.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/runtime/model_manager.py",
+        "rag/runtime/status.py",
+        "rag/runtime/model_manager.py",
+        "rag/models/fallback.py",
+        "rag/models/code_lifecycle.py",
+        "rag/models/lifecycle.py",
+        "rag/benchmark/gpu_canary.py",
+        "rag/benchmark/cpu_canary.py",
+        "rag/models/lifecycle.py",
+        "rag/models/lifecycle.py"
+      ],
+      "top10_unique_path_count": 7,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-092",
+      "route": "CODE",
+      "expected": [
+        "rag/runtime/model_manager.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/models/lifecycle.py",
+        "rag/models/lifecycle.py",
+        "rag/models/lifecycle.py",
+        "rag/models/lifecycle.py",
+        "rag/benchmark/model_failure.py",
+        "rag/models/fallback.py",
+        "rag/models/lifecycle.py",
+        "rag/models/lifecycle.py",
+        "rag/models/fallback.py",
+        "rag/benchmark/model_failure.py"
+      ],
+      "top10_unique_path_count": 3,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-093",
+      "route": "CODE",
+      "expected": [
+        "rag/index/vector_namespace.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/index/vector_namespace.py",
+        "rag/index/vector_namespace.py",
+        "rag/retrieval/hybrid_code.py",
+        "rag/retrieval/hybrid_text.py",
+        "rag/index/vector_namespace.py",
+        "rag/index/purge.py",
+        "rag/index/vector_namespace.py",
+        "rag/contracts.py",
+        "rag/index/vector_ids.py",
+        "rag/index/vector_namespace.py"
+      ],
+      "top10_unique_path_count": 6,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-094",
+      "route": "CODE",
+      "expected": [
+        "rag/runtime/query_classifier.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "rag/retrieval/hybrid_query.py",
+        "rag/index/lexical_search.py",
+        "rag/retrieval/hybrid_query.py",
+        "rag/index/lexical_ranking.py",
+        "rag/runtime/query_classifier.py",
+        "rag/retrieval/hybrid_text.py",
+        "rag/index/lexical_search.py",
+        "rag/runtime/query_classifier.py",
+        "rag/runtime/query_classifier.py",
+        "rag/retrieval/hybrid_text.py"
+      ],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-095",
+      "route": "TEXT",
+      "expected": [
+        "rag/ranking/rrf.py"
+      ],
+      "text_top10": [
+        "docs/RAG_010_D_RRF.md",
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/RAG_010_D_RRF.md",
+        "docs/RAG_010_C_HYBRID_QUERY.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_010_D_RRF.md",
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/RAG_010_D_RRF.md",
+        "docs/RAG_MODULE_LAYOUT.md",
+        "docs/RAG_010_CLOSEOUT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-096",
+      "route": "TEXT",
+      "expected": [
+        "rag/ranking/dedup.py"
+      ],
+      "text_top10": [
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/RAG_010_E_DEDUP.md",
+        "docs/RAG_010_E_DEDUP.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_010_E_DEDUP.md",
+        "docs/RAG_010_E_DEDUP.md",
+        "docs/RAG_010_E_DEDUP.md",
+        "docs/RAG_010_E_DEDUP.md",
+        "docs/RAG_010_E_DEDUP.md",
+        "docs/RAG_013_C_SEARCH_CONTEXT.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 4,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-097",
+      "route": "TEXT",
+      "expected": [
+        "rag/sources/staleness.py"
+      ],
+      "text_top10": [
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_011_D_STALENESS.md",
+        "docs/RAG_011_CLOSEOUT.md",
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 3,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-098",
+      "route": "TEXT",
+      "expected": [
+        "rag/sources/git_state.py"
+      ],
+      "text_top10": [
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 5,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    },
+    {
+      "id": "rag014-099",
+      "route": "CODE",
+      "expected": [
+        "author_mcp/mcp_server.py"
+      ],
+      "text_top10": [],
+      "code_top10": [
+        "author_mcp/mcp_server.py",
+        "author_mcp/mcp_server.py",
+        "author_mcp/test_rag_real_mcp_integration.py",
+        "author_mcp/test_output_modes.py",
+        "rag/runtime/context_service.py",
+        "author_mcp/mcp_server.py",
+        "author_mcp/test_rag_real_mcp_integration.py",
+        "author_mcp/test_wait_tool.py",
+        "author_mcp/test_structured_result.py",
+        "author_mcp/test_error_contract.py"
+      ],
+      "top10_unique_path_count": 7,
+      "top10_chunk_count": 10,
+      "expected_in_vector": true,
+      "final_hit": true
+    },
+    {
+      "id": "rag014-100",
+      "route": "TEXT",
+      "expected": [
+        "rag/runtime/search_service.py"
+      ],
+      "text_top10": [
+        "docs/RAG_014_B_GROUND_TRUTH.md",
+        "docs/RAG_013_C_SEARCH_CONTEXT.md",
+        "docs/RAG_008_E_FAILURE_POLICY.md",
+        "docs/RAG_005_C_LEXICAL_SEARCH.md",
+        "docs/HANDOFF_RAG_017_024_KNOWLEDGE_MANAGEMENT_UI_2026-10-08.md",
+        "docs/RAG_013_CLOSEOUT.md",
+        "docs/RAG_008_CLOSEOUT.md",
+        "docs/RAG_013_C_SEARCH_CONTEXT.md",
+        "docs/RAG_004_D_SAFE_FALLBACK.md",
+        "docs/RAG_005_C_LEXICAL_SEARCH.md"
+      ],
+      "code_top10": [],
+      "top10_unique_path_count": 8,
+      "top10_chunk_count": 10,
+      "expected_in_vector": false,
+      "final_hit": false
+    }
+  ]
+}
