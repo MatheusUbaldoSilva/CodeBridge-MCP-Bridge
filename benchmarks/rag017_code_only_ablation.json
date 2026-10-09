@@ -1,0 +1,22 @@
+{
+  "evaluated_queries": 100,
+  "holdout_independent": false,
+  "results": {
+    "original": {
+      "recall_at_5": 0.82,
+      "recall_at_10": 0.91,
+      "mrr": 0.5965952380952381
+    },
+    "code_only": {
+      "recall_at_5": 0.88,
+      "recall_at_10": 0.92,
+      "mrr": 0.6929444444444445
+    },
+    "dual": {
+      "recall_at_5": 0.89,
+      "recall_at_10": 0.95,
+      "mrr": 0.7048055555555556
+    }
+  },
+  "gate": "BLOCKED"
+}
