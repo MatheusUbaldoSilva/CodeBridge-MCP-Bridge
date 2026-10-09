@@ -1,0 +1,80 @@
+{
+  "scope": "exploratory evaluation on same frozen queries, not independent validation",
+  "results": {
+    "pool10_weight0": {
+      "recall5": 0.8,
+      "recall10": 0.88,
+      "mrr": 0.5048253968253968
+    },
+    "pool10_weight0.15": {
+      "recall5": 0.66,
+      "recall10": 0.88,
+      "mrr": 0.48631349206349206
+    },
+    "pool10_weight0.4": {
+      "recall5": 0.66,
+      "recall10": 0.88,
+      "mrr": 0.48631349206349206
+    },
+    "pool10_weight0.8": {
+      "recall5": 0.66,
+      "recall10": 0.88,
+      "mrr": 0.48631349206349206
+    },
+    "pool10_weight1.5": {
+      "recall5": 0.66,
+      "recall10": 0.88,
+      "mrr": 0.48631349206349206
+    },
+    "pool20_weight0": {
+      "recall5": 0.8,
+      "recall10": 0.88,
+      "mrr": 0.5048253968253968
+    },
+    "pool20_weight0.15": {
+      "recall5": 0.64,
+      "recall10": 0.75,
+      "mrr": 0.45638492063492064
+    },
+    "pool20_weight0.4": {
+      "recall5": 0.64,
+      "recall10": 0.75,
+      "mrr": 0.4506349206349206
+    },
+    "pool20_weight0.8": {
+      "recall5": 0.64,
+      "recall10": 0.75,
+      "mrr": 0.4506349206349206
+    },
+    "pool20_weight1.5": {
+      "recall5": 0.64,
+      "recall10": 0.75,
+      "mrr": 0.4506349206349206
+    },
+    "pool32_weight0": {
+      "recall5": 0.8,
+      "recall10": 0.88,
+      "mrr": 0.5048253968253968
+    },
+    "pool32_weight0.15": {
+      "recall5": 0.64,
+      "recall10": 0.73,
+      "mrr": 0.45005555555555554
+    },
+    "pool32_weight0.4": {
+      "recall5": 0.64,
+      "recall10": 0.72,
+      "mrr": 0.4434444444444444
+    },
+    "pool32_weight0.8": {
+      "recall5": 0.64,
+      "recall10": 0.72,
+      "mrr": 0.4434444444444444
+    },
+    "pool32_weight1.5": {
+      "recall5": 0.64,
+      "recall10": 0.72,
+      "mrr": 0.4434444444444444
+    }
+  }
+}
