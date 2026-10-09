@@ -22,6 +22,7 @@ from rag.models.code_lifecycle import CodeModelLifecycle, build_code_server_conf
 from rag.models.lifecycle import LlamaServerConfig, TextModelLifecycle
 from rag.ranking.rrf import reciprocal_rank_fusion
 from rag.ranking.dedup import deduplicate_ranked_results
+from rag.ranking.semantic_document_reranker import rerank_documents
 from rag.retrieval.hybrid_text import search_text_vector
 from rag.retrieval.hybrid_code import search_code_vector
 from rag.runtime.query_classifier import QueryRoute
@@ -67,6 +68,7 @@ def search_persistent_semantic(
     route: QueryRoute,
     *,
     llama_server: Path = Path(r"C:\llama\llama-server.exe"),
+    experimental_cross_route: bool = False,
 ) -> tuple[SearchResult, ...]:
     """Search an already READY, persistent index; fail closed otherwise."""
     if not isinstance(query, SearchQuery) or not isinstance(route, QueryRoute):
@@ -91,7 +93,7 @@ def search_persistent_semantic(
         code_vector = None
         if route in (QueryRoute.TEXT, QueryRoute.HYBRID):
             text_vector = _embed_text(query.query, llama_server)
-        if route in (QueryRoute.CODE, QueryRoute.HYBRID):
+        if route in (QueryRoute.CODE, QueryRoute.HYBRID) or experimental_cross_route:
             code_vector = _embed_code(query.query, llama_server)
 
         connection = sqlite3.connect(
@@ -100,12 +102,15 @@ def search_persistent_semantic(
         vector_client = None
         try:
             vector_client = open_qdrant_local(qdrant_path)
-            lexical = search_lexical_ranked(connection, query)
+            candidate_query = SearchQuery(query=query.query, project_id=query.project_id, top_k=32, source_types=query.source_types, path_filter=query.path_filter, branch=query.branch) if experimental_cross_route else query
+            lexical = search_lexical_ranked(connection, candidate_query)
             rankings = [lexical]
             if text_vector is not None:
-                rankings.append(search_text_vector(vector_client, query, text_vector))
+                rankings.append(search_text_vector(vector_client, candidate_query, text_vector))
             if code_vector is not None:
-                rankings.append(search_code_vector(vector_client, query, code_vector))
+                rankings.append(search_code_vector(vector_client, candidate_query, code_vector))
+            if experimental_cross_route:
+                return rerank_documents(rankings, top_k=query.top_k, rrf_k=10)
             fused = reciprocal_rank_fusion(rankings, top_k=max(20,query.top_k*3))
             final = deduplicate_ranked_results(fused, top_k=query.top_k)
             return final.results

@@ -1,0 +1,42 @@
+{
+  "mode": "opt-in-real-end-to-end-text+code",
+  "sample_count": 2,
+  "measurements": [
+    {
+      "query": "How is a Git provenance commit associated with a document?",
+      "elapsed_ms": 8132.447100011632,
+      "results": [
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "rag/sources/git_provenance.py",
+        "docs/RAG_011_CLOSEOUT.md",
+        "rag/sources/git_state.py",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "rag/chunking/provenance.py",
+        "rag/sources/git_worktree.py",
+        "rag/contracts.py",
+        "docs/RAG_015_C_PATH_TRAVERSAL.md",
+        "rag/runtime/context_service.py"
+      ],
+      "rss_bytes": 324136960
+    },
+    {
+      "query": "What happens if get_context refers to a missing chunk?",
+      "elapsed_ms": 8141.650800011121,
+      "results": [
+        "docs/RAG_013_D_GET_CONTEXT.md",
+        "docs/RAG_013_MCP_INTEGRATION.md",
+        "rag/runtime/context_service.py",
+        "docs/RAG_013_E_ERROR_CONTRACTS.md",
+        "author_mcp/mcp_server.py",
+        "docs/RAG_015_B_SCOPE.md",
+        "docs/RAG_015_C_PATH_TRAVERSAL.md",
+        "docs/RAG_015_D_CHUNK_ORIGIN.md",
+        "rag/models/embedding.py",
+        "rag/chunking/overlap.py"
+      ],
+      "rss_bytes": 349855744
+    }
+  ],
+  "gate": "BLOCKED",
+  "warning": "two smoke queries not official cold/warm p95 and no independent quality holdout"
+}
