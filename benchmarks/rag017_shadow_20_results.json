@@ -1,0 +1,111 @@
+{
+  "sample_count": 20,
+  "recall_at_5": 0.9,
+  "recall_at_10": 0.95,
+  "mrr": 0.7254761904761905,
+  "results": [
+    {
+      "id": "rag017-shadow-001",
+      "rank": 1,
+      "latency_ms": 3753.66
+    },
+    {
+      "id": "rag017-shadow-002",
+      "rank": 5,
+      "latency_ms": 88.717
+    },
+    {
+      "id": "rag017-shadow-003",
+      "rank": 3,
+      "latency_ms": 109.005
+    },
+    {
+      "id": "rag017-shadow-004",
+      "rank": 2,
+      "latency_ms": 102.716
+    },
+    {
+      "id": "rag017-shadow-005",
+      "rank": 7,
+      "latency_ms": 80.703
+    },
+    {
+      "id": "rag017-shadow-006",
+      "rank": 1,
+      "latency_ms": 92.965
+    },
+    {
+      "id": "rag017-shadow-007",
+      "rank": null,
+      "latency_ms": 96.96
+    },
+    {
+      "id": "rag017-shadow-008",
+      "rank": 1,
+      "latency_ms": 80.899
+    },
+    {
+      "id": "rag017-shadow-009",
+      "rank": 1,
+      "latency_ms": 75.58
+    },
+    {
+      "id": "rag017-shadow-010",
+      "rank": 1,
+      "latency_ms": 78.092
+    },
+    {
+      "id": "rag017-shadow-011",
+      "rank": 1,
+      "latency_ms": 72.864
+    },
+    {
+      "id": "rag017-shadow-012",
+      "rank": 2,
+      "latency_ms": 117.051
+    },
+    {
+      "id": "rag017-shadow-013",
+      "rank": 1,
+      "latency_ms": 97.281
+    },
+    {
+      "id": "rag017-shadow-014",
+      "rank": 3,
+      "latency_ms": 90.086
+    },
+    {
+      "id": "rag017-shadow-015",
+      "rank": 1,
+      "latency_ms": 98.032
+    },
+    {
+      "id": "rag017-shadow-016",
+      "rank": 2,
+      "latency_ms": 89.829
+    },
+    {
+      "id": "rag017-shadow-017",
+      "rank": 1,
+      "latency_ms": 85.864
+    },
+    {
+      "id": "rag017-shadow-018",
+      "rank": 1,
+      "latency_ms": 110.585
+    },
+    {
+      "id": "rag017-shadow-019",
+      "rank": 1,
+      "latency_ms": 68.065
+    },
+    {
+      "id": "rag017-shadow-020",
+      "rank": 1,
+      "latency_ms": 92.634
+    }
+  ],
+  "independent_holdout": false,
+  "annotation_note": "assistant-generated source-grounded shadow examples, not a pre-registered independent evaluator",
+  "gate": "BLOCKED"
+}
