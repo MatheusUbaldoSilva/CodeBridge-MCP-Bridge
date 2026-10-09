@@ -7,6 +7,7 @@ Embeddings and hybrid fusion remain out of scope.
 from __future__ import annotations
 
 import math
+import re
 import sqlite3
 from typing import List, Tuple
 
@@ -23,6 +24,36 @@ from .lexical_search import (
 
 
 LEXICAL_RETRIEVAL_MODE = "LEXICAL_FTS5_BM25"
+
+# General token expansion when exact-phrase matching yields no candidates.
+# Token quoting prevents user input from becoming an FTS5 operator.
+_LEXICAL_WORD = re.compile(r"\w+", re.UNICODE)
+_LEXICAL_STOPWORDS = frozenset(
+    "the a an and or to of for in on by from with is are where what how which "
+    "does do that this it its can i you we de da do das dos e em para por que qual "
+    "quais como onde uma um o os as no na nos nas sobre tem esta".split()
+)
+
+
+def _normalized_lexical_terms(value: str) -> tuple[str, ...]:
+    tokens = _LEXICAL_WORD.findall(value.casefold())
+    terms = []
+    seen = set()
+    for token in tokens:
+        if len(token) < 3 or token in _LEXICAL_STOPWORDS or token in seen:
+            continue
+        seen.add(token)
+        terms.append(token)
+    return tuple(terms)
+
+
+def _normalized_fallback_match(value: str) -> str | None:
+    terms = _normalized_lexical_terms(value)
+    if not terms:
+        return None
+    # Retrieval query expansion is independent of benchmark query IDs.
+    return " OR ".join('"' + token.replace('"', '""') + '"' for token in terms[:16])
+
 
 # FTS5 column order:
 # chunk_id, document_id, project_id, content, path, symbol,
@@ -139,6 +170,21 @@ def search_lexical_ranked(
             sql,
             tuple(parameters),
         ).fetchall()
+        # Keep exact phrase results first, then fill remaining slots from
+        # normalized token matches using the same source/security filters.
+        if len(rows) < query.top_k:
+            fallback = _normalized_fallback_match(query.query)
+            if fallback and fallback != match_query:
+                extra_parameters = [fallback, *parameters[1:]]
+                extra_parameters[-1] = max(query.top_k * 10, 100)
+                extra = connection.execute(sql, tuple(extra_parameters)).fetchall()
+                present = {row[0] for row in rows}
+                for row in extra:
+                    if row[0] not in present:
+                        rows.append(row)
+                        present.add(row[0])
+                    if len(rows) >= query.top_k:
+                        break
     except sqlite3.OperationalError as exc:
         raise RagLexicalQueryError(
             f"ranked lexical search failed: {exc}"
