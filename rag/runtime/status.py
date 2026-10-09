@@ -365,7 +365,23 @@ def build_rag_status(
     ):
         overall_state = "STALE"
     elif manifest.entries or projects:
-        overall_state = "READY"
+        # READY requires all three durable stores and a positive SQLite project
+        # state, not only the existence of a manifest or incomplete write.
+        ready_projects = {
+            item["project_id"] for item in sqlite_projects
+            if item.get("index_state") == "READY"
+        }
+        declared = {entry.project_id for entry in manifest.entries}
+        if (
+            manifest_path.is_file()
+            and sqlite_path.is_file()
+            and qdrant_path.is_dir()
+            and declared
+            and declared.issubset(ready_projects)
+        ):
+            overall_state = "READY"
+        else:
+            overall_state = "STALE"
     else:
         overall_state = "EMPTY"
 

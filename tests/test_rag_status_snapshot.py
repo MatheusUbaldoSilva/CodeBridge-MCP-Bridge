@@ -106,7 +106,7 @@ class RagStatusSnapshotTests(unittest.TestCase):
                     local_app_data=root
                 ).to_dict()
 
-            self.assertEqual(status["index"]["state"], "READY")
+            self.assertEqual(status["index"]["state"], "STALE")
             self.assertEqual(status["index"]["manifest_entries"], 3)
             by_id = {
                 item["project_id"]: item
@@ -176,7 +176,7 @@ class RagStatusSnapshotTests(unittest.TestCase):
                     local_app_data=root
                 ).to_dict()
 
-            self.assertEqual(status["index"]["state"], "READY")
+            self.assertEqual(status["index"]["state"], "STALE")
             self.assertEqual(
                 status["last_indexed_at"],
                 "2026-10-07T22:00:00+00:00",
