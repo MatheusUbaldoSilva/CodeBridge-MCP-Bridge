@@ -1,0 +1,20 @@
+{
+  "method": "diagnostic document-level aggregation on frozen queries and persistent corpus",
+  "results": {
+    "document_model_k10": {
+      "recall5": 0.82,
+      "recall10": 0.91,
+      "mrr": 0.596595
+    },
+    "document_model_k15": {
+      "recall5": 0.83,
+      "recall10": 0.91,
+      "mrr": 0.587845
+    },
+    "document_model_k20": {
+      "recall5": 0.83,
+      "recall10": 0.91,
+      "mrr": 0.584325
+    }
+  }
+}
