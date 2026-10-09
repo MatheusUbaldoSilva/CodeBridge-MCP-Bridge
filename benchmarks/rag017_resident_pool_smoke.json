@@ -1,0 +1,47 @@
+{
+  "sample_count": 5,
+  "latencies_ms": [
+    {
+      "ms": 13942.378300009295,
+      "paths": [
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "rag/sources/git_provenance.py",
+        "docs/RAG_011_CLOSEOUT.md"
+      ]
+    },
+    {
+      "ms": 6285.764600033872,
+      "paths": [
+        "docs/RAG_013_D_GET_CONTEXT.md",
+        "rag/runtime/context_service.py",
+        "docs/RAG_013_MCP_INTEGRATION.md"
+      ]
+    },
+    {
+      "ms": 5991.770699969493,
+      "paths": [
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "rag/sources/git_state.py",
+        "rag/sources/git_worktree.py"
+      ]
+    },
+    {
+      "ms": 5766.277500079013,
+      "paths": [
+        "docs/RAG_012_C_CHANGED_FILE.md",
+        "rag/index/incremental.py",
+        "rag/sources/git_worktree.py"
+      ]
+    },
+    {
+      "ms": 4520.135400001891,
+      "paths": [
+        "rag/models/embedding.py",
+        "rag/chunking/provenance.py",
+        "docs/RAG_015_D_CHUNK_ORIGIN.md"
+      ]
+    }
+  ],
+  "classification": "diagnostic only",
+  "production_gate": "BLOCKED"
+}

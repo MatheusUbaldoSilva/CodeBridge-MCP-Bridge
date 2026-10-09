@@ -26,6 +26,7 @@ from rag.ranking.semantic_document_reranker import rerank_documents
 from rag.retrieval.hybrid_text import search_text_vector
 from rag.retrieval.hybrid_code import search_code_vector
 from rag.runtime.query_classifier import QueryRoute
+from rag.runtime.resident_models import resident_pool
 from rag.runtime.status import build_rag_status, resolve_rag_sqlite_path
 
 _MODEL_LOCK = threading.RLock()
@@ -69,6 +70,7 @@ def search_persistent_semantic(
     *,
     llama_server: Path = Path(r"C:\llama\llama-server.exe"),
     experimental_cross_route: bool = False,
+    experimental_resident_models: bool = False,
 ) -> tuple[SearchResult, ...]:
     """Search an already READY, persistent index; fail closed otherwise."""
     if not isinstance(query, SearchQuery) or not isinstance(route, QueryRoute):
@@ -92,9 +94,9 @@ def search_persistent_semantic(
         text_vector = None
         code_vector = None
         if route in (QueryRoute.TEXT, QueryRoute.HYBRID):
-            text_vector = _embed_text(query.query, llama_server)
+            text_vector = resident_pool.embed_text(query.query,llama_server) if experimental_resident_models else _embed_text(query.query, llama_server)
         if route in (QueryRoute.CODE, QueryRoute.HYBRID) or experimental_cross_route:
-            code_vector = _embed_code(query.query, llama_server)
+            code_vector = resident_pool.embed_code(query.query,llama_server) if experimental_resident_models else _embed_code(query.query, llama_server)
 
         connection = sqlite3.connect(
             f"{sqlite_path.resolve().as_uri()}?mode=ro", uri=True
