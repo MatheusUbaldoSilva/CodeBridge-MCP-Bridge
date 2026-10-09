@@ -1,0 +1,91 @@
+{
+  "note": "experimental process-local pool; measurements include sequential inference, not qdrant or full response",
+  "results": [
+    {
+      "iteration": 1,
+      "steps": {
+        "text": {
+          "ms": 2051.565,
+          "dimensions": 1024
+        },
+        "code": {
+          "ms": 4476.328,
+          "dimensions": 1536
+        }
+      },
+      "gpu_memory_mib_and_util_percent": [
+        5903,
+        15
+      ]
+    },
+    {
+      "iteration": 2,
+      "steps": {
+        "text": {
+          "ms": 1008.424,
+          "dimensions": 1024
+        },
+        "code": {
+          "ms": 2002.923,
+          "dimensions": 1536
+        }
+      },
+      "gpu_memory_mib_and_util_percent": [
+        5913,
+        26
+      ]
+    },
+    {
+      "iteration": 3,
+      "steps": {
+        "text": {
+          "ms": 1811.404,
+          "dimensions": 1024
+        },
+        "code": {
+          "ms": 1904.648,
+          "dimensions": 1536
+        }
+      },
+      "gpu_memory_mib_and_util_percent": [
+        5913,
+        70
+      ]
+    },
+    {
+      "iteration": 4,
+      "steps": {
+        "text": {
+          "ms": 1638.205,
+          "dimensions": 1024
+        },
+        "code": {
+          "ms": 1614.394,
+          "dimensions": 1536
+        }
+      },
+      "gpu_memory_mib_and_util_percent": [
+        5903,
+        0
+      ]
+    },
+    {
+      "iteration": 5,
+      "steps": {
+        "text": {
+          "ms": 1499.945,
+          "dimensions": 1024
+        },
+        "code": {
+          "ms": 1481.823,
+          "dimensions": 1536
+        }
+      },
+      "gpu_memory_mib_and_util_percent": [
+        5913,
+        1
+      ]
+    }
+  ],
+  "production_gate": "BLOCKED"
+}
