@@ -1,0 +1,48 @@
+{
+  "stage": "RAG-017-F",
+  "benchmark": "real semantic Jina, all 100 frozen queries",
+  "metrics": {
+    "query_count": 100,
+    "recall_at_5": 0.77,
+    "recall_at_10": 0.83,
+    "mrr": 0.5318174603174605
+  },
+  "frozen_reference": {
+    "query_count": 100,
+    "recall_at_5": 0.46,
+    "recall_at_10": 0.48,
+    "mrr": 0.32577777777777767
+  },
+  "thresholds": {
+    "recall_at_5_min": 0.8,
+    "recall_at_10_min": 0.9,
+    "mrr_min": 0.6
+  },
+  "qualifiers": {
+    "recall_at_5": false,
+    "recall_at_10": false,
+    "mrr": false
+  },
+  "quality_gate": "BLOCKED",
+  "production_gate": "BLOCKED",
+  "production_index_caveat": "Prior report index status; this benchmark uses a temporary index and does not assert current production readiness.",
+  "corpus": {
+    "documents": 205,
+    "chunks": 8726,
+    "denied": 2976,
+    "unsupported": 2,
+    "build_ms": 1625.725300051272
+  },
+  "reference_corpus": {
+    "documents": 179,
+    "chunks": 6994,
+    "denied": 2967,
+    "unsupported": 2,
+    "build_ms": 1254.423999984283
+  },
+  "provenance": {
+    "dataset": "benchmarks/rag014_dataset.jsonl",
+    "ground_truth": "benchmarks/rag014_ground_truth.jsonl",
+    "replay": "benchmarks/rag017f_semantic_latest.json"
+  }
+}
