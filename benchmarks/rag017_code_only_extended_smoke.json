@@ -1,0 +1,58 @@
+{
+  "sample": 12,
+  "warm_sample": 11,
+  "warm_max_ms": 113.57460008002818,
+  "warm_p95_observed_ms": 113.57460008002818,
+  "results": [
+    {
+      "elapsed_ms": 3087.6481999875978,
+      "top1": "docs/RAG_005_C_LEXICAL_SEARCH.md"
+    },
+    {
+      "elapsed_ms": 64.5988000323996,
+      "top1": "rag/index/incremental.py"
+    },
+    {
+      "elapsed_ms": 77.76859996374696,
+      "top1": "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md"
+    },
+    {
+      "elapsed_ms": 60.66920002922416,
+      "top1": "rag/chunking/code_lines.py"
+    },
+    {
+      "elapsed_ms": 76.86860009562224,
+      "top1": "docs/RAG_015_C_PATH_TRAVERSAL.md"
+    },
+    {
+      "elapsed_ms": 78.88100005220622,
+      "top1": "rag/models/artifact_install.py"
+    },
+    {
+      "elapsed_ms": 73.32920003682375,
+      "top1": "rag/sources/staleness.py"
+    },
+    {
+      "elapsed_ms": 65.64110005274415,
+      "top1": "author_mcp/rag_bridge.py"
+    },
+    {
+      "elapsed_ms": 79.27709992509335,
+      "top1": "rag/models/lifecycle.py"
+    },
+    {
+      "elapsed_ms": 70.47349994536489,
+      "top1": "rag/models/code_embedding.py"
+    },
+    {
+      "elapsed_ms": 68.96699999924749,
+      "top1": "docs/RAG_012_D_REMOVED_FILE.md"
+    },
+    {
+      "elapsed_ms": 113.57460008002818,
+      "top1": "rag/index/vector_backend_policy.py"
+    }
+  ],
+  "production_gate": "BLOCKED",
+  "reason": "smoke sample, no independent quality labels or concurrent peak measurement"
+}

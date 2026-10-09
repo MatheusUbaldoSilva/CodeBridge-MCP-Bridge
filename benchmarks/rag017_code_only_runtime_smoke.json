@@ -1,0 +1,53 @@
+{
+  "sample_count": 5,
+  "warm_count": 4,
+  "measurements": [
+    {
+      "number": 1,
+      "latency_ms": 3066.503099980764,
+      "first_paths": [
+        "rag/sources/git_state.py",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "rag/sources/git_worktree.py"
+      ]
+    },
+    {
+      "number": 2,
+      "latency_ms": 64.46839997079223,
+      "first_paths": [
+        "rag/sources/git_provenance.py",
+        "rag/index/incremental.py",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md"
+      ]
+    },
+    {
+      "number": 3,
+      "latency_ms": 83.93159997649491,
+      "first_paths": [
+        "docs/RAG_013_D_GET_CONTEXT.md",
+        "rag/runtime/context_service.py",
+        "author_mcp/mcp_server.py"
+      ]
+    },
+    {
+      "number": 4,
+      "latency_ms": 77.64619996305555,
+      "first_paths": [
+        "rag/sources/git_worktree.py",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "rag/sources/git_state.py"
+      ]
+    },
+    {
+      "number": 5,
+      "latency_ms": 72.78649997897446,
+      "first_paths": [
+        "rag/sources/git_state.py",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "rag/sources/git_worktree.py"
+      ]
+    }
+  ],
+  "production_gate": "BLOCKED",
+  "warning": "diagnostic smoke, same persistent corpus, not independent quality holdout"
+}
