@@ -162,6 +162,20 @@ def _looks_like_code_snippet(query: str) -> bool:
     return False
 
 
+# Match complete words/phrases only: "code" must not match "CodeBridge".
+def _contains_hint(text: str, hint: str) -> bool:
+    return re.search(r"(?<!\w)" + re.escape(hint.casefold()) + r"(?!\w)", text) is not None
+
+
+_IMPLEMENTATION_HINTS = (
+    "implemented", "implementation", "implements", "generated", "serialized",
+    "suppressed", "converted", "removed", "checker", "retriever", "function",
+    "method", "handler", "source file", "where does", "where is",
+    "onde fica", "onde pega", "onde verifica", "onde acontece", "qual parte",
+    "como implementa", "como funciona a funcao",
+)
+
+
 def classify_query(
     query: str,
     *,
@@ -200,8 +214,14 @@ def classify_query(
         )
 
     code_snippet = _looks_like_code_snippet(stripped)
-    code_hint = code_snippet or any(hint in lowered for hint in _CODE_HINTS)
-    text_hint = any(hint in lowered for hint in _TEXT_HINTS)
+    code_hint = code_snippet or any(_contains_hint(lowered, hint) for hint in _CODE_HINTS)
+    text_hint = any(_contains_hint(lowered, hint) for hint in _TEXT_HINTS)
+    implementation_hint = any(
+        _contains_hint(lowered, hint) for hint in _IMPLEMENTATION_HINTS
+    )
+    # A direct question about code behavior can be routed to the code model
+    # without relying on benchmark-specific queries or document titles.
+    code_hint = code_hint or (implementation_hint and not text_hint)
 
     if code_hint and text_hint:
         return QueryClassification(

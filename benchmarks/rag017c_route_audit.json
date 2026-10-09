@@ -1,0 +1,1049 @@
+{
+  "stage": "RAG-017-C",
+  "queries": [
+    {
+      "id": "rag014-001",
+      "category": "code",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-002",
+      "category": "code",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_snippet"
+      ]
+    },
+    {
+      "id": "rag014-003",
+      "category": "code",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-004",
+      "category": "code",
+      "old_route": "TEXT",
+      "new_route": "CODE",
+      "changed": true,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-005",
+      "category": "code",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-006",
+      "category": "code",
+      "old_route": "TEXT",
+      "new_route": "CODE",
+      "changed": true,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-007",
+      "category": "code",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_snippet"
+      ]
+    },
+    {
+      "id": "rag014-008",
+      "category": "code",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-009",
+      "category": "code",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-010",
+      "category": "code",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-011",
+      "category": "code",
+      "old_route": "TEXT",
+      "new_route": "CODE",
+      "changed": true,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-012",
+      "category": "code",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-013",
+      "category": "code",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-014",
+      "category": "code",
+      "old_route": "TEXT",
+      "new_route": "CODE",
+      "changed": true,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-015",
+      "category": "code",
+      "old_route": "TEXT",
+      "new_route": "CODE",
+      "changed": true,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-016",
+      "category": "code",
+      "old_route": "TEXT",
+      "new_route": "CODE",
+      "changed": true,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-017",
+      "category": "code",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-018",
+      "category": "code",
+      "old_route": "TEXT",
+      "new_route": "CODE",
+      "changed": true,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-019",
+      "category": "code",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-020",
+      "category": "code",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-021",
+      "category": "code",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-022",
+      "category": "code",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-023",
+      "category": "code",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-024",
+      "category": "code",
+      "old_route": "CODE",
+      "new_route": "TEXT",
+      "changed": true,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-025",
+      "category": "code",
+      "old_route": "HYBRID",
+      "new_route": "HYBRID",
+      "changed": false,
+      "reasons": [
+        "code_hint",
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-026",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-027",
+      "category": "docs",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-028",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-029",
+      "category": "docs",
+      "old_route": "CODE",
+      "new_route": "TEXT",
+      "changed": true,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-030",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-031",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-032",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-033",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-034",
+      "category": "docs",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-035",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-036",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-037",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-038",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-039",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-040",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-041",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-042",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "CODE",
+      "changed": true,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-043",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-044",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "CODE",
+      "changed": true,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-045",
+      "category": "docs",
+      "old_route": "CODE",
+      "new_route": "TEXT",
+      "changed": true,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-046",
+      "category": "docs",
+      "old_route": "CODE",
+      "new_route": "TEXT",
+      "changed": true,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-047",
+      "category": "docs",
+      "old_route": "CODE",
+      "new_route": "TEXT",
+      "changed": true,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-048",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-049",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-050",
+      "category": "docs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-051",
+      "category": "errors_audits",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-052",
+      "category": "errors_audits",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-053",
+      "category": "errors_audits",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-054",
+      "category": "errors_audits",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-055",
+      "category": "errors_audits",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-056",
+      "category": "errors_audits",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-057",
+      "category": "errors_audits",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_snippet"
+      ]
+    },
+    {
+      "id": "rag014-058",
+      "category": "errors_audits",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-059",
+      "category": "errors_audits",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-060",
+      "category": "errors_audits",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-061",
+      "category": "errors_audits",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-062",
+      "category": "errors_audits",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-063",
+      "category": "errors_audits",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_snippet"
+      ]
+    },
+    {
+      "id": "rag014-064",
+      "category": "errors_audits",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-065",
+      "category": "errors_audits",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-066",
+      "category": "errors_audits",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-067",
+      "category": "errors_audits",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-068",
+      "category": "errors_audits",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-069",
+      "category": "errors_audits",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-070",
+      "category": "errors_audits",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-071",
+      "category": "git",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-072",
+      "category": "git",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-073",
+      "category": "git",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-074",
+      "category": "git",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-075",
+      "category": "git",
+      "old_route": "HYBRID",
+      "new_route": "HYBRID",
+      "changed": false,
+      "reasons": [
+        "code_hint",
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-076",
+      "category": "git",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-077",
+      "category": "git",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-078",
+      "category": "git",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-079",
+      "category": "git",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-080",
+      "category": "git",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-081",
+      "category": "logs",
+      "old_route": "HYBRID",
+      "new_route": "HYBRID",
+      "changed": false,
+      "reasons": [
+        "code_hint",
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-082",
+      "category": "logs",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_snippet"
+      ]
+    },
+    {
+      "id": "rag014-083",
+      "category": "logs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-084",
+      "category": "logs",
+      "old_route": "HYBRID",
+      "new_route": "TEXT",
+      "changed": true,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-085",
+      "category": "logs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-086",
+      "category": "logs",
+      "old_route": "HYBRID",
+      "new_route": "HYBRID",
+      "changed": false,
+      "reasons": [
+        "code_hint",
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-087",
+      "category": "logs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-088",
+      "category": "logs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-089",
+      "category": "logs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "default_text"
+      ]
+    },
+    {
+      "id": "rag014-090",
+      "category": "logs",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-091",
+      "category": "ptbr_code",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-092",
+      "category": "ptbr_code",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-093",
+      "category": "ptbr_code",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-094",
+      "category": "ptbr_code",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-095",
+      "category": "ptbr_code",
+      "old_route": "TEXT",
+      "new_route": "CODE",
+      "changed": true,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-096",
+      "category": "ptbr_code",
+      "old_route": "TEXT",
+      "new_route": "CODE",
+      "changed": true,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-097",
+      "category": "ptbr_code",
+      "old_route": "TEXT",
+      "new_route": "CODE",
+      "changed": true,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-098",
+      "category": "ptbr_code",
+      "old_route": "TEXT",
+      "new_route": "TEXT",
+      "changed": false,
+      "reasons": [
+        "text_hint"
+      ]
+    },
+    {
+      "id": "rag014-099",
+      "category": "ptbr_code",
+      "old_route": "CODE",
+      "new_route": "CODE",
+      "changed": false,
+      "reasons": [
+        "code_hint"
+      ]
+    },
+    {
+      "id": "rag014-100",
+      "category": "ptbr_code",
+      "old_route": "TEXT",
+      "new_route": "CODE",
+      "changed": true,
+      "reasons": [
+        "code_hint"
+      ]
+    }
+  ],
+  "route_counts_before": {
+    "CODE": 30,
+    "TEXT": 65,
+    "HYBRID": 5
+  },
+  "route_counts_after": {
+    "CODE": 38,
+    "TEXT": 58,
+    "HYBRID": 4
+  },
+  "route_changes": 19,
+  "category_route_counts": {
+    "code": {
+      "CODE": 20,
+      "TEXT": 4,
+      "HYBRID": 1
+    },
+    "docs": {
+      "TEXT": 21,
+      "CODE": 4
+    },
+    "errors_audits": {
+      "TEXT": 16,
+      "CODE": 4
+    },
+    "git": {
+      "TEXT": 9,
+      "HYBRID": 1
+    },
+    "logs": {
+      "HYBRID": 2,
+      "CODE": 1,
+      "TEXT": 7
+    },
+    "ptbr_code": {
+      "CODE": 9,
+      "TEXT": 1
+    }
+  },
+  "note": "Dataset category is coarse metadata, not ground truth route. Cannot infer semantic recall delta without full replay."
+}
