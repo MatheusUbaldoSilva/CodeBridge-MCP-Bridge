@@ -5,10 +5,11 @@ from collections import defaultdict
 from typing import Sequence
 from rag.contracts import SearchResult
 from rag.ranking.local_cross_encoder import cross_encoder_rerank
+from rag.ranking.passage_diversity import select_diverse_passages
 
 def rerank_multi_passage(query:str,rankings:Sequence[Sequence[SearchResult]],*,top_k:int=10,
                          documents_limit:int=20,passages_per_document:int=3,rrf_k:int=10,
-                         endpoint:str="http://127.0.0.1:8081/reranking"):
+                         endpoint:str="http://127.0.0.1:8081/reranking",diverse:bool=False):
     """Score up to three distinct passages per document; only rerank authorized input."""
     if not 1<=documents_limit<=20 or not 1<=passages_per_document<=3 or not 1<=top_k<=documents_limit:
         raise ValueError("invalid bounded multi-passage limits")
@@ -33,7 +34,9 @@ def rerank_multi_passage(query:str,rankings:Sequence[Sequence[SearchResult]],*,t
     passages=[]
     owners=[]
     for key in ranked:
-        selected=sorted(grouped[key].values(),key=lambda pair:(-pair[0],pair[1].chunk_id))[:passages_per_document]
+        selected=sorted(grouped[key].values(),key=lambda pair:(-pair[0],pair[1].chunk_id))[:passages_per_document] if not diverse else [
+            (grouped[key][item.chunk_id][0],item) for item in select_diverse_passages(
+                tuple(grouped[key].values()),passages_per_document)]
         for _,item in selected:
             owners.append(key)
             passages.append(item)

@@ -1,0 +1,29 @@
+{
+  "stage": "RAG-017-diverse-passage",
+  "sample": 100,
+  "independent_holdout": false,
+  "baseline": {
+    "recall_at_5": 0.82,
+    "recall_at_10": 0.91,
+    "mrr": 0.5965952380952381
+  },
+  "reranked": {
+    "recall_at_5": 0.72,
+    "recall_at_10": 0.88,
+    "mrr": 0.4792261904761904
+  },
+  "rerank_latency_p95_ms": 811.7723000468686,
+  "frozen_thresholds": {
+    "recall_at_5_min": 0.8,
+    "recall_at_10_min": 0.9,
+    "mrr_min": 0.6,
+    "cold_latency_ms_max": 20000.0,
+    "warm_p95_ms_max": 1000.0,
+    "ram_peak_bytes_max": 6442450944,
+    "vram_delta_mib_max": 5120,
+    "index_size_bytes_max": 2147483648
+  },
+  "passes_three_quality_metrics": false,
+  "production_gate": "BLOCKED",
+  "caveat": "Exploratory benchmark on known questions; requires independent validation and RAM/VRAM before approval."
+}
