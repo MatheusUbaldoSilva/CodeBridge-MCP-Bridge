@@ -1,0 +1,146 @@
+{
+  "candidate_absent": [
+    {
+      "id": "rag014-053",
+      "query": "What happens when get_context requests a chunk that does not exist",
+      "route": "QueryRoute.TEXT",
+      "expected": [
+        "rag/runtime/context_service.py",
+        "rag/runtime/errors.py"
+      ],
+      "top_lexical": [
+        "docs/RAG_006_F_CPU_FALLBACK.md",
+        "docs/RAG_013_D_GET_CONTEXT.md",
+        "docs/RAG_013_D_GET_CONTEXT.md",
+        "docs/RAG_013_D_GET_CONTEXT.md",
+        "docs/RAG_013_D_GET_CONTEXT.md"
+      ],
+      "top_vector": [
+        "docs/RAG_013_MCP_INTEGRATION.md",
+        "docs/RAG_015_D_CHUNK_ORIGIN.md",
+        "docs/RAG_015_C_PATH_TRAVERSAL.md",
+        "docs/RAG_013_D_GET_CONTEXT.md",
+        "docs/RAG_013_D_GET_CONTEXT.md"
+      ]
+    },
+    {
+      "id": "rag014-078",
+      "query": "How is the provenance commit associated with a file when possible",
+      "route": "QueryRoute.TEXT",
+      "expected": [
+        "rag/sources/git_provenance.py"
+      ],
+      "top_lexical": [
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md"
+      ],
+      "top_vector": [
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_015_C_PATH_TRAVERSAL.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md"
+      ]
+    },
+    {
+      "id": "rag014-080",
+      "query": "How does the RAG decide that Git related context may be stale after the working tree changes",
+      "route": "QueryRoute.TEXT",
+      "expected": [
+        "rag/sources/staleness.py"
+      ],
+      "top_lexical": [
+        "docs/RAG_011_B_GIT_PROVENANCE_COMMIT.md",
+        "docs/RAG_002_C_GIT_SOURCES.md",
+        "docs/RAG_016_F_GIT_AUDIT.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md"
+      ],
+      "top_vector": [
+        "docs/RAG_002_C_GIT_SOURCES.md",
+        "docs/RAG_CONTRACT.md",
+        "docs/RAG_009_CLOSEOUT.md",
+        "docs/RAG_002_C_GIT_SOURCES.md",
+        "docs/RAG_011_C_GIT_WORKTREE.md"
+      ]
+    },
+    {
+      "id": "rag014-098",
+      "query": "onde pega o HEAD e a branch atual do Git para anexar ao chunk",
+      "route": "QueryRoute.TEXT",
+      "expected": [
+        "rag/sources/git_state.py"
+      ],
+      "top_lexical": [
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md"
+      ],
+      "top_vector": [
+        "docs/HANDOFF_RAG_JINA_CODEBRIDGE_2_0_2026-10-06.md",
+        "docs/RAG_010_CLOSEOUT.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md",
+        "docs/RAG_011_A_GIT_HEAD_BRANCH.md"
+      ]
+    }
+  ],
+  "missing_count": 4,
+  "outside_top10": [
+    {
+      "id": "rag014-020",
+      "expected": [
+        "author_mcp/mcp_server.py"
+      ]
+    },
+    {
+      "id": "rag014-064",
+      "expected": [
+        "docs/RAG_010_CLOSEOUT.md"
+      ]
+    },
+    {
+      "id": "rag014-067",
+      "expected": [
+        "rag/retrieval/hybrid_text.py"
+      ]
+    },
+    {
+      "id": "rag014-068",
+      "expected": [
+        "rag/retrieval/hybrid_code.py"
+      ]
+    },
+    {
+      "id": "rag014-073",
+      "expected": [
+        "rag/sources/git_provenance.py"
+      ]
+    },
+    {
+      "id": "rag014-081",
+      "expected": [
+        "docs/RAG_002_E_EXCLUSIONS.md",
+        "rag/sources/exclusion_policy.py"
+      ]
+    },
+    {
+      "id": "rag014-092",
+      "expected": [
+        "rag/runtime/model_manager.py"
+      ]
+    },
+    {
+      "id": "rag014-100",
+      "expected": [
+        "rag/runtime/search_service.py"
+      ]
+    }
+  ],
+  "outside_top10_count": 8
+}
