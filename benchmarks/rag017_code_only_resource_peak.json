@@ -1,0 +1,62 @@
+{
+  "requests": [
+    {
+      "ms": 3376.52,
+      "dims": 1536
+    },
+    {
+      "ms": 19.97,
+      "dims": 1536
+    },
+    {
+      "ms": 178.59,
+      "dims": 1536
+    },
+    {
+      "ms": 208.84,
+      "dims": 1536
+    },
+    {
+      "ms": 37.88,
+      "dims": 1536
+    },
+    {
+      "ms": 28.27,
+      "dims": 1536
+    },
+    {
+      "ms": 31.16,
+      "dims": 1536
+    },
+    {
+      "ms": 32.12,
+      "dims": 1536
+    },
+    {
+      "ms": 76.87,
+      "dims": 1536
+    },
+    {
+      "ms": 124.97,
+      "dims": 1536
+    },
+    {
+      "ms": 54.4,
+      "dims": 1536
+    },
+    {
+      "ms": 19.25,
+      "dims": 1536
+    },
+    {
+      "ms": 90.54,
+      "dims": 1536
+    }
+  ],
+  "samples": 28,
+  "sampling_errors": [],
+  "peak_gpu_used_mib": 3204,
+  "peak_code_rss_mib": 2017.1,
+  "production_gate": "BLOCKED",
+  "note": "periodic sampled GPU device usage and resident code process working set; not total RAM of system or guaranteed transient peaks"
+}
