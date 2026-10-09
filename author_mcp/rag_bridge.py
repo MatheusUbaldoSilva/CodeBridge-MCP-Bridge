@@ -36,6 +36,29 @@ def register_rag_search_executor(
     _RAG_SEARCH_EXECUTOR = executor
 
 
+def configure_production_rag_executors(
+    *,
+    staged_index: bool = False,
+    semantic_search: bool = False,
+) -> dict[str, bool]:
+    """Explicitly register real RAG adapters; no automatic production activation.
+
+    Index execution creates staging only. Promoting persistent data and proving
+    READY remains the responsibility of RAG-017-H.
+    """
+    _ensure_project_root()
+    if staged_index:
+        from rag.runtime.production_index import build_staged_index
+        register_rag_index_executor(build_staged_index)
+    if semantic_search:
+        from rag.runtime.production_search import search_persistent_semantic
+        register_rag_search_executor(search_persistent_semantic)
+    return {
+        "staged_index_registered": _RAG_INDEX_EXECUTOR is not None,
+        "semantic_search_registered": _RAG_SEARCH_EXECUTOR is not None,
+    }
+
+
 def _ensure_project_root() -> None:
     value = str(ROOT)
     if value not in sys.path:
