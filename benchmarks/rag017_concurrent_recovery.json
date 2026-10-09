@@ -1,0 +1,24 @@
+{
+  "terminated_pid": 1428,
+  "simultaneous": [
+    {
+      "request": 0,
+      "ok": false,
+      "error": "CodeEmbeddingStateError"
+    },
+    {
+      "request": 1,
+      "ok": true,
+      "elapsed_ms": 3575.25
+    },
+    {
+      "request": 2,
+      "ok": true,
+      "elapsed_ms": 3628.52
+    }
+  ],
+  "subsequent_ok": true,
+  "new_pid": 10584,
+  "pass": true,
+  "gate": "BLOCKED"
+}

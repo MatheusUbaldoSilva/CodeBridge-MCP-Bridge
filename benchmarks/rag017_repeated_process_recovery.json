@@ -1,0 +1,30 @@
+{
+  "cycles": [
+    {
+      "cycle": 1,
+      "old_pid": 9204,
+      "new_pid": 4136,
+      "detected": true,
+      "cleared": true,
+      "recovered": true
+    },
+    {
+      "cycle": 2,
+      "old_pid": 4136,
+      "new_pid": 10876,
+      "detected": true,
+      "cleared": true,
+      "recovered": true
+    },
+    {
+      "cycle": 3,
+      "old_pid": 10876,
+      "new_pid": 3264,
+      "detected": true,
+      "cleared": true,
+      "recovered": true
+    }
+  ],
+  "passed": true,
+  "gate": "BLOCKED"
+}
