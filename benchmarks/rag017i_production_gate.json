@@ -1,0 +1,75 @@
+{
+  "stage": "RAG-017-I",
+  "production_gate": "BLOCKED",
+  "checks": {
+    "recall_at_5": {
+      "measured": 0.77,
+      "limit": 0.8,
+      "passed": false,
+      "source": "RAG-017-F real semantic benchmark"
+    },
+    "recall_at_10": {
+      "measured": 0.83,
+      "limit": 0.9,
+      "passed": false,
+      "source": "RAG-017-F real semantic benchmark"
+    },
+    "mrr": {
+      "measured": 0.5318174603174605,
+      "limit": 0.6,
+      "passed": false,
+      "source": "RAG-017-F real semantic benchmark"
+    },
+    "cold_latency_ms": {
+      "measured": 3723.6911000218242,
+      "limit": 20000.0,
+      "passed": true,
+      "source": "RAG-017-F estimated cold latency"
+    },
+    "warm_p95_ms": {
+      "measured": 173.33140003029257,
+      "limit": 1000.0,
+      "passed": true,
+      "source": "RAG-017-F benchmark"
+    },
+    "ram_peak_bytes": {
+      "measured": 4432125952,
+      "limit": 6442450944,
+      "passed": true,
+      "source": "RAG-017-F sum of recorded python and llama RSS; approximate"
+    },
+    "vram_delta_mib": {
+      "measured": 4214,
+      "limit": 5120,
+      "passed": true,
+      "source": "RAG-017-F benchmark"
+    },
+    "index_size_bytes": {
+      "measured": 111625249,
+      "limit": 2147483648,
+      "passed": true,
+      "source": "RAG-017-F temporary index"
+    },
+    "persistent_index_size_bytes": {
+      "measured": 113201554,
+      "limit": 2147483648,
+      "passed": true,
+      "source": "live published SQLite + Qdrant + manifest"
+    }
+  },
+  "threshold_source": "benchmarks/rag014_readiness_report.json",
+  "quality_benchmark": "benchmarks/rag017f_semantic_latest.json",
+  "persistent": {
+    "state": "READY",
+    "documents": 210,
+    "chunks": 8761,
+    "manifest_entries": 210,
+    "sqlite_integrity": "ok"
+  },
+  "limitations": [
+    "cold is benchmark estimate, not independent restart load timer",
+    "RAM uses approximate RSS sum",
+    "quality metrics derived from temporary benchmark corpus; persistent corpus differs",
+    "application installed MCP not activated and continuous reindex not enabled"
+  ]
+}
