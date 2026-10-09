@@ -59,7 +59,7 @@ def cross_encoder_rerank(
         raise ValueError("cross-project reranking is forbidden")
 
     payload = json.dumps(
-        {"query": query, "documents": [item.content[:6000] for item in candidates]},
+        {"query": query, "documents": [item.content[:1400] for item in candidates]},
         ensure_ascii=False,
     ).encode("utf-8")
     req = Request(endpoint, data=payload, headers={"Content-Type": "application/json"}, method="POST")
