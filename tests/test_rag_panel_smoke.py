@@ -9,7 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "app_rewrite"))
 sys.path.insert(0, str(ROOT))
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QAbstractItemView
 from rag_panel import RagPanel, _rag_operation
 
 class RagPanelSmokeTests(unittest.TestCase):
@@ -23,6 +23,8 @@ class RagPanelSmokeTests(unittest.TestCase):
             self.assertTrue(panel.search_btn.isEnabled())
             self.assertEqual(panel.project.text(), "codebridge")
             self.assertFalse(panel.index_btn.isEnabled())
+            for table in (panel.projects, panel.results, panel.candidates):
+                self.assertEqual(table.editTriggers(), QAbstractItemView.NoEditTriggers)
             panel.close()
 
     def test_plan_shows_candidates_without_indexing(self):

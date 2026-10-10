@@ -6,7 +6,7 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QLineEdit,
     QPlainTextEdit, QTableWidget, QTableWidgetItem, QFileDialog, QComboBox,
-    QMessageBox, QHeaderView,
+    QMessageBox, QHeaderView, QAbstractItemView,
 )
 
 class BridgeWorker(QObject):
@@ -43,6 +43,7 @@ class RagPanel(QWidget):
         header.addWidget(self.refresh_btn)
         layout.addLayout(header)
         self.projects = QTableWidget(0, 4)
+        self.projects.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.projects.setHorizontalHeaderLabels(["Projeto", "Documentos", "Chunks", "Estado"])
         self.projects.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.projects.setMaximumHeight(160)
@@ -59,6 +60,7 @@ class RagPanel(QWidget):
         row.addWidget(self.search_btn)
         layout.addLayout(row)
         self.results = QTableWidget(0, 3)
+        self.results.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.results.setHorizontalHeaderLabels(["Origem", "Score", "Trecho"])
         self.results.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.results.itemSelectionChanged.connect(self.show_selected)
@@ -89,6 +91,7 @@ class RagPanel(QWidget):
         self.plan_summary = QLabel("Nenhuma pasta analisada.")
         layout.addWidget(self.plan_summary)
         self.candidates = QTableWidget(0, 3)
+        self.candidates.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.candidates.setHorizontalHeaderLabels(["Arquivo elegivel", "Texto", "Codigo"])
         self.candidates.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.candidates.setMaximumHeight(180)
