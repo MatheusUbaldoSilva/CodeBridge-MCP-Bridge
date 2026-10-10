@@ -34,6 +34,23 @@ class VMInventoryTests(unittest.TestCase):
                     capture("vm-a", root, out)
             self.assertEqual(out.read_text(), "CANARY")
 
+    def test_blank_vm_id_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "CodeBridge-RAG017-VMTest-canary"
+            root.mkdir()
+            with self.assertRaises(ValueError):
+                capture("  ", root, Path(temp) / "out.json")
+
+    def test_output_inside_scan_root_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "CodeBridge-RAG017-VMTest-canary"
+            root.mkdir()
+            with patch("benchmarks.rag017_vm_windows_inventory.guest_probe",
+                       return_value={"Manufacturer": "Microsoft", "Model": "Virtual Machine"}):
+                with self.assertRaises(ValueError):
+                    capture("vm-a", root, root / "snapshot.json")
+            self.assertFalse((root / "snapshot.json").exists())
+
     def test_wrong_root_rejected(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "wrong-root"

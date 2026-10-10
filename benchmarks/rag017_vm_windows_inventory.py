@@ -24,6 +24,8 @@ def guest_probe():
 
 
 def capture(vm_id, evidence_root, out):
+    if not isinstance(vm_id, str) or not vm_id.strip():
+        raise ValueError("nonempty VM identity required")
     guest = guest_probe()
     if not guest_identity(str(guest.get("Manufacturer", "")),
                           str(guest.get("Model", ""))):
@@ -32,6 +34,8 @@ def capture(vm_id, evidence_root, out):
     if not evidence_root.is_dir() or not evidence_root.name.startswith("CodeBridge-RAG017-VMTest-"):
         raise ValueError("dedicated VM evidence root required")
     out = out.resolve()
+    if out == evidence_root or evidence_root in out.parents:
+        raise ValueError("evidence output must stay outside the scanned directory")
     if out.exists():
         raise FileExistsError(out)
     if not out.parent.is_dir():
