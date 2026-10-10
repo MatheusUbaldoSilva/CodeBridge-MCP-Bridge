@@ -1,12 +1,17 @@
-"""Atomic generation pointer switch for isolated tests; not wired to production."""
+"""Test-only atomic generation activation serialized with retirement.
+
+No production reader or publication entry point calls this module.
+"""
 from __future__ import annotations
 import json
 import os
 import re
-from pathlib import Path
 import tempfile
+from pathlib import Path
+from rag.runtime.generation_pointer import resolve_generation
+from rag.runtime.generation_process_lock import generation_lock
 
-from rag.runtime.generation_pointer import resolve_generation, RagGenerationPointerError
+PUBLICATION_LOCK_NAME = "__publication__"
 
 
 class GenerationActivationError(RuntimeError):
@@ -16,38 +21,36 @@ class GenerationActivationError(RuntimeError):
 def activate_test_generation(state_root, generation, *, fail_before_replace=False):
     root = Path(state_root).resolve()
     if "codebridge-rag-generation-test" not in {part.lower() for part in root.parts}:
-        raise GenerationActivationError("activation is restricted to test roots")
+        raise GenerationActivationError("activation restricted to test roots")
     if not isinstance(generation, str) or not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}", generation):
         raise GenerationActivationError("invalid generation identifier")
-    pointer = root / "active-generation.json"
-    temp_pointer = None
-    # Verify the prospective generation with the same resolver contract.
-    try:
+    with generation_lock(root, PUBLICATION_LOCK_NAME, exclusive=True):
         candidate = root / "generations" / generation
-        if candidate.name != generation or candidate.parent != root / "generations":
-            raise GenerationActivationError("invalid generation name")
         if not candidate.is_dir():
             raise GenerationActivationError("generation missing")
-        for part in ("rag_index.sqlite3", "rag-index-manifest.json", "qdrant"):
-            if not (candidate / part).exists():
-                raise GenerationActivationError("generation incomplete")
-        payload = {"schema_version": 1, "generation": generation}
-        with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", dir=root, prefix=".active-generation.",
-            suffix=".tmp", delete=False,
-        ) as handle:
-            temp_pointer = Path(handle.name)
-            json.dump(payload, handle, sort_keys=True)
-            handle.flush()
-            os.fsync(handle.fileno())
-        if fail_before_replace:
-            raise GenerationActivationError("injected interruption before pointer swap")
-        os.replace(temp_pointer, pointer)
-        temp_pointer = None
-        selected = resolve_generation(root)
-        if selected is None or selected.generation != generation:
-            raise GenerationActivationError("activation verification failed")
-        return selected
-    finally:
-        if temp_pointer is not None:
-            temp_pointer.unlink(missing_ok=True)
+        if not (candidate / "rag_index.sqlite3").is_file() or not (candidate / "rag-index-manifest.json").is_file() or not (candidate / "qdrant").is_dir():
+            raise GenerationActivationError("generation incomplete")
+        # The publication lock serializes activation with retirement.
+        if candidate.is_dir():
+            pointer = root / "active-generation.json"
+            temporary = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode="w", encoding="utf-8", dir=root,
+                    prefix=".active-generation.", suffix=".tmp", delete=False,
+                ) as handle:
+                    temporary = Path(handle.name)
+                    json.dump({"schema_version": 1, "generation": generation}, handle, sort_keys=True)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                if fail_before_replace:
+                    raise GenerationActivationError("injected interruption before pointer swap")
+                os.replace(temporary, pointer)
+                temporary = None
+                selected = resolve_generation(root)
+                if selected is None or selected.generation != generation:
+                    raise GenerationActivationError("activation verification failed")
+                return selected
+            finally:
+                if temporary is not None:
+                    temporary.unlink(missing_ok=True)

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from rag.runtime.generation_pointer import resolve_generation
 from rag.runtime.generation_process_lock import generation_lock, GenerationBusy
+from rag.runtime.generation_activation import PUBLICATION_LOCK_NAME
 from rag.runtime.generation_read_session import GenerationReadSession, GenerationReadError
 
 
@@ -35,10 +36,11 @@ def protected_generation_read(test_root, *, retries=8):
 
 @contextmanager
 def protected_generation_retirement(test_root, name):
-    """Acquire exclusivity only; caller must recheck active pointer under a wider publish lock."""
+    """Lock publication and generation for a safe retirement decision; no deletion."""
     root = Path(test_root).resolve()
-    with generation_lock(root, name, exclusive=True):
-        selected = resolve_generation(root)
-        if selected is not None and selected.generation == name:
-            raise GenerationReadError("cannot retire active generation")
-        yield root / "generations" / name
+    with generation_lock(root, PUBLICATION_LOCK_NAME, exclusive=True):
+        with generation_lock(root, name, exclusive=True):
+            selected = resolve_generation(root)
+            if selected is not None and selected.generation == name:
+                raise GenerationReadError("cannot retire active generation")
+            yield root / "generations" / name
