@@ -1,0 +1,49 @@
+{
+  "cases": [
+    {
+      "case": "project_only",
+      "results": 10,
+      "scoped": true,
+      "ms": 4521.56
+    },
+    {
+      "case": "branch_nonexistent",
+      "results": 0,
+      "scoped": true,
+      "ms": 67.38
+    },
+    {
+      "case": "path_nonexistent",
+      "results": 0,
+      "scoped": true,
+      "ms": 90.64
+    },
+    {
+      "case": "source_code",
+      "results": 10,
+      "scoped": true,
+      "ms": 76.62
+    },
+    {
+      "case": "combined_existing_filter",
+      "results": 10,
+      "scoped": true,
+      "ms": 113.5
+    },
+    {
+      "case": "combined_nonexistent_branch",
+      "results": 0,
+      "scoped": true,
+      "ms": 155.83
+    },
+    {
+      "case": "other_project",
+      "results": 0,
+      "scoped": true,
+      "ms": 62.01
+    }
+  ],
+  "passed": true,
+  "gate": "BLOCKED",
+  "note": "Real persistent index with opt-in Code-only, no production wiring."
+}
