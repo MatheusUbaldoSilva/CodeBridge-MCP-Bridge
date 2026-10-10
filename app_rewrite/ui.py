@@ -240,9 +240,9 @@ class MainWindow(QMainWindow):
         self.ssh_config_status = QLabel()
         ssh_layout.addWidget(self.ssh_config_status)
         ssh_layout.addStretch(1)
-        self.tabs.addTab(self.ssh_tab, "Configuracao SSH")
         self.rag_tab = RagPanel(self.tabs)
         self.tabs.addTab(self.rag_tab, "Central RAG")
+        self.tabs.addTab(self.ssh_tab, "Configuracao SSH")
         self.tabs.currentChanged.connect(
             self._sync_telemetry_panel
         )

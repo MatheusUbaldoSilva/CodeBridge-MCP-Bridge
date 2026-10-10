@@ -76,6 +76,15 @@ class RagPanelSmokeTests(unittest.TestCase):
             (documents / 'test.md').write_text('sample', encoding='utf-8')
             self.assertEqual(validate_preview_folder(documents), 1)
 
+    def test_online_indicator(self):
+        panel = self.make_panel()
+        with patch.object(panel, "_run"):
+            panel._complete("status", {"index": {"state": "READY"}, "projects": []}, "")
+        self.assertEqual(panel.rag_status.text(), "RAG: ONLINE")
+        panel._complete("status", {}, "unavailable")
+        self.assertEqual(panel.rag_status.text(), "RAG: OFFLINE")
+        panel.close()
+
     def test_status_read_only(self):
         status = _rag_operation("status", {})
         self.assertIn("index", status)

@@ -76,6 +76,8 @@ class RagPanel(QWidget):
         heading.addWidget(self.summary, 1)
         heading.addWidget(self.refresh_btn)
         outer.addLayout(heading)
+        self.rag_status = QLabel("RAG: VERIFICANDO...")
+        outer.addWidget(self.rag_status)
         project_row = QHBoxLayout()
         project_row.addWidget(QLabel("Projeto:"))
         self.project_picker = QComboBox()
@@ -237,10 +239,14 @@ class RagPanel(QWidget):
         for button in (self.refresh_btn, self.search_btn, self.plan_btn):
             button.setEnabled(True)
         if error:
+            if operation == "status":
+                self.rag_status.setText("RAG: OFFLINE")
             self.notice.setText("Nao foi possivel carregar: " + error)
             return
         self.notice.setText("")
         if operation == "status":
+            ready = str((data.get("index") or {}).get("state") or "").upper() == "READY"
+            self.rag_status.setText("RAG: ONLINE" if ready else "RAG: OFFLINE")
             projects = data.get("projects") or []
             count = sum(int(p.get("document_count") or 0) for p in projects)
             self.summary.setText(f"Meus conhecimentos — {count} documentos")
