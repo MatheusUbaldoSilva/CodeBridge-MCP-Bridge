@@ -81,6 +81,13 @@ class RagPanel(QWidget):
         folder_row.addWidget(self.scope)
         folder_row.addWidget(self.plan_btn)
         layout.addLayout(folder_row)
+        self.plan_summary = QLabel("Nenhuma pasta analisada.")
+        layout.addWidget(self.plan_summary)
+        self.candidates = QTableWidget(0, 3)
+        self.candidates.setHorizontalHeaderLabels(["Arquivo elegivel", "Texto", "Codigo"])
+        self.candidates.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.candidates.setMaximumHeight(180)
+        layout.addWidget(self.candidates)
         self.notice = QLabel("Indexacao real desabilitada ate validacao do executor. A previa nao altera o indice.")
         self.notice.setWordWrap(True)
         layout.addWidget(self.notice)
@@ -147,8 +154,24 @@ class RagPanel(QWidget):
             self.notice.setText(f"{len(self._results)} resultado(s). Rota: {data.get('effective_route', '?')}; fallback: {data.get('fallback_reason') or 'nenhum'}")
         elif operation == "plan":
             plan = data.get("plan") or {}
+            candidates = plan.get("candidates") or []
+            self.plan_summary.setText(
+                f"Elegiveis: {plan.get('candidate_count', 0)} | "
+                f"Texto: {plan.get('text_candidate_count', 0)} | "
+                f"Codigo: {plan.get('code_candidate_count', 0)} | "
+                f"Ignorados: {plan.get('denied_count', 0)} | "
+                f"Nao suportados: {plan.get('unsupported_count', 0)} | "
+                f"Sensiveis: {plan.get('sensitive_count', 0)}"
+            )
+            self.candidates.setRowCount(len(candidates))
+            for i, candidate in enumerate(candidates):
+                values = (candidate.get("path", ""),
+                          "Sim" if candidate.get("text_eligible") else "-",
+                          "Sim" if candidate.get("code_eligible") else "-")
+                for j, value in enumerate(values):
+                    self.candidates.setItem(i, j, QTableWidgetItem(str(value)))
             self.preview.setPlainText(__import__("json").dumps(plan, ensure_ascii=False, indent=2))
-            self.notice.setText("Previa gerada: nenhuma indexacao foi executada.")
+            self.notice.setText("Previa somente leitura. Nenhuma indexacao foi executada.")
 
     def show_selected(self):
         row = self.results.currentRow()

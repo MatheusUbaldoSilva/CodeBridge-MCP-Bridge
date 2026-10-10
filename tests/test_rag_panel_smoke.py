@@ -24,6 +24,23 @@ class RagPanelSmokeTests(unittest.TestCase):
             self.assertEqual(panel.project.text(), "codebridge")
             panel.close()
 
+    def test_plan_shows_candidates_without_indexing(self):
+        with patch.object(RagPanel, "_run"):
+            panel = RagPanel()
+        panel._complete("plan", {"plan": {
+            "candidate_count": 2, "text_candidate_count": 1,
+            "code_candidate_count": 1, "denied_count": 1,
+            "unsupported_count": 3, "sensitive_count": 0,
+            "candidates": [
+                {"path": "notes/readme.md", "text_eligible": True, "code_eligible": False},
+                {"path": "src/app.py", "text_eligible": False, "code_eligible": True},
+            ],
+        }}, "")
+        self.assertEqual(panel.candidates.rowCount(), 2)
+        self.assertIn("Elegiveis: 2", panel.plan_summary.text())
+        self.assertIn("Nenhuma indexacao", panel.notice.text())
+        panel.close()
+
     def test_status_read_only(self):
         status = _rag_operation("status", {})
         self.assertIn("index", status)
