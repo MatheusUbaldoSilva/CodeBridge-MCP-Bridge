@@ -27,8 +27,9 @@ def compare(before, after):
             "removed": sorted(a - b),
             "modified": sorted(k for k in (a & b) if left[k] != right[k]),
         }
-    vm_same = bool(before.get("vm_id")) and before.get("vm_id") == after.get("vm_id")
-    evidence_complete = vm_same and all(
+    vm_same = isinstance(before.get("vm_id"), str) and bool(before["vm_id"].strip()) and before["vm_id"] == after.get("vm_id")
+    same_root = isinstance(before.get("root"), str) and bool(before["root"].strip()) and before["root"] == after.get("root")
+    evidence_complete = vm_same and same_root and all(
         before.get(flag) is True and after.get(flag) is True for flag in FLAGS
     ) and all(changes[s]["available"] for s in SECTIONS)
     difference_found = any(
@@ -37,6 +38,7 @@ def compare(before, after):
     )
     return {
         "same_vm_identity": vm_same,
+        "same_evidence_root": same_root,
         "evidence_complete": evidence_complete,
         "differences": changes,
         "differences_found": difference_found,
