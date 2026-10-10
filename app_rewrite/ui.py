@@ -14,6 +14,7 @@ from constants import APP_NAME
 from terminal_widget import TerminalWidget
 from telemetry import TelemetryService
 from telemetry_widget import TelemetryPanel
+from rag_panel import RagPanel
 from theme import apply_dark_theme
 
 
@@ -240,6 +241,8 @@ class MainWindow(QMainWindow):
         ssh_layout.addWidget(self.ssh_config_status)
         ssh_layout.addStretch(1)
         self.tabs.addTab(self.ssh_tab, "Configuracao SSH")
+        self.rag_tab = RagPanel(self.tabs)
+        self.tabs.addTab(self.rag_tab, "Central RAG")
         self.tabs.currentChanged.connect(
             self._sync_telemetry_panel
         )
