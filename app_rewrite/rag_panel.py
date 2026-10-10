@@ -76,10 +76,15 @@ class RagPanel(QWidget):
         self.scope.addItems(["BOTH", "TEXT", "CODE"])
         self.plan_btn = QPushButton("Previa de indexacao")
         self.plan_btn.clicked.connect(self.plan)
+        self.index_btn = QPushButton("Confirmar indexacao")
+        self.index_btn.setEnabled(False)
+        self.index_btn.setToolTip("A publicacao incremental nao esta disponivel; indice existente preservado.")
+        self.index_btn.clicked.connect(self.confirm_index)
         folder_row.addWidget(self.folder, 3)
         folder_row.addWidget(self.browse_btn)
         folder_row.addWidget(self.scope)
         folder_row.addWidget(self.plan_btn)
+        folder_row.addWidget(self.index_btn)
         layout.addLayout(folder_row)
         self.plan_summary = QLabel("Nenhuma pasta analisada.")
         layout.addWidget(self.plan_summary)
@@ -109,6 +114,13 @@ class RagPanel(QWidget):
             return
         self._run("plan", {"project":self.project.text().strip(), "root":self.folder.text().strip(),
                             "scope":self.scope.currentText()})
+
+    def confirm_index(self):
+        QMessageBox.information(
+            self, "Central RAG",
+            "A atualizacao incremental do indice existente ainda nao foi validada. "
+            "Nenhum conhecimento foi alterado. Utilize a previa para revisar os arquivos."
+        )
 
     def _run(self, operation, args):
         if self._busy:

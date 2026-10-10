@@ -22,6 +22,7 @@ class RagPanelSmokeTests(unittest.TestCase):
             panel = RagPanel()
             self.assertTrue(panel.search_btn.isEnabled())
             self.assertEqual(panel.project.text(), "codebridge")
+            self.assertFalse(panel.index_btn.isEnabled())
             panel.close()
 
     def test_plan_shows_candidates_without_indexing(self):
