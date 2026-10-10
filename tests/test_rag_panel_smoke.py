@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT / "app_rewrite"))
 sys.path.insert(0, str(ROOT))
 from PySide6.QtWidgets import QApplication
 from rag_panel import RagPanel, _rag_operation, _source, _content
+from rag_projects import validate_preview_folder, create_project, list_projects
 
 class RagPanelSmokeTests(unittest.TestCase):
     @classmethod
@@ -57,6 +58,23 @@ class RagPanelSmokeTests(unittest.TestCase):
     def test_source_helpers(self):
         self.assertEqual(_source({"metadata":{"path":"notes/a.md"}}),"notes/a.md")
         self.assertEqual(_content({"content":"sample"}),"sample")
+
+    def test_project_registry_and_preview_safety(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as root:
+            with patch('rag_projects.registry_path', return_value=Path(root) / 'projects.json'):
+                self.assertEqual(create_project('new-world-pvp'), 'new-world-pvp')
+                self.assertIn('new-world-pvp', list_projects())
+                with self.assertRaises(ValueError):
+                    create_project('wrong name')
+            blocked = Path(root) / 'CodeBridge_Recovery_TEST'
+            blocked.mkdir()
+            with self.assertRaises(ValueError):
+                validate_preview_folder(blocked)
+            documents = Path(root) / 'docs'
+            documents.mkdir()
+            (documents / 'test.md').write_text('sample', encoding='utf-8')
+            self.assertEqual(validate_preview_folder(documents), 1)
 
     def test_status_read_only(self):
         status = _rag_operation("status", {})

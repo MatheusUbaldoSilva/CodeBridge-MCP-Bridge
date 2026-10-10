@@ -5,10 +5,11 @@ import threading
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal
+from rag_projects import list_projects, create_project, validate_preview_folder
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
     QPlainTextEdit, QListWidget, QListWidgetItem, QStackedWidget,
-    QFileDialog, QMessageBox,
+    QFileDialog, QMessageBox, QComboBox, QInputDialog,
 )
 
 
@@ -28,6 +29,7 @@ def _rag_operation(operation, args):
         return bridge.search_rag_context(
             query=args["query"], project_id=args["project"], top_k=10)
     if operation == "plan":
+        validate_preview_folder(args["root"])
         return bridge.index_rag(
             project_id=args["project"], project_root=args["root"],
             scope="BOTH", execute=False)
@@ -74,6 +76,16 @@ class RagPanel(QWidget):
         heading.addWidget(self.summary, 1)
         heading.addWidget(self.refresh_btn)
         outer.addLayout(heading)
+        project_row = QHBoxLayout()
+        project_row.addWidget(QLabel("Projeto:"))
+        self.project_picker = QComboBox()
+        self.project_picker.addItem("codebridge")
+        self.project_picker.currentTextChanged.connect(self.change_project)
+        self.new_project_btn = QPushButton("Novo projeto")
+        self.new_project_btn.clicked.connect(self.new_project)
+        project_row.addWidget(self.project_picker, 1)
+        project_row.addWidget(self.new_project_btn)
+        outer.addLayout(project_row)
 
         navigation = QHBoxLayout()
         self.nav_buttons = []
@@ -158,6 +170,31 @@ class RagPanel(QWidget):
         for number, button in enumerate(self.nav_buttons):
             button.setChecked(number == index)
 
+    def change_project(self, name):
+        if not name or name == self.project_id:
+            return
+        self.project_id = name
+        self.files.clear()
+        self._documents = []
+        self.results.clear()
+        self._results = []
+        self.preview.clear()
+        self._run("documents", {"project": name})
+
+    def new_project(self):
+        name, accepted = QInputDialog.getText(self, "Novo projeto", "Nome do projeto (letras, numeros e hifens):")
+        if not accepted or not name.strip():
+            return
+        try:
+            name = create_project(name)
+        except (ValueError, OSError) as exc:
+            QMessageBox.warning(self, "Novo projeto", str(exc))
+            return
+        if self.project_picker.findText(name) < 0:
+            self.project_picker.addItem(name)
+        self.project_picker.setCurrentText(name)
+        self.notice.setText("Projeto criado. Ele recebera documentos quando a indexacao for habilitada.")
+
     def refresh(self):
         self._run("status", {})
 
@@ -207,8 +244,16 @@ class RagPanel(QWidget):
             projects = data.get("projects") or []
             count = sum(int(p.get("document_count") or 0) for p in projects)
             self.summary.setText(f"Meus conhecimentos — {count} documentos")
-            if projects:
-                self.project_id = str(projects[0].get("project_id") or "codebridge")
+            names = sorted(set(["codebridge"] +
+                               [str(p.get("project_id")) for p in projects if p.get("project_id")] +
+                               list_projects()))
+            self.project_picker.blockSignals(True)
+            self.project_picker.clear()
+            self.project_picker.addItems(names)
+            if self.project_id not in names:
+                self.project_id = names[0]
+            self.project_picker.setCurrentText(self.project_id)
+            self.project_picker.blockSignals(False)
             self._run("documents", {"project": self.project_id})
         elif operation == "documents":
             self._documents = list(data)
