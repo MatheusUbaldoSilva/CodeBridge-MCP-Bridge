@@ -292,7 +292,9 @@ class RagPanel(QWidget):
             self.plan_summary.setText(
                 f"{plan.get('candidate_count', 0)} arquivos analisados. "
                 f"{assessment.get('new_count', 0)} novos; "
-                f"{assessment.get('existing_count', 0)} ja registrados. "
+                f"{assessment.get('modified_count', 0)} atualizados; "
+                f"{assessment.get('unchanged_count', 0)} sem alteracoes; "
+                f"{assessment.get('unknown_count', 0)} pendentes de verificacao. "
                 f"{plan.get('denied_count', 0)} protegidos e "
                 f"{plan.get('unsupported_count', 0)} nao suportados. "
                 "Nenhum arquivo foi indexado."
