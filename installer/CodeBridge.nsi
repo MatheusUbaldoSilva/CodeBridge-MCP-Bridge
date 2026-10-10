@@ -1,4 +1,4 @@
-﻿!include "MUI2.nsh"
+!include "MUI2.nsh"
 !include "WinMessages.nsh"
 
 !define APP_NAME "CodeBridge"
@@ -190,6 +190,9 @@ Section "CodeBridge" SEC_MAIN
   File "..\author_mcp\protocol.py"
   File "..\author_mcp\runtime_client.py"
   File "..\author_mcp\requirements.txt"
+
+  SetOutPath "$INSTDIR\rag"
+  File /r "..\rag\*.py"
 
   SetOutPath "$INSTDIR\assets"
   File "..\assets\*.*"

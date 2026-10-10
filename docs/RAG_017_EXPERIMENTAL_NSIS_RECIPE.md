@@ -1,0 +1,5 @@
+# RAG-017 — Receita NSIS experimental para pacote RAG (2026-10-10)
+
+Na branch experimental, o NSIS agora declara `SetOutPath "$INSTDIR\rag"` e `File /r "..\rag\*.py"` para incluir fontes Python do RAG sem incluir bancos locais, caches de modelos ou índices. O bootstrap do Python embutido acrescenta a raiz instalada `..\..` ao `python313._pth`, permitindo importar `rag.*` sem caminhos de desenvolvimento. A validação final do bootstrap passa a exigir `numpy`, `qdrant_client`, `rag.contracts` e `rag.runtime.production_search` além das dependências MCP existentes.
+
+O preflight estrutural reconheceu a nova receita (`safe_to_update_rag=true`), e os 808 testes RAG passaram. **Esse resultado significa somente que a receita contém os elementos inspecionados, não que o instalador foi compilado ou instalado.** Não foi executado NSIS, nem atualizado o aplicativo em `%LOCALAPPDATA%\Programs\CodeBridge`. Falta provar build limpa, instalação em diretório isolado, wheels binárias compatíveis, migração, backup e rollback. A instalação ativa preserva o MCP na porta 8765. A qualidade independente permanece não certificada e RAG-017-J segue BLOCKED.

@@ -1,4 +1,4 @@
-﻿param(
+param(
     [Parameter(Mandatory=$true)]
     [string]$InstallRoot
 )
@@ -75,6 +75,7 @@ try {
         "..\..\app_rewrite",
         "..\..\author_mcp",
         "..\..\installer",
+        "..\..",
         "import site"
     ) | Set-Content -LiteralPath $pth.FullName -Encoding ASCII
     New-Item -ItemType Directory -Force -Path (Join-Path $RuntimeDir 'Lib\site-packages') | Out-Null
@@ -107,7 +108,7 @@ try {
     }
 
     Write-Log 'Validating runtime...'
-    & $PythonExe -c "import PySide6,paramiko,psutil,mcp,pydantic; print('RUNTIME_OK')"
+    & $PythonExe -c "import PySide6,paramiko,psutil,mcp,pydantic,numpy,qdrant_client,rag.contracts,rag.runtime.production_search; print('RUNTIME_OK')"
     if ($LASTEXITCODE -ne 0) {
         throw "Runtime validation failed with exit code $LASTEXITCODE"
     }
