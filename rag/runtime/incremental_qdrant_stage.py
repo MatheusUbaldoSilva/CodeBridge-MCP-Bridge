@@ -41,8 +41,10 @@ def stage_incremental_qdrant(existing, incoming, destination, project_id):
     incoming_client = None
     try:
         incoming_client = open_qdrant_local(stage)
-        added = replaced = 0
+        added = 0
         from qdrant_client import models
+        incoming_by_collection = {}
+        incoming_docs = set()
         for collection in COLLECTIONS:
             if not incoming_client.collection_exists(collection):
                 raise IncrementalQdrantError("missing incoming collection: " + collection)
@@ -55,9 +57,12 @@ def stage_incremental_qdrant(existing, incoming, destination, project_id):
             points = list(_points(incoming_client, collection))
             if any((p.payload or {}).get("project_namespace") != project_id for p in points):
                 raise IncrementalQdrantError("candidate includes another project")
-            incoming_docs = {p.payload.get("document_id") for p in points}
-            if None in incoming_docs:
+            doc_ids = {p.payload.get("document_id") for p in points}
+            if None in doc_ids:
                 raise IncrementalQdrantError("candidate missing document_id")
+            incoming_by_collection[collection] = points
+            incoming_docs.update(doc_ids)
+        for collection in COLLECTIONS:
             if incoming_docs:
                 # Delete old chunks of updated docs in isolated copy, not production.
                 merged.delete(
@@ -68,6 +73,7 @@ def stage_incremental_qdrant(existing, incoming, destination, project_id):
                     ])),
                     wait=True,
                 )
+            points = incoming_by_collection[collection]
             if points:
                 for pos in range(0, len(points), 64):
                     batch = points[pos:pos+64]
@@ -77,9 +83,8 @@ def stage_incremental_qdrant(existing, incoming, destination, project_id):
                         wait=True,
                     )
                 added += len(points)
-            replaced += len(incoming_docs)
         return {"state":"QDRANT_STAGED_NOT_PUBLISHED", "incoming_vectors":added,
-                "incoming_documents":replaced, "destination":str(output)}
+                "incoming_documents":len(incoming_docs), "destination":str(output)}
     except BaseException:
         try:
             if incoming_client is not None:

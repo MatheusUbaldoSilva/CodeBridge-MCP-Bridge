@@ -58,6 +58,24 @@ class QdrantStageTests(unittest.TestCase):
             finally:
                 close_qdrant_local(reader)
 
+    def test_document_moves_between_collections(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            old, new, output = (root / n for n in ("old", "new", "out"))
+            seed(old, [("text", "a", "doc-moved", "stale-text", 301),
+                       ("text", "b", "other", "keep", 302)])
+            seed(new, [("code", "a", "doc-moved", "new-code", 303)])
+            result = stage_incremental_qdrant(old, new, output, "a")
+            self.assertEqual(result["incoming_documents"], 1)
+            reader = open_qdrant_local(output)
+            try:
+                text_points, _ = reader.scroll("text", limit=100, with_payload=True)
+                code_points, _ = reader.scroll("code", limit=100, with_payload=True)
+                self.assertEqual({p.payload["chunk_id"] for p in text_points}, {"keep"})
+                self.assertEqual({p.payload["chunk_id"] for p in code_points}, {"new-code"})
+            finally:
+                close_qdrant_local(reader)
+
     def test_foreign_project_rejected_without_output(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
