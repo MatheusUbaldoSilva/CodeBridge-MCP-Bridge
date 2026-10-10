@@ -313,7 +313,7 @@ class MainWindow(QMainWindow):
         self._update_sound_button()
 
     def _sync_telemetry_panel(self, index):
-        if index >= 2:
+        if index in (self.terminal_tab_indices["SSH"], self.tabs.indexOf(self.ssh_tab)):
             self.telemetry_stack.setCurrentWidget(
                 self.telemetry_linux
             )
