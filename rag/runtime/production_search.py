@@ -27,6 +27,7 @@ from rag.retrieval.hybrid_text import search_text_vector
 from rag.retrieval.hybrid_code import search_code_vector
 from rag.runtime.query_classifier import QueryRoute
 from rag.runtime.resident_models import resident_pool
+from rag.runtime.experimental_scope_guard import validate_scoped_results
 from rag.runtime.status import build_rag_status, resolve_rag_sqlite_path
 
 _MODEL_LOCK = threading.RLock()
@@ -112,7 +113,7 @@ def search_persistent_semantic(
             if code_vector is not None:
                 rankings.append(search_code_vector(vector_client, candidate_query, code_vector))
             if experimental_cross_route:
-                return rerank_documents(rankings, top_k=query.top_k, rrf_k=10)
+                return validate_scoped_results(query, rerank_documents(rankings, top_k=query.top_k, rrf_k=10))
             fused = reciprocal_rank_fusion(rankings, top_k=max(20,query.top_k*3))
             final = deduplicate_ranked_results(fused, top_k=query.top_k)
             return final.results
