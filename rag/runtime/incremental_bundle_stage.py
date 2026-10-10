@@ -8,6 +8,7 @@ import shutil
 from rag.runtime.incremental_sqlite_stage import stage_incremental_sqlite
 from rag.runtime.incremental_manifest_stage import stage_incremental_manifest
 from rag.runtime.incremental_qdrant_stage import stage_incremental_qdrant
+from rag.runtime.incremental_bundle_validate import validate_incremental_bundle
 
 
 class IncrementalBundleError(RuntimeError):
@@ -42,11 +43,11 @@ def stage_incremental_bundle(old_root, incoming_root, destination, project_id,
             old / "qdrant", new / "qdrant", output / "qdrant", project_id)
         if fail_after == "qdrant":
             raise IncrementalBundleError("injected failure after qdrant")
-        # validate_staged_index is single-project only and does not support
-        # a merged multi-project store. Full cross-store validation is pending.
-        return {"state": "BUNDLE_STAGED_NOT_PUBLISHED",
+        verification = validate_incremental_bundle(output)
+        return {"state": "BUNDLE_VALIDATED_NOT_PUBLISHED",
                 "sqlite": sqlite, "manifest": manifest, "qdrant": vectors,
-                "validated_for_publish": False, "destination": str(output)}
+                "verification": verification, "validated_for_publish": False,
+                "destination": str(output)}
     except BaseException:
         shutil.rmtree(output, ignore_errors=True)
         raise
