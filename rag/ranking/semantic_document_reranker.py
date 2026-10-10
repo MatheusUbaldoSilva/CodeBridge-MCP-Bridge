@@ -33,6 +33,7 @@ def rerank_documents(
         for position, result in enumerate(ranking,1):
             if not isinstance(result,SearchResult):
                 raise ValueError("rankings must contain SearchResult")
+            namespaces.add(result.metadata.project_id)
             if result.chunk_id in seen_chunks:
                 continue
             seen_chunks.add(result.chunk_id)
