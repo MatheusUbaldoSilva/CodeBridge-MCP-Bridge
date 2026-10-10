@@ -30,9 +30,12 @@ def _rag_operation(operation, args):
             query=args["query"], project_id=args["project"], top_k=10)
     if operation == "plan":
         validate_preview_folder(args["root"])
-        return bridge.index_rag(
+        response = bridge.index_rag(
             project_id=args["project"], project_root=args["root"],
             scope="BOTH", execute=False)
+        from rag.runtime.incremental_preflight import assess_incremental_plan
+        response["incremental"] = assess_incremental_plan(response["plan"])
+        return response
     if operation == "documents":
         from rag.runtime.status import resolve_rag_sqlite_path
         db = resolve_rag_sqlite_path()
@@ -282,14 +285,17 @@ class RagPanel(QWidget):
                 self.notice.setText("Pesquisa textual ativa. Pesquisa inteligente ainda em preparacao.")
         elif operation == "plan":
             plan = data.get("plan") or {}
+            assessment = data.get("incremental") or {}
             self.candidates.clear()
             for item in plan.get("candidates") or []:
                 self.candidates.addItem(str(item.get("path") or ""))
             self.plan_summary.setText(
-                f"{plan.get('candidate_count', 0)} arquivos disponiveis para futura inclusao. "
-                f"{plan.get('denied_count', 0)} protegidos, "
-                f"{plan.get('sensitive_count', 0)} sensiveis, "
-                f"{plan.get('unsupported_count', 0)} nao suportados."
+                f"{plan.get('candidate_count', 0)} arquivos analisados. "
+                f"{assessment.get('new_count', 0)} novos; "
+                f"{assessment.get('existing_count', 0)} ja registrados. "
+                f"{plan.get('denied_count', 0)} protegidos e "
+                f"{plan.get('unsupported_count', 0)} nao suportados. "
+                "Nenhum arquivo foi indexado."
             )
 
     def _show_file(self, row):
