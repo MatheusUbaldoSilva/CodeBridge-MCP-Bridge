@@ -71,6 +71,8 @@ class RagPanel(QWidget):
         self._results = []
         self._documents = []
         self._preview_snapshot = None
+        self._preview_revision = 0
+        self._plan_request = None
         self.project_id = "codebridge"
         outer = QVBoxLayout(self)
         heading = QHBoxLayout()
@@ -230,10 +232,15 @@ class RagPanel(QWidget):
         if not path or not Path(path).is_dir():
             QMessageBox.information(self, "Adicionar conhecimentos", "Escolha uma pasta primeiro.")
             return
+        if self._busy:
+            return
         self.cancel_preview()
+        self._plan_request = (self._preview_revision, self.project_id, str(Path(path).resolve()))
         self._run("plan", {"project": self.project_id, "root": path})
 
     def cancel_preview(self):
+        self._preview_revision += 1
+        self._plan_request = None
         self._preview_snapshot = None
         self.candidates.clear()
         self.confirm_preview_btn.setEnabled(False)
@@ -274,11 +281,19 @@ class RagPanel(QWidget):
         for button in (self.refresh_btn, self.search_btn, self.plan_btn):
             button.setEnabled(True)
         if error:
+            if operation == "plan":
+                from rag.runtime.incremental_preview_request import matching_preview_request
+                pending = self._plan_request
+                self._plan_request = None
+                if not matching_preview_request(pending, self._preview_revision,
+                                                self.project_id, self.folder.text().strip()):
+                    return
             if operation == "status":
                 self.rag_status.setText("RAG: OFFLINE")
             self.notice.setText("Nao foi possivel carregar: " + error)
             return
-        self.notice.setText("")
+        if operation != "plan":
+            self.notice.setText("")
         if operation == "status":
             ready = str((data.get("index") or {}).get("state") or "").upper() == "READY"
             self.rag_status.setText("RAG: ONLINE" if ready else "RAG: OFFLINE")
@@ -316,6 +331,12 @@ class RagPanel(QWidget):
             if data.get("fallback_reason"):
                 self.notice.setText("Pesquisa textual ativa. Pesquisa inteligente ainda em preparacao.")
         elif operation == "plan":
+            expected = self._plan_request
+            self._plan_request = None
+            from rag.runtime.incremental_preview_request import matching_preview_request
+            if not matching_preview_request(expected, self._preview_revision,
+                                            self.project_id, self.folder.text().strip()):
+                return
             plan = data.get("plan") or {}
             assessment = data.get("incremental") or {}
             from rag.runtime.incremental_preview_view import describe_incremental_preview
