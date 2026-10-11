@@ -29,6 +29,7 @@ from rag.runtime.query_classifier import QueryRoute
 from rag.runtime.resident_models import resident_pool
 from rag.runtime.experimental_scope_guard import validate_scoped_results
 from rag.runtime.status import build_rag_status, resolve_rag_sqlite_path
+from rag.runtime.generation_search_paths import isolated_generation_search_paths
 
 _MODEL_LOCK = threading.RLock()
 
@@ -72,6 +73,8 @@ def search_persistent_semantic(
     llama_server: Path = Path(r"C:\llama\llama-server.exe"),
     experimental_cross_route: bool = False,
     experimental_resident_models: bool = False,
+    experimental_generation_root: Path | None = None,
+    _generation_paths=None,
 ) -> tuple[SearchResult, ...]:
     """Search an already READY, persistent index; fail closed otherwise."""
     if not isinstance(query, SearchQuery) or not isinstance(route, QueryRoute):
@@ -79,16 +82,28 @@ def search_persistent_semantic(
     if route is QueryRoute.LEXICAL_ONLY:
         raise ValueError("lexical-only must be handled by search_context")
 
-    status = build_rag_status()
-    index = status.index
-    sqlite_path = resolve_rag_sqlite_path()
-    qdrant_path = resolve_qdrant_local_path()
-    if (
-        index.get("state") != "READY"
-        or not sqlite_path.is_file()
-        or not qdrant_path.is_dir()
-    ):
-        raise ProductionSearchUnavailable("persistent RAG index is not READY")
+    if experimental_generation_root is not None:
+        if _generation_paths is not None:
+            raise ValueError("nested generation path overrides are not supported")
+        with isolated_generation_search_paths(experimental_generation_root) as pinned:
+            return search_persistent_semantic(
+                query, route, llama_server=llama_server,
+                experimental_cross_route=experimental_cross_route,
+                experimental_resident_models=experimental_resident_models,
+                _generation_paths=pinned,
+            )
+
+    if _generation_paths is None:
+        status = build_rag_status()
+        index = status.index
+        sqlite_path = resolve_rag_sqlite_path()
+        qdrant_path = resolve_qdrant_local_path()
+        if (index.get("state") != "READY" or not sqlite_path.is_file()
+                or not qdrant_path.is_dir()):
+            raise ProductionSearchUnavailable("persistent RAG index is not READY")
+    else:
+        sqlite_path = _generation_paths.sqlite
+        qdrant_path = _generation_paths.qdrant
 
     # Serialize model transitions. GPU memory must not carry both models.
     with _MODEL_LOCK:
