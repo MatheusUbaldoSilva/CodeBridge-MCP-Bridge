@@ -286,19 +286,19 @@ class RagPanel(QWidget):
         elif operation == "plan":
             plan = data.get("plan") or {}
             assessment = data.get("incremental") or {}
+            from rag.runtime.incremental_preview_view import describe_incremental_preview
+            try:
+                view = describe_incremental_preview(plan, assessment)
+            except (ValueError, TypeError) as exc:
+                self.candidates.clear()
+                self.plan_summary.setText("Previa indisponivel: dados inconsistentes.")
+                self.notice.setText("Nao foi possivel validar a previa: " + str(exc))
+                return
             self.candidates.clear()
-            for item in plan.get("candidates") or []:
-                self.candidates.addItem(str(item.get("path") or ""))
-            self.plan_summary.setText(
-                f"{plan.get('candidate_count', 0)} arquivos analisados. "
-                f"{assessment.get('new_count', 0)} novos; "
-                f"{assessment.get('modified_count', 0)} atualizados; "
-                f"{assessment.get('unchanged_count', 0)} sem alteracoes; "
-                f"{assessment.get('unknown_count', 0)} pendentes de verificacao. "
-                f"{plan.get('denied_count', 0)} protegidos e "
-                f"{plan.get('unsupported_count', 0)} nao suportados. "
-                "Nenhum arquivo foi indexado."
-            )
+            for item in view["rows"]:
+                self.candidates.addItem(f'[{item["status"]}] {item["path"]}')
+            self.plan_summary.setText(view["summary"])
+            self.index_btn.setEnabled(False)
 
     def _show_file(self, row):
         if 0 <= row < len(self._documents):
