@@ -25,6 +25,8 @@ def activate_test_generation(state_root, generation, *, fail_before_replace=Fals
     if not isinstance(generation, str) or not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}", generation):
         raise GenerationActivationError("invalid generation identifier")
     with generation_lock(root, PUBLICATION_LOCK_NAME, exclusive=True):
+        if (root / "transition-pending.json").exists():
+            raise GenerationActivationError("pending transition; recover before activation")
         candidate = root / "generations" / generation
         if not candidate.is_dir():
             raise GenerationActivationError("generation missing")
