@@ -70,6 +70,7 @@ class RagPanel(QWidget):
         self._busy = False
         self._results = []
         self._documents = []
+        self._preview_snapshot = None
         self.project_id = "codebridge"
         outer = QVBoxLayout(self)
         heading = QHBoxLayout()
@@ -156,6 +157,13 @@ class RagPanel(QWidget):
         add_layout.addWidget(self.plan_summary)
         self.candidates = QListWidget()
         add_layout.addWidget(self.candidates, 1)
+        self.confirm_preview_btn = QPushButton("Conferir previa (sem publicar)")
+        self.confirm_preview_btn.setEnabled(False)
+        self.confirm_preview_btn.clicked.connect(self.confirm_preview)
+        add_layout.addWidget(self.confirm_preview_btn)
+        self.cancel_preview_btn = QPushButton("Cancelar previa")
+        self.cancel_preview_btn.clicked.connect(self.cancel_preview)
+        add_layout.addWidget(self.cancel_preview_btn)
         self.index_btn = QPushButton("Adicionar ao conhecimento (em preparacao)")
         self.index_btn.setEnabled(False)
         self.index_btn.setToolTip("A atualizacao incremental ainda nao foi validada.")
@@ -178,6 +186,7 @@ class RagPanel(QWidget):
     def change_project(self, name):
         if not name or name == self.project_id:
             return
+        self.cancel_preview()
         self.project_id = name
         self.files.clear()
         self._documents = []
@@ -206,6 +215,7 @@ class RagPanel(QWidget):
     def browse(self):
         path = QFileDialog.getExistingDirectory(self, "Escolher pasta")
         if path:
+            self.cancel_preview()
             self.folder.setText(path)
             self.candidates.clear()
             self.plan_summary.setText("Clique para conferir os arquivos selecionados.")
@@ -220,7 +230,29 @@ class RagPanel(QWidget):
         if not path or not Path(path).is_dir():
             QMessageBox.information(self, "Adicionar conhecimentos", "Escolha uma pasta primeiro.")
             return
+        self.cancel_preview()
         self._run("plan", {"project": self.project_id, "root": path})
+
+    def cancel_preview(self):
+        self._preview_snapshot = None
+        self.candidates.clear()
+        self.confirm_preview_btn.setEnabled(False)
+        self.plan_summary.setText("Previa cancelada. Gere uma nova previa para continuar.")
+
+    def confirm_preview(self):
+        if self._preview_snapshot is None:
+            return
+        from rag.runtime.incremental_preview_confirmation import revalidate_preview
+        try:
+            result = revalidate_preview(self._preview_snapshot, self.project_id,
+                                        self.folder.text().strip())
+        except (ValueError, OSError) as exc:
+            self.cancel_preview()
+            QMessageBox.warning(self, "Previa desatualizada", str(exc))
+            return
+        QMessageBox.information(self, "Conferencia concluida",
+            str(result["files_checked"]) + " arquivos conferidos. Nenhum indice foi alterado. "
+            "A publicacao ainda esta desabilitada.")
 
     def _run(self, operation, args):
         if self._busy:
@@ -298,6 +330,14 @@ class RagPanel(QWidget):
             for item in view["rows"]:
                 self.candidates.addItem(f'[{item["status"]}] {item["path"]}')
             self.plan_summary.setText(view["summary"])
+            from rag.runtime.incremental_preview_confirmation import snapshot_preview
+            try:
+                self._preview_snapshot = snapshot_preview(
+                    self.project_id, self.folder.text().strip(), view["rows"])
+            except (ValueError, OSError) as exc:
+                self._preview_snapshot = None
+                self.notice.setText("Previa nao confirmavel: " + str(exc))
+            self.confirm_preview_btn.setEnabled(self._preview_snapshot is not None)
             self.index_btn.setEnabled(False)
 
     def _show_file(self, row):
