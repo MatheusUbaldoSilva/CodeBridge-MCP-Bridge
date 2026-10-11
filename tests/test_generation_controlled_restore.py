@@ -43,6 +43,22 @@ class ControlledRestoreTests(unittest.TestCase):
                 restore_test_generation(root, "two")
             self.assertEqual(resolve_generation(root).generation, "one")
 
+    def test_failure_after_switch_restores_previous_generation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "codebridge-rag-generation-test"
+            one = root / "generations" / "one"
+            two = root / "generations" / "two"
+            one.mkdir(parents=True)
+            two.mkdir()
+            fixture(one)
+            fixture(two)
+            activate_test_generation(root, "one")
+            with self.assertRaisesRegex(ControlledRestoreError, "previous generation restored"):
+                restore_test_generation(root, "two", fail_after_switch=True)
+            self.assertEqual(resolve_generation(root).generation, "one")
+            self.assertTrue(two.is_dir())
+            self.assertFalse(list(root.glob(".rollback-generation.*.tmp")))
+
     def test_injected_failure_preserves_active(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "codebridge-rag-generation-test"
