@@ -30,9 +30,12 @@ def _rag_operation(operation, args):
             query=args["query"], project_id=args["project"], top_k=10)
     if operation == "plan":
         validate_preview_folder(args["root"])
+        from rag.runtime.incremental_discovery_guard import inventory_folder, assert_discovery_unchanged
+        initial_inventory = inventory_folder(args["root"])
         response = bridge.index_rag(
             project_id=args["project"], project_root=args["root"],
             scope="BOTH", execute=False)
+        assert_discovery_unchanged(initial_inventory, args["root"])
         from rag.runtime.incremental_preflight import assess_incremental_plan
         from rag.runtime.incremental_preview_confirmation import snapshot_preview, revalidate_preview
         from rag.runtime.incremental_preview_view import describe_incremental_preview
