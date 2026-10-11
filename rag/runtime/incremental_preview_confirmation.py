@@ -21,7 +21,12 @@ def snapshot_preview(project, folder, rows):
         candidate = (root / relative).resolve(strict=True)
         if not candidate.is_relative_to(root) or not candidate.is_file():
             raise ValueError("file outside selected folder")
-        signatures[relative] = hashlib.sha256(candidate.read_bytes()).hexdigest()
+        before = candidate.stat()
+        digest = hashlib.sha256(candidate.read_bytes()).hexdigest()
+        after = candidate.stat()
+        if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+            raise ValueError("file changed during preview; generate a new preview")
+        signatures[relative] = digest
     return {"project": project, "folder": str(root), "sha256": signatures}
 
 

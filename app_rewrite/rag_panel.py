@@ -34,7 +34,16 @@ def _rag_operation(operation, args):
             project_id=args["project"], project_root=args["root"],
             scope="BOTH", execute=False)
         from rag.runtime.incremental_preflight import assess_incremental_plan
-        response["incremental"] = assess_incremental_plan(response["plan"])
+        from rag.runtime.incremental_preview_confirmation import snapshot_preview, revalidate_preview
+        from rag.runtime.incremental_preview_view import describe_incremental_preview
+        plan = response["plan"]
+        candidates = plan.get("candidates") or []
+        start = snapshot_preview(args["project"], args["root"], candidates) if candidates else None
+        response["incremental"] = assess_incremental_plan(plan)
+        describe_incremental_preview(plan, response["incremental"])
+        if start is not None:
+            revalidate_preview(start, args["project"], args["root"])
+        response["preview_start"] = start
         return response
     if operation == "documents":
         from rag.runtime.status import resolve_rag_sqlite_path
@@ -351,10 +360,13 @@ class RagPanel(QWidget):
             for item in view["rows"]:
                 self.candidates.addItem(f'[{item["status"]}] {item["path"]}')
             self.plan_summary.setText(view["summary"])
-            from rag.runtime.incremental_preview_confirmation import snapshot_preview
+            from rag.runtime.incremental_preview_confirmation import revalidate_preview
             try:
-                self._preview_snapshot = snapshot_preview(
-                    self.project_id, self.folder.text().strip(), view["rows"])
+                start = data.get("preview_start")
+                if start is None:
+                    raise ValueError("no valid candidate snapshot")
+                revalidate_preview(start, self.project_id, self.folder.text().strip())
+                self._preview_snapshot = start
             except (ValueError, OSError) as exc:
                 self._preview_snapshot = None
                 self.notice.setText("Previa nao confirmavel: " + str(exc))
