@@ -96,6 +96,27 @@ class OfflineFixtureTests(unittest.TestCase):
         with self.assertRaises(OfflineFixtureError):
             capture_fixture(self.root, "symlinked")
 
+    def test_separate_python_process_lock_blocks_capture(self):
+        import subprocess
+        code = ("import sys,time;"
+                "from rag.runtime.generation_process_lock import generation_lock;"
+                "root=sys.argv[1];"
+                "ctx=generation_lock(root,'offline_capture',exclusive=True);"
+                "ctx.__enter__();"
+                "print('LOCKED',flush=True);"
+                "time.sleep(10)")
+        writer = subprocess.Popen([sys.executable, "-c", code, str(self.root)],
+                                  cwd=str(Path(__file__).resolve().parents[1]),
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            self.assertEqual(writer.stdout.readline().strip(), "LOCKED")
+            with self.assertRaises(OfflineFixtureError):
+                capture_fixture(self.root, "cross_process")
+            self.assertFalse((self.root / "offline-fixture-backups" / "cross_process").exists())
+        finally:
+            writer.terminate()
+            writer.communicate(timeout=10)
+
     def test_windows_open_writer_blocks_snapshot(self):
         import subprocess
         import time
