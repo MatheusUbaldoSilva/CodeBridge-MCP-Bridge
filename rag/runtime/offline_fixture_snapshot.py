@@ -11,15 +11,21 @@ import tempfile
 
 from rag.runtime.incremental_bundle_validate import validate_incremental_bundle
 from rag.runtime.generation_process_lock import generation_lock, GenerationBusy
+from rag.runtime.offline_fixture_file_guard import hold_fixture_files_readonly, FixtureFileBusy
 
 
 class OfflineFixtureError(RuntimeError):
     pass
 
 
+def _redirected(path):
+    path = Path(path)
+    return path.is_symlink() or (hasattr(path, "is_junction") and path.is_junction())
+
+
 def _root(path):
     original = Path(path)
-    if original.is_symlink():
+    if any(_redirected(part) for part in (original, *original.parents)):
         raise OfflineFixtureError("symlink root forbidden")
     root = original.resolve(strict=True)
     if root.name.casefold() != "codebridge-rag-generation-test":
@@ -30,8 +36,8 @@ def _root(path):
 def _hash_tree(root):
     hashes = {}
     for path in sorted(root.rglob("*")):
-        if path.is_symlink():
-            raise OfflineFixtureError("symlink forbidden")
+        if _redirected(path) or (path.is_file() and path.stat().st_nlink > 1):
+            raise OfflineFixtureError("redirected or hardlinked file forbidden")
         if path.is_file():
             hashes[path.relative_to(root).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
     return hashes
@@ -42,17 +48,24 @@ def capture_fixture(source_root, backup_name):
     try:
         with generation_lock(root, "offline_capture", exclusive=True):
             return _capture_locked(root, backup_name)
-    except GenerationBusy as exc:
-        raise OfflineFixtureError("concurrent fixture capture blocked") from exc
+    except (GenerationBusy, FixtureFileBusy, shutil.Error, PermissionError) as exc:
+        raise OfflineFixtureError("fixture capture blocked by another process") from exc
 
 
 def _capture_locked(root, backup_name):
+    files = [root / "rag_index.sqlite3", root / "rag-index-manifest.json"]
+    files += [file for file in (root / "qdrant").rglob("*") if file.is_file()]
+    with hold_fixture_files_readonly(files):
+        return _capture_guarded(root, backup_name)
+
+
+def _capture_guarded(root, backup_name):
     """Capture only a closed synthetic fixture into a new local backup directory."""
     if not isinstance(backup_name, str) or not backup_name.isidentifier():
         raise OfflineFixtureError("invalid backup name")
     for name in ("rag_index.sqlite3", "rag-index-manifest.json", "qdrant"):
         path = root / name
-        if not path.exists() or path.is_symlink():
+        if not path.exists() or _redirected(path) or (path.is_file() and path.stat().st_nlink > 1):
             raise OfflineFixtureError("incomplete or redirected fixture")
     db = root / "rag_index.sqlite3"
     for suffix in ("-wal", "-shm", "-journal"):
@@ -60,7 +73,7 @@ def _capture_locked(root, backup_name):
             raise OfflineFixtureError("SQLite sidecar blocks capture")
     backups = root / "offline-fixture-backups"
     target = backups / backup_name
-    if backups.is_symlink() or target.exists() or target.is_symlink():
+    if _redirected(backups) or target.exists() or _redirected(target):
         raise OfflineFixtureError("existing or redirected backup forbidden")
     before = _hash_tree(root / "qdrant")
     db_hash = hashlib.sha256(db.read_bytes()).hexdigest()

@@ -41,6 +41,22 @@ class OfflineFixtureTests(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertEqual(json.loads(proc.stdout)["state"], "VALIDATED_OFFLINE_NOT_PUBLISHED")
 
+    def test_standalone_cli_laboratory_only(self):
+        import json
+        import subprocess
+        script = Path(__file__).resolve().parents[1] / "rag_offline_fixture_cli.py"
+        base = [sys.executable, str(script), "--fixture-root", str(self.root),
+                "--backup-name", "from_cli"]
+        no_flag = subprocess.run(base, capture_output=True, text=True, timeout=20)
+        self.assertNotEqual(no_flag.returncode, 0)
+        self.assertFalse((self.root / "offline-fixture-backups" / "from_cli").exists())
+        okay = subprocess.run(base + ["--lab-only"], capture_output=True, text=True, timeout=20)
+        self.assertEqual(okay.returncode, 0, okay.stderr)
+        self.assertEqual(json.loads(okay.stdout)["state"], "LAB_FIXTURE_SNAPSHOT_ONLY")
+        another = subprocess.run(base + ["--lab-only"], capture_output=True, text=True, timeout=20)
+        self.assertEqual(another.returncode, 2)
+        self.assertEqual(json.loads(another.stdout)["state"], "BLOCKED")
+
     def test_no_overwrite(self):
         capture_fixture(self.root, "first")
         with self.assertRaises(OfflineFixtureError):
@@ -79,6 +95,41 @@ class OfflineFixtureTests(unittest.TestCase):
         (self.root / "qdrant" / "outside").symlink_to(self.root.parent, target_is_directory=True)
         with self.assertRaises(OfflineFixtureError):
             capture_fixture(self.root, "symlinked")
+
+    def test_windows_open_writer_blocks_snapshot(self):
+        import subprocess
+        import time
+        code = ("import sys,time;"
+                "f=open(sys.argv[1],'r+b',buffering=0);"
+                "print('READY',flush=True);"
+                "time.sleep(10)")
+        writer = subprocess.Popen([sys.executable, "-c", code,
+                                   str(self.root / "rag_index.sqlite3")],
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            self.assertEqual(writer.stdout.readline().strip(), "READY")
+            with self.assertRaises(OfflineFixtureError):
+                capture_fixture(self.root, "open_writer")
+            self.assertFalse((self.root / "offline-fixture-backups" / "open_writer").exists())
+        finally:
+            writer.terminate()
+            writer.communicate(timeout=10)
+
+    def test_hardlinked_sqlite_is_rejected(self):
+        import os
+        shared = self.root.parent / "shared-synthetic.sqlite3"
+        original = self.root / "rag_index.sqlite3"
+        original.rename(shared)
+        os.link(shared, original)
+        with self.assertRaises(OfflineFixtureError):
+            capture_fixture(self.root, "linked")
+
+    def test_hardlinked_qdrant_file_is_rejected(self):
+        import os
+        source = next(p for p in (self.root / "qdrant").rglob("*") if p.is_file())
+        os.link(source, source.with_name(source.name + ".hardlink"))
+        with self.assertRaises(OfflineFixtureError):
+            capture_fixture(self.root, "linked_vector")
 
     def test_symlink_qdrant_blocked(self):
         import shutil
