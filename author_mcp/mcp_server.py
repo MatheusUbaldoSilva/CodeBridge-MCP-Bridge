@@ -12,6 +12,7 @@ from mcp.types import Icon, ToolAnnotations
 from pydantic import BaseModel
 
 from http_client import ProtocolHTTPClient
+from development_checkpoint_tools import register_development_checkpoint_tools
 
 
 class ProtocolOutcome(BaseModel):
@@ -279,6 +280,9 @@ mcp = MCPServer(
     version="0.8.0",
 )
 
+
+
+register_development_checkpoint_tools(mcp)
 
 def _outcome_fields(payload):
     return {
