@@ -42,6 +42,27 @@ class OfflineFixtureRestoreTests(unittest.TestCase):
         self.assertEqual(json.loads(completed.stdout)["state"],
                          "LAB_FIXTURE_RESTORED_NOT_ACTIVATED")
 
+    def test_backup_and_restore_do_not_change_active_pointer(self):
+        import hashlib
+        pointer = self.root / "active-generation.json"
+        pointer.write_text('{"generation":"unchanged"}', encoding="utf-8")
+        before = hashlib.sha256(pointer.read_bytes()).hexdigest()
+        capture_fixture(self.root, "second")
+        restore_fixture_snapshot(self.root, "second", "copy")
+        self.assertEqual(hashlib.sha256(pointer.read_bytes()).hexdigest(), before)
+
+    def test_two_project_restore_preserves_both_namespaces(self):
+        import shutil
+        multi_root = self.root.parent / "multiproject" / "codebridge-rag-generation-test"
+        multi_root.parent.mkdir()
+        create_bundle(multi_root, [("alpha", "one", "text-a"),
+                                   ("beta", "two", "text-b")])
+        capture_fixture(multi_root, "two_projects")
+        report = restore_fixture_snapshot(multi_root, "two_projects", "both")
+        self.assertEqual(report["verification"]["documents"], 2)
+        self.assertEqual(report["verification"]["vectors"], 2)
+        self.assertEqual(report["verification"]["manifest_entries"], 2)
+
     def test_restore_never_overwrites(self):
         restore_fixture_snapshot(self.root, "saved", "recovered")
         with self.assertRaises(OfflineFixtureRestoreError):
