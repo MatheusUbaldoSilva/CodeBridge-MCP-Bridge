@@ -53,6 +53,55 @@ class TestOnlyAuthorizationTests(unittest.TestCase):
         self.assertEqual(resolve_generation(self.root).generation,"one")
         self.assertFalse((self.root/"backups"/"before").exists())
 
+    def test_concurrent_same_authorization_only_one_execution(self):
+        import threading
+        from unittest.mock import patch
+        import rag.runtime.generation_test_authorization as module
+        authorization=self.authorization()
+        entered=threading.Event()
+        release=threading.Event()
+        outcomes=[]
+        original=module.publish_with_verified_backup
+        def delayed(*args,**kwargs):
+            entered.set()
+            if not release.wait(6):
+                raise TimeoutError("test did not release publication")
+            return original(*args,**kwargs)
+        def worker():
+            try:
+                outcomes.append(("first",authorization.execute(
+                    confirmed=True,backup_name="before")))
+            except Exception as exc:
+                outcomes.append(("first",type(exc).__name__))
+        with patch.object(module,"publish_with_verified_backup",side_effect=delayed) as publishing:
+            thread=threading.Thread(target=worker,daemon=True)
+            thread.start()
+            try:
+                self.assertTrue(entered.wait(4))
+                with self.assertRaisesRegex(ValueError,"consumed"):
+                    authorization.execute(confirmed=True,backup_name="again")
+            finally:
+                release.set()
+                thread.join(9)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(len(outcomes),1)
+        self.assertIsInstance(outcomes[0][1],dict)
+        self.assertEqual(publishing.call_count,1)
+        self.assertEqual(resolve_generation(self.root).generation,"two")
+
+    def test_publication_failure_consumes_authorization(self):
+        from unittest.mock import patch
+        import rag.runtime.generation_test_authorization as module
+        authorization=self.authorization()
+        with patch.object(module,"publish_with_verified_backup",
+                          side_effect=RuntimeError("injected publication failure")) as publishing:
+            with self.assertRaisesRegex(RuntimeError,"injected publication"):
+                authorization.execute(confirmed=True,backup_name="before")
+            with self.assertRaisesRegex(ValueError,"consumed"):
+                authorization.execute(confirmed=True,backup_name="again")
+        self.assertEqual(publishing.call_count,1)
+        self.assertEqual(resolve_generation(self.root).generation,"one")
+
     def test_non_test_root_rejected(self):
         with self.assertRaisesRegex(ValueError,"isolated"):
             TestPublicationAuthorization(self.inputs,"one","two","demo",
