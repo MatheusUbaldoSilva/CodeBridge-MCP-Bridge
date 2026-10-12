@@ -21,7 +21,7 @@ class TransitionRecoveryError(RuntimeError):
 
 def _test_root(state_root):
     root = Path(state_root).resolve()
-    if "codebridge-rag-generation-test" not in {p.lower() for p in root.parts}:
+    if root.name.casefold() != "codebridge-rag-generation-test":
         raise TransitionRecoveryError("test root required")
     return root
 

@@ -16,7 +16,7 @@ class RecoveryCandidateError(RuntimeError):
 
 def verify_recovery_candidate(test_root, name):
     root = Path(test_root).resolve()
-    if "codebridge-rag-generation-test" not in {part.lower() for part in root.parts}:
+    if root.name.casefold() != "codebridge-rag-generation-test":
         raise RecoveryCandidateError("test directory required")
     if not isinstance(name, str) or not _NAME.fullmatch(name):
         raise RecoveryCandidateError("invalid generation name")
@@ -34,7 +34,7 @@ def verify_recovery_candidate(test_root, name):
 
 def inspect_recovery_candidates(test_root):
     root = Path(test_root).resolve()
-    if "codebridge-rag-generation-test" not in {part.lower() for part in root.parts}:
+    if root.name.casefold() != "codebridge-rag-generation-test":
         raise RecoveryCandidateError("test directory required")
     base = root / "generations"
     if not base.exists():

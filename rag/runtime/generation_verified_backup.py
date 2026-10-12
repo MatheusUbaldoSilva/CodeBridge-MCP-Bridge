@@ -15,7 +15,7 @@ class VerifiedBackupError(RuntimeError):
 
 def _root(value):
     root = Path(value).resolve()
-    if "codebridge-rag-generation-test" not in {part.lower() for part in root.parts}:
+    if root.name.casefold() != "codebridge-rag-generation-test":
         raise VerifiedBackupError("backup restricted to isolated test roots")
     return root
 

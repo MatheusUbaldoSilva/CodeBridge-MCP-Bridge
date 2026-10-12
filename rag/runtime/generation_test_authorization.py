@@ -14,7 +14,7 @@ from rag.runtime.generation_backup_publish import publish_with_verified_backup
 class TestPublicationAuthorization:
     def __init__(self, root, previous, candidate, project, folder, snapshot, review_contract):
         base = Path(root).resolve()
-        if "codebridge-rag-generation-test" not in {p.lower() for p in base.parts}:
+        if base.name.casefold() != "codebridge-rag-generation-test":
             raise ValueError("isolated test root required")
         if not previous or not candidate or previous == candidate:
             raise ValueError("invalid generation transition")

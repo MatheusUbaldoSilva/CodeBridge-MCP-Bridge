@@ -21,7 +21,7 @@ class ControlledRestoreError(RuntimeError):
 
 def restore_test_generation(state_root, chosen, *, fail_before_switch=False, fail_after_switch=False):
     root = Path(state_root).resolve()
-    if "codebridge-rag-generation-test" not in {p.lower() for p in root.parts}:
+    if root.name.casefold() != "codebridge-rag-generation-test":
         raise ControlledRestoreError("test roots only")
     # Hold this lock across candidate re-validation, pointer change and check.
     with generation_lock(root, PUBLICATION_LOCK_NAME, exclusive=True):

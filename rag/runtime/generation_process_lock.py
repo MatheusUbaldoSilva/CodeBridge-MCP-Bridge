@@ -33,7 +33,7 @@ _unlock.restype = wintypes.BOOL
 @contextmanager
 def generation_lock(test_root, generation, *, exclusive=False):
     root = Path(test_root).resolve()
-    if "codebridge-rag-generation-test" not in {part.lower() for part in root.parts}:
+    if root.name.casefold() != "codebridge-rag-generation-test":
         raise ValueError("locks restricted to test roots")
     if not isinstance(generation, str) or not generation.isidentifier() or len(generation) > 64:
         raise ValueError("invalid generation identifier")

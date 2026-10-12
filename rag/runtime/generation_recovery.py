@@ -9,7 +9,7 @@ from rag.runtime.generation_pointer import resolve_generation, RagGenerationPoin
 
 def inspect_test_generation_recovery(state_root):
     root = Path(state_root).resolve()
-    if "codebridge-rag-generation-test" not in {p.lower() for p in root.parts}:
+    if root.name.casefold() != "codebridge-rag-generation-test":
         raise ValueError("recovery inspection restricted to test roots")
     pointer = root / "active-generation.json"
     stale = sorted(path.name for path in root.glob(".active-generation.*.tmp") if path.is_file())

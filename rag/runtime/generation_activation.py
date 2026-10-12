@@ -20,7 +20,7 @@ class GenerationActivationError(RuntimeError):
 
 def activate_test_generation(state_root, generation, *, fail_before_replace=False):
     root = Path(state_root).resolve()
-    if "codebridge-rag-generation-test" not in {part.lower() for part in root.parts}:
+    if root.name.casefold() != "codebridge-rag-generation-test":
         raise GenerationActivationError("activation restricted to test roots")
     if not isinstance(generation, str) or not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}", generation):
         raise GenerationActivationError("invalid generation identifier")
