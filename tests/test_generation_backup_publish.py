@@ -30,6 +30,40 @@ class BackupGatedPublicationTests(unittest.TestCase):
             self.assertEqual(resolve_generation(root).generation,"two")
             self.assertEqual(verify_generation_backup(root,"before_change")["documents"],1)
 
+    def test_corrupted_backup_blocks_switch_without_journal(self):
+        from unittest.mock import patch
+        from rag.runtime.generation_verified_backup import (
+            verify_generation_backup as real_verify, VerifiedBackupError)
+        with tempfile.TemporaryDirectory() as temp:
+            root=self.setup_root(temp)
+            def corrupt_before_verify(root_arg,name):
+                manifest=root/"backups"/name/"rag-index-manifest.json"
+                manifest.write_text("damaged",encoding="utf-8")
+                return real_verify(root_arg,name)
+            with patch("rag.runtime.generation_backup_publish.verify_generation_backup",
+                       side_effect=corrupt_before_verify):
+                with self.assertRaises(VerifiedBackupError):
+                    publish_with_verified_backup(root,"one","two","before_change")
+            self.assertEqual(resolve_generation(root).generation,"one")
+            self.assertEqual(inspect_pending_transition(root)["state"],"NO_PENDING_TRANSITION")
+
+    def test_backup_publication_with_old_reader_pinned(self):
+        from rag.runtime.generation_search_paths import isolated_generation_search_paths
+        from rag.runtime.generation_protected_session import protected_generation_retirement
+        from rag.runtime.generation_process_lock import GenerationBusy
+        with tempfile.TemporaryDirectory() as temp:
+            root=self.setup_root(temp)
+            with isolated_generation_search_paths(root) as old_paths:
+                self.assertEqual(old_paths.generation,"one")
+                result=publish_with_verified_backup(root,"one","two","before_change")
+                self.assertEqual(result["published"]["active"],"two")
+                self.assertEqual(verify_generation_backup(root,"before_change")["documents"],1)
+                with self.assertRaises(GenerationBusy):
+                    with protected_generation_retirement(root,"one"):
+                        pass
+            with protected_generation_retirement(root,"one") as folder:
+                self.assertTrue(folder.is_dir())
+
     def test_failure_after_backup_does_not_change_active(self):
         with tempfile.TemporaryDirectory() as temp:
             root=self.setup_root(temp)
