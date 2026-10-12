@@ -36,5 +36,26 @@ class DevelopmentCheckpointTests(unittest.TestCase):
         self.assertFalse(self.db.exists())
 
 
+    def test_concurrent_writes_are_serialized(self):
+        from concurrent.futures import ThreadPoolExecutor
+
+        def write(number):
+            return self.store.save(self.sid, f"step {number}", "continue")
+
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            list(pool.map(write, range(15)))
+
+        resumed = DevelopmentCheckpoints(self.db).latest(self.sid)
+        self.assertEqual(resumed["revision"], 15)
+
+    def test_both_session_id_lengths_are_supported(self):
+        legacy = "codebridge_" + "b" * 32
+        self.assertEqual(self.store.save(legacy, "legacy", "next")["revision"], 1)
+        with self.assertRaises(ValueError):
+            self.store.save("codebridge_" + "a" * 15, "bad", "next")
+        with self.assertRaises(ValueError):
+            self.store.save("codebridge_" + "a" * 33, "bad", "next")
+
+
 if __name__ == "__main__":
     unittest.main()
