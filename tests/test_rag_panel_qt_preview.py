@@ -54,6 +54,30 @@ class RagPanelQtPreviewTests(unittest.TestCase):
         self.assertEqual(self.panel.candidates.count(), 0)
         self.assertFalse(self.panel.confirm_preview_btn.isEnabled())
 
+    def test_authorization_rehearsal_does_not_publish(self):
+        self._pending()
+        self.panel._complete("plan", self._response(), "")
+        self.assertTrue(self.panel.review_auth_btn.isEnabled())
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.Yes) as dialog:
+            self.panel.review_authorization()
+        dialog.assert_called_once()
+        self.assertIn("Projeto: demo", dialog.call_args.args[2])
+        self.assertIn("Arquivos conferidos: 1", dialog.call_args.args[2])
+        self.assertFalse(self.panel.index_btn.isEnabled())
+        self.assertIn("Nenhum indice alterado", self.panel.notice.text())
+        self.panel.cancel_preview()
+        self.assertFalse(self.panel.review_auth_btn.isEnabled())
+
+    def test_authorization_rehearsal_rejects_stale_file(self):
+        self._pending()
+        self.panel._complete("plan", self._response(), "")
+        (self.root / "a.md").write_text("changed", encoding="utf-8")
+        with patch.object(QMessageBox, "warning") as warning, patch.object(QMessageBox, "question") as question:
+            self.panel.review_authorization()
+        warning.assert_called_once()
+        question.assert_not_called()
+        self.assertFalse(self.panel.index_btn.isEnabled())
+
     def test_cancel_while_busy_discards_late_completion(self):
         self._pending()
         reply = self._response()

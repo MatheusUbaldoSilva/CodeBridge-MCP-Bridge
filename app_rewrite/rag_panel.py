@@ -175,6 +175,10 @@ class RagPanel(QWidget):
         self.confirm_preview_btn.setEnabled(False)
         self.confirm_preview_btn.clicked.connect(self.confirm_preview)
         add_layout.addWidget(self.confirm_preview_btn)
+        self.review_auth_btn = QPushButton("Revisar autorizacao (simulacao)")
+        self.review_auth_btn.setEnabled(False)
+        self.review_auth_btn.clicked.connect(self.review_authorization)
+        add_layout.addWidget(self.review_auth_btn)
         self.cancel_preview_btn = QPushButton("Cancelar previa")
         self.cancel_preview_btn.clicked.connect(self.cancel_preview)
         add_layout.addWidget(self.cancel_preview_btn)
@@ -256,6 +260,7 @@ class RagPanel(QWidget):
         self._preview_snapshot = None
         self.candidates.clear()
         self.confirm_preview_btn.setEnabled(False)
+        self.review_auth_btn.setEnabled(False)
         self.plan_summary.setText("Previa cancelada. Gere uma nova previa para continuar.")
 
     def confirm_preview(self):
@@ -272,6 +277,31 @@ class RagPanel(QWidget):
         QMessageBox.information(self, "Conferencia concluida",
             str(result["files_checked"]) + " arquivos conferidos. Nenhum indice foi alterado. "
             "A publicacao ainda esta desabilitada.")
+
+    def review_authorization(self):
+        """UI-only rehearsal: no indexing, credentials or persistent approval."""
+        if self._busy or self._preview_snapshot is None:
+            return
+        from rag.runtime.incremental_preview_confirmation import revalidate_preview
+        try:
+            checked = revalidate_preview(self._preview_snapshot, self.project_id,
+                                         self.folder.text().strip())
+        except (ValueError, OSError) as exc:
+            self.cancel_preview()
+            QMessageBox.warning(self, "Previa desatualizada", str(exc))
+            return
+        question = ("SIMULACAO — nenhuma publicacao sera executada.\\n\\n"
+                    f"Projeto: {self.project_id}\\n"
+                    f"Pasta: {self.folder.text().strip()}\\n"
+                    f"Arquivos conferidos: {checked['files_checked']}\\n\\n"
+                    "Confirmar somente o ensaio de autorizacao?")
+        choice = QMessageBox.question(self, "Revisao de autorizacao (sem publicar)",
+                                      question, QMessageBox.Yes | QMessageBox.No,
+                                      QMessageBox.No)
+        self.notice.setText("Simulacao registrada na interface. Nenhum indice alterado."
+                            if choice == QMessageBox.Yes else
+                            "Simulacao cancelada. Nenhum indice alterado.")
+        self.index_btn.setEnabled(False)
 
     def _run(self, operation, args):
         if self._busy:
@@ -373,6 +403,7 @@ class RagPanel(QWidget):
                 self._preview_snapshot = None
                 self.notice.setText("Previa nao confirmavel: " + str(exc))
             self.confirm_preview_btn.setEnabled(self._preview_snapshot is not None)
+            self.review_auth_btn.setEnabled(self._preview_snapshot is not None)
             self.index_btn.setEnabled(False)
 
     def _show_file(self, row):
