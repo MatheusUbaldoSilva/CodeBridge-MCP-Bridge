@@ -44,7 +44,9 @@ class RagPanelQtPreviewTests(unittest.TestCase):
 
     def test_preview_display_and_cancel_after_completion(self):
         self._pending()
+        self.panel.notice.setText("Carregando...")
         self.panel._complete("plan", self._response(), "")
+        self.assertEqual(self.panel.notice.text(), "")
         self.assertTrue(self.panel.confirm_preview_btn.isEnabled())
         self.assertEqual(self.panel.candidates.count(), 1)
         self.assertFalse(self.panel.index_btn.isEnabled())

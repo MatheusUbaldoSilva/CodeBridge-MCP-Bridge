@@ -304,8 +304,7 @@ class RagPanel(QWidget):
                 self.rag_status.setText("RAG: OFFLINE")
             self.notice.setText("Nao foi possivel carregar: " + error)
             return
-        if operation != "plan":
-            self.notice.setText("")
+        self.notice.setText("")
         if operation == "status":
             ready = str((data.get("index") or {}).get("state") or "").upper() == "READY"
             self.rag_status.setText("RAG: ONLINE" if ready else "RAG: OFFLINE")
