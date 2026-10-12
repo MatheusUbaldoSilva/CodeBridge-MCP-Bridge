@@ -1,6 +1,7 @@
 import tempfile
 import sys
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from test_incremental_bundle_e2e import create_bundle
@@ -34,6 +35,42 @@ class VerifiedGenerationBackupTests(unittest.TestCase):
             with self.assertRaises(VerifiedBackupError):
                 backup_generation(root,"missing","backup")
 
+
+    def test_existing_checksum_manifest_is_not_overwritten(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "codebridge-rag-generation-test"
+            generation = root / "generations" / "one"
+            generation.parent.mkdir(parents=True)
+            create_bundle(generation, [("a", "doc", "original")])
+            backups = root / "backups"
+            backups.mkdir()
+            digest_path = backups / "reserved.sha256.json"
+            digest_path.write_text("DO_NOT_OVERWRITE", encoding="utf-8")
+            with self.assertRaisesRegex(VerifiedBackupError, "never overwrite"):
+                backup_generation(root, "one", "reserved")
+            self.assertEqual(
+                digest_path.read_text(encoding="utf-8"), "DO_NOT_OVERWRITE")
+            self.assertFalse((backups / "reserved").exists())
+
+    def test_symlinked_backup_root_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "codebridge-rag-generation-test"
+            generation = root / "generations" / "one"
+            generation.parent.mkdir(parents=True)
+            create_bundle(generation, [("a", "doc", "original")])
+            backup_generation(root, "one", "safe")
+            forbidden = root / "backups"
+            real_is_symlink = Path.is_symlink
+            with patch.object(
+                Path, "is_symlink", autospec=True,
+                side_effect=lambda path:
+                    path == forbidden or real_is_symlink(path)):
+                with self.assertRaisesRegex(VerifiedBackupError, "symlink"):
+                    backup_generation(root, "one", "another")
+                with self.assertRaisesRegex(VerifiedBackupError, "symlink"):
+                    verify_generation_backup(root, "safe")
+            self.assertFalse((root / "backups" / "another").exists())
+            self.assertTrue((root / "backups" / "safe").is_dir())
 
 if __name__=="__main__":
     unittest.main()

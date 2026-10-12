@@ -36,11 +36,19 @@ def backup_generation(test_root, generation, backup_name):
         raise VerifiedBackupError("invalid backup name")
     if not isinstance(generation, str) or not generation.isidentifier():
         raise VerifiedBackupError("invalid generation")
-    origin = (root / "generations" / generation).resolve()
-    if origin.parent != (root / "generations").resolve() or not origin.is_dir():
+    generation_dir = root / "generations"
+    origin_path = generation_dir / generation
+    if generation_dir.is_symlink() or origin_path.is_symlink():
+        raise VerifiedBackupError("symlink forbidden in generation source")
+    origin = origin_path.resolve()
+    if origin.parent != generation_dir.resolve() or not origin.is_dir():
         raise VerifiedBackupError("generation unavailable")
-    destination = root / "backups" / backup_name
-    if destination.exists():
+    backup_dir = root / "backups"
+    destination = backup_dir / backup_name
+    manifest = backup_dir / (backup_name + ".sha256.json")
+    if any(path.is_symlink() for path in (backup_dir, destination, manifest)):
+        raise VerifiedBackupError("symlink forbidden in backup destination")
+    if destination.exists() or manifest.exists():
         raise VerifiedBackupError("backup already exists; never overwrite")
     with generation_lock(root, generation):
         validate_incremental_bundle(origin)
@@ -52,7 +60,6 @@ def backup_generation(test_root, generation, backup_name):
             if copied != before:
                 raise VerifiedBackupError("backup hashes differ from original")
             verified = validate_incremental_bundle(destination)
-            manifest = root / "backups" / (backup_name + ".sha256.json")
             manifest.write_text(json.dumps(before, indent=2, sort_keys=True), encoding="utf-8")
             return {"state": "VERIFIED_TEST_BACKUP", "path": str(destination),
                     "files": len(before), "report": verified}
@@ -65,8 +72,11 @@ def verify_generation_backup(test_root, backup_name):
     root = _root(test_root)
     if not isinstance(backup_name, str) or not backup_name.isidentifier():
         raise VerifiedBackupError("invalid backup name")
-    folder = root / "backups" / backup_name
-    manifest = root / "backups" / (backup_name + ".sha256.json")
+    backup_dir = root / "backups"
+    folder = backup_dir / backup_name
+    manifest = backup_dir / (backup_name + ".sha256.json")
+    if any(path.is_symlink() for path in (backup_dir, folder, manifest)):
+        raise VerifiedBackupError("symlink forbidden in verified backup")
     if not folder.is_dir() or not manifest.is_file():
         raise VerifiedBackupError("backup or manifest missing")
     expected = json.loads(manifest.read_text(encoding="utf-8"))
