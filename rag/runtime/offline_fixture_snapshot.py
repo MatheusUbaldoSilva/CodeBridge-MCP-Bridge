@@ -10,6 +10,7 @@ import sqlite3
 import tempfile
 
 from rag.runtime.incremental_bundle_validate import validate_incremental_bundle
+from rag.runtime.generation_process_lock import generation_lock, GenerationBusy
 
 
 class OfflineFixtureError(RuntimeError):
@@ -37,8 +38,16 @@ def _hash_tree(root):
 
 
 def capture_fixture(source_root, backup_name):
-    """Capture only a closed synthetic fixture into a new local backup directory."""
     root = _root(source_root)
+    try:
+        with generation_lock(root, "offline_capture", exclusive=True):
+            return _capture_locked(root, backup_name)
+    except GenerationBusy as exc:
+        raise OfflineFixtureError("concurrent fixture capture blocked") from exc
+
+
+def _capture_locked(root, backup_name):
+    """Capture only a closed synthetic fixture into a new local backup directory."""
     if not isinstance(backup_name, str) or not backup_name.isidentifier():
         raise OfflineFixtureError("invalid backup name")
     for name in ("rag_index.sqlite3", "rag-index-manifest.json", "qdrant"):
