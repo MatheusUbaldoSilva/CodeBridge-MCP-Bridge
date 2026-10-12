@@ -290,16 +290,22 @@ class RagPanel(QWidget):
             self.cancel_preview()
             QMessageBox.warning(self, "Previa desatualizada", str(exc))
             return
-        question = ("SIMULACAO — nenhuma publicacao sera executada.\\n\\n"
-                    f"Projeto: {self.project_id}\\n"
-                    f"Pasta: {self.folder.text().strip()}\\n"
-                    f"Arquivos conferidos: {checked['files_checked']}\\n\\n"
+        question = ("SIMULACAO - nenhuma publicacao sera executada.\n\n"
+                    f"Projeto: {self.project_id}\n"
+                    f"Pasta: {self.folder.text().strip()}\n"
+                    f"Arquivos conferidos: {checked['files_checked']}\n\n"
                     "Confirmar somente o ensaio de autorizacao?")
-        choice = QMessageBox.question(self, "Revisao de autorizacao (sem publicar)",
-                                      question, QMessageBox.Yes | QMessageBox.No,
-                                      QMessageBox.No)
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Revisao de autorizacao (sem publicar)")
+        dialog.setIcon(QMessageBox.Question)
+        dialog.setText(question)
+        dialog.setMinimumWidth(500)
+        confirm_btn = dialog.addButton("Confirmar simulacao", QMessageBox.AcceptRole)
+        dialog.addButton("Cancelar", QMessageBox.RejectRole)
+        dialog.exec()
+        accepted = dialog.clickedButton() is confirm_btn
         self.notice.setText("Simulacao registrada na interface. Nenhum indice alterado."
-                            if choice == QMessageBox.Yes else
+                            if accepted else
                             "Simulacao cancelada. Nenhum indice alterado.")
         self.index_btn.setEnabled(False)
 

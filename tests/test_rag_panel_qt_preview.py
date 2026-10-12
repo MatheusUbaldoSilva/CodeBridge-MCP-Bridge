@@ -58,11 +58,16 @@ class RagPanelQtPreviewTests(unittest.TestCase):
         self._pending()
         self.panel._complete("plan", self._response(), "")
         self.assertTrue(self.panel.review_auth_btn.isEnabled())
-        with patch.object(QMessageBox, "question", return_value=QMessageBox.Yes) as dialog:
+        def accept(dialog):
+            self.assertIn("Projeto: demo\n", dialog.text())
+            self.assertIn("Arquivos conferidos: 1\n", dialog.text())
+            self.assertNotIn(r"\\n", dialog.text())
+            self.assertGreaterEqual(dialog.minimumWidth(), 500)
+            self.assertEqual([b.text() for b in dialog.buttons()],
+                             ["Confirmar simulacao", "Cancelar"])
+            dialog.buttons()[0].click()
+        with patch.object(QMessageBox, "exec", accept):
             self.panel.review_authorization()
-        dialog.assert_called_once()
-        self.assertIn("Projeto: demo", dialog.call_args.args[2])
-        self.assertIn("Arquivos conferidos: 1", dialog.call_args.args[2])
         self.assertFalse(self.panel.index_btn.isEnabled())
         self.assertIn("Nenhum indice alterado", self.panel.notice.text())
         self.panel.cancel_preview()
