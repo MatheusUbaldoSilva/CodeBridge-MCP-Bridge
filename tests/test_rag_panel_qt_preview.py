@@ -61,6 +61,7 @@ class RagPanelQtPreviewTests(unittest.TestCase):
         def accept(dialog):
             self.assertIn("Projeto: demo\n", dialog.text())
             self.assertIn("Arquivos conferidos: 1\n", dialog.text())
+            self.assertIn("Identificador da revisao: ", dialog.text())
             self.assertNotIn(r"\\n", dialog.text())
             self.assertGreaterEqual(dialog.minimumWidth(), 500)
             self.assertEqual([b.text() for b in dialog.buttons()],
@@ -72,6 +73,20 @@ class RagPanelQtPreviewTests(unittest.TestCase):
         self.assertIn("Nenhum indice alterado", self.panel.notice.text())
         self.panel.cancel_preview()
         self.assertFalse(self.panel.review_auth_btn.isEnabled())
+
+    def test_changed_during_authorization_dialog_is_blocked(self):
+        self._pending()
+        self.panel._complete("plan", self._response(), "")
+        def change_after_review(dialog):
+            (self.root / "a.md").write_text("changed after opening", encoding="utf-8")
+            dialog.buttons()[0].click()
+        with patch.object(QMessageBox, "exec", change_after_review), patch.object(
+                QMessageBox, "warning") as warning:
+            self.panel.review_authorization()
+        warning.assert_called_once()
+        self.assertIsNone(self.panel._preview_snapshot)
+        self.assertFalse(self.panel.review_auth_btn.isEnabled())
+        self.assertFalse(self.panel.index_btn.isEnabled())
 
     def test_authorization_rehearsal_rejects_stale_file(self):
         self._pending()

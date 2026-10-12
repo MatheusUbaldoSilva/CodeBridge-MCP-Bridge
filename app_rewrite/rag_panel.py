@@ -282,18 +282,20 @@ class RagPanel(QWidget):
         """UI-only rehearsal: no indexing, credentials or persistent approval."""
         if self._busy or self._preview_snapshot is None:
             return
-        from rag.runtime.incremental_preview_confirmation import revalidate_preview
+        from rag.runtime.incremental_review_contract import (
+            build_review_contract, verify_review_contract)
         try:
-            checked = revalidate_preview(self._preview_snapshot, self.project_id,
-                                         self.folder.text().strip())
+            contract = build_review_contract(self._preview_snapshot, self.project_id,
+                                             self.folder.text().strip())
         except (ValueError, OSError) as exc:
             self.cancel_preview()
             QMessageBox.warning(self, "Previa desatualizada", str(exc))
             return
         question = ("SIMULACAO - nenhuma publicacao sera executada.\n\n"
-                    f"Projeto: {self.project_id}\n"
-                    f"Pasta: {self.folder.text().strip()}\n"
-                    f"Arquivos conferidos: {checked['files_checked']}\n\n"
+                    f"Projeto: {contract['project']}\n"
+                    f"Pasta: {contract['folder']}\n"
+                    f"Arquivos conferidos: {contract['files_checked']}\n"
+                    f"Identificador da revisao: {contract['review_sha256'][:12]}\n\n"
                     "Confirmar somente o ensaio de autorizacao?")
         dialog = QMessageBox(self)
         dialog.setWindowTitle("Revisao de autorizacao (sem publicar)")
@@ -304,6 +306,14 @@ class RagPanel(QWidget):
         dialog.addButton("Cancelar", QMessageBox.RejectRole)
         dialog.exec()
         accepted = dialog.clickedButton() is confirm_btn
+        if accepted:
+            try:
+                verify_review_contract(self._preview_snapshot, self.project_id,
+                                       self.folder.text().strip(), contract)
+            except (ValueError, OSError) as exc:
+                self.cancel_preview()
+                QMessageBox.warning(self, "Revisao desatualizada", str(exc))
+                return
         self.notice.setText("Simulacao registrada na interface. Nenhum indice alterado."
                             if accepted else
                             "Simulacao cancelada. Nenhum indice alterado.")
