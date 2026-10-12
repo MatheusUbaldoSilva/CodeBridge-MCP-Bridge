@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-SESSION_ID = re.compile(r"^codebridge_[a-f0-9]{32}$")
+SESSION_ID = re.compile(r"^codebridge_[a-f0-9]{16,32}$")
 STAGES = {"RUNNING", "PREPARE_WRAP_UP", "WRAP_UP_NOW", "FINISHED"}
 
 

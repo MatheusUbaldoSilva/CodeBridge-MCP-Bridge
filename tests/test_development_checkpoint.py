@@ -1,4 +1,4 @@
-﻿"""Persistence and validation checks for development-session checkpoints."""
+"""Persistence and validation checks for development-session checkpoints."""
 import sys
 import tempfile
 import unittest
@@ -12,7 +12,7 @@ class DevelopmentCheckpointTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.db = Path(self.tmp.name) / "sessions.sqlite3"
-        self.sid = "codebridge_" + "a" * 32
+        self.sid = "codebridge_" + "a" * 16
         self.store = DevelopmentCheckpoints(self.db)
 
     def test_persistent_resume_and_revision(self):

@@ -25,7 +25,7 @@ class DevelopmentMCPTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.file = Path(self.temp.name) / "checkpoint.sqlite3"
-        self.sid = "codebridge_" + "a" * 32
+        self.sid = "codebridge_" + "a" * 16
         self.control = {"stage": "NORMAL", "claimed_by_codebridge": True,
                         "request_id": self.sid}
         self.server = FakeMCP()
