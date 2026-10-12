@@ -1,0 +1,62 @@
+import tempfile
+import sys
+import unittest
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from test_incremental_bundle_validate import fixture
+from rag.runtime.generation_activation import activate_test_generation
+from rag.runtime.generation_pointer import resolve_generation
+from rag.runtime.incremental_preview_confirmation import snapshot_preview
+from rag.runtime.generation_test_authorization import TestPublicationAuthorization
+
+
+class TestOnlyAuthorizationTests(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root=Path(self.temp.name)/"codebridge-rag-generation-test"
+        for name in ("one","two"):
+            folder=self.root/"generations"/name
+            folder.mkdir(parents=True)
+            fixture(folder)
+        activate_test_generation(self.root,"one")
+        self.inputs=Path(self.temp.name)/"selected"
+        self.inputs.mkdir()
+        (self.inputs/"report.md").write_text("initial",encoding="utf-8")
+        self.snapshot=snapshot_preview("demo",self.inputs,[{"path":"report.md"}])
+
+    def authorization(self):
+        return TestPublicationAuthorization(
+            self.root,"one","two","demo",self.inputs,self.snapshot)
+
+    def test_confirmed_once_publishes_to_isolated_root(self):
+        authorization=self.authorization()
+        result=authorization.execute(confirmed=True,backup_name="before")
+        self.assertEqual(result["state"],"BACKUP_GATED_TEST_PUBLICATION")
+        self.assertEqual(resolve_generation(self.root).generation,"two")
+        with self.assertRaisesRegex(ValueError,"consumed"):
+            authorization.execute(confirmed=True,backup_name="again")
+
+    def test_denied_confirmation_cannot_publish_or_be_reused(self):
+        authorization=self.authorization()
+        with self.assertRaisesRegex(ValueError,"explicit confirmation"):
+            authorization.execute(confirmed=False,backup_name="before")
+        self.assertEqual(resolve_generation(self.root).generation,"one")
+        with self.assertRaisesRegex(ValueError,"consumed"):
+            authorization.execute(confirmed=True,backup_name="before")
+
+    def test_stale_snapshot_blocks_publish(self):
+        authorization=self.authorization()
+        (self.inputs/"report.md").write_text("changed",encoding="utf-8")
+        with self.assertRaisesRegex(ValueError,"changed"):
+            authorization.execute(confirmed=True,backup_name="before")
+        self.assertEqual(resolve_generation(self.root).generation,"one")
+        self.assertFalse((self.root/"backups"/"before").exists())
+
+    def test_non_test_root_rejected(self):
+        with self.assertRaisesRegex(ValueError,"isolated"):
+            TestPublicationAuthorization(self.inputs,"one","two","demo",
+                                         self.inputs,self.snapshot)
+
+if __name__=="__main__":
+    unittest.main()
