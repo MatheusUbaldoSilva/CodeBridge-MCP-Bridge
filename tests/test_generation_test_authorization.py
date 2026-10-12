@@ -3,7 +3,7 @@ import sys
 import unittest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from test_incremental_bundle_validate import fixture
+from test_incremental_bundle_e2e import create_bundle
 from rag.runtime.generation_activation import activate_test_generation
 from rag.runtime.generation_pointer import resolve_generation
 from rag.runtime.incremental_preview_confirmation import snapshot_preview
@@ -16,20 +16,21 @@ class TestOnlyAuthorizationTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)/"codebridge-rag-generation-test"
-        for name in ("one","two"):
-            folder=self.root/"generations"/name
-            folder.mkdir(parents=True)
-            fixture(folder)
+        (self.root/"generations").mkdir(parents=True)
+        create_bundle(self.root/"generations"/"one",
+                      [("a","doc","hello"),("b","other","preserved")])
+        create_bundle(self.root/"generations"/"two",
+                      [("a","doc","updated"),("b","other","preserved")])
         activate_test_generation(self.root,"one")
         self.inputs=Path(self.temp.name)/"selected"
         self.inputs.mkdir()
-        (self.inputs/"report.md").write_text("initial",encoding="utf-8")
-        self.snapshot=snapshot_preview("demo",self.inputs,[{"path":"report.md"}])
-        self.contract=build_review_contract(self.snapshot,"demo",self.inputs)
+        (self.inputs/"doc.md").write_text("updated",encoding="utf-8")
+        self.snapshot=snapshot_preview("a",self.inputs,[{"path":"doc.md"}])
+        self.contract=build_review_contract(self.snapshot,"a",self.inputs)
 
     def authorization(self):
         return TestPublicationAuthorization(
-            self.root,"one","two","demo",self.inputs,self.snapshot,self.contract)
+            self.root,"one","two","a",self.inputs,self.snapshot,self.contract)
 
     def test_confirmed_once_publishes_to_isolated_root(self):
         authorization=self.authorization()
@@ -49,7 +50,7 @@ class TestOnlyAuthorizationTests(unittest.TestCase):
 
     def test_stale_snapshot_blocks_publish(self):
         authorization=self.authorization()
-        (self.inputs/"report.md").write_text("changed",encoding="utf-8")
+        (self.inputs/"doc.md").write_text("changed",encoding="utf-8")
         with self.assertRaisesRegex(ValueError,"changed"):
             authorization.execute(confirmed=True,review_contract=self.contract,backup_name="before")
         self.assertEqual(resolve_generation(self.root).generation,"one")
@@ -116,9 +117,24 @@ class TestOnlyAuthorizationTests(unittest.TestCase):
             authorization.execute(confirmed=True, review_contract=self.contract,
                                   backup_name="before")
 
+    def test_unreviewed_candidate_blocks_publication_and_backup(self):
+        create_bundle(self.root/"generations"/"three",
+                      [("a","doc","updated"),("a","extra","unreviewed"),
+                       ("b","other","preserved")])
+        authorization=TestPublicationAuthorization(
+            self.root,"one","three","a",self.inputs,self.snapshot,self.contract)
+        with self.assertRaisesRegex(ValueError,"unreviewed"):
+            authorization.execute(confirmed=True,review_contract=self.contract,
+                                  backup_name="blocked")
+        self.assertEqual(resolve_generation(self.root).generation,"one")
+        self.assertFalse((self.root/"backups"/"blocked").exists())
+        with self.assertRaisesRegex(ValueError,"consumed"):
+            authorization.execute(confirmed=True,review_contract=self.contract,
+                                  backup_name="retry")
+
     def test_non_test_root_rejected(self):
         with self.assertRaisesRegex(ValueError,"isolated"):
-            TestPublicationAuthorization(self.inputs,"one","two","demo",
+            TestPublicationAuthorization(self.inputs,"one","two","a",
                                          self.inputs,self.snapshot,self.contract)
 
 if __name__=="__main__":
