@@ -29,6 +29,21 @@ class SyntheticStopTests(unittest.TestCase):
         self.assertFalse(result["copy_authorized"])
         self.assertFalse(result["production_quiescence_proven"])
 
+    def test_external_cli_does_not_authorize_real_backup(self):
+        import json
+        import subprocess
+        cli = Path(__file__).resolve().parents[1] / "rag_offline_synthetic_stop_cli.py"
+        base = [sys.executable, str(cli), "--fixture-root", str(self.root)]
+        denied = subprocess.run(base, capture_output=True, text=True, timeout=15)
+        self.assertNotEqual(denied.returncode, 0)
+        result = subprocess.run(base + ["--lab-only"], capture_output=True,
+                                text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        self.assertEqual(report["stores_verified"], 3)
+        self.assertFalse(report["copy_authorized"])
+        self.assertFalse(report["production_quiescence_proven"])
+
     def test_non_fixture_path_is_rejected(self):
         with self.assertRaises(OfflineFixtureError):
             run_synthetic_stop_trial(self.root.parent)
