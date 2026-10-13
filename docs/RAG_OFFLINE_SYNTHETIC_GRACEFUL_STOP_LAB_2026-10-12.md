@@ -16,3 +16,5 @@ de índices Qdrant, cache mmap, bancos SQLite de produção ou adaptadores.
 Os resultados incluem `copy_authorized=false`.
 
 Aprovação e execução de manutenção no ambiente real continuam pendentes.
+
+Extensão: o filho agora mantém simultaneamente handles de SQLite, manifesto e um arquivo Qdrant sintéticos. A ausência de qualquer armazenamento bloqueia antes de iniciar o filho.

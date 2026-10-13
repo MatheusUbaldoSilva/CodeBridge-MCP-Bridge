@@ -25,6 +25,7 @@ class SyntheticStopTests(unittest.TestCase):
         self.assertTrue(result["writer_was_blocked"])
         self.assertTrue(result["handle_released"])
         self.assertEqual(result["child_exit_code"], 0)
+        self.assertEqual(result["stores_verified"], 3)
         self.assertFalse(result["copy_authorized"])
         self.assertFalse(result["production_quiescence_proven"])
 
@@ -34,6 +35,17 @@ class SyntheticStopTests(unittest.TestCase):
 
     def test_missing_database_is_rejected(self):
         (self.root / "rag_index.sqlite3").unlink()
+        with self.assertRaises(SyntheticStopTrialError):
+            run_synthetic_stop_trial(self.root)
+
+    def test_missing_manifest_rejected_before_spawning_child(self):
+        (self.root / "rag-index-manifest.json").unlink()
+        with self.assertRaises(SyntheticStopTrialError):
+            run_synthetic_stop_trial(self.root)
+
+    def test_missing_qdrant_rejected_before_spawning_child(self):
+        import shutil
+        shutil.rmtree(self.root / "qdrant")
         with self.assertRaises(SyntheticStopTrialError):
             run_synthetic_stop_trial(self.root)
 
