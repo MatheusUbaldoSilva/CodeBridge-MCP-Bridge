@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
 import subprocess
 import sys
 
@@ -39,6 +40,8 @@ def run_synthetic_stop_trial(fixture_root, *, timeout=8):
         raise SyntheticStopTrialError("synthetic cross-store fixture unavailable")
     if not 1 <= timeout <= 20:
         raise SyntheticStopTrialError("invalid timeout")
+    before = {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+              for p in sources}
     proc = subprocess.Popen([sys.executable, "-c", _CHILD, *(str(p) for p in sources)],
                             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE, text=True)
@@ -58,10 +61,14 @@ def run_synthetic_stop_trial(fixture_root, *, timeout=8):
         if proc.returncode != 0:
             raise SyntheticStopTrialError("synthetic child did not exit cleanly")
         with hold_fixture_files_readonly(sources):
-            pass
+            after = {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+                     for p in sources}
+        if before != after:
+            raise SyntheticStopTrialError("synthetic stores changed during shutdown")
         return {"state": "LAB_CHILD_GRACEFULLY_STOPPED",
                 "writer_was_blocked": True, "handle_released": True,
                 "child_exit_code": 0, "stores_verified": 3,
+                "source_hashes_preserved": True,
                 "production_quiescence_proven": False,
                 "copy_authorized": False, "publication_authorized": False}
     finally:

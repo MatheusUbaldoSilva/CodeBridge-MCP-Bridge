@@ -20,3 +20,5 @@ Aprovação e execução de manutenção no ambiente real continuam pendentes.
 Extensão: o filho agora mantém simultaneamente handles de SQLite, manifesto e um arquivo Qdrant sintéticos. A ausência de qualquer armazenamento bloqueia antes de iniciar o filho.
 
 Execução autônoma: python rag_offline_synthetic_stop_cli.py --fixture-root RAIZ_SINTETICA --lab-only. Código 0 significa apenas que o ensaio sintético passou; copy_authorized permanece false.
+
+A prova em laboratório também exige SHA-256 inalterado dos três arquivos amostrados antes e após o encerramento do filho, além de não interromper um processo sintético não relacionado.

@@ -26,6 +26,7 @@ class SyntheticStopTests(unittest.TestCase):
         self.assertTrue(result["handle_released"])
         self.assertEqual(result["child_exit_code"], 0)
         self.assertEqual(result["stores_verified"], 3)
+        self.assertTrue(result["source_hashes_preserved"])
         self.assertFalse(result["copy_authorized"])
         self.assertFalse(result["production_quiescence_proven"])
 
@@ -52,6 +53,17 @@ class SyntheticStopTests(unittest.TestCase):
         (self.root / "rag_index.sqlite3").unlink()
         with self.assertRaises(SyntheticStopTrialError):
             run_synthetic_stop_trial(self.root)
+
+    def test_unrelated_process_survives_synthetic_shutdown(self):
+        import subprocess
+        stranger = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(10)"])
+        try:
+            result = run_synthetic_stop_trial(self.root)
+            self.assertTrue(result["handle_released"])
+            self.assertIsNone(stranger.poll(), "unrelated process was terminated")
+        finally:
+            stranger.terminate()
+            stranger.wait(timeout=10)
 
     def test_missing_manifest_rejected_before_spawning_child(self):
         (self.root / "rag-index-manifest.json").unlink()
