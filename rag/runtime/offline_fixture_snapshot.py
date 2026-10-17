@@ -43,6 +43,15 @@ def _hash_tree(root):
     return hashes
 
 
+def _qdrant_sqlite_sidecars(tree):
+    for path in Path(tree).rglob("*"):
+        name = path.name.lower()
+        for suffix in ("-wal", "-shm", "-journal"):
+            if name.endswith(suffix) and name[:-len(suffix)].endswith((".sqlite", ".sqlite3", ".db")):
+                return True
+    return False
+
+
 def capture_fixture(source_root, backup_name):
     root = _root(source_root)
     try:
@@ -75,6 +84,8 @@ def _capture_guarded(root, backup_name):
     target = backups / backup_name
     if _redirected(backups) or target.exists() or _redirected(target):
         raise OfflineFixtureError("existing or redirected backup forbidden")
+    if _qdrant_sqlite_sidecars(root / "qdrant"):
+        raise OfflineFixtureError("Qdrant SQLite sidecar blocks capture")
     before = _hash_tree(root / "qdrant")
     db_hash = hashlib.sha256(db.read_bytes()).hexdigest()
     manifest_hash = hashlib.sha256((root / "rag-index-manifest.json").read_bytes()).hexdigest()

@@ -9,7 +9,7 @@ import tempfile
 
 from rag.runtime.generation_process_lock import generation_lock, GenerationBusy
 from rag.runtime.incremental_bundle_validate import validate_incremental_bundle
-from rag.runtime.offline_fixture_snapshot import _root, _hash_tree, _redirected, OfflineFixtureError
+from rag.runtime.offline_fixture_snapshot import _root, _hash_tree, _redirected, OfflineFixtureError, _qdrant_sqlite_sidecars
 
 
 class OfflineFixtureRestoreError(RuntimeError):
@@ -41,6 +41,8 @@ def _restore_locked(root, backup_name, restored_name):
     if any((payload / ("rag_index.sqlite3" + suffix)).exists()
            for suffix in ("-wal", "-shm", "-journal")):
         raise OfflineFixtureRestoreError("unexpected SQLite sidecar")
+    if _qdrant_sqlite_sidecars(payload / "qdrant"):
+        raise OfflineFixtureRestoreError("Qdrant SQLite sidecar blocks restore")
     if destination.exists() or not metadata.is_file() or not payload.is_dir():
         raise OfflineFixtureRestoreError("missing snapshot or existing target")
     try:
