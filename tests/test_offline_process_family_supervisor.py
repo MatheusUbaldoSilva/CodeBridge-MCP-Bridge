@@ -29,6 +29,18 @@ class FamilySupervisorTests(unittest.TestCase):
  def test_descendant_reappearing_blocks(self):
   r=inspect_family_shutdown_samples(10,[shot(row(10,0),row(11,10)),shot(row(11,10)),shot(row(10,0),row(11,10))])
   self.assertIn("FAMILY_PROCESS_REAPPEARED",r["issues"])
+ def test_missing_parent_identity_blocks_initial_snapshot(self):
+  data=shot(row(10,0))
+  data["verified_pids"][0].pop("created_at")
+  r=inspect_family_shutdown_samples(10,[data,shot(),shot()])
+  self.assertEqual(r["state"],"BLOCKED")
+  self.assertFalse(r["copy_authorized"])
+ def test_missing_child_identity_blocks_followup(self):
+  incomplete=shot(row(11,10))
+  incomplete["verified_pids"][0].pop("executable_fingerprint")
+  r=inspect_family_shutdown_samples(10,[shot(row(10,0),row(11,10)),incomplete,shot()])
+  self.assertEqual(r["state"],"BLOCKED")
+  self.assertFalse(r["copy_authorized"])
  def test_untrusted_snapshot_blocks(self):
   bad=shot();bad["identity_inventory_ok"]=False
   r=inspect_family_shutdown_samples(10,[shot(row(10,0)),bad,shot()])
