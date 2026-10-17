@@ -54,6 +54,23 @@ class FamilyLineageTests(unittest.TestCase):
         data=basic();data[0]["verified_pids"][0]["created_at"]="2090-01-01T00:00:00+00:00"
         self.assertIn("PROCESS_BORN_AFTER_OBSERVATION",
                       assess_scoped_family_timeline(10,data)["issues"])
+    def test_orphan_child_still_active_blocks(self):
+        data=basic()
+        data[2]["verified_pids"]=[person(11,10,YOUNG)]
+        data[3]["verified_pids"]=[person(11,10,YOUNG)]
+        self.assertIn("FAMILY_EXIT_UNPROVEN",
+                      assess_scoped_family_timeline(10,data)["issues"])
+    def test_late_spawn_after_first_sample_blocks(self):
+        data=basic()
+        data[0]["verified_pids"]=[person(10,0,OLD)]
+        data[1]["verified_pids"]=[person(10,0,OLD),person(11,10,YOUNG)]
+        self.assertIn("FAMILY_EXIT_UNPROVEN",
+                      assess_scoped_family_timeline(10,data)["issues"])
+    def test_reparented_child_blocks(self):
+        data=basic()
+        data[1]["verified_pids"][0]=dict(data[1]["verified_pids"][0],parent_pid=999)
+        self.assertIn("PROCESS_REPARENTED_OR_PPID_CHANGED",
+                      assess_scoped_family_timeline(10,data)["issues"])
     def test_unknown_birth_format_blocks(self):
         data=basic();data[0]["verified_pids"][0]["created_at"]="not-a-time"
         self.assertEqual(assess_scoped_family_timeline(10,data)["state"],"BLOCKED")

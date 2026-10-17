@@ -36,6 +36,7 @@ def assess_scoped_family_timeline(root_pid, samples):
             return report
         baseline = dict(first)
         identities = {}
+        parents = {}
         for sample in samples:
             for row in sample["verified_pids"]:
                 pid = row["pid"]
@@ -45,6 +46,10 @@ def assess_scoped_family_timeline(root_pid, samples):
                     report["issues"].append("PID_REUSED_OR_IDENTITY_CHANGED")
                     return report
                 identities[pid] = identity
+                if pid in parents and parents[pid] != row["parent_pid"]:
+                    report["issues"].append("PROCESS_REPARENTED_OR_PPID_CHANGED")
+                    return report
+                parents[pid] = row["parent_pid"]
                 if birth > datetime.fromisoformat(sample["observed_end_utc"]).astimezone(timezone.utc):
                     report["issues"].append("PROCESS_BORN_AFTER_OBSERVATION")
                     return report
