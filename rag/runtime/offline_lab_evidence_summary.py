@@ -12,6 +12,10 @@ def summarize_lab_evidence(*, process_exit, handle_probe, restore_audit,
         if any(not isinstance(x, dict) for x in items):
             raise ValueError("invalid report")
         for name, report in zip(("process", "handles", "restore"), items):
+            if report.get("issues") not in (None, []):
+                result["issues"].append(name + "_HAS_UNRESOLVED_ISSUES")
+            if "error_type" in report or "operation_error" in report:
+                result["issues"].append(name + "_REPORTED_ERROR")
             mandatory_flag = ("production_authorized" if name == "restore"
                               else "copy_authorized")
             if report.get(mandatory_flag) is not False:

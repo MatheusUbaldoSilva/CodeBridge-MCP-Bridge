@@ -42,6 +42,15 @@ class EvidenceSummaryTests(unittest.TestCase):
     def test_embedded_false_claim_of_global_shutdown_blocks(self):
         r=self.report(process={**P,"all_handles_closed":True})
         self.assertIn("process_CLAIMS_AUTHORIZATION",r["issues"])
+    def test_success_state_with_errors_still_blocks(self):
+        r=self.report(process={**P,"issues":["STALE_EVIDENCE"]})
+        self.assertIn("process_HAS_UNRESOLVED_ISSUES",r["issues"])
+        self.assertFalse(r["evidence_complete"])
+    def test_success_state_with_error_marker_blocks(self):
+        r=self.report(restore={**R,"error_type":"UnexpectedCorruption"})
+        self.assertIn("restore_REPORTED_ERROR",r["issues"])
+        self.assertFalse(r["copy_authorized"])
+
     def test_unverified_inventory_blocks(self):
         r=self.report(inventory={"identity_inventory_ok":False,"unverified_count":1})
         self.assertIn("FULL_PROCESS_INVENTORY_UNTRUSTED",r["issues"])
