@@ -80,6 +80,23 @@ class RestoreEquivalenceTests(unittest.TestCase):
         folder.symlink_to(original,target_is_directory=True)
         r=audit_restored_fixture(self.root,"first","recovered")
         self.assertEqual(r["state"],"BLOCKED")
+    def test_hardlinked_restored_sqlite_blocks(self):
+        import os
+        sqlite=self.root/"offline-fixture-restores"/"recovered"/"snapshot"/"rag_index.sqlite3"
+        outside=self.root.parent/"linked_synthetic.sqlite"
+        sqlite.rename(outside)
+        os.link(outside,sqlite)
+        result=audit_restored_fixture(self.root,"first","recovered")
+        self.assertEqual(result["state"],"BLOCKED")
+        self.assertFalse(result["same_hashes"])
+    def test_manifest_omitted_from_report_blocks(self):
+        import json
+        metadata=self.root/"offline-fixture-backups"/"first"/"report.json"
+        report=json.loads(metadata.read_text(encoding="utf-8"))
+        report["hashes"].pop("rag-index-manifest.json")
+        metadata.write_text(json.dumps(report),encoding="utf-8")
+        result=audit_restored_fixture(self.root,"first","recovered")
+        self.assertEqual(result["state"],"BLOCKED")
     def test_unknown_restore_blocks(self):
         r=audit_restored_fixture(self.root,"first","missing")
         self.assertEqual(r["state"],"BLOCKED")
