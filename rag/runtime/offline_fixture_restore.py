@@ -36,8 +36,11 @@ def _restore_locked(root, backup_name, restored_name):
     destination = destination_parent / restored_name
     for path in (backup.parent, backup, payload, metadata,
                  destination_parent, destination):
-        if _redirected(path):
+        if any(_redirected(part) for part in (path, *path.parents)):
             raise OfflineFixtureRestoreError("redirected path forbidden")
+    if any((payload / ("rag_index.sqlite3" + suffix)).exists()
+           for suffix in ("-wal", "-shm", "-journal")):
+        raise OfflineFixtureRestoreError("unexpected SQLite sidecar")
     if destination.exists() or not metadata.is_file() or not payload.is_dir():
         raise OfflineFixtureRestoreError("missing snapshot or existing target")
     try:

@@ -96,6 +96,19 @@ class OfflineFixtureRestoreTests(unittest.TestCase):
             restore_fixture_snapshot(self.root, "saved", "corrupted")
         self.assertFalse((self.root / "offline-fixture-restores" / "corrupted").exists())
 
+    def test_restore_rejects_sqlite_sidecar_in_backup(self):
+        source=self.root/"offline-fixture-backups"/"saved"/"snapshot"
+        (source/"rag_index.sqlite3-wal").write_bytes(b"synthetic")
+        with self.assertRaises(OfflineFixtureRestoreError):
+            restore_fixture_snapshot(self.root,"saved","unsafe")
+
+    def test_restore_rejects_redirected_backup_ancestor(self):
+        folder=self.root/"offline-fixture-backups"
+        real=folder.with_name("original_backups")
+        folder.rename(real)
+        folder.symlink_to(real,target_is_directory=True)
+        with self.assertRaises(OfflineFixtureRestoreError):
+            restore_fixture_snapshot(self.root,"saved","redirected")
     def test_wrong_root_rejected(self):
         with self.assertRaises((ValueError, RuntimeError)):
             restore_fixture_snapshot(self.root.parent, "saved", "recovered")
