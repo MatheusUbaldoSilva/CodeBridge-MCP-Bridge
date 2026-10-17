@@ -7,6 +7,7 @@ import hashlib
 import json
 import subprocess
 from datetime import datetime, timezone
+from rag.runtime.offline_process_lineage_evidence import _birth_timestamp
 
 def observe_scoped_windows_pids(pids, *, runner=None, clock=None):
     response = {
@@ -40,7 +41,12 @@ def observe_scoped_windows_pids(pids, *, runner=None, clock=None):
             ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
             capture_output=True, text=True, timeout=20, check=True)
         response["observed_end_utc"] = timestamp()
-        raw = json.loads(result.stdout) if result.stdout.strip() else []
+        if datetime.fromisoformat(response["observed_end_utc"]) < datetime.fromisoformat(response["observed_start_utc"]):
+            raise ValueError("observer clock reversed")
+        output = getattr(result, "stdout", None)
+        if not isinstance(output, str) or len(output) > 1024 * 1024:
+            raise ValueError("untrusted CIM output size/type")
+        raw = json.loads(output) if output.strip() else []
         rows = raw if isinstance(raw, list) else ([] if raw is None else [raw])
         seen = set()
         for row in rows:
@@ -52,9 +58,10 @@ def observe_scoped_windows_pids(pids, *, runner=None, clock=None):
                     type(parent) is not int or parent < 0):
                 raise ValueError("invalid CIM process identity")
             seen.add(pid)
-            if not born or not exe:
+            if not isinstance(born, str) or not isinstance(exe, str) or not born or not exe:
                 response["unverified_count"] += 1
                 continue
+            _birth_timestamp(born)
             response["verified_pids"].append({
                 "pid": pid, "parent_pid": parent, "created_at": str(born),
                 "executable_fingerprint": hashlib.sha256(
@@ -62,10 +69,14 @@ def observe_scoped_windows_pids(pids, *, runner=None, clock=None):
             })
         response["verified_pids"].sort(key=lambda row: row["pid"])
         if response["unverified_count"]:
+            response["verified_pids"] = []
             response["issues"].append("PROCESS_IDENTITY_UNAVAILABLE")
         else:
             response["identity_inventory_ok"] = True
             response["state"] = "SCOPED_CIM_OBSERVATION_UNPROVEN"
-    except (ValueError, TypeError, OSError, KeyError, subprocess.SubprocessError) as exc:
+    except (ValueError, TypeError, OSError, KeyError, OverflowError,
+            subprocess.SubprocessError) as exc:
+        response["identity_inventory_ok"] = False
+        response["verified_pids"] = []
         response["issues"].append(type(exc).__name__)
     return response

@@ -5,7 +5,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from rag.runtime.offline_scoped_cim_observer import observe_scoped_windows_pids
 from rag.runtime.offline_process_sample_contract import validate_observation_series
 
-def row(pid, parent=0, born="20261017120000", path="C:/lab/python.exe"):
+def row(pid, parent=0, born="/Date(1792264281643)/", path="C:/lab/python.exe"):
     return dict(ProcessId=pid, ParentProcessId=parent, CreationDate=born, ExecutablePath=path)
 def runner(data):
     return lambda *a, **kw: SimpleNamespace(stdout=json.dumps(data))
@@ -53,6 +53,55 @@ class ScopedObserverTests(unittest.TestCase):
         out=observe_scoped_windows_pids([100],runner=fails)
         self.assertEqual(out["state"],"BLOCKED")
         self.assertEqual(out["issues"],["OSError"])
+    def test_timeout_blocks_without_disclosing_paths(self):
+        import subprocess
+        def timeout(*args, **kwargs):
+            raise subprocess.TimeoutExpired("powershell.exe", 20)
+        result=observe_scoped_windows_pids([100],runner=timeout)
+        self.assertEqual(result["state"], "BLOCKED")
+        self.assertEqual(result["verified_pids"], [])
+        self.assertIn("TimeoutExpired", result["issues"])
+    def test_permission_failure_blocks(self):
+        import subprocess
+        def denied(*args, **kwargs):
+            raise subprocess.CalledProcessError(5,"powershell.exe")
+        result=observe_scoped_windows_pids([100],runner=denied)
+        self.assertIn("CalledProcessError",result["issues"])
+        self.assertFalse(result["copy_authorized"])
+    def test_partially_parsed_report_fails_atomically(self):
+        result=observe_scoped_windows_pids([100,101],runner=runner(
+            [row(100),row(101,path="")]))
+        self.assertEqual(result["state"],"BLOCKED")
+        self.assertFalse(result["identity_inventory_ok"])
+        self.assertEqual(result["verified_pids"], [])
+    def test_partial_bad_row_clears_all_verified_rows(self):
+        result=observe_scoped_windows_pids([100,101],runner=runner(
+            [row(100),dict(row(101),ParentProcessId=-1)]))
+        self.assertEqual(result["state"],"BLOCKED")
+        self.assertEqual(result["verified_pids"],[])
+    def test_malformed_creation_time_blocks(self):
+        result=observe_scoped_windows_pids([100],runner=runner([row(100,born="invented")]))
+        self.assertEqual(result["state"],"BLOCKED")
+        self.assertEqual(result["verified_pids"],[])
+    def test_oversized_stdout_blocks(self):
+        result=observe_scoped_windows_pids([100],runner=lambda *a,**kw:
+            SimpleNamespace(stdout="x" * (1024*1024 + 1)))
+        self.assertEqual(result["state"],"BLOCKED")
+    def test_cim_json_malformed_blocks(self):
+        result=observe_scoped_windows_pids([100],runner=lambda *a,**kw:
+            SimpleNamespace(stdout="[garbled"))
+        self.assertEqual(result["state"],"BLOCKED")
+    def test_unverifiable_executable_type_blocks(self):
+        result=observe_scoped_windows_pids([100],runner=runner([row(100,path=7)]))
+        self.assertEqual(result["state"],"BLOCKED")
+    def test_clock_reversal_fails_closed(self):
+        from datetime import datetime, timedelta, timezone
+        first=datetime(2026,10,17,tzinfo=timezone.utc)
+        moments=iter([first,first-timedelta(seconds=1)])
+        result=observe_scoped_windows_pids(
+            [100],runner=runner([row(100)]),clock=lambda:next(moments))
+        self.assertEqual(result["state"],"BLOCKED")
+        self.assertFalse(result["identity_inventory_ok"])
     def test_does_not_ask_for_command_line(self):
         calls=[]
         def fake(command,**kw):
