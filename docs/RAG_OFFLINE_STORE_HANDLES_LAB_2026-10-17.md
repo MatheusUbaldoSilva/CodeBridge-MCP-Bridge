@@ -17,3 +17,5 @@ Sempre `copy_authorized=false`, `all_handles_closed=false` e
 A verificacao adicional compara SHA-256 de SQLite, manifesto e arquivos Qdrant durante a janela protegida e bloqueia divergencias; nao substitui consistencia semantica entre os stores.
 
 Adicionado ensaio concorrente com escritor Python para SQLite, manifesto e arquivo Qdrant separadamente; todos devem resultar BLOCKED.
+
+Ensaio de processo pai encerrado: filho sintetico mantem SQLite aberto apos saida do pai, e o probe permanece BLOCKED ate o proprio filho encerrar normalmente. Nenhum taskkill e usado.

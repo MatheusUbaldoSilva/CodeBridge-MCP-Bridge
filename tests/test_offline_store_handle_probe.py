@@ -79,6 +79,38 @@ class StoreHandleTests(unittest.TestCase):
             p.terminate()
             p.communicate(timeout=10)
 
+    def test_exited_parent_with_orphan_writer_still_blocks(self):
+        import subprocess
+        import time
+        sqlite_path=self.root/"rag_index.sqlite3"
+        ready=self.root/"child-ready.txt"
+        writer=("import sys,time;"
+                "f=open(sys.argv[1],'r+b',buffering=0);"
+                "open(sys.argv[2],'w').write('ready');"
+                "time.sleep(3)")
+        parent=("import subprocess,sys;"
+                "p=subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2],sys.argv[3]],"
+                "stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);"
+                "print(p.pid,flush=True)")
+        launch=subprocess.run([sys.executable,"-c",parent,writer,str(sqlite_path),str(ready)],
+                              capture_output=True,text=True,timeout=10)
+        self.assertEqual(launch.returncode,0,launch.stderr)
+        child_pid=int(launch.stdout.strip())
+        try:
+            for _ in range(40):
+                if ready.exists():
+                    break
+                time.sleep(0.05)
+            self.assertTrue(ready.exists())
+            result=inspect_fixture_handles(self.root)
+            self.assertEqual(result["state"],"BLOCKED")
+            self.assertFalse(result["copy_authorized"])
+        finally:
+            # The synthetic child exits on its own; no PID is killed.
+            time.sleep(3.2)
+            released=inspect_fixture_handles(self.root)
+            self.assertEqual(released["state"],"LAB_HANDLES_READABLE_UNPROVEN")
+
     def test_external_open_writer_fails_closed(self):
         import subprocess
         script=("import sys,time;"
