@@ -38,6 +38,23 @@ class StoreHandleTests(unittest.TestCase):
         r=inspect_fixture_handles(self.root)
         self.assertEqual(r["state"],"BLOCKED")
         self.assertIn("VECTOR_TREE_REDIRECTED",r["issues"])
+    def test_detects_mismatched_fingerprints(self):
+        from unittest.mock import patch
+        import rag.runtime.offline_store_handle_probe as probe
+        original=probe._hash_tree
+        counts=[0]
+        def changed(root):
+            result=original(root)
+            counts[0]+=1
+            if counts[0]>1:
+                result["synthetic-change"]="0"*64
+            return result
+        with patch.object(probe,"_hash_tree",side_effect=changed):
+            result=inspect_fixture_handles(self.root)
+        self.assertEqual(result["state"],"BLOCKED")
+        self.assertIn("STORES_CHANGED_DURING_READ",result["issues"])
+        self.assertFalse(result["copy_authorized"])
+
     def test_external_open_writer_fails_closed(self):
         import subprocess
         script=("import sys,time;"

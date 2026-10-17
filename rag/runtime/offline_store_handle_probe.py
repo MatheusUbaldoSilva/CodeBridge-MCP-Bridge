@@ -5,6 +5,7 @@ This probe cannot prove mmap release or full production quiescence.
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
 
 from rag.runtime.offline_fixture_snapshot import _root, _redirected, _hash_tree
 from rag.runtime.offline_fixture_file_guard import hold_fixture_files_readonly
@@ -41,10 +42,17 @@ def inspect_fixture_handles(root_path):
                 report["issues"].append("REDIRECTED_OR_MISSING_SOURCE")
                 return report
         with hold_fixture_files_readonly(files):
-            before = _hash_tree(vectors)
-            after = _hash_tree(vectors)
-            if before != after:
-                report["issues"].append("VECTOR_CHANGED_DURING_READ")
+            def fingerprints():
+                result = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                          for p in (sqlite_file, manifest)}
+                result.update({"qdrant/" + key: value
+                               for key, value in _hash_tree(vectors).items()})
+                return result
+            before = fingerprints()
+            after = fingerprints()
+            current_entries = sorted(vectors.rglob("*"))
+            if current_entries != entries or before != after:
+                report["issues"].append("STORES_CHANGED_DURING_READ")
                 return report
             report["files_checked"] = len(files)
         report["state"] = "LAB_HANDLES_READABLE_UNPROVEN"
