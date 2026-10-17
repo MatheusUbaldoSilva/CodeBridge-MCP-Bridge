@@ -55,6 +55,30 @@ class StoreHandleTests(unittest.TestCase):
         self.assertIn("STORES_CHANGED_DURING_READ",result["issues"])
         self.assertFalse(result["copy_authorized"])
 
+    def test_external_manifest_writer_fails_closed(self):
+        self._assert_writer_blocks(self.root/"rag-index-manifest.json")
+
+    def test_external_qdrant_writer_fails_closed(self):
+        vector=next(x for x in (self.root/"qdrant").rglob("*") if x.is_file())
+        self._assert_writer_blocks(vector)
+
+    def _assert_writer_blocks(self, source):
+        import subprocess
+        script=("import sys,time;"
+                "f=open(sys.argv[1],'r+b',buffering=0);"
+                "print('READY',flush=True);"
+                "time.sleep(10)")
+        p=subprocess.Popen([sys.executable,"-c",script,str(source)],
+                           stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+        try:
+            self.assertEqual(p.stdout.readline().strip(),"READY")
+            result=inspect_fixture_handles(self.root)
+            self.assertEqual(result["state"],"BLOCKED")
+            self.assertFalse(result["copy_authorized"])
+        finally:
+            p.terminate()
+            p.communicate(timeout=10)
+
     def test_external_open_writer_fails_closed(self):
         import subprocess
         script=("import sys,time;"

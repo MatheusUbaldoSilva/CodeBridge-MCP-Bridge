@@ -15,3 +15,5 @@ Sempre `copy_authorized=false`, `all_handles_closed=false` e
 `production_quiescence_proven=false`. Nenhum dado de producao e copiado.
 
 A verificacao adicional compara SHA-256 de SQLite, manifesto e arquivos Qdrant durante a janela protegida e bloqueia divergencias; nao substitui consistencia semantica entre os stores.
+
+Adicionado ensaio concorrente com escritor Python para SQLite, manifesto e arquivo Qdrant separadamente; todos devem resultar BLOCKED.
