@@ -9,7 +9,7 @@ import tempfile
 
 from rag.runtime.generation_process_lock import generation_lock, GenerationBusy
 from rag.runtime.incremental_bundle_validate import validate_incremental_bundle
-from rag.runtime.offline_fixture_snapshot import _root, _hash_tree, _redirected
+from rag.runtime.offline_fixture_snapshot import _root, _hash_tree, _redirected, OfflineFixtureError
 
 
 class OfflineFixtureRestoreError(RuntimeError):
@@ -52,7 +52,7 @@ def _restore_locked(root, backup_name, restored_name):
         verification = validate_incremental_bundle(payload)
         if verification != report["verification"]:
             raise OfflineFixtureRestoreError("snapshot verification mismatch")
-    except (KeyError, TypeError, ValueError, OSError) as exc:
+    except (KeyError, TypeError, ValueError, OSError, OfflineFixtureError) as exc:
         raise OfflineFixtureRestoreError("invalid backup metadata") from exc
     destination_parent.mkdir(exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=".restore-fixture-", dir=destination_parent))
