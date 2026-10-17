@@ -33,6 +33,8 @@ def catalog_synthetic_stores(root_path, *, max_files=10000, max_bytes=67108864):
                 folder=pending.pop()
                 if _redirected(folder):
                     raise ValueError("redirected directory")
+                if folder != vector and not any(folder.iterdir()):
+                    raise ValueError("empty vector directory")
                 with os.scandir(folder) as iterator:
                     for entry in iterator:
                         item=Path(entry.path)

@@ -29,6 +29,9 @@ def inspect_fixture_handles(root_path):
             report["issues"].append("VECTOR_DIR_MISSING_OR_REDIRECTED")
             return report
         entries = sorted(vectors.rglob("*"))
+        if any(p.is_dir() and not any(p.iterdir()) for p in entries):
+            report["issues"].append("EMPTY_VECTOR_DIRECTORY")
+            return report
         if any(_redirected(p) for p in entries):
             report["issues"].append("VECTOR_TREE_REDIRECTED")
             return report
