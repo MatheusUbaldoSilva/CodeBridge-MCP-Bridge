@@ -79,6 +79,10 @@ def catalog_synthetic_stores(root_path, *, max_files=10000, max_bytes=67108864):
             if sidecar.exists() or _redirected(sidecar):
                 report["issues"].append("SQLITE_SIDECAR_PRESENT")
                 return report
+        vector=root/"qdrant"
+        if not vector.is_dir() or _redirected(vector):
+            report["issues"].append("VECTOR_TREE_REDIRECTED_OR_MISSING")
+            return report
         report["files"]=sorted(first)
         report["files_checked"]=len(first)
         report["bytes_checked"]=nbytes
