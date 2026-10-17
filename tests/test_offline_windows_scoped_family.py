@@ -4,6 +4,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from rag.runtime.offline_process_family_supervisor import inspect_family_shutdown_samples
 from rag.runtime.offline_scoped_cim_observer import observe_scoped_windows_pids
 from rag.runtime.offline_process_sample_contract import validate_observation_series
+from rag.runtime.offline_process_lineage_evidence import assess_scoped_family_timeline
 from rag.runtime.offline_store_handle_probe import inspect_fixture_handles
 from rag.runtime.offline_fixture_file_guard import hold_fixture_files_readonly, FixtureFileBusy
 from test_incremental_bundle_e2e import create_bundle
@@ -68,6 +69,9 @@ class ScopedFamily(unittest.TestCase):
             final = snapshot(pids)
             clock_report = validate_observation_series([first, middle, last, final])
             self.assertEqual(clock_report["state"], "TIMED_LAB_OBSERVATIONS_VALID_UNPROVEN")
+            lineage = assess_scoped_family_timeline(parent.pid, [first, middle, last, final])
+            self.assertEqual(lineage["state"], "LAB_TEMPORAL_FAMILY_EXIT_UNPROVEN_FOR_PRODUCTION")
+            self.assertFalse(lineage["copy_authorized"])
             self.assertFalse(clock_report["production_quiescence_proven"])
             result=inspect_family_shutdown_samples(parent.pid,[first,middle,last,final])
             self.assertEqual(result['state'],'LAB_FAMILY_ABSENT_UNPROVEN')
