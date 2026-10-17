@@ -4,6 +4,8 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from rag.runtime.offline_process_family_supervisor import inspect_family_shutdown_samples
 from rag.runtime.offline_scoped_cim_observer import observe_scoped_windows_pids
 from rag.runtime.offline_process_sample_contract import validate_observation_series
+from rag.runtime.offline_process_sampling_gate import evaluate_scoped_exit_window
+from datetime import datetime, timezone
 from rag.runtime.offline_process_lineage_evidence import assess_scoped_family_timeline
 from rag.runtime.offline_store_handle_probe import inspect_fixture_handles
 from rag.runtime.offline_fixture_file_guard import hold_fixture_files_readonly, FixtureFileBusy
@@ -73,6 +75,13 @@ class ScopedFamily(unittest.TestCase):
             self.assertEqual(lineage["state"], "LAB_TEMPORAL_FAMILY_EXIT_UNPROVEN_FOR_PRODUCTION")
             self.assertFalse(lineage["copy_authorized"])
             self.assertFalse(clock_report["production_quiescence_proven"])
+            window = evaluate_scoped_exit_window(
+                [first, middle, last, final],
+                now=datetime.now(timezone.utc), max_gap_ms=7000,
+                max_age_ms=15000)
+            self.assertEqual(window["state"], "LAB_SCOPED_EXIT_WINDOW_UNPROVEN")
+            self.assertFalse(window["copy_authorized"])
+            self.assertFalse(window["all_handles_closed"])
             result=inspect_family_shutdown_samples(parent.pid,[first,middle,last,final])
             self.assertEqual(result['state'],'LAB_FAMILY_ABSENT_UNPROVEN')
             released=inspect_fixture_handles(root)
