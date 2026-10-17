@@ -1,7 +1,9 @@
-import hashlib,json,subprocess,sys,tempfile,time,unittest
+import subprocess,sys,tempfile,time,unittest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from rag.runtime.offline_process_family_supervisor import inspect_family_shutdown_samples
+from rag.runtime.offline_scoped_cim_observer import observe_scoped_windows_pids
+from rag.runtime.offline_process_sample_contract import validate_observation_series
 from rag.runtime.offline_store_handle_probe import inspect_fixture_handles
 from rag.runtime.offline_fixture_file_guard import hold_fixture_files_readonly, FixtureFileBusy
 from test_incremental_bundle_e2e import create_bundle
@@ -25,18 +27,11 @@ print(p.pid,flush=True)
 sys.exit(0 if sys.stdin.readline().strip()=='STOP' else 3)
 """
 def snapshot(pids):
-    expression=" OR ".join("ProcessId = %d"%i for i in pids)
-    script="@(Get-CimInstance Win32_Process -Filter '"+expression+"' | Select-Object ProcessId,ParentProcessId,CreationDate,ExecutablePath) | ConvertTo-Json -Compress"
-    r=subprocess.run(["powershell.exe","-NoProfile","-NonInteractive","-Command",script],capture_output=True,text=True,timeout=15,check=True)
-    raw=json.loads(r.stdout) if r.stdout.strip() else []
-    raw=raw if isinstance(raw,list) else [raw]
-    records=[]
-    for x in raw:
-        if not x: continue
-        if not x.get('CreationDate') or not x.get('ExecutablePath'): raise ValueError('unverifiable identity')
-        records.append(dict(pid=x['ProcessId'],parent_pid=x['ParentProcessId'],
-            created_at=str(x['CreationDate']),executable_fingerprint=hashlib.sha256(x['ExecutablePath'].casefold().encode()).hexdigest()))
-    return dict(identity_inventory_ok=True,unverified_count=0,verified_pids=records)
+    report = observe_scoped_windows_pids(list(pids))
+    if report["state"] != "SCOPED_CIM_OBSERVATION_UNPROVEN":
+        raise ValueError("scoped Windows observation blocked")
+    return report
+
 @unittest.skipUnless(sys.platform=='win32','Windows-only test')
 class ScopedFamily(unittest.TestCase):
  def test_cooperative_parent_then_child_exit(self):
@@ -70,7 +65,11 @@ class ScopedFamily(unittest.TestCase):
                 if not last['verified_pids']: break
                 time.sleep(.1)
             else: self.fail('synthetic child remains')
-            result=inspect_family_shutdown_samples(parent.pid,[first,middle,last,snapshot(pids)])
+            final = snapshot(pids)
+            clock_report = validate_observation_series([first, middle, last, final])
+            self.assertEqual(clock_report["state"], "TIMED_LAB_OBSERVATIONS_VALID_UNPROVEN")
+            self.assertFalse(clock_report["production_quiescence_proven"])
+            result=inspect_family_shutdown_samples(parent.pid,[first,middle,last,final])
             self.assertEqual(result['state'],'LAB_FAMILY_ABSENT_UNPROVEN')
             released=inspect_fixture_handles(root)
             self.assertEqual(released['state'],'LAB_HANDLES_READABLE_UNPROVEN')
