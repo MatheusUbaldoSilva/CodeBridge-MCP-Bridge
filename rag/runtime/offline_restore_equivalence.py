@@ -34,6 +34,10 @@ def audit_restored_fixture(fixture_root, backup_name, restore_name):
         if av!=bv or av!=meta.get("verification"):
             result["issues"].append("CROSS_STORE_CONTENT_MISMATCH")
             return result
+        # The verification itself can race an external writer; recheck both.
+        if _hash_tree(original)!=a or _hash_tree(restored)!=b:
+            result["issues"].append("STORES_CHANGED_DURING_VALIDATION")
+            return result
         result.update(state="LAB_RESTORE_EQUIVALENCE_UNPROVEN_FOR_PRODUCTION",
                       same_hashes=True,same_semantic_content=True)
     except (OSError,ValueError,RuntimeError,TypeError,KeyError) as exc:

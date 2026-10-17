@@ -36,6 +36,35 @@ class RestoreEquivalenceTests(unittest.TestCase):
         r=audit_restored_fixture(self.root,"first","recovered")
         self.assertEqual(r["state"],"BLOCKED")
         self.assertFalse(r["same_semantic_content"])
+    def test_symlink_in_restored_tree_blocks(self):
+        q=self.root/"offline-fixture-restores"/"recovered"/"snapshot"/"qdrant"
+        (q/"redirected").symlink_to(self.root.parent,target_is_directory=True)
+        result=audit_restored_fixture(self.root,"first","recovered")
+        self.assertEqual(result["state"],"BLOCKED")
+        self.assertFalse(result["production_authorized"])
+    def test_tampered_report_blocks(self):
+        import json
+        report=self.root/"offline-fixture-backups"/"first"/"report.json"
+        data=json.loads(report.read_text(encoding="utf-8"))
+        data["production_authorized"]=True
+        report.write_text(json.dumps(data),encoding="utf-8")
+        result=audit_restored_fixture(self.root,"first","recovered")
+        self.assertEqual(result["state"],"BLOCKED")
+    def test_changed_during_semantic_validation_blocks(self):
+        from unittest.mock import patch
+        import rag.runtime.offline_restore_equivalence as audit
+        original=audit._hash_tree
+        sequence=[0]
+        def drifting(root):
+            sequence[0]+=1
+            values=original(root)
+            if sequence[0]>=3:
+                values=dict(values,synthetic_drift="0"*64)
+            return values
+        with patch.object(audit,"_hash_tree",side_effect=drifting):
+            result=audit_restored_fixture(self.root,"first","recovered")
+        self.assertEqual(result["state"],"BLOCKED")
+        self.assertIn("STORES_CHANGED_DURING_VALIDATION",result["issues"])
     def test_unknown_restore_blocks(self):
         r=audit_restored_fixture(self.root,"first","missing")
         self.assertEqual(r["state"],"BLOCKED")
