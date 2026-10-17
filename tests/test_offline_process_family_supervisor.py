@@ -23,6 +23,12 @@ class FamilySupervisorTests(unittest.TestCase):
   r=inspect_family_shutdown_samples(10,[shot(row(10,0),child),shot(changed),shot()])
   self.assertIn("FAMILY_PID_IDENTITY_CHANGED",r["issues"])
   self.assertFalse(r["copy_authorized"])
+ def test_child_spawned_after_parent_exit_blocks(self):
+  r=inspect_family_shutdown_samples(10,[shot(row(10,0)),shot(),shot(row(22,10))])
+  self.assertIn("LATE_CHILD_OBSERVED",r["issues"])
+ def test_descendant_reappearing_blocks(self):
+  r=inspect_family_shutdown_samples(10,[shot(row(10,0),row(11,10)),shot(row(11,10)),shot(row(10,0),row(11,10))])
+  self.assertIn("FAMILY_PROCESS_REAPPEARED",r["issues"])
  def test_untrusted_snapshot_blocks(self):
   bad=shot();bad["identity_inventory_ok"]=False
   r=inspect_family_shutdown_samples(10,[shot(row(10,0)),bad,shot()])
