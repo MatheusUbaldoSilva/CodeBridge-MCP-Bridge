@@ -11,7 +11,7 @@ import subprocess
 
 _SCRIPT = (
     "Get-CimInstance Win32_Process | "
-    "Select-Object ProcessId,Name,ExecutablePath,CreationDate,CommandLine | "
+    "Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CreationDate,CommandLine | "
     "ConvertTo-Json -Compress -Depth 3"
 )
 
@@ -43,7 +43,7 @@ def inspect_process_identities(*, runner=None):
             if not isinstance(pid, int) or pid <= 0 or not born or not exe:
                 report["unverified_count"] += 1
                 continue
-            suspects.append({"pid": pid, "name": name,
+            suspects.append({"pid": pid, "parent_pid": item.get("ParentProcessId"), "name": name,
                              "created_at": str(born),
                              "executable_fingerprint": hashlib.sha256(
                                  str(exe).casefold().encode("utf-8")).hexdigest()})
