@@ -36,7 +36,9 @@ def summarize_lab_evidence(*, process_exit, handle_probe, restore_audit,
         if full_inventory is not None:
             if (not isinstance(full_inventory, dict) or
                     full_inventory.get("identity_inventory_ok") is not True or
-                    full_inventory.get("unverified_count") != 0):
+                    full_inventory.get("unverified_count") != 0 or
+                    full_inventory.get("state") != "FULL_INVENTORY_UNPROVEN" or
+                    full_inventory.get("copy_authorized") is not False):
                 result["issues"].append("FULL_PROCESS_INVENTORY_UNTRUSTED")
         if not result["issues"]:
             result["state"] = "LAB_EVIDENCE_COLLECTED_NO_PRODUCTION_PROOF"

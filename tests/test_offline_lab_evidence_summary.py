@@ -54,6 +54,19 @@ class EvidenceSummaryTests(unittest.TestCase):
     def test_unverified_inventory_blocks(self):
         r=self.report(inventory={"identity_inventory_ok":False,"unverified_count":1})
         self.assertIn("FULL_PROCESS_INVENTORY_UNTRUSTED",r["issues"])
+    def test_contradictory_full_inventory_is_blocked(self):
+        inventory={"identity_inventory_ok":True,"unverified_count":0,
+                   "state":"BLOCKED","copy_authorized":False}
+        r=self.report(inventory=inventory)
+        self.assertEqual(r["state"],"BLOCKED")
+        self.assertIn("FULL_PROCESS_INVENTORY_UNTRUSTED",r["issues"])
+    def test_explicit_good_inventory_is_still_not_production_proof(self):
+        inventory={"identity_inventory_ok":True,"unverified_count":0,
+                   "state":"FULL_INVENTORY_UNPROVEN","copy_authorized":False}
+        r=self.report(inventory=inventory)
+        self.assertTrue(r["evidence_complete"])
+        self.assertFalse(r["copy_authorized"])
+        self.assertFalse(r["production_quiescence_proven"])
     def test_null_input_is_blocked(self):
         r=self.report(process=None)
         self.assertEqual(r["state"],"BLOCKED")
