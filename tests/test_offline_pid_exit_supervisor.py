@@ -54,8 +54,9 @@ class ExitSupervisorTests(unittest.TestCase):
         result = supervise_expected_exits([OLD], observer=sequence(
             shot([OLD]), shot([]), shot([OLD]), shot([]), shot([])),
             samples=5, sleeper=lambda x: None)
-        self.assertEqual(result["state"], "EXPECTED_PIDS_ABSENT_UNPROVEN")
-        self.assertEqual(result["samples_completed"], 5)
+        self.assertEqual(result["state"], "BLOCKED")
+        self.assertIn("EXPECTED_PID_REAPPEARED", result["issues"])
+        self.assertEqual(result["samples_completed"], 3)
         self.assertFalse(result["production_quiescence_proven"])
 
     def test_pid_reuse_blocks(self):

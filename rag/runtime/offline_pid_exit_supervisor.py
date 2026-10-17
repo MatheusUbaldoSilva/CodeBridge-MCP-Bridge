@@ -45,6 +45,7 @@ def supervise_expected_exits(expected, *, observer=inspect_process_identities,
             raise ValueError("duplicate baseline PID")
         consecutive_absence = 0
         observed_live = set()
+        was_absent = set()
         for index in range(samples):
             snapshot = observer()
             if (not isinstance(snapshot, dict) or
@@ -67,10 +68,14 @@ def supervise_expected_exits(expected, *, observer=inspect_process_identities,
             active = sorted(pid for pid, base in expected_by_pid.items()
                             if visible.get(pid) == base)
             if active:
+                if any(pid in was_absent for pid in active):
+                    report["issues"] = ["EXPECTED_PID_REAPPEARED"]
+                    break
                 observed_live.update(active)
                 consecutive_absence = 0
                 report["issues"] = ["EXPECTED_PROCESS_STILL_ACTIVE"]
             else:
+                was_absent.update(expected_by_pid)
                 consecutive_absence += 1
                 if consecutive_absence >= 2:
                     if observed_live != set(expected_by_pid):
