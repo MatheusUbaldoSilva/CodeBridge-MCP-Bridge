@@ -22,10 +22,11 @@ def sequence(*shots):
 
 
 class ExitSupervisorTests(unittest.TestCase):
-    def test_two_absence_samples_still_not_copy_authorization(self):
+    def test_never_seen_active_cannot_claim_exit(self):
         result = supervise_expected_exits([OLD], observer=sequence(shot([]), shot([])),
                                           samples=2, sleeper=lambda x: None)
-        self.assertEqual(result["state"], "EXPECTED_PIDS_ABSENT_UNPROVEN")
+        self.assertEqual(result["state"], "BLOCKED")
+        self.assertIn("EXPECTED_PROCESS_NEVER_SEEN_ACTIVE", result["issues"])
         self.assertEqual(result["samples_completed"], 2)
         self.assertFalse(result["copy_authorized"])
         self.assertFalse(result["all_handles_closed"])
@@ -41,6 +42,21 @@ class ExitSupervisorTests(unittest.TestCase):
                                           samples=2, sleeper=lambda x: None)
         self.assertEqual(result["state"], "BLOCKED")
         self.assertIn("AWAITING_SECOND_ABSENCE_SAMPLE", result["issues"])
+
+    def test_partial_observation_does_not_prove_all_expected_exited(self):
+        another = {**OLD, "pid": 121}
+        result = supervise_expected_exits([OLD, another], observer=sequence(
+            shot([OLD]), shot([]), shot([])), samples=3, sleeper=lambda x: None)
+        self.assertEqual(result["state"], "BLOCKED")
+        self.assertIn("EXPECTED_PROCESS_NEVER_SEEN_ACTIVE", result["issues"])
+
+    def test_process_reappearing_resets_consecutive_absence(self):
+        result = supervise_expected_exits([OLD], observer=sequence(
+            shot([OLD]), shot([]), shot([OLD]), shot([]), shot([])),
+            samples=5, sleeper=lambda x: None)
+        self.assertEqual(result["state"], "EXPECTED_PIDS_ABSENT_UNPROVEN")
+        self.assertEqual(result["samples_completed"], 5)
+        self.assertFalse(result["production_quiescence_proven"])
 
     def test_pid_reuse_blocks(self):
         result = supervise_expected_exits([OLD], observer=sequence(shot([NEW])),
