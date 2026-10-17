@@ -21,3 +21,5 @@ Prova global de parada exigira supervisor externo e manutencao
 explicitamente autorizada, sem encerrar o MCP pela propria conexao.
 
 Testes adicionais: symlink interno rejeitado; metadata adulterada rejeitada; reamostragem SHA-256 apos verificacao semantica detecta mutacao na janela.
+
+Gate: SQLite sidecars and redirected ancestor paths are rejected for lab restore audits.

@@ -16,9 +16,13 @@ def audit_restored_fixture(fixture_root, backup_name, restore_name):
         restored=root/"offline-fixture-restores"/restore_name/"snapshot"
         original=saved/"snapshot"
         report=saved/"report.json"
-        for p in (saved,original,restored,report):
-            if _redirected(p):
+        for leaf in (saved, original, restored, report):
+            if any(_redirected(part) for part in (leaf, *leaf.parents)):
                 raise ValueError("redirected path")
+        for payload in (original, restored):
+            if any((payload / ("rag_index.sqlite3" + suffix)).exists()
+                   for suffix in ("-wal", "-shm", "-journal")):
+                raise ValueError("unexpected SQLite sidecar")
         if not original.is_dir() or not restored.is_dir() or not report.is_file():
             raise ValueError("incomplete fixture")
         meta=json.loads(report.read_text(encoding="utf-8"))

@@ -65,6 +65,21 @@ class RestoreEquivalenceTests(unittest.TestCase):
             result=audit_restored_fixture(self.root,"first","recovered")
         self.assertEqual(result["state"],"BLOCKED")
         self.assertIn("STORES_CHANGED_DURING_VALIDATION",result["issues"])
+    def test_sqlite_sidecar_in_restored_snapshot_blocks(self):
+        sidecar=self.root/"offline-fixture-restores"/"recovered"/"snapshot"/"rag_index.sqlite3-wal"
+        sidecar.write_bytes(b"synthetic WAL")
+        r=audit_restored_fixture(self.root,"first","recovered")
+        self.assertEqual(r["state"],"BLOCKED")
+        self.assertFalse(r["publication_authorized"])
+    def test_redirected_restore_ancestor_blocks(self):
+        # The relocated snapshot path exists beneath a redirected restore folder.
+        import shutil
+        folder=self.root/"offline-fixture-restores"/"recovered"
+        original=folder.with_name("original")
+        folder.rename(original)
+        folder.symlink_to(original,target_is_directory=True)
+        r=audit_restored_fixture(self.root,"first","recovered")
+        self.assertEqual(r["state"],"BLOCKED")
     def test_unknown_restore_blocks(self):
         r=audit_restored_fixture(self.root,"first","missing")
         self.assertEqual(r["state"],"BLOCKED")
