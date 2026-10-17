@@ -57,6 +57,24 @@ class OfflinePipelineExternalTests(unittest.TestCase):
         self.assertEqual(report["state"],"BLOCKED")
         self.assertFalse(report["same_semantic_content"])
         self.assertFalse(report["production_authorized"])
+    def test_external_roundtrip_evidence_never_authorizes(self):
+        from rag.runtime.offline_lab_evidence_summary import summarize_lab_evidence
+        self.assertEqual(self.capture().returncode,0)
+        self.assertEqual(self.restore().returncode,0)
+        raw=self.audit()
+        self.assertEqual(raw.returncode,0,raw.stderr)
+        audit=json.loads(raw.stdout)
+        process={"state":"EXPECTED_PIDS_ABSENT_UNPROVEN","copy_authorized":False}
+        handles={"state":"LAB_HANDLES_READABLE_UNPROVEN",
+                 "files_checked":3,"copy_authorized":False}
+        result=summarize_lab_evidence(process_exit=process,
+                  handle_probe=handles,restore_audit=audit)
+        self.assertTrue(result["evidence_complete"])
+        self.assertFalse(result["copy_authorized"])
+        self.assertFalse(result["production_quiescence_proven"])
+        self.assertFalse(result["all_handles_closed"])
+        self.assertFalse((self.root/"active-generation.json").exists())
+
     def test_tampered_backup_cannot_restore(self):
         self.assertEqual(self.capture().returncode,0)
         manifest=self.root/"offline-fixture-backups"/"first"/"snapshot"/"rag-index-manifest.json"
