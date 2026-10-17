@@ -3,7 +3,7 @@ from __future__ import annotations
 
 
 def summarize_lab_evidence(*, process_exit, handle_probe, restore_audit,
-                           full_inventory=None):
+                           full_inventory=None, family_shutdown=None):
     result = {"state": "BLOCKED", "issues": [], "evidence_complete": False,
               "copy_authorized": False, "publication_authorized": False,
               "production_quiescence_proven": False, "all_handles_closed": False}
@@ -40,6 +40,12 @@ def summarize_lab_evidence(*, process_exit, handle_probe, restore_audit,
                     full_inventory.get("state") != "FULL_INVENTORY_UNPROVEN" or
                     full_inventory.get("copy_authorized") is not False):
                 result["issues"].append("FULL_PROCESS_INVENTORY_UNTRUSTED")
+        if family_shutdown is not None:
+            if (not isinstance(family_shutdown, dict) or
+                    family_shutdown.get("state") != "LAB_FAMILY_ABSENT_UNPROVEN" or
+                    family_shutdown.get("copy_authorized") is not False or
+                    family_shutdown.get("issues") not in (None, [])):
+                result["issues"].append("PROCESS_FAMILY_SHUTDOWN_UNPROVEN")
         if not result["issues"]:
             result["state"] = "LAB_EVIDENCE_COLLECTED_NO_PRODUCTION_PROOF"
             result["evidence_complete"] = True

@@ -14,7 +14,8 @@ class EvidenceSummaryTests(unittest.TestCase):
     def report(self, **kwargs):
         return summarize_lab_evidence(process_exit=kwargs.get("process",P),
           handle_probe=kwargs.get("handles",H),restore_audit=kwargs.get("restore",R),
-          full_inventory=kwargs.get("inventory"))
+          full_inventory=kwargs.get("inventory"),
+          family_shutdown=kwargs.get("family"))
     def test_successful_lab_still_blocks_production(self):
         r=self.report()
         self.assertTrue(r["evidence_complete"])
@@ -67,6 +68,18 @@ class EvidenceSummaryTests(unittest.TestCase):
         self.assertTrue(r["evidence_complete"])
         self.assertFalse(r["copy_authorized"])
         self.assertFalse(r["production_quiescence_proven"])
+    def test_late_child_blocks_aggregated_evidence(self):
+        family={"state":"BLOCKED","issues":["LATE_CHILD_OBSERVED"],
+                "copy_authorized":False}
+        r=self.report(family=family)
+        self.assertIn("PROCESS_FAMILY_SHUTDOWN_UNPROVEN",r["issues"])
+        self.assertFalse(r["evidence_complete"])
+    def test_safe_synthetic_family_remains_non_authorizing(self):
+        family={"state":"LAB_FAMILY_ABSENT_UNPROVEN","issues":[],
+                "copy_authorized":False}
+        r=self.report(family=family)
+        self.assertTrue(r["evidence_complete"])
+        self.assertFalse(r["copy_authorized"])
     def test_null_input_is_blocked(self):
         r=self.report(process=None)
         self.assertEqual(r["state"],"BLOCKED")
