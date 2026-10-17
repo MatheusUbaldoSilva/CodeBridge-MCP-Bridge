@@ -41,6 +41,15 @@ class FamilySupervisorTests(unittest.TestCase):
   r=inspect_family_shutdown_samples(10,[shot(row(10,0),row(11,10)),incomplete,shot()])
   self.assertEqual(r["state"],"BLOCKED")
   self.assertFalse(r["copy_authorized"])
+ def test_unrelated_row_missing_identity_blocks(self):
+  invalid=row(999,0);invalid.pop("executable_fingerprint")
+  r=inspect_family_shutdown_samples(10,[shot(row(10,0)),shot(invalid),shot()])
+  self.assertEqual(r["state"],"BLOCKED")
+  self.assertFalse(r["copy_authorized"])
+ def test_invalid_pid_type_blocks(self):
+  invalid=row(99,0);invalid["pid"]=True
+  r=inspect_family_shutdown_samples(10,[shot(row(10,0)),shot(invalid),shot()])
+  self.assertEqual(r["state"],"BLOCKED")
  def test_untrusted_snapshot_blocks(self):
   bad=shot();bad["identity_inventory_ok"]=False
   r=inspect_family_shutdown_samples(10,[shot(row(10,0)),bad,shot()])

@@ -29,9 +29,21 @@ def inspect_family_shutdown_samples(root_pid, snapshots):
                 result["issues"].append("UNTRUSTED_PROCESS_INVENTORY")
                 break
             records=snap["verified_pids"]
-            ids={item.get("pid") for item in records if isinstance(item,dict)}
-            if len(ids)!=len(records):
-                raise ValueError("duplicate PID")
+            ids=set()
+            for item in records:
+                if not isinstance(item,dict):
+                    raise ValueError("invalid process row")
+                pid=item.get("pid")
+                parent=item.get("parent_pid")
+                born=item.get("created_at")
+                exe=item.get("executable_fingerprint")
+                if (not isinstance(pid,int) or isinstance(pid,bool) or pid<=0 or
+                    not isinstance(parent,int) or isinstance(parent,bool) or parent<0 or
+                    not isinstance(born,str) or not born or
+                    not isinstance(exe,str) or len(exe)!=64 or
+                    any(c not in "0123456789abcdef" for c in exe) or pid in ids):
+                    raise ValueError("untrusted process identity")
+                ids.add(pid)
             new_children={item["pid"] for item in records
                           if isinstance(item,dict)
                           and item.get("parent_pid") in baseline
