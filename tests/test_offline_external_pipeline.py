@@ -46,6 +46,17 @@ class OfflinePipelineExternalTests(unittest.TestCase):
         self.assertFalse(report["production_authorized"])
         self.assertFalse(report["publication_authorized"])
         self.assertFalse((self.root/"active-generation.json").exists())
+    def test_post_restore_tampering_fails_independent_audit(self):
+        self.assertEqual(self.capture().returncode,0)
+        self.assertEqual(self.restore().returncode,0)
+        db=self.root/"offline-fixture-restores"/"recovered"/"snapshot"/"rag_index.sqlite3"
+        db.write_bytes(b"synthetic tampering after restore")
+        audit=self.audit()
+        self.assertEqual(audit.returncode,0,audit.stderr)
+        report=json.loads(audit.stdout)
+        self.assertEqual(report["state"],"BLOCKED")
+        self.assertFalse(report["same_semantic_content"])
+        self.assertFalse(report["production_authorized"])
     def test_tampered_backup_cannot_restore(self):
         self.assertEqual(self.capture().returncode,0)
         manifest=self.root/"offline-fixture-backups"/"first"/"snapshot"/"rag-index-manifest.json"
