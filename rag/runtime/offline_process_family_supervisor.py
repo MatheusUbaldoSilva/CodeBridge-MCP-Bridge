@@ -15,6 +15,9 @@ def inspect_family_shutdown_samples(root_pid, snapshots):
         if starting["state"]!="KNOWN_FAMILY_OBSERVED_UNPROVEN":
             raise ValueError("root never observed")
         baseline=set(starting["known_descendant_pids"]) | {root_pid}
+        original_ids = {item["pid"]: (item.get("created_at"),
+                          item.get("executable_fingerprint")) for item in first["verified_pids"]
+                          if item["pid"] in baseline}
         last_active=set(baseline)
         consecutive_absences=0
         for snap in snapshots:
@@ -35,6 +38,12 @@ def inspect_family_shutdown_samples(root_pid, snapshots):
             if new_children:
                 result["issues"].append("LATE_CHILD_OBSERVED")
                 break
+            for item in records:
+                if item["pid"] in original_ids and (
+                     item.get("created_at"), item.get("executable_fingerprint")
+                     ) != original_ids[item["pid"]]:
+                    result["issues"].append("FAMILY_PID_IDENTITY_CHANGED")
+                    return result
             active=ids & baseline
             if active:
                 last_active=active

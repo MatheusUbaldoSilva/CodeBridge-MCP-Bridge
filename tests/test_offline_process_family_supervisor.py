@@ -17,6 +17,12 @@ class FamilySupervisorTests(unittest.TestCase):
  def test_parent_exits_child_remains(self):
   r=inspect_family_shutdown_samples(10,[shot(row(10,0),row(11,10)),shot(row(11,10)),shot(row(11,10))])
   self.assertEqual(r["state"],"BLOCKED")
+ def test_reused_descendant_pid_blocks(self):
+  child=row(11,10)
+  changed=dict(child,created_at="20261018103000")
+  r=inspect_family_shutdown_samples(10,[shot(row(10,0),child),shot(changed),shot()])
+  self.assertIn("FAMILY_PID_IDENTITY_CHANGED",r["issues"])
+  self.assertFalse(r["copy_authorized"])
  def test_untrusted_snapshot_blocks(self):
   bad=shot();bad["identity_inventory_ok"]=False
   r=inspect_family_shutdown_samples(10,[shot(row(10,0)),bad,shot()])
