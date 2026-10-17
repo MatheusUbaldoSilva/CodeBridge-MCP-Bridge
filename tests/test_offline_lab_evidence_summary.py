@@ -34,6 +34,14 @@ class EvidenceSummaryTests(unittest.TestCase):
     def test_claim_of_authorization_is_rejected(self):
         r=self.report(handles={**H,"copy_authorized":True})
         self.assertIn("handles_CLAIMS_AUTHORIZATION",r["issues"])
+    def test_missing_explicit_prohibition_blocks(self):
+        r=self.report(handles={"state":"LAB_HANDLES_READABLE_UNPROVEN",
+                               "files_checked":3})
+        self.assertIn("handles_MISSING_SAFE_FLAG",r["issues"])
+        self.assertFalse(r["evidence_complete"])
+    def test_embedded_false_claim_of_global_shutdown_blocks(self):
+        r=self.report(process={**P,"all_handles_closed":True})
+        self.assertIn("process_CLAIMS_AUTHORIZATION",r["issues"])
     def test_unverified_inventory_blocks(self):
         r=self.report(inventory={"identity_inventory_ok":False,"unverified_count":1})
         self.assertIn("FULL_PROCESS_INVENTORY_UNTRUSTED",r["issues"])

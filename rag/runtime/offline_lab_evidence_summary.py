@@ -12,10 +12,14 @@ def summarize_lab_evidence(*, process_exit, handle_probe, restore_audit,
         if any(not isinstance(x, dict) for x in items):
             raise ValueError("invalid report")
         for name, report in zip(("process", "handles", "restore"), items):
-            if (report.get("copy_authorized") is not False and "copy_authorized" in report or
-                    report.get("production_authorized") is not False and "production_authorized" in report or
-                    report.get("publication_authorized") is not False and "publication_authorized" in report):
-                result["issues"].append(name + "_CLAIMS_AUTHORIZATION")
+            mandatory_flag = ("production_authorized" if name == "restore"
+                              else "copy_authorized")
+            if report.get(mandatory_flag) is not False:
+                result["issues"].append(name + "_MISSING_SAFE_FLAG")
+            for flag in ("copy_authorized", "production_authorized", "publication_authorized",
+                         "production_quiescence_proven", "all_handles_closed"):
+                if flag in report and report[flag] is not False:
+                    result["issues"].append(name + "_CLAIMS_AUTHORIZATION")
         if process_exit.get("state") != "EXPECTED_PIDS_ABSENT_UNPROVEN":
             result["issues"].append("PROCESS_EXIT_UNPROVEN")
         if (handle_probe.get("state") != "LAB_HANDLES_READABLE_UNPROVEN" or
