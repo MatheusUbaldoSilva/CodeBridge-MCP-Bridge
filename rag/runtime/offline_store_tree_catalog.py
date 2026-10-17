@@ -74,6 +74,11 @@ def catalog_synthetic_stores(root_path, *, max_files=10000, max_bytes=67108864):
         if first!=second or nbytes!=nbytes2:
             report["issues"].append("FILE_TREE_CHANGED_DURING_CATALOG")
             return report
+        for suffix in ("-wal","-shm","-journal"):
+            sidecar=root/("rag_index.sqlite3"+suffix)
+            if sidecar.exists() or _redirected(sidecar):
+                report["issues"].append("SQLITE_SIDECAR_PRESENT")
+                return report
         report["files"]=sorted(first)
         report["files_checked"]=len(first)
         report["bytes_checked"]=nbytes
