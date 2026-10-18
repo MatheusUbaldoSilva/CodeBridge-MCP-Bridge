@@ -27,3 +27,10 @@ RED: in a disposable Windows fixture, replace offline-fixture-restores with a di
 GREEN: recheck destination parent, staging, destination and ancestors before publication; avoid deleting a staging directory through a redirected ancestor in cleanup.
 Focused LAB04: 46 PASS; backend regression: 404 PASS (276 offline + 83 generation + 7 preflight + 38 incremental).
 No guarantee of atomic Windows-wide quiescence against adversarial post-check swaps; real maintenance, Qdrant Server snapshots and production backups remain BLOCKED.
+
+RAG-LAB.04 - snapshot-parent directory swap (2026-10-18)
+Files: rag/runtime/offline_fixture_snapshot.py and tests/test_offline_lab04_snapshot_parent_swap.py.
+RED: in a disposable Windows fixture, replace offline-fixture-backups with a symlink after source verification; old snapshot published outside its fixture root.
+GREEN: reject redirected backup parent, staging, target or their ancestors immediately before snapshot publication and avoid deleting staging through a redirected parent during cleanup.
+Focused LAB04: 47 PASS; backend regression: 405 PASS (277 offline + 83 generation + 7 preflight + 38 incremental).
+Synthetic laboratory only; production quiescence, native Qdrant Server snapshots, and real backup remain BLOCKED.

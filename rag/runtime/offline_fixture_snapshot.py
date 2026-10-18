@@ -138,10 +138,13 @@ def _capture_guarded(root, backup_name):
             raise OfflineFixtureError("snapshot report redirected or hardlinked")
         if report_path.read_text(encoding="utf-8") != expected_report:
             raise OfflineFixtureError("snapshot report changed before publication")
+        if any(_redirected(part) for path in (backups, stage, target)
+               for part in (path, *path.parents)):
+            raise OfflineFixtureError("backup parent redirected before publication")
         if target.exists() or target.is_symlink():
             raise OfflineFixtureError("concurrent destination")
         os.rename(stage, target)
         return report
     finally:
-        if stage.exists():
+        if not any(_redirected(part) for part in (stage, *stage.parents)) and stage.exists():
             shutil.rmtree(stage)
