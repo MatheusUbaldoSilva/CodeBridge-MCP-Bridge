@@ -89,6 +89,11 @@ def _v1_verify_search_sources(payload: dict[str, Any], repository_root: Path) ->
             "status": status, "reason": reason, "current_sha256": current_sha,
         }
         record["stale"] = bool(record.get("stale")) or status != "FRESH"
+    # Preserve historical results; prioritize only verified current sources.
+    items = payload.get("results", [])
+    items.sort(key=lambda item: (item["source_verification"]["status"] != "FRESH", item["rank"]))
+    for position, item in enumerate(items, 1):
+        item["rank"] = position
     return payload
 
 

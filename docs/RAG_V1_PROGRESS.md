@@ -64,3 +64,9 @@
 - (4) decisao de nao indexar logs: handoffs e politicas retornados, relevancia semantica top-1 irregular.
 - (5) indexacao incremental: rag/index/incremental.py em top-1 e outros candidatos.
 - Nenhuma busca falhou e todas indicaram rota real; ainda ha trabalho de ranking e indice antigo para V1.02 concluir.
+
+### V1.02 — prioridade para fonte verificada, sem apagar evidencias
+- author_mcp/rag_bridge.py: depois da recuperacao e da verificacao de SHA, resultados FRESH sobem antes de STALE/UNVERIFIED mantendo esses registros historicos presentes com rank reenumerado e scores do recuperador originais preservados.
+- Prova no CodeBridge real com repositório local: CODE registradores semânticos -> posicoes 1-4 FRESH e 5-8 STALE, nenhum resultado desapareceu.
+- Cinco pesquisas de avaliacao registradas acima; seguir depois com criterio de relevancia especifica e reindexacao para corrigir fontes antigas.
+- A nova ordenacao ainda necessita reinicio gracioso do processo MCP publico para ser observada na ferramenta publica; nao interromper por dentro do proprio MCP.
