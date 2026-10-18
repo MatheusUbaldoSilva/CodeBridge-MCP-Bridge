@@ -107,3 +107,13 @@
 - Prova no CodeBridge real via adaptador do repo: uma fonte NEW uma MODIFIED uma UNCHANGED e publication_gate BLOCKED com motivos listados
 - Teste focado existente atualizado para evitar regressao do gate, 4 testes PASS
 - A trilha de laboratorio generation_* permanece exclusivamente test-root; nao foi usada para modificar o indice ativo. Nao marcar V1.03-C concluida ate haver writer e leitores atomicos reais e autorizacao especifica
+
+### V1.03-C - contrato de revisao de fontes no MCP
+- Antes o MCP entregava classificacao delta sem identidade reproducivel do conjunto de arquivos selecionado
+- Agora usa snapshot_preview + build_review_contract existentes em uma selecao de 1 a 20 fontes do root aprovado
+- O recibo SHA-256 de 64 caracteres inclui caminhos + hashes atuais e retorna FINGERPRINTED_NOT_APPROVED; nunca concede autorizacao para publicacao
+- Para inventario grande o retorno SOURCE_SELECTION_REQUIRED exige curadoria e selecao menor antes de revisar
+- Prova real pelo adapter CodeBridge em repositorio aprovado: dois arquivos existentes, files_checked=2, review_sha256 valido, gate BLOCKED e execute=false
+- Corrigimos testes legados do MCP que herdavam opt-in real via LOCALAPPDATA; cada subprocesso sintetico agora isola seu diretorio temporario sem alterar a politica de producao
+- Regressoes focadas 4 preflight + 5 review contract + 3 preview confirmation + 3 MCP index + 9 index request = 24 PASS
+- Ainda sem publicacao real: V1.03-C bloqueada aguardando integracao de geracao atomica, leitores travados e autorizacao especifica

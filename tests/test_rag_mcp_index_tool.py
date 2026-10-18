@@ -89,9 +89,14 @@ result = mcp_server.codebridge_rag_index(
 ).model_dump()
 print(json.dumps(result))
 """
+            # Isolate synthetic project-root tests from the operator's real
+            # CodeBridge LOCALAPPDATA opt-in and approved repository policy.
+            env = os.environ.copy()
+            env["LOCALAPPDATA"] = str(Path(td) / "localappdata")
             completed = subprocess.run(
                 [str(MCP_PYTHON), "-c", script, str(root)],
                 cwd=str(AUTHOR_MCP),
+                env=env,
                 capture_output=True,
                 text=True,
                 check=True,
@@ -140,9 +145,14 @@ print(json.dumps({
     "result": result,
 }))
 """
+            # Isolate synthetic project-root tests from the operator's real
+            # CodeBridge LOCALAPPDATA opt-in and approved repository policy.
+            env = os.environ.copy()
+            env["LOCALAPPDATA"] = str(Path(td) / "localappdata")
             completed = subprocess.run(
                 [str(MCP_PYTHON), "-c", script, str(root)],
                 cwd=str(AUTHOR_MCP),
+                env=env,
                 capture_output=True,
                 text=True,
                 check=True,

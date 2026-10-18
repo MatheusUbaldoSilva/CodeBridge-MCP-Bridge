@@ -252,6 +252,21 @@ def index_rag(
                     payload["plan"],
                     full_inventory=scope == "BOTH" and not paths,
                 )
+                # A deterministic review receipt is informational only:
+                # it never grants a right to publish. Large inventories must
+                # be curated into small, explicitly selected source batches.
+                candidate_rows = payload["plan"]["candidates"]
+                if 0 < len(candidate_rows) <= 20:
+                    from rag.runtime.incremental_preview_confirmation import snapshot_preview
+                    from rag.runtime.incremental_review_contract import build_review_contract
+
+                    snapshot = snapshot_preview(project_id, root, candidate_rows)
+                    payload["plan"]["review_contract"] = build_review_contract(
+                        snapshot, project_id, root
+                    )
+                    payload["plan"]["review_status"] = "FINGERPRINTED_NOT_APPROVED"
+                else:
+                    payload["plan"]["review_status"] = "SOURCE_SELECTION_REQUIRED"
     return payload
 
 
