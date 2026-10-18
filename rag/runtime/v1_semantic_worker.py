@@ -1,4 +1,4 @@
-﻿"""Isolated semantic search worker for the installed CodeBridge RAG V1.
+"""Isolated semantic search worker for the installed CodeBridge RAG V1.
 
 Runs with an explicitly approved Python environment containing qdrant-client.
 Never mutates, rebuilds, promotes, or deletes the persistent index.
@@ -30,7 +30,7 @@ def main() -> None:
         branch=data.get("branch"),
     )
     results = search_persistent_semantic(query, route)
-    json.dump([search_result_to_dict(item) for item in results], sys.stdout, ensure_ascii=False)
+    json.dump([search_result_to_dict(item) for item in results], sys.stdout, ensure_ascii=True)
     sys.stdout.write("\n")
 
 

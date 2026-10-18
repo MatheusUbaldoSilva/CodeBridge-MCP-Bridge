@@ -62,6 +62,36 @@ def configure_production_rag_executors(
 _V1_PYTHON: Optional[Path] = None
 
 
+
+def _v1_verify_search_sources(payload: dict[str, Any], repository_root: Path) -> dict[str, Any]:
+    """Verify search result hashes against the approved live repository."""
+    from rag.contracts import SourceMetadata, SourceType
+    from rag.sources.staleness import evaluate_source_staleness
+
+    for record in payload.get("results", []):
+        metadata = record.get("metadata") or {}
+        try:
+            source = SourceMetadata(
+                project_id=metadata["project_id"],
+                source_type=SourceType(metadata["source_type"]),
+                path=metadata.get("path"),
+                sha256=metadata.get("sha256"),
+            )
+            if source.project_id != "codebridge":
+                raise ValueError("outside approved source project")
+            evaluation = evaluate_source_staleness(repository_root, source)
+            status, reason, current_sha = (
+                evaluation.status.value, evaluation.reason, evaluation.current_sha256
+            )
+        except (KeyError, TypeError, ValueError, OSError, UnicodeError):
+            status, reason, current_sha = ("UNVERIFIED", "SOURCE_VERIFICATION_FAILED", None)
+        record["source_verification"] = {
+            "status": status, "reason": reason, "current_sha256": current_sha,
+        }
+        record["stale"] = bool(record.get("stale")) or status != "FRESH"
+    return payload
+
+
 def _v1_semantic_process_executor(query: Any, route: Any) -> tuple[Any, ...]:
     """Use a trusted, separately configured Python for vector dependencies."""
     import json
@@ -207,7 +237,19 @@ def search_rag_context(
         branch=branch,
         semantic_executor=_RAG_SEARCH_EXECUTOR,
     )
-    return result.to_dict()
+    payload = result.to_dict()
+    if project_id == "codebridge":
+        import json
+        import os
+        config_path = Path(os.environ.get("LOCALAPPDATA") or str(Path.home())) / "CodeBridge-MCP-Bridge" / "rag_v1_semantic.json"
+        if config_path.is_file():
+            config = json.loads(config_path.read_text(encoding="utf-8-sig"))
+            if config.get("enabled") is True and config.get("project_id") == "codebridge":
+                root = Path(config["repository_root"]).resolve()
+                if not root.is_dir() or not (root / ".git").exists():
+                    raise RuntimeError("approved repository root is invalid")
+                return _v1_verify_search_sources(payload, root)
+    return payload
 
 
 def get_rag_context(
