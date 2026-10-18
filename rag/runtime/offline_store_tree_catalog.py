@@ -6,7 +6,7 @@ from __future__ import annotations
 import hashlib
 import os
 from pathlib import Path
-from rag.runtime.offline_fixture_snapshot import _root, _redirected
+from rag.runtime.offline_fixture_snapshot import _root, _redirected, _qdrant_sqlite_sidecars
 
 def catalog_synthetic_stores(root_path, *, max_files=10000, max_bytes=67108864):
     report={"state":"BLOCKED","issues":[],"files":[],"files_checked":0,
@@ -16,6 +16,9 @@ def catalog_synthetic_stores(root_path, *, max_files=10000, max_bytes=67108864):
         if type(max_files) is not int or max_files < 3 or type(max_bytes) is not int or max_bytes < 1:
             raise ValueError("invalid catalog bounds")
         root=_root(root_path)
+        if _qdrant_sqlite_sidecars(root/"qdrant"):
+            report["issues"].append("QDRANT_SQLITE_SIDECAR_PRESENT")
+            return report
         for suffix in ("-wal","-shm","-journal"):
             path=root/("rag_index.sqlite3"+suffix)
             if path.exists() or _redirected(path):
@@ -84,6 +87,9 @@ def catalog_synthetic_stores(root_path, *, max_files=10000, max_bytes=67108864):
         vector=root/"qdrant"
         if not vector.is_dir() or _redirected(vector):
             report["issues"].append("VECTOR_TREE_REDIRECTED_OR_MISSING")
+            return report
+        if _qdrant_sqlite_sidecars(root/"qdrant"):
+            report["issues"].append("QDRANT_SQLITE_SIDECAR_PRESENT")
             return report
         report["files"]=sorted(first)
         report["files_checked"]=len(first)

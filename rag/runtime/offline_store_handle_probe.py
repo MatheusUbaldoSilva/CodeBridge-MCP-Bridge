@@ -7,7 +7,7 @@ from __future__ import annotations
 from pathlib import Path
 import hashlib
 
-from rag.runtime.offline_fixture_snapshot import _root, _redirected, _hash_tree
+from rag.runtime.offline_fixture_snapshot import _root, _redirected, _hash_tree, _qdrant_sqlite_sidecars
 from rag.runtime.offline_fixture_file_guard import hold_fixture_files_readonly
 
 
@@ -20,6 +20,9 @@ def inspect_fixture_handles(root_path):
         sqlite_file = root / "rag_index.sqlite3"
         manifest = root / "rag-index-manifest.json"
         vectors = root / "qdrant"
+        if _qdrant_sqlite_sidecars(vectors):
+            report["issues"].append("QDRANT_SQLITE_SIDECAR_PRESENT")
+            return report
         sidecars = [root / ("rag_index.sqlite3" + suffix)
                     for suffix in ("-wal", "-shm", "-journal")]
         if any(p.exists() or _redirected(p) for p in sidecars):
@@ -58,6 +61,9 @@ def inspect_fixture_handles(root_path):
                 report["issues"].append("STORES_CHANGED_DURING_READ")
                 return report
             report["files_checked"] = len(files)
+        if _qdrant_sqlite_sidecars(vectors):
+            report["issues"].append("QDRANT_SQLITE_SIDECAR_PRESENT")
+            return report
         report["state"] = "LAB_HANDLES_READABLE_UNPROVEN"
     except (OSError, ValueError, RuntimeError) as exc:
         report["issues"].append(type(exc).__name__)
