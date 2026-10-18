@@ -27,7 +27,8 @@ def audit_restored_fixture(fixture_root, backup_name, restore_name):
             raise ValueError("Qdrant SQLite sidecar blocks equivalence")
         if not original.is_dir() or not restored.is_dir() or not report.is_file():
             raise ValueError("incomplete fixture")
-        meta=json.loads(report.read_text(encoding="utf-8"))
+        report_bytes=report.read_bytes()
+        meta=json.loads(report_bytes)
         if meta.get("production_authorized") is not False or meta.get("state")!="LAB_FIXTURE_SNAPSHOT_ONLY":
             raise ValueError("unsafe snapshot report")
         a=_hash_tree(original)
@@ -43,6 +44,9 @@ def audit_restored_fixture(fixture_root, backup_name, restore_name):
         # The verification itself can race an external writer; recheck both.
         if _hash_tree(original)!=a or _hash_tree(restored)!=b:
             result["issues"].append("STORES_CHANGED_DURING_VALIDATION")
+            return result
+        if report.read_bytes()!=report_bytes:
+            result["issues"].append("REPORT_CHANGED_DURING_VALIDATION")
             return result
         result.update(state="LAB_RESTORE_EQUIVALENCE_UNPROVEN_FOR_PRODUCTION",
                       same_hashes=True,same_semantic_content=True)
