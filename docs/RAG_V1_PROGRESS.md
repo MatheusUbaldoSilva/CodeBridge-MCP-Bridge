@@ -70,3 +70,10 @@
 - Prova no CodeBridge real com repositório local: CODE registradores semânticos -> posicoes 1-4 FRESH e 5-8 STALE, nenhum resultado desapareceu.
 - Cinco pesquisas de avaliacao registradas acima; seguir depois com criterio de relevancia especifica e reindexacao para corrigir fontes antigas.
 - A nova ordenacao ainda necessita reinicio gracioso do processo MCP publico para ser observada na ferramenta publica; nao interromper por dentro do proprio MCP.
+
+### V1.03-A/B - inventario e delta real read-only
+- codebridge_rag_index execute=false aceitou docs/RAG_V1_PROGRESS.md no root aprovado; scope TEXT, 1 candidato, 0 deny/unsupported/sensitive; nenhuma execucao pesada.
+- assess_incremental_plan no SQLite ativo em modo somente leitura: docs/RAG_CONTRACT.md UNCHANGED, author_mcp/rag_bridge.py MODIFIED, docs/RAG_V1_PROGRESS.md NEW; new=1 modified=1 unchanged=1 unknown=0.
+- A API existente retorna safe_to_publish=false e informa explicitamente que a publicacao incremental ainda nao foi implementada e validada.
+- Proxima letra V1.03-C requer desenho/validacao de publicacao atomica e autorizacao especifica antes de alterar indice ativo. Nao houve copia, backup, reindexacao nem escrita em SQLite/Qdrant reais.
+- Teste de reclassificacao foi executado por CodeBridge MCP no projeto real; nenhuma nova trilha de laboratorio criada.
