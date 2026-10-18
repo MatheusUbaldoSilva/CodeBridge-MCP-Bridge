@@ -135,3 +135,10 @@
 - Proxima acao depois de reiniciar de forma manual e segura: codebridge_rag_index execute=false com 2 fontes aprovadas e verificar review_contract + publication_gate na ferramenta publica
 - Depois implementar protocolo de geracao com snapshot consistente e pin de leitores antes de qualquer alteracao de indice real, com aprovacao especifica do operador
 - Permanecem preservadas as duas excecoes antigas do working tree; nao alterar benchmarks/rag017_code_only_extended_smoke.json nem docs/RAG_017_J_VM_ROLLBACK_RUNBOOK_2026-10-10.md
+
+### V1.03-C - previa legivel para operador usando codigo existente
+- A API MCP de indexacao planejada agora tambem entrega preview_view reutilizando rag/runtime/incremental_preview_view.py existente, apenas com selecao de no maximo 20 fontes
+- Retorna linhas com NOVO, ATUALIZAR, SEM ALTERACAO, resumo e publish_enabled=false. Para inventario grande exige selecao, sem dar falsa aprovacao
+- Prova no repositório real via CodeBridge: 3 arquivos => rag_bridge.py ATUALIZAR, RAG_CONTRACT.md SEM ALTERACAO, RAG_V1_PROGRESS.md NOVO; executado=false
+- O resumo explicita nenhum arquivo indexado, e o review_contract continua FINGERPRINTED_NOT_APPROVED
+- Nenhum acesso fora do root ou mudanca do indice ativo; 3 testes focados existentes do modulo preview_view PASS

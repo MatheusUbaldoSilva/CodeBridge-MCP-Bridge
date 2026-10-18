@@ -265,7 +265,11 @@ def index_rag(
                 if 0 < len(candidate_rows) <= 20:
                     from rag.runtime.incremental_preview_confirmation import snapshot_preview
                     from rag.runtime.incremental_review_contract import build_review_contract
+                    from rag.runtime.incremental_preview_view import describe_incremental_preview
 
+                    payload["plan"]["preview_view"] = describe_incremental_preview(
+                        payload["plan"], payload["plan"]["incremental_preview"]
+                    )
                     snapshot = snapshot_preview(project_id, root, candidate_rows)
                     payload["plan"]["review_contract"] = build_review_contract(
                         snapshot, project_id, root
