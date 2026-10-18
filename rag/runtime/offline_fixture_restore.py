@@ -46,7 +46,8 @@ def _restore_locked(root, backup_name, restored_name):
     if destination.exists() or not metadata.is_file() or not payload.is_dir():
         raise OfflineFixtureRestoreError("missing snapshot or existing target")
     try:
-        report = json.loads(metadata.read_text(encoding="utf-8"))
+        metadata_bytes = metadata.read_bytes()
+        report = json.loads(metadata_bytes)
         if report["state"] != "LAB_FIXTURE_SNAPSHOT_ONLY" or report["production_authorized"] is not False:
             raise OfflineFixtureRestoreError("unsafe report state")
         if report["hashes"] != _hash_tree(payload):
@@ -73,6 +74,8 @@ def _restore_locked(root, backup_name, restored_name):
             raise OfflineFixtureRestoreError("snapshot changed before restore publication")
         if _hash_tree(copy) != report["hashes"]:
             raise OfflineFixtureRestoreError("restored copy changed before publication")
+        if metadata.read_bytes() != metadata_bytes:
+            raise OfflineFixtureRestoreError("backup report changed before publication")
         if destination.exists():
             raise OfflineFixtureRestoreError("destination appeared during restore")
         os.rename(staging, destination)
