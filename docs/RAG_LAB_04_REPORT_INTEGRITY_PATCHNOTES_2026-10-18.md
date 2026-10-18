@@ -62,3 +62,9 @@ RED: replacing saved snapshot source directory with a Windows directory symlink 
 GREEN: before restore publication, validate the original saved source, its parent, snapshot payload, metadata and all ancestor reparse boundaries again.
 Regression: RAG-LAB.04 focused 54 PASS; backend 412 PASS (284 offline + 83 generation + 7 preflight + 38 incremental).
 These are synthetic fixture defenses against observed races; they do not constitute atomic protection or global Windows process/mmap quiescence. Production backup and go-live remain BLOCKED.
+
+RAG-LAB.04 - nested duplicate keys and JSON root types (2026-10-18)
+Test-only additional coverage: tests/test_offline_lab04_report_duplicate_keys.py.
+Confirmed strict report decoder rejects duplicate nested keys and non-object JSON roots. No production data touched.
+Focused RAG-LAB.04 56 PASS; backend 414 PASS (286 offline + 83 generation + 7 preflight + 38 incremental).
+RAG-LAB.04 remains PARTIAL; native Qdrant Server snapshots and global quiescence unproven; production backup BLOCKED.

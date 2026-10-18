@@ -28,6 +28,16 @@ class DuplicateReportKeyTests(unittest.TestCase):
         self.assertIs(json.loads(duplicate)["production_authorized"], False)
         self.report.write_text(duplicate, encoding="utf-8")
 
+    def test_strict_decoder_rejects_duplicate_nested_key(self):
+        from rag.runtime.offline_fixture_report import decode_fixture_report
+        with self.assertRaises(ValueError):
+            decode_fixture_report('{ "verification": { "code": "OK", "code": "OK" } }')
+
+    def test_strict_decoder_requires_object_root(self):
+        from rag.runtime.offline_fixture_report import decode_fixture_report
+        with self.assertRaises(ValueError):
+            decode_fixture_report('["LAB_FIXTURE_SNAPSHOT_ONLY"]')
+
     def test_restore_rejects_duplicate_top_level_report_key(self):
         self.add_duplicate_key()
         with self.assertRaises(OfflineFixtureRestoreError):
