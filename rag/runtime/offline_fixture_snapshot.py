@@ -121,7 +121,8 @@ def _capture_guarded(root, backup_name):
         report = {"state": "LAB_FIXTURE_SNAPSHOT_ONLY", "verification": verified,
                   "hashes": _hash_tree(payload),
                   "production_authorized": False, "active_generation_changed": False}
-        (stage / "report.json").write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+        expected_report = json.dumps(report, indent=2, sort_keys=True)
+        (stage / "report.json").write_text(expected_report, encoding="utf-8")
         if _qdrant_sqlite_sidecars(root / "qdrant") or _qdrant_sqlite_sidecars(payload / "qdrant"):
             raise OfflineFixtureError("Qdrant SQLite sidecar appeared before publication")
         if any((root / (db.name + suffix)).exists() for suffix in ("-wal", "-shm", "-journal")):
@@ -132,6 +133,8 @@ def _capture_guarded(root, backup_name):
             raise OfflineFixtureError("source changed before snapshot publication")
         if _hash_tree(payload) != report["hashes"]:
             raise OfflineFixtureError("staging changed before snapshot publication")
+        if (stage / "report.json").read_text(encoding="utf-8") != expected_report:
+            raise OfflineFixtureError("snapshot report changed before publication")
         if target.exists() or target.is_symlink():
             raise OfflineFixtureError("concurrent destination")
         os.rename(stage, target)
