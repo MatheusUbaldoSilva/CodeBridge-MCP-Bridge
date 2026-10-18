@@ -93,7 +93,17 @@ def build_staged_index(plan: RagIndexPlan) -> dict[str, object]:
         from rag.runtime.production_search import _MODEL_LOCK
         with _MODEL_LOCK:
             _write_vectors(staging/"qdrant",plan.project_id,text_rows,code_rows)
-        return {"state":"STAGED_NOT_PUBLISHED","project_id":plan.project_id,"staging_path":str(staging),"documents":documents,"chunks":chunks,"text_chunks":len(text_rows),"code_chunks":len(code_rows)}
+        manifest = None
+        # Incremental merge requires model-compatible entries from the
+        # existing active manifest. Fresh standalone staging keeps its old API.
+        from rag.runtime.status import resolve_rag_manifest_path
+        if resolve_rag_manifest_path().is_file():
+            from rag.index.manifest import load_index_manifest
+            active = load_index_manifest(resolve_rag_manifest_path())
+            if any(item.project_id == plan.project_id for item in active.entries):
+                from rag.runtime.staged_manifest import create_staged_manifest
+                manifest = create_staged_manifest(staging, root, plan.project_id)
+        return {"state":"STAGED_NOT_PUBLISHED","project_id":plan.project_id,"staging_path":str(staging),"documents":documents,"chunks":chunks,"text_chunks":len(text_rows),"code_chunks":len(code_rows),"manifest_entries":manifest["entries"] if manifest else None}
     except BaseException:
         if connection is not None:
             connection.close()

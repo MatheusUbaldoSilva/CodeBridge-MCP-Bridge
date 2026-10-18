@@ -153,3 +153,13 @@
 - LIMITACAO EXPLICITA: snapshot_consistent=false e safe_to_publish=false. Uma leitura ao vivo nao demonstra quiescencia, pin de leitor, recuperacao nem publicacao atomica.
 - Regressao focal: 9 testes do vector_ids e 4 preflight PASS, sem novo laboratorio e sem alterar banco ativo
 - Proxima entrega: ativar novo tool MCP por reinicio gracioso externo e provar consulta publica; so depois manter plano de publicacao em geracao imutavel e manutencao aprovada
+
+### V1.03-C — staging incremental REAL e manifesto compativel
+- Para fontes que ja possuem versoes de modelo no manifesto ativo o indexador isolado agora cria rag-index-manifest.json junto com rag_index.sqlite3 e qdrant da nova geracao staging
+- Novo modulo rag/runtime/staged_manifest.py compara SHA do arquivo real de novo apos embeddings; rejeita mudanca durante operacao e versoes ambiguas de modelo; nao grava em indice ativo
+- Sem corpus ativo para o mesmo projeto o fluxo de staging anterior permanece compativel; plano vazio tambem segue suportado
+- Testes legados: test_rag_017_g_staged_index 2 PASS e test_rag_017_g_staging_security 3 PASS
+- PROVA NO SISTEMA REAL com CodeBridge: build_staged_index do arquivo ja commitado rag/runtime/live_integrity.py retornou STAGED_NOT_PUBLISHED, 1 documento, 5 chunks/code, 1 entrada de manifesto em 9.8 s
+- Staging novo em %LOCALAPPDATA%/CodeBridge/rag/staging/build-ec8595a85ef44f59ba085a1b75b6e49a. Nao promover, nao apagar sem auditoria.
+- Validador offline existente validate_incremental_bundle retornou VALIDATED_OFFLINE_NOT_PUBLISHED com 1 documento, 5 chunks, 5 vetores e 1 manifesto
+- A prova e de staging real isolado NAO de update do indice ativo. Mesclagem/publicacao geracional e leitor protegido ainda pendentes. Nao houve novo laboratorio nem backup real
