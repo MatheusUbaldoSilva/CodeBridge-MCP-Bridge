@@ -133,7 +133,10 @@ def _capture_guarded(root, backup_name):
             raise OfflineFixtureError("source changed before snapshot publication")
         if _hash_tree(payload) != report["hashes"]:
             raise OfflineFixtureError("staging changed before snapshot publication")
-        if (stage / "report.json").read_text(encoding="utf-8") != expected_report:
+        report_path = stage / "report.json"
+        if _redirected(report_path) or not report_path.is_file() or report_path.stat().st_nlink != 1:
+            raise OfflineFixtureError("snapshot report redirected or hardlinked")
+        if report_path.read_text(encoding="utf-8") != expected_report:
             raise OfflineFixtureError("snapshot report changed before publication")
         if target.exists() or target.is_symlink():
             raise OfflineFixtureError("concurrent destination")
