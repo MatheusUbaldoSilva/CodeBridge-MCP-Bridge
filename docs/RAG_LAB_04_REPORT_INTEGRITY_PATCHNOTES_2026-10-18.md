@@ -11,3 +11,12 @@ production_backup=BLOCKED; all_handles_closed=false; production_quiescence_prove
 Focused LAB04 regression on 2026-10-18: 43 tests PASS (exit 0).
 Full backend regression recorded at 2bbac58: 401 PASS (273 offline + 83 generation + 7 preflight + 38 incremental).
 RAG-LAB.04 remains PARTIAL: native Qdrant Server snapshots and global handles/mmap quiescence unproven; production backup remains BLOCKED.
+
+RAG-LAB.04 - generation-state metadata invariant (2026-10-18)
+Files: rag/runtime/offline_fixture_restore.py; rag/runtime/offline_restore_equivalence.py; tests/test_offline_lab04_report_generation_flag.py.
+A synthetic report with active_generation_changed=true was previously accepted by both restore and independent equivalence; two negative tests reproduced the defect (RED, 2 failures).
+Both paths now require active_generation_changed is exactly false, matching the original capture report contract (GREEN, 2 tests).
+Regression: focused RAG-LAB.04 45 PASS; backend 403 PASS (275 offline + 83 generation + 7 preflight + 38 incremental).
+Synthetic fixture only; no production backups, process shutdown, live index operations or production permissions.
+RAG-LAB.04 remains PARTIAL; native Qdrant Server snapshots, global Windows handles/mmap, production quiescence and go-live are NOT proven.
+production_backup=BLOCKED; copy_authorized=false; production_quiescence_proven=false.

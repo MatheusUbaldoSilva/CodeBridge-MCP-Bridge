@@ -29,7 +29,7 @@ def audit_restored_fixture(fixture_root, backup_name, restore_name):
             raise ValueError("incomplete fixture")
         report_bytes=report.read_bytes()
         meta=json.loads(report_bytes)
-        if meta.get("production_authorized") is not False or meta.get("state")!="LAB_FIXTURE_SNAPSHOT_ONLY":
+        if meta.get("production_authorized") is not False or meta.get("state")!="LAB_FIXTURE_SNAPSHOT_ONLY" or meta.get("active_generation_changed") is not False:
             raise ValueError("unsafe snapshot report")
         a=_hash_tree(original)
         b=_hash_tree(restored)

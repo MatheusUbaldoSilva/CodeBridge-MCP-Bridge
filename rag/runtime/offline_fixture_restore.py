@@ -48,7 +48,7 @@ def _restore_locked(root, backup_name, restored_name):
     try:
         metadata_bytes = metadata.read_bytes()
         report = json.loads(metadata_bytes)
-        if report["state"] != "LAB_FIXTURE_SNAPSHOT_ONLY" or report["production_authorized"] is not False:
+        if report["state"] != "LAB_FIXTURE_SNAPSHOT_ONLY" or report["production_authorized"] is not False or report.get("active_generation_changed") is not False:
             raise OfflineFixtureRestoreError("unsafe report state")
         if report["hashes"] != _hash_tree(payload):
             raise OfflineFixtureRestoreError("snapshot fingerprint mismatch")
