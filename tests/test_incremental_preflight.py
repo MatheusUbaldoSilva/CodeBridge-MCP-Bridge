@@ -27,6 +27,10 @@ class IncrementalPreflightTests(unittest.TestCase):
             self.assertEqual(result["new_files"], ["new.md"])
             self.assertEqual(result["existing_files"], ["existing.md"])
             self.assertFalse(result["safe_to_publish"])
+            gate = result["publication_gate"]
+            self.assertEqual(gate["state"], "BLOCKED")
+            self.assertIn("PRODUCTION_ATOMIC_GENERATION_WRITER_NOT_WIRED", gate["reasons"])
+            self.assertIn("NEW_SOURCES_REQUIRE_INDIVIDUAL_APPROVAL", gate["reasons"])
             self.assertEqual(db.read_bytes(), original)
 
     def test_modified_unchanged_and_project_isolation(self):

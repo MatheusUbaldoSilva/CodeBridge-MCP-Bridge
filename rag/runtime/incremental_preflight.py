@@ -130,6 +130,21 @@ def assess_incremental_plan(plan: dict, *, database: Path | None = None, full_in
                     offset += 1
         except (OSError, subprocess.TimeoutExpired):
             git_status = "UNAVAILABLE"
+    # A plan is a review aid, never a publication authorization. These
+    # blockers must remain explicit until runtime readers, writer and operator
+    # approval are integrated with the same immutable generation protocol.
+    blockers = [
+        "PRODUCTION_ATOMIC_GENERATION_WRITER_NOT_WIRED",
+        "MCP_READERS_NOT_PINNED_TO_PRODUCTION_GENERATION",
+        "QDRANT_CROSS_STORE_VERIFICATION_PENDING",
+        "OPERATOR_MAINTENANCE_AUTHORIZATION_REQUIRED",
+    ]
+    if fresh:
+        blockers.append("NEW_SOURCES_REQUIRE_INDIVIDUAL_APPROVAL")
+    if git_modified or git_untracked:
+        blockers.append("DIRTY_WORKTREE_REQUIRES_REVIEW")
+    if unknown:
+        blockers.append("UNKNOWN_HASHES_REQUIRE_REVIEW")
     return {
         "project_id": project,
         "new_count": len(fresh),
@@ -150,6 +165,11 @@ def assess_incremental_plan(plan: dict, *, database: Path | None = None, full_in
         "git_head": git_head,
         "git_modified_files": sorted(git_modified),
         "git_untracked_files": sorted(git_untracked),
+        "publication_gate": {
+            "state": "BLOCKED",
+            "reasons": blockers,
+            "safe_to_publish": False,
+        },
         "safe_to_publish": False,
         "reason": "A publicacao incremental ainda nao foi implementada e validada.",
     }

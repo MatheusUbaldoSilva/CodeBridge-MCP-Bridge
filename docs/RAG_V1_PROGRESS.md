@@ -99,3 +99,11 @@
 - SQLite ativo verificado somente leitura: PRAGMA integrity_check=ok, 210 docs, 8761 chunks, 0 orfaos; manifest existe com entries e schema_version
 - Revisao de gate: sem vetor Qdrant consistente sob sessao fechada, locking e publicacao atomica comprovados nao ha aprovacao para trocar geracao ativa; V1.03-C, D e E permanecem parciais/bloqueadas
 - Nao foi executada indexacao, backup real, copia do indice, exclusao, parada de GUI ou alteracao de DB
+
+### V1.03-C - status de bloqueio explicitado para a publicacao
+- rag/runtime/incremental_preflight.py inclui publication_gate {state:BLOCKED, reasons, safe_to_publish:false} na resposta do planejamento read-only
+- Razoes objetivas: writer de geracoes nao conectado a producao, leitores MCP sem pin da geracao, verificacao completa Qdrant pendente, autorizacao de manutencao pendente
+- Novas fontes sem aprovacao individual, worktree dirty e hashes desconhecidos acrescentam bloqueios adicionais quando presentes
+- Prova no CodeBridge real via adaptador do repo: uma fonte NEW uma MODIFIED uma UNCHANGED e publication_gate BLOCKED com motivos listados
+- Teste focado existente atualizado para evitar regressao do gate, 4 testes PASS
+- A trilha de laboratorio generation_* permanece exclusivamente test-root; nao foi usada para modificar o indice ativo. Nao marcar V1.03-C concluida ate haver writer e leitores atomicos reais e autorizacao especifica
