@@ -125,3 +125,13 @@
 - Prova real no CodeBridge pelo adapter do repositorio: PLAN permitiu consulta, EXECUTE recusado com EXECUTOR_UNAVAILABLE, nenhuma escrita no indice
 - Testes legados do MCP com ambiente local isolado: 3 PASS; o bloqueio e aplicado ao contexto de instalacao opt-in, nao a executor customizado num teste isolado
 - V1.03-C segue PARCIAL/BLOQUEADA: impedir publish nao constitui implementacao de publish
+
+### V1.03-C — prova na instalacao e dependencias para proxima janela
+- Commits recentes e188492 (motivos do gate), edaec06 (recibo de revisao) e d706404 (execute=true fail closed) verificados em origin
+- Na instalacao Windows o adaptador atualizado retornou PLAN, FINGERPRINTED_NOT_APPROVED e gate BLOCKED
+- Tentativa controlada execute=true no adaptador da instalacao retornou EXECUTOR_UNAVAILABLE antes de iniciar job; nenhum arquivo de indice modificado
+- Os arquivos da instalacao correspondem aos fontes dos commits; processo MCP carregado precisa de reinicio externo seguro para disponibilizar publicamente os novos campos
+- Etapa C ainda nao tem leitor de geracao ativado na producao, publicador atomico e prova Qdrant cross-store; nao reaproveitar modulo test-only como se fosse production-ready
+- Proxima acao depois de reiniciar de forma manual e segura: codebridge_rag_index execute=false com 2 fontes aprovadas e verificar review_contract + publication_gate na ferramenta publica
+- Depois implementar protocolo de geracao com snapshot consistente e pin de leitores antes de qualquer alteracao de indice real, com aprovacao especifica do operador
+- Permanecem preservadas as duas excecoes antigas do working tree; nao alterar benchmarks/rag017_code_only_extended_smoke.json nem docs/RAG_017_J_VM_ROLLBACK_RUNBOOK_2026-10-10.md
