@@ -30,7 +30,14 @@ try:
     result=publish_with_verified_backup(root,'one',candidate,'backup_'+candidate)
     output={'success': True,'active':result['published']['active']}
 except Exception as error:
-    output={'success': False,'error':type(error).__name__}
+    causes=[]
+    current=error
+    for _ in range(5):
+        if current is None:
+            break
+        causes.append({'type':type(current).__name__, 'message':str(current)[:240]})
+        current=current.__cause__ or current.__context__
+    output={'success': False,'error':type(error).__name__,'causes':causes}
 (root/('out_'+candidate+'.json')).write_text(json.dumps(output))
 """
 
@@ -63,6 +70,10 @@ class ProcessPublicationRaceTests(unittest.TestCase):
                 self.assertEqual([p.wait(timeout=12) for p in children],[0,0])
                 results=[json.loads((root/("out_"+name+".json")).read_text())
                          for name in ("two","three")]
+                for entry in results:
+                    if not entry["success"]:
+                        self.assertTrue(entry.get("causes"),results)
+                        self.assertEqual(entry["causes"][0]["type"],entry["error"])
                 self.assertEqual(sum(x["success"] for x in results),1,results)
                 winning=next(x["active"] for x in results if x["success"])
                 self.assertEqual(resolve_generation(root).generation,winning)
