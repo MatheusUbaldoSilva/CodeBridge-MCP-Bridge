@@ -214,6 +214,12 @@ def index_rag(
                 approved = config.get("repository_root")
                 if not approved or Path(project_root).resolve() != Path(approved).resolve():
                     raise PermissionError("CodeBridge index plan requires the approved repository root")
+                if execute:
+                    from rag.runtime.index_request import RagIndexExecutionUnavailableError
+                    raise RagIndexExecutionUnavailableError(
+                        "RAG V1 incremental publication is blocked until source approval, "
+                        "production generation locking and operator maintenance authorization"
+                    )
 
     from rag.runtime.index_request import (
         RagIndexScope,

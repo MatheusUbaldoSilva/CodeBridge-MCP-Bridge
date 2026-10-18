@@ -117,3 +117,11 @@
 - Corrigimos testes legados do MCP que herdavam opt-in real via LOCALAPPDATA; cada subprocesso sintetico agora isola seu diretorio temporario sem alterar a politica de producao
 - Regressoes focadas 4 preflight + 5 review contract + 3 preview confirmation + 3 MCP index + 9 index request = 24 PASS
 - Ainda sem publicacao real: V1.03-C bloqueada aguardando integracao de geracao atomica, leitores travados e autorizacao especifica
+
+### V1.03-C - fail closed real na solicitacao execute=true
+- index_rag em codebridge com opt-in local e root aprovado bloqueia execute=true mesmo se um executor staging for registrado prematuramente
+- Retorno de erro estruturado usa RagIndexExecutionUnavailableError / EXECUTOR_UNAVAILABLE explicando ausencia de registry aprovado, writer atomico e manutencao autorizada
+- execute=false permanece disponivel e retorna preview digest de selecao e gate BLOCKED
+- Prova real no CodeBridge pelo adapter do repositorio: PLAN permitiu consulta, EXECUTE recusado com EXECUTOR_UNAVAILABLE, nenhuma escrita no indice
+- Testes legados do MCP com ambiente local isolado: 3 PASS; o bloqueio e aplicado ao contexto de instalacao opt-in, nao a executor customizado num teste isolado
+- V1.03-C segue PARCIAL/BLOQUEADA: impedir publish nao constitui implementacao de publish
