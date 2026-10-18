@@ -74,6 +74,8 @@ def _restore_locked(root, backup_name, restored_name):
             raise OfflineFixtureRestoreError("snapshot changed before restore publication")
         if _hash_tree(copy) != report["hashes"]:
             raise OfflineFixtureRestoreError("restored copy changed before publication")
+        if _redirected(metadata) or not metadata.is_file() or metadata.stat().st_nlink != 1:
+            raise OfflineFixtureRestoreError("backup report redirected or hardlinked before publication")
         if metadata.read_bytes() != metadata_bytes:
             raise OfflineFixtureRestoreError("backup report changed before publication")
         if destination.exists():
