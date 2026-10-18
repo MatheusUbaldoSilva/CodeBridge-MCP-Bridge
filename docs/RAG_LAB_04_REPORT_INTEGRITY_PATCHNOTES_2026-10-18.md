@@ -20,3 +20,10 @@ Regression: focused RAG-LAB.04 45 PASS; backend 403 PASS (275 offline + 83 gener
 Synthetic fixture only; no production backups, process shutdown, live index operations or production permissions.
 RAG-LAB.04 remains PARTIAL; native Qdrant Server snapshots, global Windows handles/mmap, production quiescence and go-live are NOT proven.
 production_backup=BLOCKED; copy_authorized=false; production_quiescence_proven=false.
+
+RAG-LAB.04 - restore-parent directory swap (2026-10-18)
+Files: rag/runtime/offline_fixture_restore.py and tests/test_offline_lab04_restore_parent_swap.py.
+RED: in a disposable Windows fixture, replace offline-fixture-restores with a directory symlink after copy validation; old restore published the snapshot outside the fixture root.
+GREEN: recheck destination parent, staging, destination and ancestors before publication; avoid deleting a staging directory through a redirected ancestor in cleanup.
+Focused LAB04: 46 PASS; backend regression: 404 PASS (276 offline + 83 generation + 7 preflight + 38 incremental).
+No guarantee of atomic Windows-wide quiescence against adversarial post-check swaps; real maintenance, Qdrant Server snapshots and production backups remain BLOCKED.

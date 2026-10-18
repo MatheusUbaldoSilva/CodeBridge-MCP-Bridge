@@ -78,6 +78,9 @@ def _restore_locked(root, backup_name, restored_name):
             raise OfflineFixtureRestoreError("backup report redirected or hardlinked before publication")
         if metadata.read_bytes() != metadata_bytes:
             raise OfflineFixtureRestoreError("backup report changed before publication")
+        if any(_redirected(part) for path in (destination_parent, staging, destination)
+               for part in (path, *path.parents)):
+            raise OfflineFixtureRestoreError("restore parent redirected before publication")
         if destination.exists():
             raise OfflineFixtureRestoreError("destination appeared during restore")
         os.rename(staging, destination)
@@ -85,5 +88,5 @@ def _restore_locked(root, backup_name, restored_name):
                 "backup": backup_name, "target": restored_name,
                 "verification": verification, "production_authorized": False}
     finally:
-        if staging.exists():
+        if not any(_redirected(part) for part in (staging, *staging.parents)) and staging.exists():
             shutil.rmtree(staging)
