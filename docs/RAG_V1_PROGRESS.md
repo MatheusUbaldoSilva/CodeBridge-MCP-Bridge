@@ -90,3 +90,12 @@
 - Bloqueio de publicacao: incremental_offline_publish e generation_* sao exclusivos de tests roots; safe_to_publish=false
 - Sem permissao especifica e locking independente nao copiar parar GUI alterar indice ativo nem gerar backup real
 - Defesa adicional: o planejamento codebridge recusa project_root fora do root previamente aprovado ANTES de listar ou ler arquivos; comprovado por tentativa real bloqueada com PermissionError e plano permitido no root correto.
+
+### V1.03-C - validacao instalada e integridade (continuacao)
+- Commit da implementacao 1fb241a97562f69ac2f73706948301e3ceb61452 sincronizado com origin
+- Copia controlada para instalacao Windows apenas author_mcp/rag_bridge.py e rag/runtime/incremental_preflight.py; hashes fonte/destino identicos e compilacao no Python embutido OK
+- Prova na arvore instalada: index_rag(scope=BOTH, 3 arquivos, execute=false) retornou NEW progress, MODIFIED rag_bridge, UNCHANGED contrato, git_status AVAILABLE, HEAD=1fb241a, tempo 0.18 s, safe_to_publish=false
+- Chamada pela ferramenta MCP publica nesta sessao ainda sem incremental_preview por import cache do processo; aguardar reinicio manual seguro para validar superficie publica; nao reiniciar processo MCP por dentro dele
+- SQLite ativo verificado somente leitura: PRAGMA integrity_check=ok, 210 docs, 8761 chunks, 0 orfaos; manifest existe com entries e schema_version
+- Revisao de gate: sem vetor Qdrant consistente sob sessao fechada, locking e publicacao atomica comprovados nao ha aprovacao para trocar geracao ativa; V1.03-C, D e E permanecem parciais/bloqueadas
+- Nao foi executada indexacao, backup real, copia do indice, exclusao, parada de GUI ou alteracao de DB
