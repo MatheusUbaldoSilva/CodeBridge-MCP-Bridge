@@ -41,3 +41,10 @@ RED: a snapshot report with duplicate production_authorized keys and identical f
 GREEN: strict JSON object_pairs_hook now rejects duplicate keys at every nesting level; root must be an object. Both restore and independent audit use this decoder.
 Regression: RAG-LAB.04 focused 49 PASS; backend 407 PASS (279 offline + 83 generation + 7 preflight + 38 incremental).
 Synthetic lab only. Backup and go-live remain BLOCKED; native Qdrant Server and global quiescence not proven.
+
+RAG-LAB.04 - non-finite JSON numbers (2026-10-18)
+Files: rag/runtime/offline_fixture_report.py and tests/test_offline_lab04_report_nonfinite.py.
+RED: report containing NaN with otherwise valid synthetic metadata passed both restore and independent audit. Python also accepted NaN, Infinity, and -Infinity in strict report decoder.
+GREEN: strict report parser uses parse_constant to reject non-standard non-finite numbers; 3 focused tests pass.
+Regression: RAG-LAB.04 focused 52 PASS; backend 410 PASS (282 offline + 83 generation + 7 preflight + 38 incremental).
+No production backup or process shutdown. RAG-LAB.04 remains PARTIAL; native Qdrant Server and global quiescence unproven; production backup BLOCKED.
