@@ -59,6 +59,84 @@ def configure_production_rag_executors(
     }
 
 
+_V1_PYTHON: Optional[Path] = None
+
+
+def _v1_semantic_process_executor(query: Any, route: Any) -> tuple[Any, ...]:
+    """Use a trusted, separately configured Python for vector dependencies."""
+    import json
+    import subprocess
+    from rag.contracts import SearchResult, SourceMetadata, SourceType
+
+    if query.project_id != "codebridge":
+        raise PermissionError("V1 semantic search project is not approved")
+    if _V1_PYTHON is None:
+        raise RuntimeError("V1 semantic Python is not configured")
+    payload = {
+        "query": query.query, "project_id": query.project_id,
+        "source_types": [value.value for value in query.source_types],
+        "top_k": query.top_k, "path_filter": query.path_filter,
+        "branch": query.branch, "route": route.value,
+    }
+    if not 1 <= query.top_k <= 20:
+        raise ValueError("V1 semantic top_k must be between 1 and 20")
+    try:
+        completed = subprocess.run(
+            [str(_V1_PYTHON), "-m", "rag.runtime.v1_semantic_worker"],
+            cwd=str(ROOT), input=json.dumps(payload), text=True,
+            capture_output=True, timeout=180, check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("V1 semantic worker timed out") from exc
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "V1 semantic worker failed: " + completed.stderr[-700:]
+        )
+    records = json.loads(completed.stdout)
+    results = []
+    for record in records:
+        metadata = dict(record["metadata"])
+        metadata["source_type"] = SourceType(metadata["source_type"])
+        results.append(SearchResult(
+            chunk_id=record["chunk_id"],
+            document_id=record["document_id"],
+            content=record["content"],
+            metadata=SourceMetadata(**metadata),
+            score=float(record["score"]),
+            rank=int(record["rank"]),
+            retrieval_modes=tuple(record.get("retrieval_modes", ())),
+            stale=bool(record.get("stale", False)),
+        ))
+    return tuple(results)
+
+
+def _configure_v1_semantic_for_project(project_id: str) -> None:
+    """Explicit local opt-in; no import of vector libraries in the MCP runtime."""
+    import json
+    import os
+
+    global _V1_PYTHON
+    path = Path(os.environ.get("LOCALAPPDATA") or str(Path.home()))
+    path = path / "CodeBridge-MCP-Bridge" / "rag_v1_semantic.json"
+    if not path.is_file():
+        if _RAG_SEARCH_EXECUTOR is _v1_semantic_process_executor:
+            register_rag_search_executor(None)
+        _V1_PYTHON = None
+        return
+    config = json.loads(path.read_text(encoding="utf-8-sig"))
+    enabled = config.get("enabled") is True and config.get("project_id") == "codebridge"
+    if not enabled or project_id != "codebridge":
+        if _RAG_SEARCH_EXECUTOR is _v1_semantic_process_executor:
+            register_rag_search_executor(None)
+        _V1_PYTHON = None
+        return
+    executable = Path(config["python_executable"])
+    if not executable.is_absolute() or not executable.is_file():
+        raise RuntimeError("V1 semantic Python executable is unavailable")
+    _V1_PYTHON = executable
+    register_rag_search_executor(_v1_semantic_process_executor)
+
+
 def _ensure_project_root() -> None:
     value = str(ROOT)
     if value not in sys.path:
@@ -117,6 +195,8 @@ def search_rag_context(
     _ensure_project_root()
 
     from rag.runtime.search_service import search_context
+
+    _configure_v1_semantic_for_project(project_id)
 
     result = search_context(
         query=query,
