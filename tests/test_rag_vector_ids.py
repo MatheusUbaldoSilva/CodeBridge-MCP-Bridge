@@ -123,6 +123,23 @@ class RagVectorDeterministicIdTests(unittest.TestCase):
         self.assertNotEqual(text_a, code)
         self.assertNotEqual(text_a, other_project)
 
+    def test_live_point_key_decoder_checks_pickle_opcode_without_unpickling(self):
+        import base64
+        import pickle
+        import uuid
+        from rag.runtime.live_integrity import (
+            LiveIntegrityError, _decode_safe_point_uuid,
+        )
+
+        point_id = str(uuid.uuid4())
+        encoded = base64.b64encode(pickle.dumps(point_id, protocol=4)).decode("ascii")
+        self.assertEqual(_decode_safe_point_uuid(encoded), point_id)
+        bad = base64.b64encode(pickle.dumps({"id": point_id}, protocol=4)).decode("ascii")
+        with self.assertRaises(LiveIntegrityError):
+            _decode_safe_point_uuid(bad)
+        with self.assertRaises(LiveIntegrityError):
+            _decode_safe_point_uuid("invalid-not-base64")
+
     def test_reindex_same_text_chunk_is_idempotent(self):
         with tempfile.TemporaryDirectory() as td:
             client = open_qdrant_local(Path(td) / "qdrant")

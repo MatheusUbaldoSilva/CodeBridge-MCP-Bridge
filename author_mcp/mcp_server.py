@@ -50,6 +50,15 @@ class RagStatusResult(ProtocolOutcome):
     retryable: bool | None = None
 
 
+class RagIntegrityResult(ProtocolOutcome):
+    state: str
+    read_only: bool
+    safe_to_publish: bool
+    details: dict[str, Any]
+    error_type: str | None = None
+    error_message: str | None = None
+
+
 class RagIndexResult(ProtocolOutcome):
     action: str | None
     executed: bool
@@ -720,6 +729,38 @@ def codebridge_rag_status() -> RagStatusResult:
         error_type=None,
         error_message=None,
         retryable=None,
+    )
+
+
+@mcp.tool(
+    name="codebridge_rag_integrity",
+    description="Auditoria somente leitura do SQLite, manifesto e identidades dos vetores do indice RAG local. Nao autoriza publicacao.",
+    annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=False),
+    structured_output=True,
+)
+def codebridge_rag_integrity() -> RagIntegrityResult:
+    try:
+        bridge = importlib.import_module("rag_bridge")
+        details = bridge.inspect_rag_integrity()
+    except Exception as exc:
+        error = _rag_public_error(exc)
+        return RagIntegrityResult(
+            operation_ok=False,
+            operation_error_type=str(error["error_type"]),
+            operation_error_message=str(error["error_message"]),
+            state="FAILED",
+            read_only=True,
+            safe_to_publish=False,
+            details={},
+            error_type=str(error["error_type"]),
+            error_message=str(error["error_message"]),
+        )
+    return RagIntegrityResult(
+        operation_ok=True,
+        state=str(details["state"]),
+        read_only=True,
+        safe_to_publish=False,
+        details=details,
     )
 
 

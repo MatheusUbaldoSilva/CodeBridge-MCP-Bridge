@@ -184,6 +184,13 @@ def format_rag_error(exc: BaseException) -> dict[str, Any]:
     return classify_rag_error(exc).to_dict()
 
 
+def inspect_rag_integrity() -> dict[str, Any]:
+    """Read-only live consistency audit; never an approval to publish."""
+    _ensure_project_root()
+    from rag.runtime.live_integrity import inspect_live_index
+    return inspect_live_index("codebridge")
+
+
 def get_rag_status() -> dict[str, Any]:
     _ensure_project_root()
 

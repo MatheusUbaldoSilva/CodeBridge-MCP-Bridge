@@ -142,3 +142,14 @@
 - Prova no repositório real via CodeBridge: 3 arquivos => rag_bridge.py ATUALIZAR, RAG_CONTRACT.md SEM ALTERACAO, RAG_V1_PROGRESS.md NOVO; executado=false
 - O resumo explicita nenhum arquivo indexado, e o review_contract continua FINGERPRINTED_NOT_APPROVED
 - Nenhum acesso fora do root ou mudanca do indice ativo; 3 testes focados existentes do modulo preview_view PASS
+
+### V1.03-C — auditoria de consistencia vetorial READ ONLY no CodeBridge real
+- Antes: o preflight comprovava 210 documentos 8761 chunks e manifesto mas nao comparava todos os IDs vetoriais do Qdrant Local sem abrir clientes de escrita
+- Criado rag/runtime/live_integrity.py: abre exclusivamente SQLite mode=ro/query_only; confere integridade do indice SQLite e bancos Qdrant, pares doc/chunk/manifest hash e todos os IDs vetoriais deterministas
+- Qdrant Local armazena IDs em base64/pickle. Interpretacao estatica de opcodes com allowlist via pickletools; NAO chama pickle.loads. Teste negativo adicionou ID malformado/dicionario proibido
+- Verifica dimensoes e metrica em meta.json: Jina Text 1024 Cosine e Jina Code 1536 Cosine
+- Prova real: SQLite principal 210 documentos 8761 chunks; Qdrant text=7627 e code=1134, 0 vetores ausentes ou extras, 0 mismatch no manifesto, PRAGMA integrity_check ok
+- API MCP read-only codebridge_rag_integrity registrada no source instalado via RagIntegrityResult e bridge lazy; chamada direta do handler em Python CodeBridge embarcado retornou operation_ok=true / OBSERVED_CONSISTENT
+- LIMITACAO EXPLICITA: snapshot_consistent=false e safe_to_publish=false. Uma leitura ao vivo nao demonstra quiescencia, pin de leitor, recuperacao nem publicacao atomica.
+- Regressao focal: 9 testes do vector_ids e 4 preflight PASS, sem novo laboratorio e sem alterar banco ativo
+- Proxima entrega: ativar novo tool MCP por reinicio gracioso externo e provar consulta publica; so depois manter plano de publicacao em geracao imutavel e manutencao aprovada
