@@ -68,3 +68,38 @@ class IncrementalPreflightTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 assess_incremental_plan({"project_id": "a", "candidates": ["invalid"]},
                                         database=Path(tmp) / "missing.sqlite3")
+
+
+    def test_full_inventory_detects_potential_rename_only_when_complete(self):
+        from rag.chunking.provenance import source_sha256
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "renamed.md").write_text("same content", encoding="utf-8")
+            db = root / "rag.sqlite3"
+            conn = sqlite3.connect(db)
+            try:
+                conn.execute("CREATE TABLE rag_documents(project_id TEXT, path TEXT, sha256 TEXT)")
+                conn.execute("INSERT INTO rag_documents VALUES (?, ?, ?)",
+                             ("codebridge", "previous.md", source_sha256("same content")))
+                conn.commit()
+            finally:
+                conn.close()
+            before = db.read_bytes()
+            plan = {
+                "project_id": "codebridge", "project_root": str(root),
+                "scope": "BOTH", "candidates": [{"path": "renamed.md"}],
+            }
+            limited = assess_incremental_plan(plan, database=db)
+            self.assertEqual(limited["removed_files"], [])
+            self.assertEqual(limited["rename_candidates"], [])
+            complete = assess_incremental_plan(plan, database=db, full_inventory=True)
+            self.assertEqual(complete["removed_files"], ["previous.md"])
+            self.assertEqual(
+                complete["rename_candidates"][0]["to"], "renamed.md"
+            )
+            self.assertFalse(complete["safe_to_publish"])
+            self.assertEqual(db.read_bytes(), before)
+            with self.assertRaises(ValueError):
+                assess_incremental_plan(
+                    dict(plan, scope="TEXT"), database=db, full_inventory=True
+                )

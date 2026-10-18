@@ -201,6 +201,19 @@ def index_rag(
     execute: bool = False,
 ) -> dict[str, Any]:
     _ensure_project_root()
+    if project_id == "codebridge":
+        import json
+        import os
+        config_path = (
+            Path(os.environ.get("LOCALAPPDATA") or str(Path.home()))
+            / "CodeBridge-MCP-Bridge" / "rag_v1_semantic.json"
+        )
+        if config_path.is_file():
+            config = json.loads(config_path.read_text(encoding="utf-8-sig"))
+            if config.get("enabled") is True and config.get("project_id") == project_id:
+                approved = config.get("repository_root")
+                if not approved or Path(project_root).resolve() != Path(approved).resolve():
+                    raise PermissionError("CodeBridge index plan requires the approved repository root")
 
     from rag.runtime.index_request import (
         RagIndexScope,
@@ -215,7 +228,31 @@ def index_rag(
         execute=bool(execute),
         executor=_RAG_INDEX_EXECUTOR,
     )
-    return result.to_dict()
+    payload = result.to_dict()
+    if not execute and project_id == "codebridge":
+        import json
+        import os
+        from rag.runtime.incremental_preflight import assess_incremental_plan
+
+        config_path = (
+            Path(os.environ.get("LOCALAPPDATA") or str(Path.home()))
+            / "CodeBridge-MCP-Bridge"
+            / "rag_v1_semantic.json"
+        )
+        if config_path.is_file():
+            config = json.loads(config_path.read_text(encoding="utf-8-sig"))
+            root = Path(project_root).resolve()
+            approved = Path(config.get("repository_root") or root.parent).resolve()
+            if (
+                config.get("enabled") is True
+                and config.get("project_id") == project_id
+                and root == approved
+            ):
+                payload["plan"]["incremental_preview"] = assess_incremental_plan(
+                    payload["plan"],
+                    full_inventory=scope == "BOTH" and not paths,
+                )
+    return payload
 
 
 def search_rag_context(

@@ -77,3 +77,16 @@
 - A API existente retorna safe_to_publish=false e informa explicitamente que a publicacao incremental ainda nao foi implementada e validada.
 - Proxima letra V1.03-C requer desenho/validacao de publicacao atomica e autorizacao especifica antes de alterar indice ativo. Nao houve copia, backup, reindexacao nem escrita em SQLite/Qdrant reais.
 - Teste de reclassificacao foi executado por CodeBridge MCP no projeto real; nenhuma nova trilha de laboratorio criada.
+
+### V1.03-C - preview MCP incremental real somente leitura
+- Antes: index_rag execute=false so listava candidatos sem delta nem Git
+- Agora: rag_bridge usa assess_incremental_plan em codebridge com opt-in e root aprovado, sem escrever no indice
+- O preflight classifica novo modificado e inalterado; remocao e renomeacao potencial apenas em inventario integral BOTH
+- Proveniencia: HEAD do Git e arquivos modificados ou untracked do escopo diferem do hash indexado
+- Prova real no CodeBridge: 3 fontes consultadas com Git AVAILABLE e alteracoes locais corretamente vistas, execute=false safe_to_publish=false
+- Inventario real completo: 864 candidatos elegiveis, 654 fora do indice, 3 modificados, 207 inalterados, zero remocoes, 4.24 segundos
+- Candidatos nao significam fontes aprovadas e nao iniciam indexacao
+- Regressao focada adicionada ao teste existente: rename somente no inventario integral e sem alterar SQLite
+- Bloqueio de publicacao: incremental_offline_publish e generation_* sao exclusivos de tests roots; safe_to_publish=false
+- Sem permissao especifica e locking independente nao copiar parar GUI alterar indice ativo nem gerar backup real
+- Defesa adicional: o planejamento codebridge recusa project_root fora do root previamente aprovado ANTES de listar ou ler arquivos; comprovado por tentativa real bloqueada com PermissionError e plano permitido no root correto.
