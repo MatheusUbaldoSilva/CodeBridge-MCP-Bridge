@@ -2,7 +2,7 @@
 from __future__ import annotations
 import json
 from pathlib import Path
-from rag.runtime.offline_fixture_snapshot import _root, _hash_tree, _redirected
+from rag.runtime.offline_fixture_snapshot import _root, _hash_tree, _redirected, _qdrant_sqlite_sidecars
 from rag.runtime.incremental_bundle_validate import validate_incremental_bundle
 
 def audit_restored_fixture(fixture_root, backup_name, restore_name):
@@ -23,6 +23,8 @@ def audit_restored_fixture(fixture_root, backup_name, restore_name):
             if any((payload / ("rag_index.sqlite3" + suffix)).exists()
                    for suffix in ("-wal", "-shm", "-journal")):
                 raise ValueError("unexpected SQLite sidecar")
+        if any(_qdrant_sqlite_sidecars(payload / "qdrant") for payload in (original, restored)):
+            raise ValueError("Qdrant SQLite sidecar blocks equivalence")
         if not original.is_dir() or not restored.is_dir() or not report.is_file():
             raise ValueError("incomplete fixture")
         meta=json.loads(report.read_text(encoding="utf-8"))
