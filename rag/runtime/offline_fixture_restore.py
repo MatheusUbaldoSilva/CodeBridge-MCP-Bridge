@@ -71,6 +71,8 @@ def _restore_locked(root, backup_name, restored_name):
             raise OfflineFixtureRestoreError("SQLite sidecar appeared before restore publication")
         if _hash_tree(payload) != report["hashes"]:
             raise OfflineFixtureRestoreError("snapshot changed before restore publication")
+        if _hash_tree(copy) != report["hashes"]:
+            raise OfflineFixtureRestoreError("restored copy changed before publication")
         if destination.exists():
             raise OfflineFixtureRestoreError("destination appeared during restore")
         os.rename(staging, destination)
