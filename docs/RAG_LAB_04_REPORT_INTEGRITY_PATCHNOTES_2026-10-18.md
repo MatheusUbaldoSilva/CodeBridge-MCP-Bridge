@@ -55,3 +55,10 @@ RED: after second cross-store semantic validation, replacing saved backup direct
 GREEN: independent auditor rechecks saved, original, restored, report and ancestor directory redirections after semantic validation; reject on any reparse redirection.
 Regression: RAG-LAB.04 focused 53 PASS; backend 411 PASS (283 offline + 83 generation + 7 preflight + 38 incremental).
 This is defense-in-depth, not atomic global Windows quiescence proof. Production backup, native Qdrant Server snapshots and go-live remain BLOCKED.
+
+RAG-LAB.04 - restore saved-source directory reparse swap (2026-10-18)
+Files: rag/runtime/offline_fixture_restore.py and tests/test_offline_lab04_restore_source_parent_swap.py.
+RED: replacing saved snapshot source directory with a Windows directory symlink after copied store verification caused restore to publish without blocking, although all source content was identical.
+GREEN: before restore publication, validate the original saved source, its parent, snapshot payload, metadata and all ancestor reparse boundaries again.
+Regression: RAG-LAB.04 focused 54 PASS; backend 412 PASS (284 offline + 83 generation + 7 preflight + 38 incremental).
+These are synthetic fixture defenses against observed races; they do not constitute atomic protection or global Windows process/mmap quiescence. Production backup and go-live remain BLOCKED.

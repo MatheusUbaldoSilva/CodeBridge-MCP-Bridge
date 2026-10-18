@@ -67,6 +67,9 @@ def _restore_locked(root, backup_name, restored_name):
             raise OfflineFixtureRestoreError("restored fingerprint mismatch")
         if validate_incremental_bundle(copy) != verification:
             raise OfflineFixtureRestoreError("restored cross-store mismatch")
+        if any(_redirected(part) for path in (backup.parent, backup, payload, metadata)
+               for part in (path, *path.parents)):
+            raise OfflineFixtureRestoreError("snapshot source redirected before restore publication")
         if _qdrant_sqlite_sidecars(payload / "qdrant") or _qdrant_sqlite_sidecars(copy / "qdrant"):
             raise OfflineFixtureRestoreError("Qdrant sidecar appeared before restore publication")
         if any((payload / ("rag_index.sqlite3" + suffix)).exists() or (copy / ("rag_index.sqlite3" + suffix)).exists() for suffix in ("-wal", "-shm", "-journal")):
