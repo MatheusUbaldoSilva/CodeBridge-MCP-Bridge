@@ -126,6 +126,12 @@ def _capture_guarded(root, backup_name):
             raise OfflineFixtureError("Qdrant SQLite sidecar appeared before publication")
         if any((root / (db.name + suffix)).exists() for suffix in ("-wal", "-shm", "-journal")):
             raise OfflineFixtureError("SQLite sidecar appeared before publication")
+        if (_hash_tree(root / "qdrant") != before or
+                hashlib.sha256(db.read_bytes()).hexdigest() != db_hash or
+                hashlib.sha256((root / "rag-index-manifest.json").read_bytes()).hexdigest() != manifest_hash):
+            raise OfflineFixtureError("source changed before snapshot publication")
+        if _hash_tree(payload) != report["hashes"]:
+            raise OfflineFixtureError("staging changed before snapshot publication")
         if target.exists() or target.is_symlink():
             raise OfflineFixtureError("concurrent destination")
         os.rename(stage, target)
