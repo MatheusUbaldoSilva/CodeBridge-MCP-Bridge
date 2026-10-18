@@ -69,6 +69,8 @@ def _restore_locked(root, backup_name, restored_name):
             raise OfflineFixtureRestoreError("Qdrant sidecar appeared before restore publication")
         if any((payload / ("rag_index.sqlite3" + suffix)).exists() or (copy / ("rag_index.sqlite3" + suffix)).exists() for suffix in ("-wal", "-shm", "-journal")):
             raise OfflineFixtureRestoreError("SQLite sidecar appeared before restore publication")
+        if _hash_tree(payload) != report["hashes"]:
+            raise OfflineFixtureRestoreError("snapshot changed before restore publication")
         if destination.exists():
             raise OfflineFixtureRestoreError("destination appeared during restore")
         os.rename(staging, destination)
