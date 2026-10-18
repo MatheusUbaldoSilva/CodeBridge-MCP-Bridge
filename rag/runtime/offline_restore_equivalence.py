@@ -45,6 +45,9 @@ def audit_restored_fixture(fixture_root, backup_name, restore_name):
         if _hash_tree(original)!=a or _hash_tree(restored)!=b:
             result["issues"].append("STORES_CHANGED_DURING_VALIDATION")
             return result
+        if _redirected(report) or not report.is_file() or report.stat().st_nlink != 1:
+            result["issues"].append("REPORT_LINKED_DURING_VALIDATION")
+            return result
         if report.read_bytes()!=report_bytes:
             result["issues"].append("REPORT_CHANGED_DURING_VALIDATION")
             return result
