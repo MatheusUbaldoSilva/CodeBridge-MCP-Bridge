@@ -39,31 +39,39 @@ class ProductionSearchUnavailable(RuntimeError):
 
 
 def _embed_text(query: str, llama_server: Path):
-    lifecycle = TextModelLifecycle(LlamaServerConfig(
+    from rag.models.fallback import TextModelFallbackManager
+
+    base = LlamaServerConfig(
         executable_path=llama_server,
         model_path=resolve_selected_model_path(),
         port=0, gpu_layers=99, device="CUDA0",
-    ))
-    lifecycle.load(timeout_seconds=90)
+    )
+    manager = TextModelFallbackManager.auto(base)
+    manager.load(timeout_seconds=90)
     try:
-        return TextEmbeddingClient(lifecycle).embed_query(query).values
+        return TextEmbeddingClient(manager.active_lifecycle).embed_query(query).values
     finally:
-        lifecycle.unload(timeout_seconds=15)
+        manager.unload(timeout_seconds=15)
 
 
 def _embed_code(query: str, llama_server: Path):
-    lifecycle = CodeModelLifecycle(build_code_server_config(
+    from rag.models.fallback import TextModelFallbackManager
+
+    base = build_code_server_config(
         executable_path=llama_server,
         model_path=resolve_selected_code_model_path(),
         port=0, gpu_layers=99, device="CUDA0",
-    ))
-    lifecycle.load(timeout_seconds=90)
+    )
+    manager = TextModelFallbackManager.auto(
+        base, lifecycle_factory=CodeModelLifecycle,
+    )
+    manager.load(timeout_seconds=90)
     try:
-        return CodeEmbeddingClient(lifecycle).embed_query(
+        return CodeEmbeddingClient(manager.active_lifecycle).embed_query(
             CodeRetrievalTask.NL2CODE, query
         ).values
     finally:
-        lifecycle.unload(timeout_seconds=15)
+        manager.unload(timeout_seconds=15)
 
 
 def search_persistent_semantic(
