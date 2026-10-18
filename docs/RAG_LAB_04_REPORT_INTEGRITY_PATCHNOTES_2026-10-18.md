@@ -48,3 +48,10 @@ RED: report containing NaN with otherwise valid synthetic metadata passed both r
 GREEN: strict report parser uses parse_constant to reject non-standard non-finite numbers; 3 focused tests pass.
 Regression: RAG-LAB.04 focused 52 PASS; backend 410 PASS (282 offline + 83 generation + 7 preflight + 38 incremental).
 No production backup or process shutdown. RAG-LAB.04 remains PARTIAL; native Qdrant Server and global quiescence unproven; production backup BLOCKED.
+
+RAG-LAB.04 - independent-audit saved-directory reparse swap (2026-10-18)
+Files: rag/runtime/offline_restore_equivalence.py and tests/test_offline_lab04_equivalence_parent_swap.py.
+RED: after second cross-store semantic validation, replacing saved backup directory with a symlink to the exact same directory outside the allowed fixture left independent audit in a non-BLOCKED lab state.
+GREEN: independent auditor rechecks saved, original, restored, report and ancestor directory redirections after semantic validation; reject on any reparse redirection.
+Regression: RAG-LAB.04 focused 53 PASS; backend 411 PASS (283 offline + 83 generation + 7 preflight + 38 incremental).
+This is defense-in-depth, not atomic global Windows quiescence proof. Production backup, native Qdrant Server snapshots and go-live remain BLOCKED.

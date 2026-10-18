@@ -42,6 +42,10 @@ def audit_restored_fixture(fixture_root, backup_name, restore_name):
         if av!=bv or av!=meta.get("verification"):
             result["issues"].append("CROSS_STORE_CONTENT_MISMATCH")
             return result
+        if any(_redirected(part) for path in (saved, original, restored, report)
+               for part in (path, *path.parents)):
+            result["issues"].append("PATH_REDIRECTED_DURING_VALIDATION")
+            return result
         # The verification itself can race an external writer; recheck both.
         if _hash_tree(original)!=a or _hash_tree(restored)!=b:
             result["issues"].append("STORES_CHANGED_DURING_VALIDATION")
