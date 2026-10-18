@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json
 from pathlib import Path
+from rag.runtime.offline_fixture_report import decode_fixture_report
 from rag.runtime.offline_fixture_snapshot import _root, _hash_tree, _redirected, _qdrant_sqlite_sidecars
 from rag.runtime.incremental_bundle_validate import validate_incremental_bundle
 
@@ -28,7 +29,7 @@ def audit_restored_fixture(fixture_root, backup_name, restore_name):
         if not original.is_dir() or not restored.is_dir() or not report.is_file():
             raise ValueError("incomplete fixture")
         report_bytes=report.read_bytes()
-        meta=json.loads(report_bytes)
+        meta=decode_fixture_report(report_bytes)
         if meta.get("production_authorized") is not False or meta.get("state")!="LAB_FIXTURE_SNAPSHOT_ONLY" or meta.get("active_generation_changed") is not False:
             raise ValueError("unsafe snapshot report")
         a=_hash_tree(original)

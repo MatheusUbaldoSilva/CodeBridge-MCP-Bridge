@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import tempfile
 
+from rag.runtime.offline_fixture_report import decode_fixture_report
 from rag.runtime.generation_process_lock import generation_lock, GenerationBusy
 from rag.runtime.incremental_bundle_validate import validate_incremental_bundle
 from rag.runtime.offline_fixture_snapshot import _root, _hash_tree, _redirected, OfflineFixtureError, _qdrant_sqlite_sidecars
@@ -47,7 +48,7 @@ def _restore_locked(root, backup_name, restored_name):
         raise OfflineFixtureRestoreError("missing snapshot or existing target")
     try:
         metadata_bytes = metadata.read_bytes()
-        report = json.loads(metadata_bytes)
+        report = decode_fixture_report(metadata_bytes)
         if report["state"] != "LAB_FIXTURE_SNAPSHOT_ONLY" or report["production_authorized"] is not False or report.get("active_generation_changed") is not False:
             raise OfflineFixtureRestoreError("unsafe report state")
         if report["hashes"] != _hash_tree(payload):

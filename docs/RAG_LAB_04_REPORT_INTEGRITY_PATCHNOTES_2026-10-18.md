@@ -34,3 +34,10 @@ RED: in a disposable Windows fixture, replace offline-fixture-backups with a sym
 GREEN: reject redirected backup parent, staging, target or their ancestors immediately before snapshot publication and avoid deleting staging through a redirected parent during cleanup.
 Focused LAB04: 47 PASS; backend regression: 405 PASS (277 offline + 83 generation + 7 preflight + 38 incremental).
 Synthetic laboratory only; production quiescence, native Qdrant Server snapshots, and real backup remain BLOCKED.
+
+RAG-LAB.04 - duplicate JSON keys in snapshot reports (2026-10-18)
+Files: rag/runtime/offline_fixture_report.py (strict shared decoder), offline_fixture_restore.py, offline_restore_equivalence.py, tests/test_offline_lab04_report_duplicate_keys.py.
+RED: a snapshot report with duplicate production_authorized keys and identical false values was accepted for both synthetic restore and independent audit (2 tests failed).
+GREEN: strict JSON object_pairs_hook now rejects duplicate keys at every nesting level; root must be an object. Both restore and independent audit use this decoder.
+Regression: RAG-LAB.04 focused 49 PASS; backend 407 PASS (279 offline + 83 generation + 7 preflight + 38 incremental).
+Synthetic lab only. Backup and go-live remain BLOCKED; native Qdrant Server and global quiescence not proven.
