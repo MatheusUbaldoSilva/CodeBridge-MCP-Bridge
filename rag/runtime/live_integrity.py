@@ -51,9 +51,17 @@ def _read_only_db(path: Path) -> sqlite3.Connection:
 
 
 def inspect_live_index(project_id: str = "codebridge") -> dict:
+    """Only inspect the immutable legacy recovery index root."""
+    return _inspect_storage_root(
+        resolve_rag_state_directory().resolve(), project_id=project_id
+    )
+
+
+def _inspect_storage_root(root: Path, *, project_id: str = "codebridge") -> dict:
+    """Shared read-only cross-store verification; caller authorizes root."""
     if project_id != "codebridge":
-        raise PermissionError("live RAG integrity limited to approved project codebridge")
-    root = resolve_rag_state_directory().resolve()
+        raise PermissionError("RAG integrity limited to approved project codebridge")
+    root = Path(root).resolve()
     db_path = root / "rag_index.sqlite3"
     manifest_path = root / "rag-index-manifest.json"
     qdrant = root / "qdrant"
@@ -77,6 +85,10 @@ def inspect_live_index(project_id: str = "codebridge") -> dict:
         chunks = db.execute(
             "SELECT chunk_id, document_id, project_id, source_type FROM rag_chunks"
         ).fetchall()
+        index_state = db.execute(
+            "SELECT state, document_count, chunk_count "
+            "FROM rag_index_state WHERE project_id=?", (project_id,),
+        ).fetchone()
         orphaned = db.execute(
             "SELECT count(*) FROM rag_chunks c LEFT JOIN rag_documents d "
             "ON c.document_id=d.document_id WHERE d.document_id IS NULL "
@@ -86,6 +98,8 @@ def inspect_live_index(project_id: str = "codebridge") -> dict:
         db.close()
     if orphaned:
         raise LiveIntegrityError("orphaned or cross-project chunks")
+    if index_state != ("READY", len(docs), len(chunks)):
+        raise LiveIntegrityError("index_state differs from real indexed content")
     if any(doc[1] != project_id for doc in docs):
         raise LiveIntegrityError("unexpected project in active SQLite index")
 

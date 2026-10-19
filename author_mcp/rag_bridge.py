@@ -225,24 +225,15 @@ def inspect_rag_generation_readers() -> dict[str, Any]:
 
 
 def inspect_rag_integrity() -> dict[str, Any]:
-    """Read-only legacy consistency audit guarded by the generation lock.
+    """Audit the selected RAG generation with the reader lock held.
 
-    This legacy-only checker cannot be presented as proof of a newly active
-    versioned generation. Fail closed until a pinned versioned cross-store
-    integrity reader is available in the installed MCP runtime.
+    This cannot activate, publish or delete a generation.
     """
     _ensure_project_root()
-    from rag.runtime.live_integrity import inspect_live_index
+    from rag.runtime.versioned_live_integrity import inspect_pinned_index
     from rag.runtime.production_generation_read import production_generation_read
     with production_generation_read() as pinned:
-        if pinned.generation != "legacy":
-            raise RuntimeError(
-                "RAG integrity tool only validates the legacy recovery store; "
-                "versioned active generation needs a separate pinned verifier"
-            )
-        result = inspect_live_index("codebridge")
-        result["audited_generation"] = pinned.generation
-        return result
+        return inspect_pinned_index(pinned)
 
 
 def get_rag_status() -> dict[str, Any]:

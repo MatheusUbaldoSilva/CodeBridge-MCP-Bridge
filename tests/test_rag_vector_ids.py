@@ -261,3 +261,53 @@ class RagVectorDeterministicIdTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RagPinnedVersionedIntegrityTests(unittest.TestCase):
+    def test_refuses_unapproved_generation_name_and_path_mismatch(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from rag.runtime.live_integrity import LiveIntegrityError
+        from rag.runtime.versioned_live_integrity import inspect_pinned_index
+
+        with tempfile.TemporaryDirectory() as folder:
+            storage = Path(folder) / "CodeBridge" / "rag"
+            storage.mkdir(parents=True)
+            with patch(
+                "rag.runtime.versioned_live_integrity.resolve_rag_state_directory",
+                return_value=storage,
+            ):
+                invalid = SimpleNamespace(
+                    generation="../v1_delta_7b228e09f65942",
+                    sqlite=storage / "rag_index.sqlite3",
+                    manifest=storage / "rag-index-manifest.json",
+                    qdrant=storage / "qdrant",
+                )
+                with self.assertRaises(LiveIntegrityError):
+                    inspect_pinned_index(invalid)
+                invalid.generation = "legacy"
+                invalid.sqlite = Path(folder) / "other.sqlite3"
+                with self.assertRaises(LiveIntegrityError):
+                    inspect_pinned_index(invalid)
+
+    def test_no_versioned_receipt_is_never_accepted(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from rag.runtime.versioned_live_integrity import inspect_pinned_index
+
+        with tempfile.TemporaryDirectory() as folder:
+            storage = Path(folder) / "CodeBridge" / "rag"
+            candidate = storage / "generations" / "v1_delta_7b228e09f65942"
+            candidate.mkdir(parents=True)
+            pinned = SimpleNamespace(
+                generation=candidate.name,
+                sqlite=candidate / "rag_index.sqlite3",
+                manifest=candidate / "rag-index-manifest.json",
+                qdrant=candidate / "qdrant",
+            )
+            with patch(
+                "rag.runtime.versioned_live_integrity.resolve_rag_state_directory",
+                return_value=storage,
+            ):
+                with self.assertRaises((OSError, ValueError)):
+                    inspect_pinned_index(pinned)

@@ -256,3 +256,13 @@
 ### V1.03-D - integridade legacy com lock
 - inspect_rag_integrity agora prende lock SHARED e devolve audited_generation=legacy; rejeita geracao versionada ativa ate haver validador embarcado.
 - Prova no real: legacy OBSERVED_CONSISTENT 8761 chunks; versao nova simulada bloqueada. Publicacao segue proibida.
+
+### V1.03-D — auditoria de integridade da geracao ATIVA no runtime instalado
+- rag/runtime/live_integrity.py generaliza auditoria de identidades SQLite / manifesto / Qdrant local por root explicitamente validado e confere rag_index_state=(READY,documentos,chunks). Preserva inspect_live_index legado.
+- Novo rag/runtime/versioned_live_integrity.py: somente leitura sem qdrant-client, aceita somente generation name v1_base/v1_delta com 14 hex, dentro de CodeBridge/rag/generations; confere caminhos pinados, recibo de geracao, SHA-256 dos cinco arquivos e impossibilidade de symlink fora da raiz.
+- Reusa verificador interno para conferir SQLite integrity_check, correspondencia SHA e chunk do manifesto, IDS de vetores Text/Code e dimensoes 1024/1536, contagem READY atualizada. Compara resumo com recibo e revalida hashes apos leitura.
+- author_mcp/rag_bridge.py/inspect_rag_integrity agora prende lock shared e audita a geracao REALMENTE pinada (legacy ou versionada), sempre safe_to_publish=false.
+- PROVA REAL no CodeBridge: legacy 210 docs/8761 chunks; candidata CORRIGIDA v1_delta_7b228e09f65942 211 docs/8766 chunks, 7627 vetores Text e 1139 Code, recibo SHA verificado. Nenhuma ativacao feita.
+- A antiga v1_delta_e4b1a435382f48 FOI REJEITADA por index_state 210/8761 inconsistente com conteudo 211/8766; jamais ativar.
+- Existing tests/test_rag_vector_ids.py expandido (11 PASS) inclui geracao com nome inseguro, caminhos externos, falta de recibo. Nao criou laboratorio externo, nao mexeu em indice real.
+- Ainda e necessario recarregamento EXTERNO seguro do MCP para expor atualizacao no processo publico; atestado do worker semantico e cutover atomico supervisionado seguem PENDENTES.
