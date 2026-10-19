@@ -246,3 +246,9 @@
 - Prova no processo isolado real do CodeBridge author MCP: registered=true, PUBLIC_READER_PROBE_PASS, 3 funcoes carregadas, escritor bloqueado, generation=legacy. Nao foi atestado ainda processo publica antigo.
 - Teste MCP existente ampliado: 3 PASS incluindo sem indice e LOCALAPPDATA isolado: reporta PUBLIC_READER_PROBE_BLOCKED sem criar storage.
 - O tool fica disponivel publicamente apenas apos usuario recarregar CodeBridge por fora do proprio MCP; nao chamar encerramento do processo ativo via MCP.
+
+### V1.03-D — correcao de import no runtime MCP embarcado
+- O handler codebridge_rag_generation_probe foi testado no Python embarcado real instalado do CodeBridge e inicialmente retornou INTERNAL_ERROR: No module named rag.
+- rag_bridge.inspect_rag_generation_readers agora chama _ensure_project_root() antes dos imports; nao muda regras de autorizacao nem indexacao.
+- Prova pos-correcao NO AMBIENTE EMBARCADO REAL: operation_ok=true, PUBLIC_READER_PROBE_PASS, search/context/status carregados e protegidos, writer bloqueado sob shared, generation=legacy, safe_to_activate=false.
+- Necessario reinicio EXTERNO para expor esse codigo como novo tool no servidor MCP ja carregado; a prova acima iniciou processo Python curto e nao indica que o servidor publico tenha sido reiniciado.

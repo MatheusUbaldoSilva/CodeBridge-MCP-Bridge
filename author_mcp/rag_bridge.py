@@ -191,6 +191,7 @@ def inspect_rag_generation_readers() -> dict[str, Any]:
     successful public CODE semantic query is still required to prove the
     external child worker executes this installed implementation.
     """
+    _ensure_project_root()
     import os
     from rag.runtime.production_generation_lock import (
         ProductionGenerationBusy, production_generation_lock,
