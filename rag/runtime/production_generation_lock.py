@@ -44,7 +44,7 @@ _unlock.restype = wintypes.BOOL
 
 
 @contextmanager
-def production_generation_lock(*, exclusive: bool = False):
+def production_generation_lock(*, exclusive: bool = False, channel: str = "generation"):
     """Hold a cross-process shared/exclusive lock until context exit.
 
     LockFileEx uses byte zero, non-blocking acquisition, with Windows
@@ -56,7 +56,16 @@ def production_generation_lock(*, exclusive: bool = False):
         raise ValueError("production generation lock requires CodeBridge RAG root")
     if not state.is_dir():
         raise ValueError("CodeBridge RAG root unavailable")
-    path = state / "production-generation.lock"
+    # Semantic workers must serialize Qdrant Local/model startup without
+    # blocking simultaneous protected lexical/status readers. Independent
+    # channel names are a fixed allowlist, never caller-controlled filenames.
+    names = {
+        "generation": "production-generation.lock",
+        "semantic": "production-semantic.lock",
+    }
+    if channel not in names:
+        raise ValueError("unsupported CodeBridge lock channel")
+    path = state / names[channel]
     try:
         stream = open(path, "r+b", buffering=0)
     except FileNotFoundError:

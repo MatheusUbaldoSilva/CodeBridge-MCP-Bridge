@@ -101,6 +101,10 @@ def _v1_semantic_process_executor(query: Any, route: Any) -> tuple[Any, ...]:
     """Use a trusted, separately configured Python for vector dependencies."""
     import json
     import subprocess
+    import time
+    from rag.runtime.production_generation_lock import (
+        production_generation_lock, ProductionGenerationBusy,
+    )
     from rag.contracts import SearchResult, SourceMetadata, SourceType
 
     if query.project_id != "codebridge":
@@ -115,14 +119,27 @@ def _v1_semantic_process_executor(query: Any, route: Any) -> tuple[Any, ...]:
     }
     if not 1 <= query.top_k <= 20:
         raise ValueError("V1 semantic top_k must be between 1 and 20")
-    try:
-        completed = subprocess.run(
-            [str(_V1_PYTHON), "-m", "rag.runtime.v1_semantic_worker"],
-            cwd=str(ROOT), input=json.dumps(payload), text=True,
-            capture_output=True, timeout=180, check=False,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise RuntimeError("V1 semantic worker timed out") from exc
+    # Qdrant Local is single-process storage and Jina model startup cannot
+    # be safely raced across MCP requests. Serialize only vector workers,
+    # using a dedicated Win32 cross-process lock. Do NOT use the generation
+    # writer lock here: the caller already holds a shared reader pin.
+    deadline = time.monotonic() + 100
+    while True:
+        try:
+            with production_generation_lock(exclusive=True, channel="semantic"):
+                try:
+                    completed = subprocess.run(
+                        [str(_V1_PYTHON), "-m", "rag.runtime.v1_semantic_worker"],
+                        cwd=str(ROOT), input=json.dumps(payload), text=True,
+                        capture_output=True, timeout=180, check=False,
+                    )
+                except subprocess.TimeoutExpired as exc:
+                    raise RuntimeError("V1 semantic worker timed out") from exc
+            break
+        except ProductionGenerationBusy as exc:
+            if time.monotonic() >= deadline:
+                raise RuntimeError("V1 semantic worker queue timed out") from exc
+            time.sleep(0.2)
     if completed.returncode != 0:
         raise RuntimeError(
             "V1 semantic worker failed: " + completed.stderr[-700:]

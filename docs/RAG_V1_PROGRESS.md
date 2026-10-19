@@ -281,3 +281,11 @@
 - production_generation_transition.py agora usa _verify_target_after_pointer via versioned_live_integrity sem dependencias indisponiveis, verificando SHA/SQLite/manifest/Qdrant IDs completos e contagens. Sob lock EXCLUSIVE, divergencia deixa journal duravel para recuperacao.
 - Prova no root REAL READ ONLY: _verify_target_after_pointer da geracao corrigida v1_delta_7b228e09f65942 PASS para 211 docs/8766 chunks/vetores/211 manifesto; pointer ativo permanece ausente.
 - Gate continua state=BLOCKED; nao autorizada ativacao enquanto faltar prova publica de reader pin e corte/rollback supervisionado.
+
+### V1.02/V1.03-C — Corrigir concorrencia HYBRID real
+- Reproducao PUBLICA antes: 3 buscas HYBRID simultaneas retornaram 1 PASS e 2 INTERNAL_ERROR: QdrantLocalError abrindo storage e ModelFallbackExhaustedError iniciando llama-server GPU/CPU em paralelo.
+- Correcao: rag/runtime/production_generation_lock.py agora aceita canal semantic separado sob production-semantic.lock. Canal fixado em allowlist; lock EXCLUSIVE entre processos. Nao reutiliza lock GENERATION que ja esta SHARED pelo leitor.
+- author_mcp/rag_bridge.py serializa a execucao do subprocesso Jina/Qdrant com espera limitada a 100 segundos, mensagem explicita se fila expirar.
+- 13 testes focados PASS, arquivos de producao instalados com SHA verificado e compilacao valida.
+- Prova REAL na instalacao: 3 threads executando HYBRID em paralelo, 3 respostas HYBRID com 3 resultados cada, fallback null; duracoes observadas 10.94s, 20.96s e 34.03s.
+- A instancia MCP publica ainda precisa de recarga EXTERNA para assimilar a correcao. Nenhum indice foi alterado nem MCP encerrado.
