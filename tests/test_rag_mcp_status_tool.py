@@ -64,6 +64,73 @@ print(json.dumps({"semantic_worker_serialization_loaded": loaded}))
         result = json.loads(completed.stdout)
         self.assertTrue(result["semantic_worker_serialization_loaded"])
 
+    def test_public_readiness_cli_fails_closed_for_old_semantic_executor(self):
+        script = r"""
+import asyncio,json
+from unittest.mock import patch
+import v1_public_readiness as readiness
+async def stub(name, args):
+    if name != "codebridge_rag_generation_probe":
+        raise AssertionError("blocked readiness must not trigger other tools")
+    return {
+        "operation_ok": True, "state": "PUBLIC_READER_PROBE_PASS",
+        "details": {
+            "mcp_pid": 9724, "generation": "legacy",
+            "loaded_reader_functions": {"search": True, "context": True, "status": True},
+            "writer_blocked_during_read": True,
+            "semantic_worker_serialization_loaded": False,
+        },
+    }
+with patch.object(readiness, "_call", side_effect=stub):
+    result = asyncio.run(readiness._audit(concurrent=True))
+print(json.dumps(result))
+"""
+        result = subprocess.run(
+            [str(MCP_PYTHON), "-c", script],
+            cwd=str(AUTHOR_MCP), capture_output=True, text=True, check=True,
+        )
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["state"], "BLOCKED")
+        self.assertFalse(payload["safe_to_activate"])
+        self.assertNotIn("hybrid_concurrent", payload)
+
+    def test_public_readiness_cli_requires_three_valid_hybrid_results(self):
+        script = r"""
+import asyncio,json
+from unittest.mock import patch
+import v1_public_readiness as readiness
+async def stub(name, args):
+    if name == "codebridge_rag_generation_probe":
+        return {
+            "operation_ok": True, "state": "PUBLIC_READER_PROBE_PASS",
+            "details": {
+                "mcp_pid": 100, "generation": "legacy",
+                "loaded_reader_functions": {"search": True, "context": True, "status": True},
+                "writer_blocked_during_read": True,
+                "semantic_worker_serialization_loaded": True,
+            },
+        }
+    if name == "codebridge_rag_status":
+        return {"index": {"state": "READY", "generation": "legacy"},
+                "projects": [{"document_count": 210, "chunk_count": 8761}]}
+    if name == "codebridge_search_context":
+        return {"operation_ok": True, "effective_route": "HYBRID",
+                "fallback_reason": None, "result_count": 3}
+    raise AssertionError("unknown tool")
+with patch.object(readiness, "_call", side_effect=stub):
+    result = asyncio.run(readiness._audit(concurrent=True))
+print(json.dumps(result))
+"""
+        result = subprocess.run(
+            [str(MCP_PYTHON), "-c", script],
+            cwd=str(AUTHOR_MCP), capture_output=True, text=True, check=True,
+        )
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["state"], "PUBLIC_HYBRID_CONCURRENCY_PASS")
+        self.assertFalse(payload["safe_to_activate"])
+        self.assertEqual(len(payload["hybrid_concurrent"]), 3)
+        self.assertTrue(all(item["ok"] for item in payload["hybrid_concurrent"]))
+
     def test_tool_is_registered_and_returns_required_status_fields(self):
         with tempfile.TemporaryDirectory() as td:
             script = r"""

@@ -305,3 +305,13 @@
 - Teste real Windows acrescentado em test_generation_transition_journal.py: com leitor generation SHARED, trava semantic EXCLUSIVE funciona; 2o semantic EXCLUSIVE e writer generation EXCLUSIVE sao recusados; liberando reader writer volta a ser adquirido. Total 10 PASS.
 - Teste MCP existente test_rag_mcp_status_tool.py ampliado para validar o bytecode carregado no novo processo Python isolado. Total 4 PASS.
 - Nao reiniciar nem encerrar o processo 9724 por meio do proprio MCP; reinicializacao EXTERNA ainda necessaria para nova sonda e fix HYBRID publicos.
+
+### V1.03-C — verificacao operacional publica apos reinicio externo, fail-closed
+- Criado author_mcp/v1_public_readiness.py somente leitura: usa SDK MCP local streamable HTTP 127.0.0.1:8765/mcp, e consulta codebridge_rag_generation_probe e status carregados.
+- Exige leitores search/context/status protegidos, writer bloqueado durante leitura, generation legacy, semantic_worker_serialization_loaded=true; valida READY 210docs/8761chunks.
+- Somente com opcao --concurrent e todas precondicoes cumpridas inicia 3 consultas HYBRID simultaneas no MCP publico. Exige operation_ok=true, effective_route=HYBRID, 3 resultados e nenhum fallback.
+- A ferramenta retorna safe_to_activate=false e index_pointer_updated=false. Qualquer erro/ausencia de prova implica state=BLOCKED, exit code=2, sem teste concorrente.
+- PROVA PUBLICA antes de reload: PID 9724 respondeu leitor protegido true, porem sem semantic_worker_serialization_loaded. Ferramenta retornou BLOCKED e PUBLIC_MCP_RELOAD_OR_SEMANTIC_LOCK_NOT_ATTESTED, sem consultas paralelas.
+- Dois novos testes na suite existente test_rag_mcp_status_tool.py validam recusa da versao antiga e aceitam somente 3/3 HYBRID no caso simulado; 6 testes PASS.
+- Uso APOS reinicio EXTERNO normal do CodeBridge: .venv Python do author_mcp executa author_mcp/v1_public_readiness.py --concurrent. NAO reiniciar MCP pelo seu proprio canal.
+- Nem sucesso em testes libera automaticamente a publicacao do indice; V1.03-C ainda depende de ativacao e rollback supervisionados e autorizacao explicita.
