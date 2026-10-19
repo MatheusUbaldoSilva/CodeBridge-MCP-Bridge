@@ -12,7 +12,6 @@ import json
 from pathlib import Path
 
 from rag.runtime.status import resolve_rag_sqlite_path
-from rag.runtime.incremental_bundle_validate import validate_incremental_bundle
 from rag.runtime.live_integrity import inspect_live_index
 
 
@@ -48,6 +47,9 @@ def _verify_versioned(root: Path, name: str, label: str) -> dict:
     for relative in _PROTECTED:
         if _sha(directory / relative) != data["file_sha256"][relative]:
             raise ValueError("versioned bundle hash drift: " + relative)
+    # Some packaged MCP runtimes do not ship the offline Qdrant validator.
+    # Absence must block the cutover, never weaken validation.
+    from rag.runtime.incremental_bundle_validate import validate_incremental_bundle
     validated = validate_incremental_bundle(directory)
     if validated != data["validation"]:
         raise ValueError("versioned bundle changed since receipt")
@@ -82,7 +84,7 @@ def assess_real_cutover(baseline: str, candidate: str) -> dict:
         if (active["documents"] != before["documents"]
                 or active["chunks"] != before["chunks"]):
             reasons.append("LEGACY_INDEX_DRIFT")
-    except (OSError, ValueError, KeyError, RuntimeError) as exc:
+    except (OSError, ValueError, KeyError, RuntimeError, ImportError) as exc:
         reasons.append("INTEGRITY_PROOF_FAILED: " + str(exc))
     if (state / "production-generation-transition.json").exists():
         reasons.append("RECOVERY_JOURNAL_PENDING")

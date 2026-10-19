@@ -211,3 +211,10 @@
 - Prova com armazenamento real: v1_base_6142ab6e3b534f 210/8761, v1_delta_e4b1a435382f48 211/8766, SHA de ambos OK, indice legado 210/8761. Gate state=BLOCKED/safe_to_activate=false.
 - Bloqueios concretos: leitores MCP publicos ainda nao atestados apos reinicializacao e writer de ponteiro atomico/rollback ainda NAO IMPLEMENTADO NEM VALIDADO. Nao criar active-generation.json, nao substituir indice legado.
 - Proximo marco: introduzir publicador atomico COM journal, reinicio externo controlado do MCP, provar integridade e rollback antes de ativacao; duas geracoes originais devem permanecer imutaveis.
+
+### V1.03-D — gate fail-closed no runtime MCP embarcado
+- O Python embarcado do CodeBridge instalado nao inclui rag/runtime/incremental_bundle_validate.py nem cliente Qdrant offline para valida-lo; comprovado em teste real. Nao inventar evidencias de integridade a partir desse processo.
+- production_cutover_gate.py agora deixa de importar o validador no carregamento; quando executado num ambiente sem validador retorna state=BLOCKED, safe_to_activate=false e INTEGRITY_PROOF_FAILED explicito. Nenhum fallback silencioso que permita corte.
+- O Python global com dependencias completas executou a auditoria OFFLINE REAL e verificou SHA das versoes 210/8761 e 211/8766; tambem retorna BLOCKED pois ainda faltam reinicio publico dos leitores e writer atomico/rollback.
+- Instalacao: patch seletivo para production_search.py instalado adicionou _generation_paths preservando historicos; prova CODE+get_context com lock no sistema instalado OK. O modulo opcional cutover gate tambem instalado, auditado e deliberadamente bloqueado no Python embarcado.
+- Prosseguir com publisher atomico em sessao futura sem ativar o ponteiro ate existir validacao completa no ambiente com dependencias e MCP externo reiniciado.
