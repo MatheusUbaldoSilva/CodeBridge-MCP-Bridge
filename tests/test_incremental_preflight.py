@@ -107,3 +107,90 @@ class IncrementalPreflightTests(unittest.TestCase):
                 assess_incremental_plan(
                     dict(plan, scope="TEXT"), database=db, full_inventory=True
                 )
+
+
+class ProductionSourceFreshnessTests(unittest.TestCase):
+    def test_crlf_only_checkout_does_not_trigger_reindex(self):
+        import hashlib
+        import json
+        from rag.runtime.production_source_freshness import (
+            assess_generation_source_freshness,
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "CodeBridge-MCP-Bridge"
+            root.mkdir()
+            (root / ".git").mkdir()
+            source = root / "sample.py"
+            source.write_bytes(b"line1\r\nline2\r\n")
+            other = root / "exact.md"
+            other.write_bytes(b"fixed")
+            snapshot = Path(temp) / "generation"
+            snapshot.mkdir()
+            manifest = snapshot / "rag-index-manifest.json"
+            contents = {"entries": [
+                {"path": "sample.py", "project_id": "codebridge",
+                 "sha256": hashlib.sha256(b"line1\nline2\n").hexdigest()},
+                {"path": "exact.md", "project_id": "codebridge",
+                 "sha256": hashlib.sha256(b"fixed").hexdigest()},
+            ]}
+            manifest.write_text(json.dumps(contents), encoding="utf-8")
+            before = manifest.read_bytes()
+            result = assess_generation_source_freshness(snapshot, root)
+            self.assertEqual(result["state"], "SOURCE_SNAPSHOT_CURRENT")
+            self.assertEqual(result["byte_exact"], 1)
+            self.assertEqual(result["newline_only"], 1)
+            self.assertEqual(result["content_changed"], 0)
+            self.assertFalse(result["safe_to_activate"])
+            self.assertEqual(manifest.read_bytes(), before)
+            self.assertEqual(source.read_bytes(), b"line1\r\nline2\r\n")
+
+    def test_edited_and_missing_sources_block_current_snapshot(self):
+        import hashlib
+        import json
+        from rag.runtime.production_source_freshness import (
+            assess_generation_source_freshness,
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "CodeBridge-MCP-Bridge"
+            root.mkdir()
+            (root / ".git").mkdir()
+            (root / "edited.py").write_text("new version", encoding="utf-8")
+            snapshot = Path(temp) / "generation"
+            snapshot.mkdir()
+            contents = {"entries": [
+                {"path": "edited.py", "project_id": "codebridge",
+                 "sha256": hashlib.sha256(b"old version").hexdigest()},
+                {"path": "missing.md", "project_id": "codebridge",
+                 "sha256": hashlib.sha256(b"missing").hexdigest()},
+            ]}
+            (snapshot / "rag-index-manifest.json").write_text(
+                json.dumps(contents), encoding="utf-8",
+            )
+            result = assess_generation_source_freshness(snapshot, root)
+            self.assertEqual(result["state"], "SOURCE_SNAPSHOT_DRIFT")
+            self.assertEqual(result["content_changed_paths"], ["edited.py"])
+            self.assertEqual(result["missing_paths"], ["missing.md"])
+            self.assertEqual(result["content_changed"], 1)
+            self.assertEqual(result["missing"], 1)
+
+    def test_rejects_path_escape_and_non_codebridge_root(self):
+        import json
+        from rag.runtime.production_source_freshness import (
+            assess_generation_source_freshness,
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "CodeBridge-MCP-Bridge"
+            root.mkdir()
+            (root / ".git").mkdir()
+            snapshot = Path(temp) / "generation"
+            snapshot.mkdir()
+            (snapshot / "rag-index-manifest.json").write_text(
+                json.dumps({"entries": [
+                    {"path": "../secrets.txt", "project_id": "codebridge",
+                     "sha256": "a" * 64},
+                ]}), encoding="utf-8",
+            )
+            with self.assertRaises(ValueError):
+                assess_generation_source_freshness(snapshot, root)
+            with self.assertRaises(ValueError):
+                assess_generation_source_freshness(snapshot, Path(temp))

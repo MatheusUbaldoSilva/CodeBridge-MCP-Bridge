@@ -348,3 +348,12 @@
 - Ambos os casos retêm journal duravel e negam qualquer production_generation_read ate rollback_pending_to_legacy reconciliar. Retorno legacy validado, indice original de fixture byte-a-byte identico, versao candidata mantida e ponteiro arquivado para auditoria.
 - Suite test_generation_transition_journal.py passou 14 testes. Nao foi escrito ponteiro, journal ou SQLite/Qdrant no armazenamento CodeBridge real.
 - Estabilizacao C ainda PARCIAL: processo MCP publico nao reiniciado apos patch HYBRID; cutover real requer provas publicas e autorizacao especifica.
+
+### V1.03-C — gate de frescor das fontes aprovado (CRLF nao provoca falso delta)
+- Auditoria READ-ONLY de fontes do manifesto da geracao corrigida v1_delta_7b228e09f65942, 211 entradas: 116 byte-identicas, 89 diferencas SOMENTE CRLF/LF, 6 conteudos realmente diferentes, 0 arquivos desaparecidos.
+- As seis fontes que divergem sao rag/runtime/status.py, rag/runtime/live_integrity.py, author_mcp/rag_bridge.py, rag/runtime/production_index.py, author_mcp/mcp_server.py, rag/runtime/production_search.py.
+- Criado rag/runtime/production_source_freshness.py reutilizando source_sha256 do contrato de proveniencia (texto UTF-8 normalizado em memoria). Guardas de checkout CodeBridge, raiz Git, caminhos relativos POSIX, duplicatas e traversal; nunca escreve indices, fontes ou manifestos.
+- Tres testes adicionados a tests/test_incremental_preflight.py para checkout CRLF nao ser falso delta, fontes editadas/ausentes e escape de path; total 7 PASS.
+- production_cutover_gate.assess_real_cutover agora executa preflight READ-ONLY da candidata, anexa candidato_source_freshness ao relatorio e exige SOURCE_SNAPSHOT_CURRENT para nao adicionar CANDIDATE_SOURCE_DRIFT_REQUIRES_REINDEX.
+- Prova com dados REAIS: gate de v1_delta_7b228e09f65942 retorna BLOCKED, alem dos bloqueios operacionais, por CANDIDATE_SOURCE_DRIFT_REQUIRES_REINDEX. A candidata continua internamente integra (211 docs/8766 vetores) mas NAO e um snapshot atual das fontes.
+- PROXIMA ACAO apos restart externo: validar 3/3 HYBRID MCP publico, reconstruir delta aprovado incluindo seis alteracoes reais; nao ativar geracao antiga nem reindexar so por CRLF. V1.03-C NAO concluida.

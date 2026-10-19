@@ -98,6 +98,20 @@ def assess_real_cutover(baseline: str, candidate: str) -> dict:
         updated = _verify_versioned(state, candidate, "delta")
         checked["baseline"] = base
         checked["candidate"] = updated
+        # Cross-store hashes prove the candidate is internally immutable, not
+        # that its indexed source text still matches the current checkout.
+        # Reuse the indexer's decoded-text SHA contract: CRLF-only checkouts
+        # do not count as semantic content drift.
+        from rag.runtime.production_source_freshness import (
+            assess_generation_source_freshness,
+        )
+        freshness = assess_generation_source_freshness(
+            state / "generations" / candidate,
+            Path.home() / "CodeBridge-MCP-Bridge",
+        )
+        checked["candidate_source_freshness"] = freshness
+        if freshness["state"] != "SOURCE_SNAPSHOT_CURRENT":
+            reasons.append("CANDIDATE_SOURCE_DRIFT_REQUIRES_REINDEX")
         before = base["validation"]
         after = updated["validation"]
         if after["documents"] != before["documents"] + 1 or (
