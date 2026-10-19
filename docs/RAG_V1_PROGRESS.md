@@ -266,3 +266,10 @@
 - A antiga v1_delta_e4b1a435382f48 FOI REJEITADA por index_state 210/8761 inconsistente com conteudo 211/8766; jamais ativar.
 - Existing tests/test_rag_vector_ids.py expandido (11 PASS) inclui geracao com nome inseguro, caminhos externos, falta de recibo. Nao criou laboratorio externo, nao mexeu em indice real.
 - Ainda e necessario recarregamento EXTERNO seguro do MCP para expor atualizacao no processo publico; atestado do worker semantico e cutover atomico supervisionado seguem PENDENTES.
+
+### V1.03-D — gate completo de producao agora funciona no Python embarcado
+- production_cutover_gate.py substitui dependencia exclusiva no validador offline qdrant-client por inspect_pinned_index, que verifica integralmente os vetores e IDs locais, bancos SQLite, manifesto, dimensoes, hashes SHA dos cinco arquivos, recibo e rag_index_state.
+- NAO e uma liberacao automatica: assess_real_cutover permanece state=BLOCKED e safe_to_activate=false com 2 exigencias de validacao operacional, mesmo apos comprovacao da integridade.
+- Prova dentro do runtime Python EMBARCADO instalado: base v1_base_6142ab6e3b534f e candidata corrigida v1_delta_7b228e09f65942 SHA verificados; candidata=211 docs/8766 chunks/vetores; apenas dois bloqueios operacionais remanescentes.
+- Controle negativo em runtime embarcado: v1_delta_e4b1a435382f48 recusada por index_state inconsistente com real conteudo.
+- O novo verificador foi instalado sem sobrescrever dados e sem reiniciar o MCP publico; o ponteiro ativo segue ausente. A etapa de cutover ainda precisa de atestacao do processo publico e prova de writer/rollback em operacao supervisonada.

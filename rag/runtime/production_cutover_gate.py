@@ -48,11 +48,23 @@ def _verify_versioned(root: Path, name: str, label: str) -> dict:
     for relative in _PROTECTED:
         if _sha(directory / relative) != data["file_sha256"][relative]:
             raise ValueError("versioned bundle hash drift: " + relative)
-    # Some packaged MCP runtimes do not ship the offline Qdrant validator.
-    # Absence must block the cutover, never weaken validation.
-    from rag.runtime.incremental_bundle_validate import validate_incremental_bundle
-    validated = validate_incremental_bundle(directory)
-    if validated != data["validation"]:
+    # Embedded MCP Python lacks qdrant-client. Reuse the full read-only
+    # SQLite/Qdrant identity verifier, not a count-only fallback.
+    from rag.runtime.versioned_live_integrity import inspect_pinned_index
+    from rag.runtime.production_generation_read import SearchStoragePaths
+    pinned = SearchStoragePaths(
+        generation=name,
+        sqlite=directory / "rag_index.sqlite3",
+        qdrant=directory / "qdrant",
+        manifest=directory / "rag-index-manifest.json",
+    )
+    observed = inspect_pinned_index(pinned)
+    validated = data["validation"]
+    if (observed["documents"] != validated.get("documents")
+            or observed["chunks"] != validated.get("chunks")
+            or observed["manifest_entries"] != validated.get("manifest_entries")
+            or sum(c["vectors"] for c in observed["collections"].values())
+                != validated.get("vectors")):
         raise ValueError("versioned bundle changed since receipt")
     # Index state is consumed by public status/health checks; a merged
     # generation with stale counts is not safe to activate even when vector
