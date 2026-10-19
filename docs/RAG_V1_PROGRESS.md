@@ -163,3 +163,15 @@
 - Staging novo em %LOCALAPPDATA%/CodeBridge/rag/staging/build-ec8595a85ef44f59ba085a1b75b6e49a. Nao promover, nao apagar sem auditoria.
 - Validador offline existente validate_incremental_bundle retornou VALIDATED_OFFLINE_NOT_PUBLISHED com 1 documento, 5 chunks, 5 vetores e 1 manifesto
 - A prova e de staging real isolado NAO de update do indice ativo. Mesclagem/publicacao geracional e leitor protegido ainda pendentes. Nao houve novo laboratorio nem backup real
+
+### V1.03-C — snapshot e merge do indice REAL (18/10, continuacao autorizada)
+- O operador autorizou expressamente a manutencao controlada, mas o CodeBridge MCP nao foi interrompido e o indice ativo continua READY e sem substituicao.
+- Criado rag/runtime/active_baseline.py: snapshot separado por SQLite backup de 3 bancos (principal, Qdrant text e code), copia imutavel de manifesto/meta, comparacao de tamanho/mtime e SHA de configs antes/depois e validacao integral do bundle fechado.
+- BACKUP REAL: staging/baseline-4bd327885fe1472ca9b875433c3d8eb7; validacao VALIDATED_OFFLINE_NOT_PUBLISHED com 210 documentos, 8761 chunks, 8761 vetores e 210 manifestos. snapshot not_a_live_atomic_snapshot=true; activation_permitted=false.
+- Criado rag/runtime/controlled_merge.py: exige root staging aprovado, recibo baseline, snapshot ativo sem drift e validacao individual dos dois bundles; mescla somente em pasta NOVA via 3 modulos incrementais existentes; confere schema, identidade e vetor sem alterar Qdrant ativo.
+- Entrada staged original e real: staging/build-ec8595a85ef44f59ba085a1b75b6e49a, 1 documento/5 chunks/5 vetores Jina Code.
+- Primeira mesclagem manual auditada: staging/merged-6b24a1cda086415798d35f9636b4454e; 211 documentos, 8766 chunks e vetores; recibo historico sem vinculo aos insumos, preservado apenas como evidencia.
+- Mesclagem pelo codigo versionavel completo: staging/merged-3180ae4026e24134b03d916a21c30a92, recibo com baseline/candidate, 211 documentos, 8766 chunks/vetores e 211 manifestos. inspect_completed_merge revalidou read-only.
+- PROVA de ponta a ponta: search_persistent_semantic diretamente no bundle novo, sem ponteiro de producao, Jina Code real retornou 8 resultados; rag/runtime/live_integrity.py apareceu entre os primeiros, modos VECTOR_CODE_COSINE e LEXICAL_FTS5_BM25.
+- PORTAO PERMANECE: MERGED_VALIDATED_NOT_PUBLISHED e activation_permitted=false; nao existe ainda migracao supervisonada com reader pin do MCP, writer atomico e rollback comprovado na instalacao.
+- Ambos os artefatos (backup original e mesclagem) foram preservados para rollback e nenhuma pasta ativa foi alterada. Nao criar novo laboratorio de testes.
