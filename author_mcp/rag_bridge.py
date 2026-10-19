@@ -184,6 +184,45 @@ def format_rag_error(exc: BaseException) -> dict[str, Any]:
     return classify_rag_error(exc).to_dict()
 
 
+def inspect_rag_generation_readers() -> dict[str, Any]:
+    """Attest loaded MCP reader code and shared lock in the live server.
+
+    Probe is read-only and does NOT authorize an activation. A separate
+    successful public CODE semantic query is still required to prove the
+    external child worker executes this installed implementation.
+    """
+    import os
+    from rag.runtime.production_generation_lock import (
+        ProductionGenerationBusy, production_generation_lock,
+    )
+    from rag.runtime.production_generation_read import production_generation_read
+
+    loaded = {
+        "search": "production_generation_read" in search_rag_context.__code__.co_names,
+        "context": "production_generation_read" in get_rag_context.__code__.co_names,
+        "status": "production_generation_read" in get_rag_status.__code__.co_names,
+    }
+    blocked_writer = False
+    with production_generation_read() as pinned:
+        try:
+            with production_generation_lock(exclusive=True):
+                blocked_writer = False
+        except ProductionGenerationBusy:
+            blocked_writer = True
+        generation = pinned.generation
+    return {
+        "state": "PUBLIC_READER_PROBE_PASS"
+                 if all(loaded.values()) and blocked_writer
+                 else "PUBLIC_READER_PROBE_BLOCKED",
+        "mcp_pid": os.getpid(),
+        "loaded_reader_functions": loaded,
+        "writer_blocked_during_read": blocked_writer,
+        "generation": generation,
+        "child_semantic_execution_attested": False,
+        "safe_to_activate": False,
+    }
+
+
 def inspect_rag_integrity() -> dict[str, Any]:
     """Read-only live consistency audit; never an approval to publish."""
     _ensure_project_root()

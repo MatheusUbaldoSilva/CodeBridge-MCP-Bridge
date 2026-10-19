@@ -50,6 +50,14 @@ class RagStatusResult(ProtocolOutcome):
     retryable: bool | None = None
 
 
+class RagGenerationProbeResult(ProtocolOutcome):
+    state: str
+    details: dict[str, Any]
+    safe_to_activate: bool
+    error_type: str | None = None
+    error_message: str | None = None
+
+
 class RagIntegrityResult(ProtocolOutcome):
     state: str
     read_only: bool
@@ -730,6 +738,35 @@ def codebridge_rag_status() -> RagStatusResult:
         error_message=None,
         retryable=None,
     )
+
+
+@mcp.tool(
+    name="codebridge_rag_generation_probe",
+    description="Verifica no processo MCP carregado os leitores protegidos por lock de geracao; nunca autoriza ativacao.",
+    annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=False),
+    structured_output=True,
+)
+def codebridge_rag_generation_probe() -> RagGenerationProbeResult:
+    try:
+        bridge = importlib.import_module("rag_bridge")
+        details = bridge.inspect_rag_generation_readers()
+        return RagGenerationProbeResult(
+            operation_ok=True,
+            state=str(details["state"]),
+            details=details,
+            safe_to_activate=False,
+        )
+    except Exception as exc:
+        error = _rag_public_error(exc)
+        return RagGenerationProbeResult(
+            operation_ok=False,
+            operation_error_type=str(error["error_type"]),
+            operation_error_message=str(error["error_message"]),
+            state="PUBLIC_READER_PROBE_BLOCKED",
+            details={}, safe_to_activate=False,
+            error_type=str(error["error_type"]),
+            error_message=str(error["error_message"]),
+        )
 
 
 @mcp.tool(

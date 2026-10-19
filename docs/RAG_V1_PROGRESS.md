@@ -237,3 +237,12 @@
 - A resposta index.generation identifica legacy ou generation versionada; index.state e projects.* consideram SQLite/manifest/Qdrant pinados.
 - Teste existente test_rag_status_snapshot.py ampliado com geraçao isolada de fixture (211/8766), 5 PASS. Suites MCP status/search/get_context: 2+3+4 PASS.
 - Prova no repositorio real: estado READY, generation=legacy, 210 documentos/8761 chunks; ainda sem ponteiro. Para atualizar processo publico o CodeBridge requer recarga EXTERNA segura depois da instalacao.
+
+### V1.03-D — sonda de leitores carregados no processo MCP publico
+- Criados inspect_rag_generation_readers em author_mcp/rag_bridge.py e tool estruturada codebridge_rag_generation_probe em author_mcp/mcp_server.py.
+- Sonda valida as funcoes Python realmente carregadas no processo MCP, verificando que search, context e status usam production_generation_read. Nao depende apenas dos arquivos recentes presentes no disco.
+- Mantem leitor SHARED durante tentativa de obter escritor EXCLUSIVE e exige ProductionGenerationBusy; informa PID e geracao selecionada.
+- Retorna child_semantic_execution_attested=false e safe_to_activate=false mesmo ao passar, pois execucao Jina CODE pelo tool publico precisa de prova separada apos recarregamento seguro.
+- Prova no processo isolado real do CodeBridge author MCP: registered=true, PUBLIC_READER_PROBE_PASS, 3 funcoes carregadas, escritor bloqueado, generation=legacy. Nao foi atestado ainda processo publica antigo.
+- Teste MCP existente ampliado: 3 PASS incluindo sem indice e LOCALAPPDATA isolado: reporta PUBLIC_READER_PROBE_BLOCKED sem criar storage.
+- O tool fica disponivel publicamente apenas apos usuario recarregar CodeBridge por fora do proprio MCP; nao chamar encerramento do processo ativo via MCP.

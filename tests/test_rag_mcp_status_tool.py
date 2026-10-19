@@ -15,6 +15,36 @@ class RagMcpStatusToolTests(unittest.TestCase):
     def test_author_mcp_venv_exists(self):
         self.assertTrue(MCP_PYTHON.is_file())
 
+    def test_generation_probe_is_registered_and_fails_closed_without_index(self):
+        with tempfile.TemporaryDirectory() as td:
+            script = r"""
+import json
+import mcp_server
+registered = "codebridge_rag_generation_probe" in (
+    mcp_server.mcp._tool_manager._tools
+)
+result = mcp_server.codebridge_rag_generation_probe().model_dump()
+print(json.dumps({
+    "registered": registered,
+    "state": result["state"],
+    "safe_to_activate": result["safe_to_activate"],
+    "operation_ok": result["operation_ok"],
+}))
+"""
+            env = os.environ.copy()
+            env["LOCALAPPDATA"] = td
+            completed = subprocess.run(
+                [str(MCP_PYTHON), "-c", script],
+                cwd=str(AUTHOR_MCP), env=env,
+                capture_output=True, text=True, check=True,
+            )
+            payload = json.loads(completed.stdout)
+            self.assertTrue(payload["registered"])
+            self.assertEqual(payload["state"], "PUBLIC_READER_PROBE_BLOCKED")
+            self.assertFalse(payload["safe_to_activate"])
+            self.assertFalse(payload["operation_ok"])
+            self.assertFalse((Path(td) / "CodeBridge" / "rag").exists())
+
     def test_tool_is_registered_and_returns_required_status_fields(self):
         with tempfile.TemporaryDirectory() as td:
             script = r"""
