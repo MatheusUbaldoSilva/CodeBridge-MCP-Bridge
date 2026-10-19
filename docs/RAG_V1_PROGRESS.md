@@ -184,3 +184,12 @@
 - Auditoria posterior: active-generation.json AUSENTE; indice publico CodeBridge RAG continua READY com 210 documentos e 8761 chunks.
 - O mecanismo test-only generation_process_lock recusa roots de producao. Nao reusar por simples troca de nome nem ativar ponteiro sem implementar e validar reader pin e writer lock reais.
 - A copia de recuperacao nao pode ser retirada nem o indice legado sobrescrito durante a migracao. Ativacao V1.03-D permanece PENDENTE.
+
+### V1.03-D — lock entre processos Windows e leitor fixado (preparado, sem migracao de handlers)
+- Criado rag/runtime/production_generation_lock.py: LockFileEx Win32 no arquivo estavel production-generation.lock do root real CodeBridge/rag, reader shared vs writer exclusive; erros de ocupacao falham com ProductionGenerationBusy e o arquivo de lock jamais e excluido.
+- Prova entre processos reais via CodeBridge Windows: reader shared ativo impede escritor exclusive em outro processo; liberando reader o writer adquire o lock.
+- Criado rag/runtime/production_generation_read.py: adquire lock shared e resolve ponteiro ativo uma unica vez; sem ponteiro utiliza as rotas LEGACY SQLite/Qdrant/manifest e mantem o lock durante toda a operacao.
+- Prova real: geracao legacy selecionada, SQLite e Qdrant presentes, writer exclusive recusado enquanto production_generation_read mantem o lock.
+- ESTE CODIGO AINDA NAO ESTA CONECTADO AOS HANDLERS PUBLICOS MCP search/get_context e ao processo worker de embedding. Sem migracao completa dos leitores e writer de ativacao no mesmo lock, o ponteiro active-generation.json nao pode ser publicado.
+- active-generation.json continua ausente; versoes preparadas v1_base_6142ab6e3b534f e v1_delta_e4b1a435382f48 permanecem NAO ATIVAS.
+- Esta entrega nao reinicia MCP/GUI, nao substitui legado, nao apaga indices e nao indica GO-LIVE.
