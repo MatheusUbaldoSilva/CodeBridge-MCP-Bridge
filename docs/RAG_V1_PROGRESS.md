@@ -175,3 +175,12 @@
 - PROVA de ponta a ponta: search_persistent_semantic diretamente no bundle novo, sem ponteiro de producao, Jina Code real retornou 8 resultados; rag/runtime/live_integrity.py apareceu entre os primeiros, modos VECTOR_CODE_COSINE e LEXICAL_FTS5_BM25.
 - PORTAO PERMANECE: MERGED_VALIDATED_NOT_PUBLISHED e activation_permitted=false; nao existe ainda migracao supervisonada com reader pin do MCP, writer atomico e rollback comprovado na instalacao.
 - Ambos os artefatos (backup original e mesclagem) foram preservados para rollback e nenhuma pasta ativa foi alterada. Nao criar novo laboratorio de testes.
+
+### V1.03-D — duas geracoes reais preparadas sem ativacao
+- Criado rag/runtime/generation_prepare.py: permite apenas bundles validados sob staging real, com recibos baseline/merge; copia cada bundle em um novo diretorio versionado, verifica SHA-256 de SQLite, manifesto e Qdrant e revalida o resultado.
+- Geracao de recuperacao: %LOCALAPPDATA%/CodeBridge/rag/generations/v1_base_6142ab6e3b534f com 210 documentos, 8761 chunks, 8761 vetores e 210 manifestos.
+- Geracao com delta: %LOCALAPPDATA%/CodeBridge/rag/generations/v1_delta_e4b1a435382f48 com 211 documentos, 8766 chunks, 8766 vetores e 211 manifestos.
+- Ambas possuem generation-receipt.json com hashes, validacao e active_pointer_updated=false/activation_permitted=false.
+- Auditoria posterior: active-generation.json AUSENTE; indice publico CodeBridge RAG continua READY com 210 documentos e 8761 chunks.
+- O mecanismo test-only generation_process_lock recusa roots de producao. Nao reusar por simples troca de nome nem ativar ponteiro sem implementar e validar reader pin e writer lock reais.
+- A copia de recuperacao nao pode ser retirada nem o indice legado sobrescrito durante a migracao. Ativacao V1.03-D permanece PENDENTE.
