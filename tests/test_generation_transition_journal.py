@@ -520,3 +520,100 @@ class ProductionPendingJournalReaderRecoveryTests(unittest.TestCase):
                 self.assertFalse((root / POINTER_NAME).exists())
                 self.assertTrue((root / "generations" / candidate).exists())
                 self.assertEqual(legacy_db.read_bytes(), b"legacy-database-unchanged")
+
+
+class ProductionCompletedRollbackCrashTests(unittest.TestCase):
+    """Simulate failures around rollback of an already activated generation."""
+
+    def _run_case(self, interrupted_at: str):
+        import os
+        from unittest.mock import patch
+        from rag.runtime.production_generation_read import production_generation_read
+        import rag.runtime.production_generation_transition as transaction
+
+        baseline = "v1_base_6142ab6e3b534f"
+        candidate = "v1_delta_e4b1a435382f48"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "CodeBridge" / "rag"
+            (root / "generations" / candidate).mkdir(parents=True)
+            legacy_sqlite = root / "rag_index.sqlite3"
+            legacy_sqlite.write_bytes(b"original-RAG-index")
+            manifest = root / "rag-index-manifest.json"
+            manifest.write_text("{}", encoding="utf-8")
+            qdrant = root / "qdrant"
+            qdrant.mkdir()
+            transaction._atomic_json(
+                root / transaction.POINTER_NAME,
+                {"schema_version": 1, "generation": candidate},
+            )
+            with patch.object(transaction, "_root", return_value=root), patch(
+                "rag.runtime.production_generation_lock.resolve_rag_sqlite_path",
+                return_value=legacy_sqlite,
+            ), patch(
+                "rag.runtime.production_generation_read.resolve_rag_sqlite_path",
+                return_value=legacy_sqlite,
+            ), patch(
+                "rag.runtime.production_generation_read.resolve_rag_manifest_path",
+                return_value=manifest,
+            ), patch(
+                "rag.runtime.production_generation_read.resolve_qdrant_local_path",
+                return_value=qdrant,
+            ), patch(
+                "rag.runtime.production_cutover_gate._verify_versioned",
+                return_value={"validation": {"documents": 210, "chunks": 8761}},
+            ), patch(
+                "rag.runtime.live_integrity.inspect_live_index",
+                return_value={"documents": 210, "chunks": 8761},
+            ):
+                real_replace = os.replace
+                real_unlink = Path.unlink
+
+                def crash_replace(source, target):
+                    if (Path(source).name == transaction.POINTER_NAME
+                            and Path(target).name.startswith("recovered-pointer-")):
+                        raise OSError("injected failure before rollback rename")
+                    return real_replace(source, target)
+
+                def crash_unlink(path, *args, **kwargs):
+                    if Path(path).name == transaction.JOURNAL_NAME:
+                        raise OSError("injected failure after rollback rename")
+                    return real_unlink(path, *args, **kwargs)
+
+                fail_context = (
+                    patch.object(transaction.os, "replace", side_effect=crash_replace)
+                    if interrupted_at == "before_archive" else
+                    patch.object(Path, "unlink", autospec=True,
+                                 side_effect=crash_unlink)
+                )
+                with fail_context:
+                    with self.assertRaisesRegex(OSError, "injected failure"):
+                        transaction.revert_active_to_legacy(
+                            baseline=baseline, expected_candidate=candidate,
+                            operator_authorization=(
+                                "CODEBRIDGE_RAG_V1_ROLLBACK:" + candidate
+                            ),
+                        )
+
+                self.assertTrue((root / transaction.JOURNAL_NAME).is_file())
+                with self.assertRaisesRegex(RuntimeError, "recovery required"):
+                    with production_generation_read():
+                        self.fail("reader accessed incomplete rollback")
+                done = transaction.rollback_pending_to_legacy(
+                    expected_candidate=candidate,
+                )
+                self.assertEqual(done["state"], "RECOVERED_LEGACY")
+                with production_generation_read() as pinned:
+                    self.assertEqual(pinned.generation, "legacy")
+                self.assertFalse((root / transaction.POINTER_NAME).exists())
+                self.assertFalse((root / transaction.JOURNAL_NAME).exists())
+                self.assertTrue(
+                    (root / ("recovered-pointer-" + candidate + ".json")).is_file()
+                )
+                self.assertTrue((root / "generations" / candidate).is_dir())
+                self.assertEqual(legacy_sqlite.read_bytes(), b"original-RAG-index")
+
+    def test_completed_rollback_crash_before_pointer_archive(self):
+        self._run_case("before_archive")
+
+    def test_completed_rollback_crash_after_pointer_archive(self):
+        self._run_case("after_archive")

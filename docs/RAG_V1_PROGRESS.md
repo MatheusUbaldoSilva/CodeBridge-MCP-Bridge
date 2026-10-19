@@ -341,3 +341,10 @@
 - Prova: journal PREPARED e pointer candidate sobrevivem a excecao; reader real falha fechado com recovery required; rollback arquiva pointer, apaga apenas journal, libera leitura legacy; bytes originais e pasta candidata preservados.
 - Suite tests/test_generation_transition_journal.py: 12 testes PASS. Indice RAG real permanece legacy READY 210/8761, sem pointer nem journal.
 - A operacao real V1.03-C segue BLOQUEADA, depende do restart externo do MCP publico e validacao HYBRID paralela; nao declarar cutover completo.
+
+### V1.03-C — falha de rollback final APOS ativacao anterior (dois pontos)
+- Tests/test_generation_transition_journal.py ampliado com 2 cenarios isolados para rollback de uma geracao ja selecionada: falha antes de os.replace do ponteiro para arquivo de evidencia e falha ao remover journal DEPOIS do ponteiro arquivado.
+- Writer/reader usam LockFileEx REAL; verificacao dos dados/geracoes e simulada somente no root temporario para injetar o erro em local preciso.
+- Ambos os casos retêm journal duravel e negam qualquer production_generation_read ate rollback_pending_to_legacy reconciliar. Retorno legacy validado, indice original de fixture byte-a-byte identico, versao candidata mantida e ponteiro arquivado para auditoria.
+- Suite test_generation_transition_journal.py passou 14 testes. Nao foi escrito ponteiro, journal ou SQLite/Qdrant no armazenamento CodeBridge real.
+- Estabilizacao C ainda PARCIAL: processo MCP publico nao reiniciado apos patch HYBRID; cutover real requer provas publicas e autorizacao especifica.
