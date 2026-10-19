@@ -289,3 +289,11 @@
 - 13 testes focados PASS, arquivos de producao instalados com SHA verificado e compilacao valida.
 - Prova REAL na instalacao: 3 threads executando HYBRID em paralelo, 3 respostas HYBRID com 3 resultados cada, fallback null; duracoes observadas 10.94s, 20.96s e 34.03s.
 - A instancia MCP publica ainda precisa de recarga EXTERNA para assimilar a correcao. Nenhum indice foi alterado nem MCP encerrado.
+
+### V1.03-C — atestacao real dos leitores publicos + worker Jina
+- Consulta DIRETA ao servidor MCP publico ativo via streamable HTTP localhost:8765/mcp (MCP SDK existente), SEM reiniciar o servico. Lista publica confirma codebridge_rag_generation_probe registrado.
+- PROVA do proprio processo servidor: mcp_pid=9724, state=PUBLIC_READER_PROBE_PASS; loaded search=true, context=true, status=true, writer_blocked_during_read=true, generation=legacy, safe_to_activate=false.
+- PROVA do worker REAL: outro processo Python313 executou rag.runtime.v1_semantic_worker com Jina CODE. Verificada aquisicao do lock EXCLUSIVE em idle, rejeicao desse writer enquanto subprocesso com reader SHARED ativo (0.15s), e reacquisicao do writer apos saida do filho.
+- Worker PID 11916 terminou em ~6.07s com 3 resultados e modo VECTOR_CODE_COSINE. Resultado REAL_CHILD_PIN_CONFIRMED.
+- Falha de HYBRID anterior tinha causa concreta em concorrencia; patch no commit d614904 serializa a abertura de Qdrant Local e carga Jina. Publicacao da versao instalada comprovada com 3 de 3 buscas concorrentes HYBRID PASS, mas o processo servidor antigo ainda nao recarregou esse patch.
+- Gate de ativacao propositalmente continua BLOQUEADO ate transicao supervisionada, prova publica apos reload do patch e reconciliacao pos-publicacao; esta nota nao autoriza cutover.
