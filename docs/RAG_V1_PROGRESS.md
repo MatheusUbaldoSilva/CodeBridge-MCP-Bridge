@@ -252,3 +252,7 @@
 - rag_bridge.inspect_rag_generation_readers agora chama _ensure_project_root() antes dos imports; nao muda regras de autorizacao nem indexacao.
 - Prova pos-correcao NO AMBIENTE EMBARCADO REAL: operation_ok=true, PUBLIC_READER_PROBE_PASS, search/context/status carregados e protegidos, writer bloqueado sob shared, generation=legacy, safe_to_activate=false.
 - Necessario reinicio EXTERNO para expor esse codigo como novo tool no servidor MCP ja carregado; a prova acima iniciou processo Python curto e nao indica que o servidor publico tenha sido reiniciado.
+
+### V1.03-D - integridade legacy com lock
+- inspect_rag_integrity agora prende lock SHARED e devolve audited_generation=legacy; rejeita geracao versionada ativa ate haver validador embarcado.
+- Prova no real: legacy OBSERVED_CONSISTENT 8761 chunks; versao nova simulada bloqueada. Publicacao segue proibida.
