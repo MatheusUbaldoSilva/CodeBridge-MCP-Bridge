@@ -315,3 +315,8 @@
 - Dois novos testes na suite existente test_rag_mcp_status_tool.py validam recusa da versao antiga e aceitam somente 3/3 HYBRID no caso simulado; 6 testes PASS.
 - Uso APOS reinicio EXTERNO normal do CodeBridge: .venv Python do author_mcp executa author_mcp/v1_public_readiness.py --concurrent. NAO reiniciar MCP pelo seu proprio canal.
 - Nem sucesso em testes libera automaticamente a publicacao do indice; V1.03-C ainda depende de ativacao e rollback supervisionados e autorizacao explicita.
+
+### V1.03-C — prova negativa de falha HYBRID parcial
+- test_rag_mcp_status_tool.py acrescenta caso de 3 consultas simultaneas com 2 HYBRID PASS e 1 INTERNAL_ERROR injetado. Gate de leitura retorna BLOCKED com PUBLIC_HYBRID_CONCURRENCY_FAILED, safe_to_activate=false e evidencia da falha; 7 testes da suite PASS.
+- O verificador v1_public_readiness.py foi tambem instalado seletivamente no CodeBridge, SHA verificado e Python embarcado compilou. Execucao embarcada real contra MCP publico antigo PID9724 retornou BLOCKED exit2 sem iniciar carga HYBRID.
+- Em nenhum momento foi escrito active-generation.json, journal de publicacao ou dados do indice legado. V1.03-C continua parcial.

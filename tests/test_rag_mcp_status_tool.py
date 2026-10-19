@@ -131,6 +131,48 @@ print(json.dumps(result))
         self.assertEqual(len(payload["hybrid_concurrent"]), 3)
         self.assertTrue(all(item["ok"] for item in payload["hybrid_concurrent"]))
 
+    def test_public_readiness_cli_blocks_if_any_hybrid_request_fails(self):
+        script = r"""
+import asyncio,json
+from unittest.mock import patch
+import v1_public_readiness as readiness
+requests = 0
+async def stub(name, args):
+    global requests
+    if name == "codebridge_rag_generation_probe":
+        return {
+            "operation_ok": True, "state": "PUBLIC_READER_PROBE_PASS",
+            "details": {"mcp_pid": 200, "generation": "legacy",
+                "loaded_reader_functions": {"search": True, "context": True, "status": True},
+                "writer_blocked_during_read": True,
+                "semantic_worker_serialization_loaded": True},
+        }
+    if name == "codebridge_rag_status":
+        return {"index": {"state": "READY", "generation": "legacy"},
+                "projects": [{"document_count": 210, "chunk_count": 8761}]}
+    if name == "codebridge_search_context":
+        requests += 1
+        if requests == 2:
+            return {"operation_ok": False, "operation_error_type": "INTERNAL_ERROR",
+                    "effective_route": None, "result_count": 0}
+        return {"operation_ok": True, "effective_route": "HYBRID",
+                "fallback_reason": None, "result_count": 3}
+    raise AssertionError("unknown tool")
+with patch.object(readiness, "_call", side_effect=stub):
+    result = asyncio.run(readiness._audit(concurrent=True))
+print(json.dumps(result))
+"""
+        result = subprocess.run(
+            [str(MCP_PYTHON), "-c", script],
+            cwd=str(AUTHOR_MCP), capture_output=True, text=True, check=True,
+        )
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["state"], "BLOCKED")
+        self.assertEqual(payload["reason"], "PUBLIC_HYBRID_CONCURRENCY_FAILED")
+        self.assertEqual(len(payload["hybrid_concurrent"]), 3)
+        self.assertEqual(sum(1 for item in payload["hybrid_concurrent"] if item["ok"]), 2)
+        self.assertFalse(payload["safe_to_activate"])
+
     def test_tool_is_registered_and_returns_required_status_fields(self):
         with tempfile.TemporaryDirectory() as td:
             script = r"""
