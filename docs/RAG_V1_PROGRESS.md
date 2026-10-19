@@ -218,3 +218,14 @@
 - O Python global com dependencias completas executou a auditoria OFFLINE REAL e verificou SHA das versoes 210/8761 e 211/8766; tambem retorna BLOCKED pois ainda faltam reinicio publico dos leitores e writer atomico/rollback.
 - Instalacao: patch seletivo para production_search.py instalado adicionou _generation_paths preservando historicos; prova CODE+get_context com lock no sistema instalado OK. O modulo opcional cutover gate tambem instalado, auditado e deliberadamente bloqueado no Python embarcado.
 - Prosseguir com publisher atomico em sessao futura sem ativar o ponteiro ate existir validacao completa no ambiente com dependencias e MCP externo reiniciado.
+
+### V1.03-D - writer atomico e delta com metadados corretos
+- Modulo production_generation_transition.py: LockFileEx EXCLUSIVE, journal fsync e pointer os.replace; leitura bloqueada ate reconciliacao. Nao modifica arquivos SQLite/Qdrant.
+- Operacoes: publicar apenas com autorizacao por generation ID, atestado MCP externo e gate READY; rollback de journal interrompido ou geracao ja ativada mediante autorizacao especifica.
+- Prova real: tentativas inseguras bloqueadas, pointer/journal ausentes; 8 testes de fluxo atomico, falha injetada e rollback PASS nos testes existentes, sem escrita ativa.
+- Achado: primeiro delta 211/8766 tinha rag_index_state antigo 210/8761. Gate atualizado para bloquear discrepancias do status.
+- incremental_sqlite_stage atualiza rag_index_state dentro da nova copia; regressao total 3 PASS.
+- Novo staging: merged-7e429c59317d4d40997f2ce3c03b87dd9; nova geracao v1_delta_7b228e09f65942 com 211 documentos, 8766 chunks/vetores e metadados READY=211/8766, SHAs conferidos.
+- Gate da nova geracao passa integridade e permanece BLOCKED pelos requisitos de reinicio publico MCP e validacao operacional/ativacao do writer.
+- Geracao antiga v1_delta_e4b1a435382f48 retida para auditoria; original v1_base_6142ab6e3b534f permanece imutavel, indice legado READY 210/8761.
+- Nenhum ponteiro publicado, nenhuma exclusao de backup, nenhum reboot via MCP, GO-LIVE continua bloqueado.

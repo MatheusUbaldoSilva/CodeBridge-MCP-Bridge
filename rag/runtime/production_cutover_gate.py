@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sqlite3
 from pathlib import Path
 
 from rag.runtime.status import resolve_rag_sqlite_path
@@ -53,6 +54,20 @@ def _verify_versioned(root: Path, name: str, label: str) -> dict:
     validated = validate_incremental_bundle(directory)
     if validated != data["validation"]:
         raise ValueError("versioned bundle changed since receipt")
+    # Index state is consumed by public status/health checks; a merged
+    # generation with stale counts is not safe to activate even when vector
+    # identities and manifest hashes are otherwise consistent.
+    sqlite_path = directory / "rag_index.sqlite3"
+    db = sqlite3.connect(sqlite_path.resolve().as_uri() + "?mode=ro", uri=True)
+    try:
+        counts = db.execute(
+            "SELECT document_count, chunk_count, state FROM rag_index_state "
+            "WHERE project_id='codebridge'"
+        ).fetchone()
+    finally:
+        db.close()
+    if counts != (validated["documents"], validated["chunks"], "READY"):
+        raise ValueError("generation index_state metadata differs from content")
     return {"generation": name, "validation": validated, "sha_verified": True}
 
 

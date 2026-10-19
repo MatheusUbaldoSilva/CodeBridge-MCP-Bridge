@@ -74,6 +74,27 @@ def stage_incremental_sqlite(existing_db, new_db, destination, project_id):
                     f"INSERT INTO {table} ({names}) VALUES ({placeholders})", rows)
             from rag.index.fts5 import initialize_fts5
             initialize_fts5(dest, rebuild=True)
+            # Metadata in the isolated output must reflect the merged corpus,
+            # not the counts copied from the old READY index.
+            row = dest.execute(
+                "SELECT count(*) FROM rag_index_state WHERE project_id=?",
+                (project_id,),
+            ).fetchone()
+            if row and row[0]:
+                documents_count = dest.execute(
+                    "SELECT count(*) FROM rag_documents WHERE project_id=?",
+                    (project_id,),
+                ).fetchone()[0]
+                chunks_count = dest.execute(
+                    "SELECT count(*) FROM rag_chunks WHERE project_id=?",
+                    (project_id,),
+                ).fetchone()[0]
+                dest.execute(
+                    "UPDATE rag_index_state SET document_count=?, chunk_count=?, "
+                    "state='READY', last_error_type=NULL, last_error_message=NULL "
+                    "WHERE project_id=?",
+                    (documents_count, chunks_count, project_id),
+                )
             integrity = dest.execute("PRAGMA integrity_check").fetchone()[0]
             if integrity != "ok":
                 raise IncrementalSqliteStageError("merged SQLite integrity failure")
