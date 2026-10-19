@@ -14,6 +14,52 @@ import rag.runtime.status as rag_status
 
 
 class RagStatusSnapshotTests(unittest.TestCase):
+    def test_status_uses_one_explicitly_pinned_generation(self):
+        from types import SimpleNamespace
+
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "generations" / "v1_delta_fixture"
+            path.mkdir(parents=True)
+            (path / "qdrant").mkdir()
+            db_path = path / "rag_index.sqlite3"
+            database = connect_rag_index(db_path)
+            try:
+                database.execute(
+                    "INSERT INTO rag_index_state "
+                    "(project_id,state,schema_version,document_count,chunk_count) "
+                    "VALUES ('codebridge','READY',1,211,8766)"
+                )
+                database.commit()
+            finally:
+                database.close()
+            manifest_path = path / "rag-index-manifest.json"
+            save_index_manifest(
+                manifest_path, IndexManifest(entries=(
+                    ManifestEntry(
+                        project_id="codebridge",
+                        index_kind=ManifestIndexKind.CODE,
+                        path="rag/runtime/live_integrity.py",
+                        size=12, mtime_ns=1,
+                        sha256="a" * 64, chunk_ids=("c1",),
+                        model_version="code-v1",
+                    ),
+                ))
+            )
+            pinned = SimpleNamespace(
+                generation="v1_delta_fixture",
+                sqlite=db_path, manifest=manifest_path, qdrant=path / "qdrant",
+            )
+            with patch.object(rag_status, "_probe_model_process",
+                              return_value=(False, "UNLOADED")):
+                report = rag_status.build_rag_status(
+                    _generation_paths=pinned,
+                ).to_dict()
+            self.assertEqual(report["index"]["generation"], "v1_delta_fixture")
+            self.assertEqual(report["index"]["state"], "READY")
+            self.assertEqual(report["projects"][0]["document_count"], 211)
+            self.assertEqual(report["projects"][0]["chunk_count"], 8766)
+            self.assertEqual(report["index"]["manifest_path"], str(manifest_path))
+
     def test_empty_state_reports_empty_without_creating_index(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

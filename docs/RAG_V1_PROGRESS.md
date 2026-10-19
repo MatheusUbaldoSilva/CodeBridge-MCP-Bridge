@@ -229,3 +229,11 @@
 - Gate da nova geracao passa integridade e permanece BLOCKED pelos requisitos de reinicio publico MCP e validacao operacional/ativacao do writer.
 - Geracao antiga v1_delta_e4b1a435382f48 retida para auditoria; original v1_base_6142ab6e3b534f permanece imutavel, indice legado READY 210/8761.
 - Nenhum ponteiro publicado, nenhuma exclusao de backup, nenhum reboot via MCP, GO-LIVE continua bloqueado.
+
+### V1.03-D - status MCP pinado no mesmo indice dos leitores
+- Corrigida lacuna de observabilidade encontrada: codebridge_rag_status usava build_rag_status legado e continuaria informando 210/8761 apos a troca, enquanto search/get_context leriam a nova geracao 211/8766.
+- rag/runtime/status.py aceita _generation_paths internos opcionais para selecionar o mesmo SQLite, manifesto e Qdrant em um unico snapshot; a API tradicional/local_app_data continua compativel e nao escreve nada.
+- author_mcp/rag_bridge.py/get_rag_status adquire production_generation_read shared durante TODA montagem do status, preservando EMPTY sem criar indice nem lock se os dados forem inexistentes.
+- A resposta index.generation identifica legacy ou generation versionada; index.state e projects.* consideram SQLite/manifest/Qdrant pinados.
+- Teste existente test_rag_status_snapshot.py ampliado com geraçao isolada de fixture (211/8766), 5 PASS. Suites MCP status/search/get_context: 2+3+4 PASS.
+- Prova no repositorio real: estado READY, generation=legacy, 210 documentos/8761 chunks; ainda sem ponteiro. Para atualizar processo publico o CodeBridge requer recarga EXTERNA segura depois da instalacao.

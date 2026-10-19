@@ -325,22 +325,25 @@ def _model_statuses(
 def build_rag_status(
     *,
     local_app_data: Optional[Path] = None,
+    _generation_paths=None,
 ) -> RagStatusSnapshot:
-    manifest_path = resolve_rag_manifest_path(
-        local_app_data=local_app_data
-    )
-    sqlite_path = resolve_rag_sqlite_path(
-        local_app_data=local_app_data
-    )
-    qdrant_base = None
-    if local_app_data is not None:
-        qdrant_base = (
-            Path(local_app_data)
-            / "CodeBridge"
-            / "rag"
-            / "qdrant"
-        )
-    qdrant_path = resolve_qdrant_local_path(qdrant_base)
+    # Internal, trusted pinned paths; only supplied while the production
+    # reader lock is held. The historical public signature stays compatible.
+    if _generation_paths is not None:
+        if local_app_data is not None:
+            raise ValueError("cannot mix pinned generation and custom app data")
+        manifest_path = _generation_paths.manifest
+        sqlite_path = _generation_paths.sqlite
+        qdrant_path = _generation_paths.qdrant
+    else:
+        manifest_path = resolve_rag_manifest_path(local_app_data=local_app_data)
+        sqlite_path = resolve_rag_sqlite_path(local_app_data=local_app_data)
+        qdrant_base = None
+        if local_app_data is not None:
+            qdrant_base = (
+                Path(local_app_data) / "CodeBridge" / "rag" / "qdrant"
+            )
+        qdrant_path = resolve_qdrant_local_path(qdrant_base)
 
     manifest = _load_manifest_if_present(manifest_path)
     sqlite_projects, last_indexed_at = _read_index_state(sqlite_path)
@@ -388,6 +391,8 @@ def build_rag_status(
     return RagStatusSnapshot(
         index={
             "state": overall_state,
+            **({"generation": _generation_paths.generation}
+               if _generation_paths is not None else {}),
             "manifest_path": str(manifest_path),
             "manifest_exists": manifest_path.is_file(),
             "manifest_entries": len(manifest.entries),

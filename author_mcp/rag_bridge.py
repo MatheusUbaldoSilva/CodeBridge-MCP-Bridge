@@ -195,8 +195,13 @@ def get_rag_status() -> dict[str, Any]:
     _ensure_project_root()
 
     from rag.runtime.status import build_rag_status
-
-    return build_rag_status().to_dict()
+    # Preserve EMPTY semantics and avoid creating a production lock in an
+    # environment where no index exists (legacy MCP status unit tests).
+    if _v1_legacy_index_missing():
+        return build_rag_status().to_dict()
+    from rag.runtime.production_generation_read import production_generation_read
+    with production_generation_read() as pinned:
+        return build_rag_status(_generation_paths=pinned).to_dict()
 
 
 def index_rag(
