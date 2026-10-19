@@ -10,6 +10,7 @@ import asyncio
 import json
 
 from mcp import ClientSession
+from mcp.client.streamable_http import httpx2 as httpx
 from mcp.client.streamable_http import streamable_http_client
 
 
@@ -18,14 +19,25 @@ _QUERY = "CodeBridge RAG incremental source hashes"
 
 
 async def _call(tool: str, args: dict) -> dict:
-    async with streamable_http_client(_ENDPOINT) as (reader, writer):
-        async with ClientSession(reader, writer) as client:
-            await client.initialize()
-            response = await client.call_tool(tool, args)
-            payload = response.structured_content
-            if response.is_error or not isinstance(payload, dict):
-                raise RuntimeError(tool + " did not return structured success")
-            return payload
+    # Jina workers intentionally serialize for Qdrant Local. The third
+    # concurrent request can outlive the default HTTP read timeout even when
+    # the queue is healthy. Bound the outer proof above the 100s queue +
+    # 180s inference watchdog rather than reporting false failures.
+    async with httpx.AsyncClient(
+        timeout=httpx.Timeout(330.0, connect=10.0),
+    ) as transport:
+        async with streamable_http_client(
+            _ENDPOINT, http_client=transport,
+        ) as (reader, writer):
+            async with ClientSession(
+                reader, writer, read_timeout_seconds=330.0,
+            ) as client:
+                await client.initialize()
+                response = await client.call_tool(tool, args)
+                payload = response.structured_content
+                if response.is_error or not isinstance(payload, dict):
+                    raise RuntimeError(tool + " did not return structured success")
+                return payload
 
 
 def _inspect_probe(probe: dict) -> dict:
@@ -76,6 +88,26 @@ async def _audit(concurrent: bool) -> dict:
         "generation": index["generation"],
         "documents": projects[0]["document_count"],
         "chunks": projects[0]["chunk_count"],
+    }
+    # The public process must also prove SQLite, manifest and both Qdrant
+    # local collections consistent before we subject it to concurrent load.
+    integrity = await _call("codebridge_rag_integrity", {})
+    observed = integrity.get("details") or {}
+    if (
+        integrity.get("operation_ok") is not True
+        or observed.get("state") != "OBSERVED_CONSISTENT"
+        or observed.get("audited_generation") != "legacy"
+        or observed.get("documents") != 210
+        or observed.get("chunks") != 8761
+        or observed.get("manifest_entries") != 210
+    ):
+        report["reason"] = "PUBLIC_CROSSSTORE_INTEGRITY_NOT_VERIFIED"
+        return report
+    report["cross_store_integrity"] = {
+        "state": observed["state"],
+        "generation": observed["audited_generation"],
+        "documents": observed["documents"],
+        "chunks": observed["chunks"],
     }
     if not concurrent:
         report["state"] = "READY_FOR_CONCURRENT_READONLY_TEST"

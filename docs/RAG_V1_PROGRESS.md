@@ -320,3 +320,11 @@
 - test_rag_mcp_status_tool.py acrescenta caso de 3 consultas simultaneas com 2 HYBRID PASS e 1 INTERNAL_ERROR injetado. Gate de leitura retorna BLOCKED com PUBLIC_HYBRID_CONCURRENCY_FAILED, safe_to_activate=false e evidencia da falha; 7 testes da suite PASS.
 - O verificador v1_public_readiness.py foi tambem instalado seletivamente no CodeBridge, SHA verificado e Python embarcado compilou. Execucao embarcada real contra MCP publico antigo PID9724 retornou BLOCKED exit2 sem iniciar carga HYBRID.
 - Em nenhum momento foi escrito active-generation.json, journal de publicacao ou dados do indice legado. V1.03-C continua parcial.
+
+### V1.03-C — fortalecer gate publico com integridade cruzada e tempo de fila
+- Atualizado author_mcp/v1_public_readiness.py para exigir a ferramenta PUBLICA codebridge_rag_integrity apos probe e status passarem e ANTES de disparar qualquer busca paralela. Exige state=OBSERVED_CONSISTENT, audited_generation=legacy, 210 documentos, 8761 chunks, 210 entradas do manifesto.
+- O SDK MCP instalado utiliza mcp.client.streamable_http.httpx2 incorporado (nao importa httpx convencional). Corrigida compatibilidade sem instalar dependencia nova.
+- Definido read timeout do HTTP e ClientSession em 330s para dar margem a fila bounded 100s e inferencia bounded 180s e evitar falso negativo com 3 workers serializados. Continua tempo limitado.
+- Prova real no servidor PUBLICO antigo PID 9724: CLI retorna BLOCKED exit2 para serializacao nao carregada, NAO realiza teste de carga nem escreve ponteiro.
+- test_rag_mcp_status_tool.py expandido para falha de integridade (8760 em vez de 8761 chunks) que bloqueia as 3 buscas antes de executar o estresse. Total 8 PASS na suite.
+- Este gate SOMENTE LEITURA nunca autoriza cutover: safe_to_activate=false permanente; PUBLIC_HYBRID_CONCURRENCY_PASS e resultado apenas da etapa de diagnostico.

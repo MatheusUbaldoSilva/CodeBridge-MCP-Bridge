@@ -113,6 +113,11 @@ async def stub(name, args):
     if name == "codebridge_rag_status":
         return {"index": {"state": "READY", "generation": "legacy"},
                 "projects": [{"document_count": 210, "chunk_count": 8761}]}
+    if name == "codebridge_rag_integrity":
+        return {"operation_ok": True, "details": {
+            "state": "OBSERVED_CONSISTENT", "audited_generation": "legacy",
+            "documents": 210, "chunks": 8761, "manifest_entries": 210,
+        }}
     if name == "codebridge_search_context":
         return {"operation_ok": True, "effective_route": "HYBRID",
                 "fallback_reason": None, "result_count": 3}
@@ -150,6 +155,11 @@ async def stub(name, args):
     if name == "codebridge_rag_status":
         return {"index": {"state": "READY", "generation": "legacy"},
                 "projects": [{"document_count": 210, "chunk_count": 8761}]}
+    if name == "codebridge_rag_integrity":
+        return {"operation_ok": True, "details": {
+            "state": "OBSERVED_CONSISTENT", "audited_generation": "legacy",
+            "documents": 210, "chunks": 8761, "manifest_entries": 210,
+        }}
     if name == "codebridge_search_context":
         requests += 1
         if requests == 2:
@@ -172,6 +182,49 @@ print(json.dumps(result))
         self.assertEqual(len(payload["hybrid_concurrent"]), 3)
         self.assertEqual(sum(1 for item in payload["hybrid_concurrent"] if item["ok"]), 2)
         self.assertFalse(payload["safe_to_activate"])
+
+    def test_public_readiness_refuses_inconsistent_crossstore_before_queries(self):
+        script = r"""
+import asyncio,json
+from unittest.mock import patch
+import v1_public_readiness as readiness
+calls = []
+async def stub(name, args):
+    calls.append(name)
+    if name == "codebridge_rag_generation_probe":
+        return {
+            "operation_ok": True, "state": "PUBLIC_READER_PROBE_PASS",
+            "details": {"mcp_pid": 100, "generation": "legacy",
+                "loaded_reader_functions": {"search": True, "context": True, "status": True},
+                "writer_blocked_during_read": True,
+                "semantic_worker_serialization_loaded": True},
+        }
+    if name == "codebridge_rag_status":
+        return {"index": {"state": "READY", "generation": "legacy"},
+                "projects": [{"document_count": 210, "chunk_count": 8761}]}
+    if name == "codebridge_rag_integrity":
+        return {"operation_ok": True, "details": {
+            "state": "OBSERVED_CONSISTENT", "audited_generation": "legacy",
+            "documents": 210, "chunks": 8760, "manifest_entries": 210,
+        }}
+    if name == "codebridge_search_context":
+        raise AssertionError("must not run a hybrid query after bad integrity")
+    raise AssertionError(name)
+with patch.object(readiness, "_call", side_effect=stub):
+    result = asyncio.run(readiness._audit(concurrent=True))
+print(json.dumps({"result":result,"calls":calls}))
+"""
+        completed = subprocess.run(
+            [str(MCP_PYTHON), "-c", script],
+            cwd=str(AUTHOR_MCP), capture_output=True, text=True, check=True,
+        )
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["result"]["state"], "BLOCKED")
+        self.assertEqual(
+            payload["result"]["reason"], "PUBLIC_CROSSSTORE_INTEGRITY_NOT_VERIFIED"
+        )
+        self.assertNotIn("codebridge_search_context", payload["calls"])
+        self.assertFalse(payload["result"]["safe_to_activate"])
 
     def test_tool_is_registered_and_returns_required_status_fields(self):
         with tempfile.TemporaryDirectory() as td:
