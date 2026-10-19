@@ -45,6 +45,25 @@ print(json.dumps({
             self.assertFalse(payload["operation_ok"])
             self.assertFalse((Path(td) / "CodeBridge" / "rag").exists())
 
+    def test_semantic_worker_probe_inspects_currently_loaded_bytecode(self):
+        # This checks the actual callable loaded by the MCP package;
+        # a changed file on disk alone does not make the probe pass.
+        script = r"""
+import json
+import rag_bridge
+code = rag_bridge._v1_semantic_process_executor.__code__
+loaded = ("production_generation_lock" in code.co_names
+          and "semantic" in code.co_consts
+          and "V1 semantic worker queue timed out" in code.co_consts)
+print(json.dumps({"semantic_worker_serialization_loaded": loaded}))
+"""
+        completed = subprocess.run(
+            [str(MCP_PYTHON), "-c", script],
+            cwd=str(AUTHOR_MCP), capture_output=True, text=True, check=True,
+        )
+        result = json.loads(completed.stdout)
+        self.assertTrue(result["semantic_worker_serialization_loaded"])
+
     def test_tool_is_registered_and_returns_required_status_fields(self):
         with tempfile.TemporaryDirectory() as td:
             script = r"""

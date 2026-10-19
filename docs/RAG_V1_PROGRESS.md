@@ -297,3 +297,11 @@
 - Worker PID 11916 terminou em ~6.07s com 3 resultados e modo VECTOR_CODE_COSINE. Resultado REAL_CHILD_PIN_CONFIRMED.
 - Falha de HYBRID anterior tinha causa concreta em concorrencia; patch no commit d614904 serializa a abertura de Qdrant Local e carga Jina. Publicacao da versao instalada comprovada com 3 de 3 buscas concorrentes HYBRID PASS, mas o processo servidor antigo ainda nao recarregou esse patch.
 - Gate de ativacao propositalmente continua BLOQUEADO ate transicao supervisionada, prova publica apos reload do patch e reconciliacao pos-publicacao; esta nota nao autoriza cutover.
+
+### V1.03-C — verificacao de versao SEMANTIC carregada no MCP e isolamento de locks
+- O processo publico atual PID 9724 foi iniciado em 2026-10-19 07:57:50, antes do patch instalado em 2026-10-19 19:29:17. A resposta anterior de reader-probe PASS atesta leitores protegidos, mas NAO prova que o servidor carregou a serializacao semantica mais recente.
+- author_mcp/rag_bridge.py/inspect_rag_generation_readers agora expoe semantic_worker_serialization_loaded obtido exclusivamente do bytecode __code__ do executor importado no processo, exigindo chamada ao production_generation_lock, constante semantic e mensagem de expiracao de fila.
+- Campo separado de child_semantic_execution_attested e safe_to_activate, ambos continuam false ate prova publica independente e cutover supervisionado.
+- Teste real Windows acrescentado em test_generation_transition_journal.py: com leitor generation SHARED, trava semantic EXCLUSIVE funciona; 2o semantic EXCLUSIVE e writer generation EXCLUSIVE sao recusados; liberando reader writer volta a ser adquirido. Total 10 PASS.
+- Teste MCP existente test_rag_mcp_status_tool.py ampliado para validar o bytecode carregado no novo processo Python isolado. Total 4 PASS.
+- Nao reiniciar nem encerrar o processo 9724 por meio do proprio MCP; reinicializacao EXTERNA ainda necessaria para nova sonda e fix HYBRID publicos.

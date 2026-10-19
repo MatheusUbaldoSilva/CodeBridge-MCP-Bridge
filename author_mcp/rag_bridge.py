@@ -220,6 +220,15 @@ def inspect_rag_generation_readers() -> dict[str, Any]:
         "context": "production_generation_read" in get_rag_context.__code__.co_names,
         "status": "production_generation_read" in get_rag_status.__code__.co_names,
     }
+    # Inspect the *loaded* function bytecode, not the installed .py file:
+    # the running MCP server may have imported the previous implementation
+    # before a CodeBridge GUI update. This is only a diagnostic, not approval.
+    worker_code = _v1_semantic_process_executor.__code__
+    serialized_worker_loaded = (
+        "production_generation_lock" in worker_code.co_names
+        and "semantic" in worker_code.co_consts
+        and "V1 semantic worker queue timed out" in worker_code.co_consts
+    )
     blocked_writer = False
     with production_generation_read() as pinned:
         try:
@@ -236,6 +245,7 @@ def inspect_rag_generation_readers() -> dict[str, Any]:
         "loaded_reader_functions": loaded,
         "writer_blocked_during_read": blocked_writer,
         "generation": generation,
+        "semantic_worker_serialization_loaded": serialized_worker_loaded,
         "child_semantic_execution_attested": False,
         "safe_to_activate": False,
     }

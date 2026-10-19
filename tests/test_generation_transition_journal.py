@@ -347,3 +347,36 @@ class ProductionWindowsRealLockCycleTests(unittest.TestCase):
                 self.assertTrue((state / (
                     "recovered-pointer-" + candidate + ".json"
                 )).is_file())
+class ProductionSemanticLockChannelTests(unittest.TestCase):
+    def test_real_win32_semantic_lock_is_separate_from_generation_lock(self):
+        from unittest.mock import patch
+        from rag.runtime.production_generation_lock import (
+            ProductionGenerationBusy, production_generation_lock,
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "CodeBridge" / "rag"
+            root.mkdir(parents=True)
+            with patch(
+                "rag.runtime.production_generation_lock.resolve_rag_sqlite_path",
+                return_value=root / "rag_index.sqlite3",
+            ):
+                with production_generation_lock(exclusive=False):
+                    # The semantic worker must run under a shared generation
+                    # reader without deadlocking with its own separate lock.
+                    with production_generation_lock(exclusive=True, channel="semantic"):
+                        with self.assertRaises(ProductionGenerationBusy):
+                            with production_generation_lock(
+                                exclusive=True, channel="semantic"
+                            ):
+                                self.fail("a second semantic worker entered")
+                        with self.assertRaises(ProductionGenerationBusy):
+                            with production_generation_lock(exclusive=True):
+                                self.fail("generation writer entered under reader")
+                    # Reader is still present after the semantic worker exits.
+                    with self.assertRaises(ProductionGenerationBusy):
+                        with production_generation_lock(exclusive=True):
+                            self.fail("generation writer acquired early")
+                with production_generation_lock(exclusive=True):
+                    pass
+                with production_generation_lock(exclusive=True, channel="semantic"):
+                    pass
