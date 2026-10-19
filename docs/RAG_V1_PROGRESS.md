@@ -334,3 +334,10 @@
 - Fluxo: reader production_generation_read seleciona legacy; writer exclusive cria journal PREPARED e pointer candidate atomicos; novas leituras produzem "recovery required" sem abrir geracao parcial; rollback_pending_to_legacy arquiva pointer e remove journal; leitor volta a abrir legacy.
 - Prova real do teste: arquivo do indice legado de fixture teve os mesmos bytes antes e depois, e a geracao versionada ficticia permaneceu intacta; 11 testes de transicao PASS.
 - Nenhum dos testes desta sessao escreveu active-generation.json, journal ou SQLite/Qdrant ativos da instalacao. A prova isolada nao libera o corte real; gate de producao permanece BLOCKED.
+
+### V1.03-C — falha injetada APOS a troca atomica do pointer
+- Ampliado tests/test_generation_transition_journal.py com teste de falha depois da escrita de active-generation.json mas antes da validacao pos-switch, usando LockFileEx/production_generation_read/rollback_pending_to_legacy reais no armazenamento temporario isolado.
+- Atestacao e gate READY sao simulados SOMENTE para injetar essa falha; nao e prova de corte no indice ativo. _verify_target_after_pointer dispara RuntimeError por injecao deliberada.
+- Prova: journal PREPARED e pointer candidate sobrevivem a excecao; reader real falha fechado com recovery required; rollback arquiva pointer, apaga apenas journal, libera leitura legacy; bytes originais e pasta candidata preservados.
+- Suite tests/test_generation_transition_journal.py: 12 testes PASS. Indice RAG real permanece legacy READY 210/8761, sem pointer nem journal.
+- A operacao real V1.03-C segue BLOQUEADA, depende do restart externo do MCP publico e validacao HYBRID paralela; nao declarar cutover completo.

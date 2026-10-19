@@ -384,6 +384,77 @@ class ProductionSemanticLockChannelTests(unittest.TestCase):
 
 
 class ProductionPendingJournalReaderRecoveryTests(unittest.TestCase):
+    def test_real_writer_verification_crash_keeps_journal_then_reader_recovers(self):
+        from unittest.mock import patch
+        from rag.runtime.production_generation_transition import (
+            publish_validated_generation, rollback_pending_to_legacy,
+            JOURNAL_NAME, POINTER_NAME,
+        )
+        from rag.runtime.production_generation_read import production_generation_read
+
+        candidate = "v1_delta_e4b1a435382f48"
+        baseline = "v1_base_6142ab6e3b534f"
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "CodeBridge" / "rag"
+            (root / "generations" / candidate).mkdir(parents=True)
+            database = root / "rag_index.sqlite3"
+            database.write_bytes(b"original-ready-index")
+            manifest = root / "rag-index-manifest.json"
+            manifest.write_text("{}", encoding="utf-8")
+            qdrant = root / "qdrant"
+            qdrant.mkdir()
+            with patch(
+                "rag.runtime.production_generation_transition._root",
+                return_value=root,
+            ), patch(
+                "rag.runtime.production_generation_lock.resolve_rag_sqlite_path",
+                return_value=database,
+            ), patch(
+                "rag.runtime.production_generation_read.resolve_rag_sqlite_path",
+                return_value=database,
+            ), patch(
+                "rag.runtime.production_generation_read.resolve_rag_manifest_path",
+                return_value=manifest,
+            ), patch(
+                "rag.runtime.production_generation_read.resolve_qdrant_local_path",
+                return_value=qdrant,
+            ), patch(
+                "rag.runtime.production_cutover_gate.assess_real_cutover",
+                return_value={
+                    "state": "READY", "safe_to_activate": True, "blockers": [],
+                    "verified": {"candidate": {"validation": {"documents": 211}}},
+                },
+            ), patch(
+                "rag.runtime.production_generation_transition._verify_target_after_pointer",
+                side_effect=RuntimeError("injected validation failure after swap"),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "injected validation"):
+                    publish_validated_generation(
+                        baseline=baseline,
+                        candidate=candidate,
+                        operator_authorization="CODEBRIDGE_RAG_V1_ACTIVATE:" + candidate,
+                        public_reader_attestation={
+                            "generation_lock_enabled": True,
+                            "mcp_restart_confirmed": True,
+                        },
+                    )
+                self.assertTrue((root / JOURNAL_NAME).is_file())
+                self.assertTrue((root / POINTER_NAME).is_file())
+                with self.assertRaisesRegex(RuntimeError, "recovery required"):
+                    with production_generation_read():
+                        self.fail("partial published generation exposed")
+                done = rollback_pending_to_legacy(expected_candidate=candidate)
+                self.assertEqual(done["state"], "RECOVERED_LEGACY")
+                with production_generation_read() as selected:
+                    self.assertEqual(selected.generation, "legacy")
+                self.assertEqual(database.read_bytes(), b"original-ready-index")
+                self.assertFalse((root / JOURNAL_NAME).exists())
+                self.assertFalse((root / POINTER_NAME).exists())
+                self.assertTrue((root / "generations" / candidate).is_dir())
+                self.assertTrue(
+                    (root / ("recovered-pointer-" + candidate + ".json")).is_file()
+                )
+
     def test_real_lock_reader_fails_closed_during_journal_then_recovers(self):
         from unittest.mock import patch
         from rag.runtime.production_generation_read import production_generation_read
