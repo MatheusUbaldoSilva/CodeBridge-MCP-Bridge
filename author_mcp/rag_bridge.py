@@ -287,6 +287,14 @@ def index_rag(
     return payload
 
 
+def _v1_legacy_index_missing() -> bool:
+    """A missing legacy index has no reader to pin; preserve error mapping."""
+    from rag.runtime.status import resolve_rag_sqlite_path
+
+    index = resolve_rag_sqlite_path()
+    return not index.is_file() and not (index.parent / "active-generation.json").is_file()
+
+
 def search_rag_context(
     *,
     query: str,
@@ -302,15 +310,35 @@ def search_rag_context(
 
     _configure_v1_semantic_for_project(project_id)
 
-    result = search_context(
-        query=query,
-        project_id=project_id,
-        source_types=tuple(source_types or ()),
-        top_k=top_k,
-        path_filter=path_filter,
-        branch=branch,
-        semantic_executor=_RAG_SEARCH_EXECUTOR,
-    )
+    if project_id == "codebridge" and _v1_legacy_index_missing():
+        # Preserve the existing structured INDEX_UNAVAILABLE error without
+        # creating a lock inside a missing index directory.
+        result = search_context(
+            query=query, project_id=project_id,
+            source_types=tuple(source_types or ()), top_k=top_k,
+            path_filter=path_filter, branch=branch,
+            semantic_executor=None,
+        )
+    elif project_id == "codebridge":
+        from rag.runtime.production_generation_read import production_generation_read
+
+        # Hold the reader lock across the complete search, including the
+        # semantic subprocess, so SQLite and vectors share one generation.
+        with production_generation_read() as pinned:
+            result = search_context(
+                query=query, project_id=project_id,
+                source_types=tuple(source_types or ()), top_k=top_k,
+                path_filter=path_filter, branch=branch,
+                sqlite_path=pinned.sqlite,
+                semantic_executor=_RAG_SEARCH_EXECUTOR,
+            )
+    else:
+        result = search_context(
+            query=query, project_id=project_id,
+            source_types=tuple(source_types or ()), top_k=top_k,
+            path_filter=path_filter, branch=branch,
+            semantic_executor=_RAG_SEARCH_EXECUTOR,
+        )
     payload = result.to_dict()
     if project_id == "codebridge":
         import json
@@ -338,11 +366,30 @@ def get_rag_context(
 
     from rag.runtime.context_service import get_context
 
-    result = get_context(
-        project_id=project_id,
-        chunk_ids=tuple(chunk_ids),
-        include_document_content=include_document_content,
-        project_root=project_root,
-        allow_stale=allow_stale,
-    )
+    if project_id == "codebridge" and _v1_legacy_index_missing():
+        result = get_context(
+            project_id=project_id, chunk_ids=tuple(chunk_ids),
+            include_document_content=include_document_content,
+            project_root=project_root, allow_stale=allow_stale,
+        )
+    elif project_id == "codebridge":
+        from rag.runtime.production_generation_read import production_generation_read
+
+        with production_generation_read() as pinned:
+            result = get_context(
+                project_id=project_id,
+                chunk_ids=tuple(chunk_ids),
+                include_document_content=include_document_content,
+                project_root=project_root,
+                allow_stale=allow_stale,
+                sqlite_path=pinned.sqlite,
+            )
+    else:
+        result = get_context(
+            project_id=project_id,
+            chunk_ids=tuple(chunk_ids),
+            include_document_content=include_document_content,
+            project_root=project_root,
+            allow_stale=allow_stale,
+        )
     return result.to_dict()

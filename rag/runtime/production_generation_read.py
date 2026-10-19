@@ -63,6 +63,13 @@ def production_generation_read():
                 qdrant=pointer.qdrant,
                 manifest=pointer.manifest,
             )
-        if not paths.sqlite.is_file() or not paths.qdrant.is_dir() or not paths.manifest.is_file():
+        # The legacy lexical-only API historically accepts a SQLite index
+        # without Qdrant or manifest (e.g. tiny source fixture indices).
+        # A versioned generation, in contrast, must contain all 3 stores.
+        if not paths.sqlite.is_file() or (
+            pointer is not None and (
+                not paths.qdrant.is_dir() or not paths.manifest.is_file()
+            )
+        ):
             raise RuntimeError("production generation incomplete")
         yield paths

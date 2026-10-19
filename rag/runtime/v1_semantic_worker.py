@@ -29,7 +29,13 @@ def main() -> None:
         path_filter=data.get("path_filter"),
         branch=data.get("branch"),
     )
-    results = search_persistent_semantic(query, route)
+    from rag.runtime.production_generation_read import production_generation_read
+
+    # An independent subprocess must pin its own generation as well.
+    with production_generation_read() as pinned:
+        results = search_persistent_semantic(
+            query, route, _generation_paths=pinned,
+        )
     json.dump([search_result_to_dict(item) for item in results], sys.stdout, ensure_ascii=True)
     sys.stdout.write("\n")
 

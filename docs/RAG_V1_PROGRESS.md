@@ -193,3 +193,12 @@
 - ESTE CODIGO AINDA NAO ESTA CONECTADO AOS HANDLERS PUBLICOS MCP search/get_context e ao processo worker de embedding. Sem migracao completa dos leitores e writer de ativacao no mesmo lock, o ponteiro active-generation.json nao pode ser publicado.
 - active-generation.json continua ausente; versoes preparadas v1_base_6142ab6e3b534f e v1_delta_e4b1a435382f48 permanecem NAO ATIVAS.
 - Esta entrega nao reinicia MCP/GUI, nao substitui legado, nao apaga indices e nao indica GO-LIVE.
+
+### V1.03-D - leitores MCP conectados ao production generation pin
+- author_mcp/rag_bridge.py: para projeto codebridge, busca e get_context resolvem a mesma geracao durante lock shared production_generation_read(); legado sem pointer permanece acessivel.
+- rag/runtime/v1_semantic_worker.py: o subprocesso Jina adquire seu proprio lock shared, seleciona SQLite/Qdrant/manifest pinados e pesquisa pelo _generation_paths; processo pai mantem lock durante o worker.
+- rag/runtime/production_generation_read.py: leitura por pointer exige SQLite, Qdrant e manifesto; legado sem pointer permite indice SQLite simples compatibilidade lexical/documental. Indice inexistente conserva erros INDEX_UNAVAILABLE sem criar pastas artificiais.
+- Prova executada no CodeBridge real: rota CODE com busca semantica 3 resultados, get_context conteudo de 1 chunk, writer exclusive adquiriu lock apenas APOS ambas as leituras terminarem.
+- Regressao real existente 3 testes MCP search, 4 MCP get_context, 6 search_service e 5 context_service: total 18 PASS.
+- IMPORTANTE: ainda nao ativar ponteiro: instalacao precisa receber novos arquivos e servico MCP publico necessita reinicializacao graciosa EXTERNA para carregar nova implementacao. Sem isso a sessao publica velha nao participa do lock.
+- Writer atomico e rollback seguro permanecem dependencias do gate para corte; indice original 210 docs/8761 chunks, pointer ainda ausente.
