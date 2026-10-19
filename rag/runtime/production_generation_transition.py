@@ -93,6 +93,35 @@ def inspect_transition() -> dict[str, Any]:
         }
 
 
+def _verify_target_after_pointer(
+    root: Path, candidate: str, expected: dict[str, Any],
+) -> None:
+    """Verify the switched immutable bundle using embedded MCP dependencies.
+
+    This runs under the exclusive writer lock and leaves the transition
+    journal intact if verification fails, so public readers remain blocked.
+    """
+    from rag.runtime.versioned_live_integrity import inspect_pinned_index
+    from rag.runtime.production_generation_read import SearchStoragePaths
+
+    folder = root / "generations" / candidate
+    pinned = SearchStoragePaths(
+        candidate,
+        folder / "rag_index.sqlite3",
+        folder / "qdrant",
+        folder / "rag-index-manifest.json",
+    )
+    result = inspect_pinned_index(pinned)
+    totals = {
+        "documents": result["documents"],
+        "chunks": result["chunks"],
+        "vectors": sum(item["vectors"] for item in result["collections"].values()),
+        "manifest_entries": result["manifest_entries"],
+    }
+    if any(totals[name] != expected.get(name) for name in totals):
+        raise GenerationTransitionBlocked("post-switch bundle verification failed")
+
+
 def publish_validated_generation(
     *, baseline: str, candidate: str, operator_authorization: str,
     public_reader_attestation: dict[str, Any],
@@ -140,11 +169,9 @@ def publish_validated_generation(
         })
         if _pointer_name(root) != candidate:
             raise GenerationTransitionBlocked("post-switch pointer verification failed")
-        from rag.runtime.incremental_bundle_validate import validate_incremental_bundle
-        if validate_incremental_bundle(root / "generations" / candidate) != (
-            readiness["verified"]["candidate"]["validation"]
-        ):
-            raise GenerationTransitionBlocked("post-switch bundle verification failed")
+        _verify_target_after_pointer(
+            root, candidate, readiness["verified"]["candidate"]["validation"],
+        )
         (root / JOURNAL_NAME).unlink()
         return {
             "state": "POINTER_ACTIVATED_PENDING_PUBLIC_QUERY_PROOF",

@@ -199,7 +199,7 @@ class ProductionPointerAtomicCommitTests(unittest.TestCase):
             ),patch("rag.runtime.production_cutover_gate.assess_real_cutover",return_value={
                 "state":"READY","safe_to_activate":True,"blockers":[],
                 "verified":{"candidate":{"validation":{"documents":211}}}
-            }),patch("rag.runtime.incremental_bundle_validate.validate_incremental_bundle",
+            }),patch("rag.runtime.production_generation_transition._verify_target_after_pointer",
                 return_value={"documents":211}):
                 done=prod.publish_validated_generation(
                     baseline=baseline,candidate=candidate,
@@ -257,3 +257,93 @@ class ProductionPointerAtomicCommitTests(unittest.TestCase):
                 self.assertEqual(prod.rollback_pending_to_legacy(
                     expected_candidate=candidate)["state"],"RECOVERED_LEGACY")
                 self.assertFalse((root/prod.JOURNAL_NAME).exists())
+
+
+class ProductionWindowsRealLockCycleTests(unittest.TestCase):
+    """Real Win32 LockFileEx on an isolated temporary CodeBridge root.
+
+    Only gate/data verification are mocked. The lock and journaled pointer
+    filesystem operations run unchanged. The real RAG root is never opened.
+    """
+    def test_reader_blocks_atomic_writer_until_release_and_rollback(self):
+        from unittest.mock import patch
+        from rag.runtime.production_generation_transition import (
+            publish_validated_generation, revert_active_to_legacy,
+            inspect_transition,
+        )
+        from rag.runtime.production_generation_lock import (
+            production_generation_lock, ProductionGenerationBusy,
+        )
+
+        candidate = "v1_delta_e4b1a435382f48"
+        baseline = "v1_base_6142ab6e3b534f"
+        with tempfile.TemporaryDirectory() as folder:
+            state = Path(folder) / "CodeBridge" / "rag"
+            (state / "generations" / candidate).mkdir(parents=True)
+            fake_db = state / "rag_index.sqlite3"
+            with patch(
+                "rag.runtime.production_generation_transition._root",
+                return_value=state,
+            ), patch(
+                "rag.runtime.production_generation_lock.resolve_rag_sqlite_path",
+                return_value=fake_db,
+            ), patch(
+                "rag.runtime.production_cutover_gate.assess_real_cutover",
+                return_value={
+                    "state": "READY", "safe_to_activate": True,
+                    "blockers": [],
+                    "verified": {"candidate": {"validation": {"documents": 211}}},
+                },
+            ), patch(
+                "rag.runtime.production_generation_transition._verify_target_after_pointer",
+                return_value={"documents": 211},
+            ):
+                options = {
+                    "baseline": baseline,
+                    "candidate": candidate,
+                    "operator_authorization": "CODEBRIDGE_RAG_V1_ACTIVATE:" + candidate,
+                    "public_reader_attestation": {
+                        "generation_lock_enabled": True,
+                        "mcp_restart_confirmed": True,
+                    },
+                }
+                with production_generation_lock(exclusive=False):
+                    with self.assertRaises(ProductionGenerationBusy):
+                        publish_validated_generation(**options)
+                    self.assertFalse((state / "active-generation.json").exists())
+                published = publish_validated_generation(**options)
+                self.assertEqual(
+                    published["state"], "POINTER_ACTIVATED_PENDING_PUBLIC_QUERY_PROOF",
+                )
+                self.assertEqual(inspect_transition()["active"], candidate)
+                self.assertFalse(
+                    (state / "production-generation-transition.json").exists()
+                )
+
+            with patch(
+                "rag.runtime.production_generation_transition._root",
+                return_value=state,
+            ), patch(
+                "rag.runtime.production_generation_lock.resolve_rag_sqlite_path",
+                return_value=fake_db,
+            ), patch(
+                "rag.runtime.production_cutover_gate._verify_versioned",
+                return_value={"validation": {"documents": 210, "chunks": 8761}},
+            ), patch(
+                "rag.runtime.live_integrity.inspect_live_index",
+                return_value={"documents": 210, "chunks": 8761},
+            ):
+                result = revert_active_to_legacy(
+                    baseline=baseline,
+                    expected_candidate=candidate,
+                    operator_authorization="CODEBRIDGE_RAG_V1_ROLLBACK:" + candidate,
+                )
+                self.assertEqual(result["state"], "RECOVERED_LEGACY")
+                self.assertFalse((state / "active-generation.json").exists())
+                self.assertFalse(
+                    (state / "production-generation-transition.json").exists()
+                )
+                self.assertTrue((state / "generations" / candidate).is_dir())
+                self.assertTrue((state / (
+                    "recovered-pointer-" + candidate + ".json"
+                )).is_file())

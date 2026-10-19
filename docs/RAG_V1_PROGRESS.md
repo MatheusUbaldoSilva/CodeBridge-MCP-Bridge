@@ -273,3 +273,11 @@
 - Prova dentro do runtime Python EMBARCADO instalado: base v1_base_6142ab6e3b534f e candidata corrigida v1_delta_7b228e09f65942 SHA verificados; candidata=211 docs/8766 chunks/vetores; apenas dois bloqueios operacionais remanescentes.
 - Controle negativo em runtime embarcado: v1_delta_e4b1a435382f48 recusada por index_state inconsistente com real conteudo.
 - O novo verificador foi instalado sem sobrescrever dados e sem reiniciar o MCP publico; o ponteiro ativo segue ausente. A etapa de cutover ainda precisa de atestacao do processo publico e prova de writer/rollback em operacao supervisonada.
+
+### V1.03-D — writer Windows REAL e confirmacao pos-switch embarcada
+- tests/test_generation_transition_journal.py ampliado: 9 PASS, inclusive ciclo de publicacao atomica e rollback com LockFileEx REAL em root temporario de teste, nao simulado por nullcontext. Verifica que reader SHARED impede writer EXCLUSIVE, a troca acontece apos liberar reader e retorno para legado preserva geracao e arquiva ponteiro.
+- Este teste continua simulando SOMENTE atestacao e auditoria de dados para isolamento; NAO constitui publicacao no indice RAG ativo e NAO remove barreiras do gate.
+- ACHADO: writer de producao fazia import de incremental_bundle_validate com qdrant-client depois de trocar ponteiro; no Python MCP embarcado isso falharia e deixaria journal pendente.
+- production_generation_transition.py agora usa _verify_target_after_pointer via versioned_live_integrity sem dependencias indisponiveis, verificando SHA/SQLite/manifest/Qdrant IDs completos e contagens. Sob lock EXCLUSIVE, divergencia deixa journal duravel para recuperacao.
+- Prova no root REAL READ ONLY: _verify_target_after_pointer da geracao corrigida v1_delta_7b228e09f65942 PASS para 211 docs/8766 chunks/vetores/211 manifesto; pointer ativo permanece ausente.
+- Gate continua state=BLOCKED; nao autorizada ativacao enquanto faltar prova publica de reader pin e corte/rollback supervisionado.
