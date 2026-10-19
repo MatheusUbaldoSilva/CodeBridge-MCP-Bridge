@@ -202,3 +202,12 @@
 - Regressao real existente 3 testes MCP search, 4 MCP get_context, 6 search_service e 5 context_service: total 18 PASS.
 - IMPORTANTE: ainda nao ativar ponteiro: instalacao precisa receber novos arquivos e servico MCP publico necessita reinicializacao graciosa EXTERNA para carregar nova implementacao. Sem isso a sessao publica velha nao participa do lock.
 - Writer atomico e rollback seguro permanecem dependencias do gate para corte; indice original 210 docs/8761 chunks, pointer ainda ausente.
+
+### V1.03-D — verificacao de corte geracional e recuperacao, ainda bloqueada
+- A versao instalada do rag/runtime/production_search.py possuia assinatura anterior sem _generation_paths; aplicado PATCH SELETIVO SOMENTE NA INSTALACAO para suportar caminhos fixados sem remover recursos experimentais historicos. A fonte versionada ja possuia esse suporte. Nao sobrescrevemos toda a instalacao.
+- Prova do codigo instalado: busca Jina CODE 3 resultados, get_context 1 chunk, depois lock exclusive adquirido; 6.3s, nenhum SQLite/Qdrant ativo alterado.
+- production_generation_read.py agora recusa novas leituras enquanto production-generation-transition.json existir (recuperacao obrigatoria), sob o mesmo lock de geracao. Nenhum journal foi criado nesta etapa.
+- Novo rag/runtime/production_cutover_gate.py inspeciona somente leitura a integridade e os SHA-256 das duas geracoes versionadas e do indice legado e verifica que nao ha ponteiro/journal pendente.
+- Prova com armazenamento real: v1_base_6142ab6e3b534f 210/8761, v1_delta_e4b1a435382f48 211/8766, SHA de ambos OK, indice legado 210/8761. Gate state=BLOCKED/safe_to_activate=false.
+- Bloqueios concretos: leitores MCP publicos ainda nao atestados apos reinicializacao e writer de ponteiro atomico/rollback ainda NAO IMPLEMENTADO NEM VALIDADO. Nao criar active-generation.json, nao substituir indice legado.
+- Proximo marco: introduzir publicador atomico COM journal, reinicio externo controlado do MCP, provar integridade e rollback antes de ativacao; duas geracoes originais devem permanecer imutaveis.

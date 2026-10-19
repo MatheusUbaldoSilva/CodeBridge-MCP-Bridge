@@ -48,6 +48,10 @@ from rag.runtime.production_generation_lock import production_generation_lock
 def production_generation_read():
     with production_generation_lock(exclusive=False):
         state = resolve_rag_sqlite_path().resolve().parent
+        # A crashed or unfinished generation transition must not be read
+        # until the rollback/commit journal has been reconciled.
+        if (state / "production-generation-transition.json").exists():
+            raise RuntimeError("production transition pending; recovery required")
         pointer = _read_pointer(state)
         if pointer is None:
             paths = SearchStoragePaths(
