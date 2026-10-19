@@ -380,3 +380,72 @@ class ProductionSemanticLockChannelTests(unittest.TestCase):
                     pass
                 with production_generation_lock(exclusive=True, channel="semantic"):
                     pass
+
+
+
+class ProductionPendingJournalReaderRecoveryTests(unittest.TestCase):
+    def test_real_lock_reader_fails_closed_during_journal_then_recovers(self):
+        from unittest.mock import patch
+        from rag.runtime.production_generation_read import production_generation_read
+        from rag.runtime.production_generation_transition import (
+            _atomic_json, rollback_pending_to_legacy, JOURNAL_NAME, POINTER_NAME,
+        )
+
+        candidate = "v1_delta_e4b1a435382f48"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "CodeBridge" / "rag"
+            root.mkdir(parents=True)
+            legacy_db = root / "rag_index.sqlite3"
+            legacy_db.write_bytes(b"legacy-database-unchanged")
+            manifest = root / "rag-index-manifest.json"
+            manifest.write_text("{}", encoding="utf-8")
+            qdrant = root / "qdrant"
+            qdrant.mkdir()
+            immutable = root / "generations" / candidate
+            immutable.mkdir(parents=True)
+            for source in ("rag_index.sqlite3", "rag-index-manifest.json"):
+                (immutable / source).write_bytes(b"versioned-data")
+            (immutable / "qdrant").mkdir()
+            from rag.runtime.production_generation_lock import (
+                production_generation_lock,
+            )
+            with patch(
+                "rag.runtime.production_generation_lock.resolve_rag_sqlite_path",
+                return_value=legacy_db,
+            ), patch(
+                "rag.runtime.production_generation_read.resolve_rag_sqlite_path",
+                return_value=legacy_db,
+            ), patch(
+                "rag.runtime.production_generation_read.resolve_rag_manifest_path",
+                return_value=manifest,
+            ), patch(
+                "rag.runtime.production_generation_read.resolve_qdrant_local_path",
+                return_value=qdrant,
+            ), patch(
+                "rag.runtime.production_generation_transition._root",
+                return_value=root,
+            ):
+                with production_generation_read() as pinned:
+                    self.assertEqual(pinned.generation, "legacy")
+                    self.assertEqual(pinned.sqlite, legacy_db.resolve())
+
+                with production_generation_lock(exclusive=True):
+                    _atomic_json(root / JOURNAL_NAME, {
+                        "schema_version": 1, "state": "PREPARED",
+                        "previous": "legacy", "candidate": candidate,
+                    })
+                    _atomic_json(root / POINTER_NAME, {
+                        "schema_version": 1, "generation": candidate,
+                    })
+                with self.assertRaisesRegex(RuntimeError, "recovery required"):
+                    with production_generation_read():
+                        self.fail("reader entered during pending transition")
+                self.assertEqual(legacy_db.read_bytes(), b"legacy-database-unchanged")
+                result = rollback_pending_to_legacy(expected_candidate=candidate)
+                self.assertEqual(result["state"], "RECOVERED_LEGACY")
+                with production_generation_read() as pinned:
+                    self.assertEqual(pinned.generation, "legacy")
+                self.assertFalse((root / JOURNAL_NAME).exists())
+                self.assertFalse((root / POINTER_NAME).exists())
+                self.assertTrue((root / "generations" / candidate).exists())
+                self.assertEqual(legacy_db.read_bytes(), b"legacy-database-unchanged")

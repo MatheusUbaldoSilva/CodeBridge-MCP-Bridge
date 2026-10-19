@@ -328,3 +328,9 @@
 - Prova real no servidor PUBLICO antigo PID 9724: CLI retorna BLOCKED exit2 para serializacao nao carregada, NAO realiza teste de carga nem escreve ponteiro.
 - test_rag_mcp_status_tool.py expandido para falha de integridade (8760 em vez de 8761 chunks) que bloqueia as 3 buscas antes de executar o estresse. Total 8 PASS na suite.
 - Este gate SOMENTE LEITURA nunca autoriza cutover: safe_to_activate=false permanente; PUBLIC_HYBRID_CONCURRENCY_PASS e resultado apenas da etapa de diagnostico.
+
+### V1.03-C — rollback recupera leitores reais apos journal interrompido
+- tests/test_generation_transition_journal.py recebeu teste integrado com LockFileEx real e filesystem CodeBridge/rag isolado em TemporaryDirectory.
+- Fluxo: reader production_generation_read seleciona legacy; writer exclusive cria journal PREPARED e pointer candidate atomicos; novas leituras produzem "recovery required" sem abrir geracao parcial; rollback_pending_to_legacy arquiva pointer e remove journal; leitor volta a abrir legacy.
+- Prova real do teste: arquivo do indice legado de fixture teve os mesmos bytes antes e depois, e a geracao versionada ficticia permaneceu intacta; 11 testes de transicao PASS.
+- Nenhum dos testes desta sessao escreveu active-generation.json, journal ou SQLite/Qdrant ativos da instalacao. A prova isolada nao libera o corte real; gate de producao permanece BLOCKED.
