@@ -7,11 +7,40 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from pathlib import Path
+from dataclasses import dataclass
+import json
+import re
 
 from rag.runtime.status import resolve_rag_sqlite_path, resolve_rag_manifest_path
 from rag.index.qdrant_local import resolve_qdrant_local_path
-from rag.runtime.generation_pointer import resolve_generation
-from rag.runtime.generation_search_paths import SearchStoragePaths
+_GEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+
+
+@dataclass(frozen=True)
+class SearchStoragePaths:
+    generation: str
+    sqlite: Path
+    qdrant: Path
+    manifest: Path
+
+
+def _read_pointer(state: Path):
+    pointer = state / "active-generation.json"
+    if not pointer.is_file():
+        return None
+    data = json.loads(pointer.read_text(encoding="utf-8"))
+    name = data.get("generation")
+    if data.get("schema_version") != 1 or not isinstance(name, str) or not _GEN.fullmatch(name):
+        raise RuntimeError("invalid production generation pointer")
+    root = (state / "generations").resolve()
+    folder = (root / name).resolve(strict=True)
+    if not folder.is_relative_to(root) or not folder.is_dir():
+        raise RuntimeError("generation outside versioned storage")
+    return SearchStoragePaths(
+        generation=name, sqlite=folder / "rag_index.sqlite3",
+        qdrant=folder / "qdrant", manifest=folder / "rag-index-manifest.json",
+    )
+
 from rag.runtime.production_generation_lock import production_generation_lock
 
 
@@ -19,7 +48,7 @@ from rag.runtime.production_generation_lock import production_generation_lock
 def production_generation_read():
     with production_generation_lock(exclusive=False):
         state = resolve_rag_sqlite_path().resolve().parent
-        pointer = resolve_generation(state)
+        pointer = _read_pointer(state)
         if pointer is None:
             paths = SearchStoragePaths(
                 generation="legacy",
