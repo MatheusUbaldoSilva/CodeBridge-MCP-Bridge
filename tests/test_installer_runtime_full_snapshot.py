@@ -46,3 +46,23 @@ class FullRuntimeSnapshotTests(unittest.TestCase):
         self.archive.write_bytes(b"not zip")
         result=verify_offline_runtime_snapshot(self.archive)
         self.assertEqual(result["state"],"SNAPSHOT_INTEGRITY_BLOCKED")
+
+    def test_existing_archive_is_never_overwritten(self):
+        self.archive.write_bytes(b"do-not-replace")
+        result=create_offline_runtime_snapshot(
+            self.root,self.archive,allow_offline_snapshot=True)
+        self.assertEqual(result["state"],"SNAPSHOT_PATH_INVALID")
+        self.assertEqual(self.archive.read_bytes(),b"do-not-replace")
+
+    def test_runtime_symlink_rejected(self):
+        target=Path(self.temp.name)/"external.txt"
+        target.write_text("external")
+        link=self.runtime/"redirect"
+        try:
+            link.symlink_to(target)
+        except OSError:
+            self.skipTest("Windows symlink permission unavailable")
+        result=create_offline_runtime_snapshot(
+            self.root,self.archive,allow_offline_snapshot=True)
+        self.assertEqual(result["state"],"SYMLINK_IN_RUNTIME")
+        self.assertFalse(self.archive.exists())

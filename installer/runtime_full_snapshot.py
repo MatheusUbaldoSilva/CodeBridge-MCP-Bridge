@@ -17,7 +17,8 @@ def create_offline_runtime_snapshot(
     target=Path(archive_path).absolute()
     default={"archive_created":False,"runtime_modified":False,
              "public_index_modified":False,"restore_performed":False}
-    if not runtime.is_dir() or target.exists() or target.is_relative_to(install):
+    if (not runtime.is_dir() or target.exists() or target.is_symlink()
+            or target.resolve(strict=False).is_relative_to(install)):
         return {**default,"state":"SNAPSHOT_PATH_INVALID"}
     if not target.parent.is_dir():
         return {**default,"state":"SNAPSHOT_PARENT_MISSING"}
@@ -40,28 +41,33 @@ def create_offline_runtime_snapshot(
     # The caller must prove offline state through its independent maintenance
     # channel. This helper never stops services, changes packages or restores.
     entries={}
+    owned=False
     try:
-        with ZipFile(target,"x",compression=ZIP_DEFLATED,allowZip64=True) as output:
-            for path in sorted(paths):
-                relative=path.relative_to(install).as_posix()
-                # Stream binary packages, then rehash the source to detect drift.
-                digest=hashlib.sha256()
-                written=0
-                with path.open("rb") as source, output.open(relative,"w") as dest:
-                    for chunk in iter(lambda: source.read(1024 * 1024), b""):
-                        digest.update(chunk)
-                        written+=len(chunk)
-                        dest.write(chunk)
-                check=hashlib.sha256()
-                with path.open("rb") as check_source:
-                    for chunk in iter(lambda: check_source.read(1024 * 1024), b""):
-                        check.update(chunk)
-                if check.digest()!=digest.digest() or written!=path.stat().st_size:
-                    raise RuntimeError("RUNTIME_CHANGED_DURING_SNAPSHOT")
-                entries[relative]={"sha256":digest.hexdigest(),"bytes":written}
-            output.writestr("RUNTIME_SHA256.json",json.dumps(entries,sort_keys=True))
+        # Exclusive file creation lets failure cleanup delete only our own ZIP.
+        with target.open("xb") as stream:
+            owned=True
+            with ZipFile(stream,"w",compression=ZIP_DEFLATED,allowZip64=True) as output:
+                for path in sorted(paths):
+                    relative=path.relative_to(install).as_posix()
+                    # Stream binary packages, then rehash the source to detect drift.
+                    digest=hashlib.sha256()
+                    written=0
+                    with path.open("rb") as source, output.open(relative,"w") as dest:
+                        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                            digest.update(chunk)
+                            written+=len(chunk)
+                            dest.write(chunk)
+                    check=hashlib.sha256()
+                    with path.open("rb") as check_source:
+                        for chunk in iter(lambda: check_source.read(1024 * 1024), b""):
+                            check.update(chunk)
+                    if check.digest()!=digest.digest() or written!=path.stat().st_size:
+                        raise RuntimeError("RUNTIME_CHANGED_DURING_SNAPSHOT")
+                    entries[relative]={"sha256":digest.hexdigest(),"bytes":written}
+                output.writestr("RUNTIME_SHA256.json",json.dumps(entries,sort_keys=True))
     except Exception:
-        target.unlink(missing_ok=True)
+        if owned:
+            target.unlink(missing_ok=True)
         return {**default,"state":"SNAPSHOT_FAILED"}
     return {**default,"archive_created":True,"state":"OFFLINE_SNAPSHOT_CREATED",
             "file_count":len(entries),"runtime_bytes":total}
