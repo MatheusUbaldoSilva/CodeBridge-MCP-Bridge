@@ -13,10 +13,13 @@ def fingerprint(path: Path) -> dict:
         return {"exists": False, "sha256": None, "bytes": None}
     digest = hashlib.sha256()
     count = 0
-    with path.open("rb") as handle:
-        for piece in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(piece)
-            count += len(piece)
+    try:
+        with path.open("rb") as handle:
+            for piece in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(piece)
+                count += len(piece)
+    except OSError:
+        return {"exists": False, "sha256": None, "bytes": None}
     return {"exists": True, "sha256": digest.hexdigest(), "bytes": count}
 
 

@@ -234,3 +234,17 @@ class RuntimeFingerprintTests(unittest.TestCase):
             path.write_text(json.dumps(modified), encoding="utf-8")
             self.assertEqual(compare_saved_public_baseline(path, Path(temp), Path(temp))["state"],
                              "PUBLIC_BASELINE_INVALID")
+
+    def test_public_file_vanishes_during_open_fails_closed(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/"rag-index-manifest.json"
+            path.write_bytes(b"fixture")
+            original=Path.open
+            def open_then_vanish(item,*args,**kwargs):
+                if item == path:
+                    raise FileNotFoundError("file vanished")
+                return original(item,*args,**kwargs)
+            with patch.object(Path,"open",autospec=True,side_effect=open_then_vanish):
+                result=fingerprint(path)
+            self.assertEqual(result,{"exists":False,"sha256":None,"bytes":None})
