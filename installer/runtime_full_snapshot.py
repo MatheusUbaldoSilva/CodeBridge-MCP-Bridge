@@ -93,9 +93,19 @@ def verify_offline_runtime_snapshot(archive_path: Path) -> dict:
             if set(names)!=(set(metadata)|{"RUNTIME_SHA256.json"}):
                 raise ValueError("entries mismatch")
             for key, expected in metadata.items():
-                if (not key.startswith("runtime/python/") or ".." in Path(key).parts
-                        or key.startswith("/") or "\\" in key):
-                    raise ValueError("path escape")
+                parts = key.split("/")
+                windows_reserved = {"CON", "PRN", "AUX", "NUL",
+                                    *(f"COM{i}" for i in range(1, 10)),
+                                    *(f"LPT{i}" for i in range(1, 10))}
+                invalid_part = any(
+                    (part in ("", ".", "..") or part.rstrip(" .") != part
+                     or ":" in part
+                     or part.split(".")[0].upper() in windows_reserved)
+                    for part in parts
+                )
+                if (parts[:2] != ["runtime", "python"] or len(parts) < 3
+                        or invalid_part or key.startswith("/") or "\\" in key):
+                    raise ValueError("unsafe Windows snapshot path")
                 digest=hashlib.sha256()
                 size=0
                 with archive.open(key, "r") as source:

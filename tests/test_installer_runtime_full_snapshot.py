@@ -81,3 +81,28 @@ class FullRuntimeSnapshotTests(unittest.TestCase):
             self.root,self.archive,allow_offline_snapshot=True)
         self.assertEqual(result["state"],"SNAPSHOT_PATH_INVALID")
         self.assertFalse(self.archive.exists())
+
+    def test_windows_reserved_zip_members_rejected_before_restore(self):
+        import hashlib
+        import json
+        from zipfile import ZipFile
+        from installer.runtime_restore_rehearsal import rehearse_runtime_restore
+        for member in ("runtime/python/CON.txt",
+                       "runtime/python/device:stream",
+                       "runtime/python/trailing. ",
+                       "runtime/python/../outside.py",
+                       "runtime/python/aux",
+                       "runtime/python/module\\other.py"):
+            candidate=Path(self.temp.name)/("hostile-"+str(abs(hash(member)))+".zip")
+            data=b"x"
+            manifest={member: {"sha256":hashlib.sha256(data).hexdigest(),
+                               "bytes":len(data)}}
+            with ZipFile(candidate,"w") as archive:
+                archive.writestr(member,data)
+                archive.writestr("RUNTIME_SHA256.json",json.dumps(manifest))
+            validation=verify_offline_runtime_snapshot(candidate)
+            self.assertEqual(validation["state"],"SNAPSHOT_INTEGRITY_BLOCKED",member)
+            scratch=Path(self.temp.name)/("scratch-"+str(abs(hash(member))))
+            result=rehearse_runtime_restore(candidate,scratch,self.root,execute=True)
+            self.assertEqual(result["state"],"SNAPSHOT_NOT_VERIFIED",member)
+            self.assertFalse(scratch.exists())
