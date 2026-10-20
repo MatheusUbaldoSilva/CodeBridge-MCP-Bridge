@@ -134,3 +134,16 @@ class RuntimeFingerprintTests(unittest.TestCase):
                 result = fingerprint_tree(tree)
         self.assertFalse(result["exists"])
         self.assertIsNone(result["sha256"])
+
+    def test_junction_path_is_not_traversed(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as temp:
+            tree=Path(temp)/"qdrant"
+            tree.mkdir()
+            (tree/"vector.bin").write_bytes(b"sample")
+            with patch.object(Path, "is_junction", autospec=True,
+                              side_effect=lambda item: item.name == "vector.bin",
+                              create=True):
+                result=fingerprint_tree(tree)
+            self.assertFalse(result["exists"])
+            self.assertIsNone(result["sha256"])

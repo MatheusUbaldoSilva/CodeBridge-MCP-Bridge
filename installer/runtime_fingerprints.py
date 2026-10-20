@@ -22,7 +22,8 @@ def fingerprint(path: Path) -> dict:
 def fingerprint_tree(root: Path) -> dict:
     """SHA-256 of canonical sorted relative paths, sizes and file hashes."""
     root = Path(root)
-    if not root.is_dir() or root.is_symlink():
+    if (not root.is_dir() or root.is_symlink()
+            or (hasattr(root, "is_junction") and root.is_junction())):
         return {"exists": False, "sha256": None, "bytes": None, "file_count": None}
     digest = hashlib.sha256()
     total = 0
@@ -30,7 +31,8 @@ def fingerprint_tree(root: Path) -> dict:
     try:
         paths = sorted(root.rglob("*"), key=lambda p: p.relative_to(root).as_posix())
         for path in paths:
-            if path.is_symlink():
+            if (path.is_symlink()
+                    or (hasattr(path, "is_junction") and path.is_junction())):
                 return {"exists": False, "sha256": None, "bytes": None,
                         "file_count": None}
             if path.is_file():
