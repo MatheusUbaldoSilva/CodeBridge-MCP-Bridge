@@ -201,6 +201,8 @@ Section "CodeBridge" SEC_MAIN
   File "bootstrap.ps1"
   File "runtime_readiness.py"
   File "runtime_staging_verify.py"
+  File "runtime_maintenance_preflight.py"
+  File "runtime_fingerprints.py"
   File "company_setup.py"
   File "extension_setup.py"
   File "updater.py"
