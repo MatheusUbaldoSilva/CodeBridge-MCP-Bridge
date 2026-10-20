@@ -20,9 +20,11 @@ class PostUpdateVerifierTests(unittest.TestCase):
 
     def test_ready_and_unchanged_is_verified_but_not_activated(self):
         result=self.check(True,baseline())
-        self.assertEqual(result["state"],"POST_UPDATE_VERIFIED")
+        self.assertEqual(result["state"],"POST_UPDATE_PREREQUISITES_VERIFIED")
         self.assertTrue(result["requires_isolated_real_jina_worker_test"])
         self.assertTrue(result["requires_mcp_handshake"])
+        self.assertFalse(result["deployment_approved"])
+        self.assertFalse(result["phase_closed"])
         self.assertTrue(result["does_not_activate_worker"])
         self.assertFalse(result["writes_performed"])
 

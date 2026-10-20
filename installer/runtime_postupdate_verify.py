@@ -16,7 +16,7 @@ def verify_installed_update(install_root: Path, rag_state: Path, before: dict) -
     integrity = compare_runtime_fingerprints(before, after)
     ok = bool(current["ready"] and integrity["public_index_intact"])
     return {
-        "state": "POST_UPDATE_VERIFIED" if ok else "POST_UPDATE_BLOCKED",
+        "state": "POST_UPDATE_PREREQUISITES_VERIFIED" if ok else "POST_UPDATE_BLOCKED",
         "installed_runtime_ready": bool(current["ready"]),
         "public_index_intact": bool(integrity["public_index_intact"]),
         "integrity": integrity,
@@ -24,6 +24,8 @@ def verify_installed_update(install_root: Path, rag_state: Path, before: dict) -
         "writes_performed": False,
         "requires_mcp_handshake": True,
         "requires_isolated_real_jina_worker_test": True,
+        "deployment_approved": False,
+        "phase_closed": False,
     }
 
 
@@ -43,7 +45,7 @@ def main() -> int:
                 "writes_performed":False,"installed_runtime_ready":False,
                 "public_index_intact":False}
     print(json.dumps(result,sort_keys=True))
-    return 0 if result["state"] == "POST_UPDATE_VERIFIED" else 2
+    return 0 if result["state"] == "POST_UPDATE_PREREQUISITES_VERIFIED" else 2
 
 
 if __name__ == "__main__":
