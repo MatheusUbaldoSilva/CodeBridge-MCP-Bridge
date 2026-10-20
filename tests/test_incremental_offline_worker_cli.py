@@ -26,3 +26,17 @@ class OfflineWorkerCliTests(unittest.TestCase):
             self.assertEqual(denied.returncode,1)
             self.assertEqual(json.loads(denied.stdout)["state"],"NO_APPROVED_SOURCES")
             self.assertFalse(db.exists())
+
+    def test_missing_runtime_backend_does_not_claim(self):
+        from unittest.mock import patch
+        from rag.runtime.incremental_offline_worker import process_offline_job_once
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)/"CodeBridge-MCP-Bridge"
+            db=Path(tmp)/"jobs"/"incremental_jobs.sqlite3"
+            with patch("importlib.util.find_spec", return_value=None):
+                result=process_offline_job_once(
+                    db,root,approved_paths=("sample.py",),
+                    queue_enabled=True,worker_enabled=True)
+            self.assertEqual(result["state"],"OFFLINE_WORKER_RUNTIME_UNAVAILABLE")
+            self.assertFalse(db.exists())
+            self.assertFalse(result["active_index_updated"])

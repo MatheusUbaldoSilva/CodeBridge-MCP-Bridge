@@ -30,6 +30,14 @@ def process_offline_job_once(
     if not 0.01 <= heartbeat_interval_seconds <= 30:
         return {"state": "INVALID_HEARTBEAT_POLICY", "executed": False,
                 "safe_to_publish": False, "active_index_updated": False}
+    # Check installed backend availability before reserving a durable job.
+    # Injected synthetic builders do not require production model dependencies.
+    if builder is None:
+        from importlib.util import find_spec
+        if find_spec("qdrant_client") is None:
+            return {"state": "OFFLINE_WORKER_RUNTIME_UNAVAILABLE",
+                    "error_type": "MissingQdrantClient", "executed": False,
+                    "safe_to_publish": False, "active_index_updated": False}
     approved = tuple(approved_paths)
     if not approved:
         return {"state": "NO_APPROVED_SOURCES", "executed": False,
