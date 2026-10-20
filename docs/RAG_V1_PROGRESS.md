@@ -380,3 +380,11 @@
 - Gerado docs/RAG_V1_03_C_SOURCE_REVIEW_2026-10-19.md com 6 arquivos, old/new SHA256, contagens de linhas e chunks, intervalos e fingerprint de evidencia b8757eb7f10b32ac1728ff10dfb4fd54f352d5b691ac7a88bb26262a57418e2c.
 - Comparacao precisa: 1 fonte adicionada (rag/runtime/live_integrity.py), 5 modificadas, 0 removidas; 205 inalteradas. Revisao humana PENDENTE. Impressao digital nao e assinatura nem aprovacao.
 - Gate assess_real_cutover da nova geracao v1_delta_bebee8b8a49943 permanece BLOCKED pelos leitores MCP nao recarregados, conteudo nao aprovado e corte/rollback supervisionado nao comprovado. Indice original READY 210docs/8761chunks preservado.
+
+### V1.03-C — MCP PUBLICO REINICIADO, concorrencia HYBRID 3/3 APROVADA
+- Operador reiniciou CodeBridge externamente. MCP publico passou de PID9724 para PID1304, iniciado em 2026-10-19 21:45:19 horario local.
+- Executado duas vezes o acceptance read-only instalado author_mcp/v1_public_readiness.py --concurrent via Python embarcado: ambos PUBLIC_HYBRID_CONCURRENCY_PASS, 3/3 respostas HYBRID simultaneas, cada uma com 3 resultados, sem fallback nem INTERNAL_ERROR.
+- Probe do processo REAL confirma reader-pin, semantic_worker_serialization_loaded=true e writer blocked under read. Integridade PUBLICA legacy OBSERVED_CONSISTENT, 210 documentos e 8761 chunks.
+- Prova persistida docs/RAG_V1_03_C_PUBLIC_HYBRID_CONCURRENCY_PROOF_2026-10-19.json: timestamp UTC, SHA do script, commit Git observado, PID, contagens, auditoria e candidate receipt SHA; activation_permitted=false, human_source_review_attested=false e production_cutover_approved=false.
+- A evidência valida EXCLUSIVAMENTE o MCP publico e consulta concorrente no INDEX LEGADO. Nao constitui consulta publica da candidata, nem permissao de publicacao ou rollback.
+- Proxima pendencia V1.03-C: revisar/atestar os cinco arquivos modificados e uma fonte nova conforme docs/RAG_V1_03_C_SOURCE_REVIEW_2026-10-19.md; comprovar cutover/rollback supervisionados em producao. Nao modificar pointer nem remover geracoes sem esses marcos.

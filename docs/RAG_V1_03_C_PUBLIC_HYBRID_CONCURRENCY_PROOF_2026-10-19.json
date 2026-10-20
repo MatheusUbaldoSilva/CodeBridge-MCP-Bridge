@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "state": "PUBLIC_HYBRID_CONCURRENCY_PASS_READONLY",
+  "recorded_at_utc": "2026-10-20T00:57:36.553738+00:00",
+  "git_head_at_proof": "99bde66bfd60d422a1d0d4a0dc09595773f9ff4f",
+  "installed_script_sha256": "2fd4960e8a5603d67ce429a459d8d58d871be9e9de5fab5b63c76e21c2d915e9",
+  "candidate": "v1_delta_bebee8b8a49943",
+  "candidate_receipt_sha256": "210619ac81034f4203451260b1601e9bd6f317f43be9c45baa450af9280184bb",
+  "public_proof": {
+    "check": "CODEBRIDGE_RAG_V103_PUBLIC_READONLY",
+    "cross_store_integrity": {
+      "chunks": 8761,
+      "documents": 210,
+      "generation": "legacy",
+      "state": "OBSERVED_CONSISTENT"
+    },
+    "hybrid_concurrent": [
+      {
+        "error_type": null,
+        "ok": true,
+        "request": 1,
+        "results": 3,
+        "route": "HYBRID"
+      },
+      {
+        "error_type": null,
+        "ok": true,
+        "request": 2,
+        "results": 3,
+        "route": "HYBRID"
+      },
+      {
+        "error_type": null,
+        "ok": true,
+        "request": 3,
+        "results": 3,
+        "route": "HYBRID"
+      }
+    ],
+    "index_pointer_updated": false,
+    "public_reader": {
+      "generation": "legacy",
+      "public_runtime_ready_for_hybrid_acceptance": true,
+      "public_server_pid": 1304,
+      "reader_pin_proved": true,
+      "semantic_worker_serialization_loaded": true
+    },
+    "safe_to_activate": false,
+    "state": "PUBLIC_HYBRID_CONCURRENCY_PASS",
+    "status": {
+      "chunks": 8761,
+      "documents": 210,
+      "generation": "legacy"
+    }
+  },
+  "human_source_review_attested": false,
+  "production_cutover_approved": false,
+  "activation_permitted": false,
+  "active_pointer_updated": false,
+  "note": "Evidence only. Never use this receipt as a production authorization. Public process must be reprobed before any cutover."
+}
