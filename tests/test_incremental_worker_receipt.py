@@ -2,7 +2,7 @@
 from pathlib import Path
 from unittest.mock import patch
 from tests.test_incremental_job_queue import DurableQueueTests
-from rag.runtime.incremental_job_queue import acknowledge_staged_bundle, inspect_job_queue
+from rag.runtime.incremental_job_queue import acknowledge_staged_bundle, inspect_job_queue, inspect_job
 from tests.test_incremental_bundle_validate import fixture
 from rag.index.manifest import IndexManifest,ManifestEntry,ManifestIndexKind,save_index_manifest
 import sqlite3
@@ -40,6 +40,13 @@ class OfflineStagingReceiptTests(DurableQueueTests):
         self.assertFalse(result["active_index_updated"])
         self.assertFalse(result["safe_to_publish"])
         self.assertEqual(inspect_job_queue(self.db)["by_state"],{"STAGED_OFFLINE_VALIDATED":1})
+        detail=inspect_job(self.db,claim["job_id"])
+        self.assertTrue(detail["staged_offline"])
+        self.assertEqual(detail["validated_counts"]["documents"],1)
+        self.assertEqual(detail["validated_counts"]["chunks"],1)
+        self.assertEqual(detail["validated_counts"]["vectors"],1)
+        self.assertNotIn("lease_token",detail)
+        self.assertNotIn("staging_path",detail)
         with closing(sqlite3.connect(self.db)) as db:
             self.assertEqual(db.execute("SELECT count(*) FROM staging_receipts").fetchone()[0],1)
         self.assertEqual(acknowledge_staged_bundle(self.db,self.root,claim["job_id"],

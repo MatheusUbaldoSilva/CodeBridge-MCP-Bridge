@@ -330,6 +330,13 @@ def inspect_job(db_path: Path, job_id: str) -> dict:
             FROM jobs WHERE job_id=?""",
             (job_id,),
         ).fetchone()
+        receipt = None
+        if row is not None and row[0] == "STAGED_OFFLINE_VALIDATED":
+            receipt = cn.execute(
+                """SELECT document_count,chunk_count,vector_count,
+                validated_at_epoch FROM staging_receipts WHERE job_id=?""",
+                (job_id,),
+            ).fetchone()
     if row is None:
         return _report("JOB_NOT_FOUND", job_id=job_id)
     return _report(
@@ -337,7 +344,13 @@ def inspect_job(db_path: Path, job_id: str) -> dict:
         source_path=row[1], attempts=row[2],
         due_at_epoch=row[3], next_attempt_epoch=row[4],
         lease_until_epoch=row[5], last_error=row[6],
-        staged_offline=False, worker_started=False,
+        staged_offline=receipt is not None,
+        validated_counts=(
+            {"documents": receipt[0], "chunks": receipt[1],
+             "vectors": receipt[2], "validated_at_epoch": receipt[3]}
+            if receipt else None
+        ),
+        worker_started=False,
     )
 def renew_job_lease(
     db_path: Path, job_id: str, lease_token: str, *,
