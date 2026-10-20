@@ -78,3 +78,36 @@ class RuntimeFingerprintTests(unittest.TestCase):
             tree=Path(temp)/"qdrant"
             tree.mkdir()
             self.assertFalse(fingerprint_tree(tree)["exists"])
+
+    def test_qdrant_tree_detects_file_addition_and_rename(self):
+        with tempfile.TemporaryDirectory() as temp:
+            tree=Path(temp)/"qdrant"
+            tree.mkdir()
+            original=tree/"a.bin"
+            original.write_bytes(b"a")
+            baseline=fingerprint_tree(tree)
+            added=tree/"b.bin"
+            added.write_bytes(b"b")
+            after_add=fingerprint_tree(tree)
+            self.assertEqual(after_add["file_count"],2)
+            self.assertNotEqual(baseline["sha256"],after_add["sha256"])
+            added.unlink()
+            original.rename(tree/"renamed.bin")
+            after_rename=fingerprint_tree(tree)
+            self.assertEqual(after_rename["file_count"],1)
+            self.assertNotEqual(baseline["sha256"],after_rename["sha256"])
+
+    def test_symlinked_qdrant_file_blocks_fingerprint(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            tree=root/"qdrant"
+            tree.mkdir()
+            outside=root/"outside.bin"
+            outside.write_bytes(b"fixture")
+            linked=tree/"redirect.bin"
+            try:
+                linked.symlink_to(outside)
+            except OSError:
+                self.skipTest("Windows symlink permission unavailable")
+            result=fingerprint_tree(tree)
+            self.assertFalse(result["exists"])
