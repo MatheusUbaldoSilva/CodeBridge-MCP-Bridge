@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import tempfile
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -18,9 +19,12 @@ def rehearse_runtime_restore(
 ) -> dict:
     target = Path(scratch_root).resolve(strict=False)
     installed = Path(install_root).resolve(strict=False)
+    temp_root = Path(tempfile.gettempdir()).resolve(strict=False)
     baseline = {"rehearsed": False, "installed_modified": False,
                 "public_index_modified": False}
-    if target == installed or target.is_relative_to(installed) or installed.is_relative_to(target):
+    if (target == installed or target.is_relative_to(installed)
+            or installed.is_relative_to(target)
+            or not target.is_relative_to(temp_root) or target == temp_root):
         return {**baseline, "state": "RESTORE_TARGET_UNSAFE"}
     if not target.parent.is_dir() or target.exists():
         return {**baseline, "state": "RESTORE_TARGET_UNAVAILABLE"}

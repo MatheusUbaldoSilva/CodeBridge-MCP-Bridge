@@ -92,3 +92,15 @@ class RestoreRehearsalTests(unittest.TestCase):
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertIn("RESTORE_REHEARSAL_DRY_RUN",result.stdout)
         self.assertFalse(self.scratch.exists())
+
+    def test_rehearsal_rejects_destination_outside_os_temp(self):
+        import tempfile
+        import os
+        from pathlib import Path
+        outside = Path.home() / "CodeBridge-Should-Not-Be-Created"
+        if outside.is_relative_to(Path(tempfile.gettempdir()).resolve()):
+            self.skipTest("Home directory within temporary directory")
+        result = rehearse_runtime_restore(
+            self.archive, outside, self.install, execute=True)
+        self.assertEqual(result["state"], "RESTORE_TARGET_UNSAFE")
+        self.assertFalse(outside.exists())
