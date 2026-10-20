@@ -96,3 +96,31 @@ def process_offline_job_once(
         heartbeat_stop.set()
         if thread is not None:
             thread.join(timeout=5)
+
+
+def main(argv=None) -> int:
+    """One-shot standalone entrypoint. No scheduler and no implicit enablement."""
+    import argparse
+    import json
+    parser = argparse.ArgumentParser(description="CodeBridge offline RAG staging worker")
+    parser.add_argument("--project-root", required=True)
+    parser.add_argument("--db-path", required=True)
+    parser.add_argument("--approved-path", action="append", default=[])
+    parser.add_argument("--enable-queue", action="store_true")
+    parser.add_argument("--enable-offline-worker", action="store_true")
+    args = parser.parse_args(argv)
+    response = process_offline_job_once(
+        Path(args.db_path), Path(args.project_root),
+        approved_paths=args.approved_path,
+        queue_enabled=args.enable_queue,
+        worker_enabled=args.enable_offline_worker,
+    )
+    print(json.dumps(response, ensure_ascii=False, sort_keys=True))
+    return 0 if response.get("state") in (
+        "OFFLINE_WORKER_DISABLED", "QUEUE_EMPTY",
+        "STAGED_OFFLINE_VALIDATED", "AUTO_INDEX_DISABLED",
+    ) else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
