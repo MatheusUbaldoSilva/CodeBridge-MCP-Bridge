@@ -429,3 +429,14 @@
 - Estados AUTO_INDEX_DISABLED por padrao, AWAITING_STABLE_COMMIT, ELIGIBLE_FOR_DURABLE_QUEUE e recusas fail-closed. Mesmo quando elegivel retorna queued=false, executed=false, safe_to_publish=false e worker_available=false.
 - Testes adicionais em tests/test_incremental_preflight.py: repo Git temporario commitado, fonte elegivel, debounce, fonte nao aprovada, HEAD divergente, arquivo editado sem commit, path traversal. Suite total 14 PASS.
 - Nenhum watcher, timer, fila persistente, worker ou reindexacao de producao foi ativado; V1.03-D permanece PARCIAL ate agendamento autonomo real e fila/erros/progresso.
+
+### V1.03-D-B - fila persistente SQLite de jobs RAG (worker DESATIVADO)
+- Criado rag/runtime/incremental_job_queue.py em DB separado jobs/incremental_jobs.sqlite3, fora do indice ativo de producao. Sem banco criado quando queue_enabled=False; default desativado.
+- enqueue_source_event so persiste evento para fonte CodeBridge explicitamente autorizada se prequeue validar commit HEAD, estado Git limpo do arquivo, SHA-256 canonico, denylist/segredos e debounce. Evento pode ficar PENDING ate prazo de estabilidade.
+- Job idempotente por projeto/path/commit/SHA; UNIQUE evita duplicatas. Arquivo usa SQLite WAL com synchronous=FULL e transacoes BEGIN IMMEDIATE; nenhuma escrita em rag_index.sqlite3, qdrant ou active-generation.json.
+- claim_approved_job (chamador explicito, sem scheduler e sem indexador) revalida commit, SHA, allowlist e debounce NO MOMENTO DA RESERVA; registros nao validos passam a REJECTED. Dois consumidores concorrentes nao conseguem reservar o mesmo job.
+- Lease UUID e expiracao delimitada; lease expirada invalida token antigo; tentativas limitadas ate FAILED. Falha registrada com retry condicionado a token valido. Eventos terminados FAILED/REJECTED nao sao reativados por enqueue repetido.
+- inspect_job_queue abre somente leitura e nunca cria banco; caminho da DB dedicado jobs/incremental_jobs.sqlite3, esquema versionado, rejeita outro SQLite unversionado.
+- Testes 10 PASS em tests/test_incremental_job_queue.py: Win32 TemporaryDirectory, Git real, debounce, idempotencia, revalidacao, dois claimers paralelos, expiro token/retry, persistencia em novo Python, esquema estranho, estado default off. Regressao ampliada com preflight14, journal14, status8 = 46 PASS.
+- Teste real no repositorio Windows com queue_enabled=False: nao criou DB em LocalAppData/CodeBridge/rag/jobs e preservou indice legacy, pointer/journal ausentes.
+- IMPORTANTE: este marco D-B entrega persistencia e reserva segura, NAO inicia job automaticamente, nao gera embedding, nao tem worker agendado nem conclui V1.03-D. D-C sera worker offline com registro de etapa/conclusao e auditoria; aprovacao de publicacao permanece separada.
