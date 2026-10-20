@@ -95,3 +95,33 @@ class OfflineStagingReceiptTests(DurableQueueTests):
         self.assertEqual(result["state"],"STAGED_OFFLINE_VALIDATED")
         with closing(sqlite3.connect(self.db)) as db:
             self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0],2)
+
+    def test_modified_source_after_claim_cannot_ack(self):
+        self.enqueue(queue_enabled=True,now_epoch=140)
+        claim=self.claim(now_epoch=141)
+        stage=self.make_stage()
+        self.file.write_text("def changed():\n    return 99\n",encoding="utf-8")
+        result=acknowledge_staged_bundle(self.db,self.root,claim["job_id"],
+            claim["lease_token"],stage,approved_paths=("sample.py",),
+            now_epoch=142,queue_enabled=True)
+        self.assertEqual(result["state"],"SOURCE_NO_LONGER_ELIGIBLE")
+        self.assertEqual(inspect_job_queue(self.db)["by_state"],{"CLAIMED":1})
+
+    def test_disallowed_source_cannot_ack(self):
+        self.enqueue(queue_enabled=True,now_epoch=140)
+        claim=self.claim(now_epoch=141)
+        stage=self.make_stage()
+        result=acknowledge_staged_bundle(self.db,self.root,claim["job_id"],
+            claim["lease_token"],stage,approved_paths=(),
+            now_epoch=142,queue_enabled=True)
+        self.assertEqual(result["state"],"SOURCE_NO_LONGER_ELIGIBLE")
+        self.assertEqual(inspect_job_queue(self.db)["by_state"],{"CLAIMED":1})
+
+    def test_invalid_staging_layout_cannot_ack(self):
+        self.enqueue(queue_enabled=True,now_epoch=140)
+        claim=self.claim(now_epoch=141)
+        result=acknowledge_staged_bundle(self.db,self.root,claim["job_id"],
+            claim["lease_token"],self.root,approved_paths=("sample.py",),
+            now_epoch=142,queue_enabled=True)
+        self.assertEqual(result["state"],"UNTRUSTED_STAGING_PATH")
+        self.assertEqual(inspect_job_queue(self.db)["by_state"],{"CLAIMED":1})
