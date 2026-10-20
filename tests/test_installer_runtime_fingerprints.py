@@ -182,3 +182,18 @@ class RuntimeFingerprintTests(unittest.TestCase):
             path.write_text('{"schema_version":1,"purpose":"wrong","files":{}}')
             result=compare_saved_public_baseline(path,Path(temp),Path(temp))
             self.assertFalse(result["public_index_intact"])
+
+    def test_cli_missing_saved_baseline_returns_error(self):
+        import subprocess
+        import sys
+        with tempfile.TemporaryDirectory() as temp:
+            base=Path(temp)
+            command=[sys.executable,"-m","installer.runtime_fingerprints",
+                     "--install-root",str(base/"install"),
+                     "--rag-state",str(base/"rag"),
+                     "--compare-baseline",str(base/"missing.json")]
+            result=subprocess.run(command,capture_output=True,text=True,
+                                  cwd=Path(__file__).resolve().parents[1],timeout=30)
+            self.assertEqual(result.returncode,2,result.stderr)
+            self.assertIn("PUBLIC_BASELINE_INVALID",result.stdout)
+            self.assertFalse((base/"rag").exists())

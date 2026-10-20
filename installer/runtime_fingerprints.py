@@ -139,7 +139,13 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--install-root", type=Path, required=True)
     parser.add_argument("--rag-state", type=Path, required=True)
+    parser.add_argument("--compare-baseline", type=Path)
     args = parser.parse_args()
+    if args.compare_baseline is not None:
+        result = compare_saved_public_baseline(
+            args.compare_baseline, args.install_root, args.rag_state)
+        print(json.dumps(result, sort_keys=True))
+        return 0 if result.get("public_index_intact") else 2
     print(json.dumps(collect_runtime_fingerprints(
         args.install_root, args.rag_state), sort_keys=True))
     return 0
