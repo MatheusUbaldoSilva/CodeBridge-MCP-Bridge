@@ -27,18 +27,25 @@ def fingerprint_tree(root: Path) -> dict:
     digest = hashlib.sha256()
     total = 0
     count = 0
-    for path in sorted(root.rglob("*"), key=lambda p: p.relative_to(root).as_posix()):
-        if path.is_symlink():
-            return {"exists": False, "sha256": None, "bytes": None,
-                    "file_count": None}
-        if path.is_file():
-            relative = path.relative_to(root).as_posix()
-            evidence = fingerprint(path)
-            payload = json.dumps([relative, evidence["bytes"], evidence["sha256"]],
-                                 ensure_ascii=False, separators=(",", ":"))
-            digest.update(payload.encode("utf-8") + b"\n")
-            total += evidence["bytes"]
-            count += 1
+    try:
+        paths = sorted(root.rglob("*"), key=lambda p: p.relative_to(root).as_posix())
+        for path in paths:
+            if path.is_symlink():
+                return {"exists": False, "sha256": None, "bytes": None,
+                        "file_count": None}
+            if path.is_file():
+                relative = path.relative_to(root).as_posix()
+                evidence = fingerprint(path)
+                if not evidence["exists"] or evidence["sha256"] is None:
+                    raise OSError("Vector file vanished during fingerprint")
+                payload = json.dumps([relative, evidence["bytes"], evidence["sha256"]],
+                                     ensure_ascii=False, separators=(",", ":"))
+                digest.update(payload.encode("utf-8") + b"\n")
+                total += evidence["bytes"]
+                count += 1
+    except OSError:
+        return {"exists": False, "sha256": None, "bytes": None,
+                "file_count": None}
     if count == 0:
         return {"exists": False, "sha256": None, "bytes": None, "file_count": 0}
     return {"exists": True, "sha256": digest.hexdigest(), "bytes": total,

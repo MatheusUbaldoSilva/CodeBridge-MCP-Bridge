@@ -121,3 +121,16 @@ class RuntimeFingerprintTests(unittest.TestCase):
                 result = compare_runtime_fingerprints(before, before)
                 self.assertEqual(result["state"], "PUBLIC_INDEX_INTEGRITY_BLOCKED")
                 self.assertFalse(result["public_index_intact"])
+
+    def test_qdrant_file_disappearing_during_hash_fails_closed(self):
+        from unittest.mock import patch
+        import installer.runtime_fingerprints as fingerprints
+        with tempfile.TemporaryDirectory() as temp:
+            tree = Path(temp)/"qdrant"
+            tree.mkdir()
+            (tree/"vector.bin").write_bytes(b"test")
+            with patch.object(fingerprints, "fingerprint",
+                              side_effect=FileNotFoundError("vanished")):
+                result = fingerprint_tree(tree)
+        self.assertFalse(result["exists"])
+        self.assertIsNone(result["sha256"])
