@@ -54,8 +54,9 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--install-root", type=Path, required=True)
     args = parser.parse_args()
-    print(json.dumps(inspect_embedded_runtime(args.install_root), sort_keys=True))
-    return 0
+    result = inspect_embedded_runtime(args.install_root)
+    print(json.dumps(result, sort_keys=True))
+    return 0 if result["ready"] else 2
 
 
 if __name__ == "__main__":

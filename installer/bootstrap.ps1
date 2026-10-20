@@ -1,10 +1,24 @@
 param(
     [Parameter(Mandatory=$true)]
-    [string]$InstallRoot
+    [string]$InstallRoot,
+    [switch]$AuditOnly
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+
+# Explicit read-only audit. Must precede initialization, downloads or directory writes.
+if ($AuditOnly) {
+    $PythonExeAudit = Join-Path $InstallRoot 'runtime\python\python.exe'
+    $AuditScript = Join-Path $PSScriptRoot 'runtime_readiness.py'
+    if (-not (Test-Path -LiteralPath $PythonExeAudit) -or
+        -not (Test-Path -LiteralPath $AuditScript)) {
+        Write-Output 'RUNTIME_AUDIT_UNAVAILABLE'
+        exit 2
+    }
+    & $PythonExeAudit $AuditScript --install-root $InstallRoot
+    exit $LASTEXITCODE
+}
 
 $PythonVersion = '3.13.15'
 $PythonZip = "python-$PythonVersion-embed-amd64.zip"
