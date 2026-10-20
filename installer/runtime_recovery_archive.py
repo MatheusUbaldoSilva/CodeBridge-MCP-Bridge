@@ -1,7 +1,6 @@
-"""Explicit offline recovery archive for non-secret runtime metadata only."""
+"""Explicit offline metadata snapshot, not a full installed-runtime rollback."""
 from __future__ import annotations
 import hashlib
-import io
 import json
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
@@ -29,7 +28,8 @@ def prepare_runtime_recovery(install_root: Path, destination: Path,
                for name, data in items.items()}
     if not create_archive:
         return {"state": "RECOVERY_DRY_RUN", "archive_created": False,
-                "files": digests, "will_include_secrets": False}
+                "files": digests, "will_include_secrets": False,
+                "full_rollback_available": False, "archive_scope": "METADATA_ONLY"}
     if not target.parent.is_dir():
         return {"state": "ARCHIVE_PARENT_MISSING", "archive_created": False}
     # Create a self-contained recovery archive without user config, keys or RAG data.
@@ -38,7 +38,8 @@ def prepare_runtime_recovery(install_root: Path, destination: Path,
             archive.writestr(name, content)
         archive.writestr("SHA256.json", json.dumps(digests,sort_keys=True))
     return {"state": "RECOVERY_ARCHIVE_CREATED", "archive_created": True,
-            "files": digests, "will_include_secrets": False}
+            "files": digests, "will_include_secrets": False,
+            "full_rollback_available": False, "archive_scope": "METADATA_ONLY"}
 
 
 def main() -> int:

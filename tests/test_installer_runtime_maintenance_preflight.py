@@ -35,6 +35,8 @@ class MaintenancePreflightTests(unittest.TestCase):
         self.assertTrue(result["operator_approval_required"])
         self.assertFalse(result["applied"])
         self.assertFalse(result["stop_requested"])
+        self.assertFalse(result["full_rollback_verified"])
+        self.assertFalse(result["maintenance_execution_authorized"])
 
     def test_existing_ready_install_does_not_request_maintenance(self):
         with patch("installer.runtime_maintenance_preflight.collect_runtime_fingerprints",

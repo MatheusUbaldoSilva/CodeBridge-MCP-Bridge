@@ -37,3 +37,7 @@ Do not delete or overwrite historical Git dirty paths.
 
 GO only after installed no-injection runtime validation, real offline worker fixture, Git diff+commit audit, SHA evidence, a fresh MCP READY handshake, and confirmation that automatic worker, scheduler and public publication remain OFF.
 Until then V1.03-D-C is not deployment-complete.
+
+
+## Rollback clarification 2026-10-20
+The recovery ZIP contains metadata only and cannot restore installed Python dependencies or application binaries. Full rollback requires a separately verified installer/runtime restore path and an independent recovery channel. Explicit operator authorization is still required before any live maintenance.

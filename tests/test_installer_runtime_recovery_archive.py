@@ -22,10 +22,13 @@ class RecoveryArchiveTests(unittest.TestCase):
         self.assertEqual(result["state"],"RECOVERY_DRY_RUN")
         self.assertFalse(self.out.exists())
         self.assertFalse(result["will_include_secrets"])
+        self.assertFalse(result["full_rollback_available"])
+        self.assertEqual(result["archive_scope"],"METADATA_ONLY")
 
     def test_explicit_archive_only_contains_allowlisted_metadata(self):
         result=prepare_runtime_recovery(self.root,self.out,create_archive=True)
         self.assertTrue(result["archive_created"])
+        self.assertFalse(result["full_rollback_available"])
         with ZipFile(self.out) as archive:
             self.assertEqual(set(archive.namelist()),set(FILES)|{"SHA256.json"})
             self.assertEqual(json.loads(archive.read("SHA256.json")),result["files"])
