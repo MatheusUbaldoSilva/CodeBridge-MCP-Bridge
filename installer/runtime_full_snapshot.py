@@ -17,7 +17,9 @@ def create_offline_runtime_snapshot(
     target=Path(archive_path).absolute()
     default={"archive_created":False,"runtime_modified":False,
              "public_index_modified":False,"restore_performed":False}
-    if (not runtime.is_dir() or target.exists() or target.is_symlink()
+    if (not runtime.is_dir() or runtime.is_symlink()
+            or not runtime.resolve(strict=False).is_relative_to(install)
+            or target.exists() or target.is_symlink()
             or target.resolve(strict=False).is_relative_to(install)):
         return {**default,"state":"SNAPSHOT_PATH_INVALID"}
     if not target.parent.is_dir():

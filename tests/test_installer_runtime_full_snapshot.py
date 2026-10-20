@@ -66,3 +66,18 @@ class FullRuntimeSnapshotTests(unittest.TestCase):
             self.root,self.archive,allow_offline_snapshot=True)
         self.assertEqual(result["state"],"SYMLINK_IN_RUNTIME")
         self.assertFalse(self.archive.exists())
+
+    def test_runtime_root_symlink_is_never_archived(self):
+        from pathlib import Path
+        other=Path(self.temp.name)/"external-runtime"
+        other.mkdir()
+        (other/"secret.txt").write_text("private")
+        self.runtime.rename(self.root/"python-real")
+        try:
+            self.runtime.symlink_to(other, target_is_directory=True)
+        except OSError:
+            self.skipTest("Windows directory symlink permission unavailable")
+        result=create_offline_runtime_snapshot(
+            self.root,self.archive,allow_offline_snapshot=True)
+        self.assertEqual(result["state"],"SNAPSHOT_PATH_INVALID")
+        self.assertFalse(self.archive.exists())
