@@ -2,7 +2,7 @@ import hashlib
 import tempfile
 import unittest
 from pathlib import Path
-from installer.runtime_fingerprints import fingerprint, collect_runtime_fingerprints
+from installer.runtime_fingerprints import fingerprint, collect_runtime_fingerprints, compare_runtime_fingerprints
 
 class RuntimeFingerprintTests(unittest.TestCase):
     def test_binary_sha256_exact_and_read_only(self):
@@ -26,3 +26,26 @@ class RuntimeFingerprintTests(unittest.TestCase):
             self.assertFalse(root.exists())
             self.assertFalse(state.exists())
             self.assertFalse(result["writes_performed"])
+
+    def test_protected_index_hashes_must_match(self):
+        baseline = {"files": {
+            "rag_manifest": {"exists": True, "sha256": "a", "bytes": 1},
+            "rag_sqlite": {"exists": True, "sha256": "b", "bytes": 2},
+            "python_path": {"exists": True, "sha256": "c", "bytes": 3},
+        }}
+        updated = {"files": {
+            **baseline["files"],
+            "python_path": {"exists": True, "sha256": "d", "bytes": 4},
+        }}
+        accepted = compare_runtime_fingerprints(baseline,updated)
+        self.assertEqual(accepted["state"],"PUBLIC_INDEX_UNCHANGED")
+        self.assertEqual(accepted["changed_entries"],["python_path"])
+        updated["files"]["rag_sqlite"] = {"exists": True, "sha256": "different", "bytes": 2}
+        rejected = compare_runtime_fingerprints(baseline,updated)
+        self.assertEqual(rejected["state"],"PUBLIC_INDEX_INTEGRITY_BLOCKED")
+        self.assertFalse(rejected["public_index_intact"])
+
+    def test_missing_public_hash_fails_closed(self):
+        baseline={"files":{"rag_sqlite":{"exists":True,"sha256":"x","bytes":1}}}
+        result=compare_runtime_fingerprints(baseline,baseline)
+        self.assertFalse(result["public_index_intact"])

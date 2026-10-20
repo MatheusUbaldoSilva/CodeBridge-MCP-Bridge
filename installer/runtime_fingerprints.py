@@ -38,6 +38,33 @@ def collect_runtime_fingerprints(install_root: Path, rag_state: Path) -> dict:
     }
 
 
+
+def compare_runtime_fingerprints(before: dict, after: dict) -> dict:
+    """Fail closed if either public SQLite or manifest changes."""
+    before_files = before.get("files", {})
+    after_files = after.get("files", {})
+    protected = ("rag_manifest", "rag_sqlite")
+    matches = {}
+    for name in protected:
+        old, new = before_files.get(name, {}), after_files.get(name, {})
+        matches[name] = bool(
+            old.get("exists") and new.get("exists")
+            and old.get("sha256") and old.get("sha256") == new.get("sha256")
+            and old.get("bytes") == new.get("bytes"))
+    changed = sorted(
+        name for name in set(before_files) | set(after_files)
+        if before_files.get(name) != after_files.get(name)
+    )
+    intact = all(matches.values())
+    return {
+        "state": "PUBLIC_INDEX_UNCHANGED" if intact else "PUBLIC_INDEX_INTEGRITY_BLOCKED",
+        "public_index_intact": intact,
+        "protected_matches": matches,
+        "changed_entries": changed,
+        "writes_performed": False,
+    }
+
+
 def main() -> int:
     import argparse
     parser = argparse.ArgumentParser()
