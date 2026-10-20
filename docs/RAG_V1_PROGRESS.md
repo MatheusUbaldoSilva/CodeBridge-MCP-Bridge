@@ -406,3 +406,12 @@
 - O ensaio supervisionado de verdade segue PENDENTE. NAO chamar marco completo, NAO atribuir sucesso de corte/rollback ate provar publicamente a candidata e o retorno ao legado.
 - Proxima janela normal: com tempo suficiente para 3 buscas publicas simultaneas, switch, busca publica da candidata e rollback, executar o supervisor e registrar o JSON de evidencia. Sempre conferindo PID atual e ausencia de pointer/journal antes da execucao.
 - Dois arquivos historicos nao relacionados no Git foram preservados.
+
+### V1.03-C - LIVE reversible candidate trial passed; legacy restored
+- User authorization covered a supervised reversible trial, NOT permanent production release.
+- Real public MCP PID1304: fresh 3/3 HYBRID preflight, exclusive writer lock, durable journal/pointer temporarily selected v1_delta_bebee8b8a49943.
+- Actual PUBLIC MCP candidate READY 211docs/8778chunks, cross-store OBSERVED_CONSISTENT, semantic CODE query returned new source rag/runtime/live_integrity.py among 12 results.
+- Finally executed revert_active_to_legacy: RECOVERED_LEGACY. Public legacy READY 210docs/8761chunks, cross-store integrity OBSERVED_CONSISTENT. Post-rollback CODE and HYBRID each 3 results, no fallback.
+- Pointer archived recovered-pointer-v1_delta_bebee8b8a49943.json; active-generation.json and production-generation-transition.json absent; candidate SHA and Qdrant vector identity still valid.
+- Authoritative evidence: docs/RAG_V1_03_C_SUPERVISED_LIVE_TRIAL_2026-10-19.json, LIVE_TRIAL_PASSED_AND_ROLLED_BACK, exit 0.
+- Technical reversible publication test PASS, but NOT a permanent GO-LIVE or final release. production_release_approved=false; source and legacy versions preserved.
