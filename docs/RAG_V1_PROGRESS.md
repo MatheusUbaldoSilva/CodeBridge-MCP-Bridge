@@ -357,3 +357,18 @@
 - production_cutover_gate.assess_real_cutover agora executa preflight READ-ONLY da candidata, anexa candidato_source_freshness ao relatorio e exige SOURCE_SNAPSHOT_CURRENT para nao adicionar CANDIDATE_SOURCE_DRIFT_REQUIRES_REINDEX.
 - Prova com dados REAIS: gate de v1_delta_7b228e09f65942 retorna BLOCKED, alem dos bloqueios operacionais, por CANDIDATE_SOURCE_DRIFT_REQUIRES_REINDEX. A candidata continua internamente integra (211 docs/8766 vetores) mas NAO e um snapshot atual das fontes.
 - PROXIMA ACAO apos restart externo: validar 3/3 HYBRID MCP publico, reconstruir delta aprovado incluindo seis alteracoes reais; nao ativar geracao antiga nem reindexar so por CRLF. V1.03-C NAO concluida.
+
+### V1.03-C — novo delta Jina CODE de seis fontes e geracao corrigida imutavel
+- Detectadas exatamente seis fontes com alteracao REAL de conteudo no manifesto da geracao anterior v1_delta_7b228e09f65942; 89 divergencias somente CRLF/LF foram descartadas sem gerar embeddings.
+- Novo plan CODE de apenas 6 fontes aprovadas no repositorio; sem caminhos negados, sem deteccao de segredo e com revisao do Git. Staging build-0bf329ab0fb2410db5d43186622076af gerou 6 documentos, 102 chunks CODE, 102 vetores Jina, 6 entradas no manifesto. Offline validate_incremental_bundle PASS.
+- Merge FECHADO stage_incremental_bundle usa como antigo snapshot IMUTAVEL versionado v1_delta_7b228e09f65942 (nao abre Qdrant live), substituiu os seis documentos sem novos/deletados. Staging merged-d4c249f688ad457fb1e6e202e1245874: 211 documentos, 8778 chunks/vetores, 211 manifesto, validação offline PASS.
+- Criado merged-receipt.json com paths exatos das 6 substituicoes, origem fechada e status MERGED_VALIDATED_NOT_PUBLISHED, activation_permitted=false; nenhum ponteiro foi publicado.
+- prepare_versioned_generation criou NOVA geracao v1_delta_bebee8b8a49943, recepito geracional com SHA-256 dos cinco artefatos protegido, 211 documentos, 8778 chunks/vetores (7627 TEXT/1151 CODE). inspect_pinned_index verificou todas identidades, dimensoes, SQLite, manifesto e hashes; PASS.
+- Freshness da NOVA candidata: SOURCE_SNAPSHOT_CURRENT, 121 fontes byte-exatas, 90 diferem somente CRLF/LF, zero mudancas reais e zero ausentes. Todas 211 fontes do manifesto verificadas. IMPORTANTE: verifica entradas existentes, nao cobertura de novos fontes fora do manifesto.
+- A antiga v1_delta_7b228e09f65942 permanece preservada intacta, mas esta desatualizada e NAO deve ser ativada. O indice publico continua LEGACY READY 210/8761, pointer e journal AUSENTES.
+
+### V1.03-C — gate de delta real em vez de constante de laboratorio
+- production_cutover_gate.py abandonou suposicao fixa de apenas +5 vetores, valida manifestos fechados base versus candidata: zero remocoes, uma fonte adicional, as substituicoes precisas e totais cross-store ja comprovados.
+- Report candidate_manifest_delta fornece added/modified/removed/unchanged e caminhos; novo v1_delta_bebee8b8a49943 tem 1 adicionado (rag/runtime/live_integrity.py), 5 modificados e 205 inalterados. 8778 vetores sao consistentes com 8778 chunks, diferenca total +17 versus baseline 8761 devido a 5 revisoes de codigo.
+- Gate permanece BLOQUEADO e exige CHANGED_SOURCE_CONTENT_REVIEW_NOT_ATTESTED, PUBLIC_MCP_READERS_RESTART_NOT_ATTESTED e ATOMIC_PRODUCTION_POINTER_WRITER_AND_ROLLBACK_NOT_VALIDATED. Nao reconhecer receipt de staging como aprovacao do operador nem alterar safe_to_activate=false.
+- tests/test_incremental_preflight.py ampliados: 9 PASS incluindo adicao/modificacao/rechunk/remocao de entradas de manifesto. Nenhum dado ativo mutado nem processo MCP encerrado.

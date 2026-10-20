@@ -194,3 +194,61 @@ class ProductionSourceFreshnessTests(unittest.TestCase):
                 assess_generation_source_freshness(snapshot, root)
             with self.assertRaises(ValueError):
                 assess_generation_source_freshness(snapshot, Path(temp))
+
+
+class CutoverManifestDeltaTests(unittest.TestCase):
+    def test_added_and_modified_manifest_paths_and_chunk_updates(self):
+        from rag.index.manifest import (
+            ManifestEntry, ManifestIndexKind, IndexManifest, save_index_manifest,
+        )
+        from rag.runtime.production_cutover_gate import _summarize_manifest_delta
+
+        def make(path, sha, chunks=("chunk1",)):
+            return ManifestEntry(
+                project_id="codebridge", index_kind=ManifestIndexKind.CODE,
+                path=path, size=20, mtime_ns=1,
+                sha256=sha * 64, chunk_ids=chunks, model_version="code-v1",
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            before = Path(tmp) / "before.json"
+            after = Path(tmp) / "after.json"
+            save_index_manifest(before, IndexManifest(entries=(
+                make("old.py", "a"),
+                make("modified.py", "b"),
+                make("rechunked.py", "c"),
+            )))
+            save_index_manifest(after, IndexManifest(entries=(
+                make("old.py", "a"),
+                make("modified.py", "d"),
+                make("rechunked.py", "c", ("chunk_new",)),
+                make("new.py", "e"),
+            )))
+            result = _summarize_manifest_delta(before, after)
+            self.assertEqual(result["added_paths"], ["new.py"])
+            self.assertEqual(
+                result["modified_paths"], ["modified.py", "rechunked.py"],
+            )
+            self.assertEqual(result["removed_paths"], [])
+            self.assertEqual(result["unchanged_count"], 1)
+            self.assertFalse(result["operator_content_review_attested"])
+
+    def test_removed_manifest_path_is_not_silently_ignored(self):
+        from rag.index.manifest import (
+            ManifestEntry, ManifestIndexKind, IndexManifest, save_index_manifest,
+        )
+        from rag.runtime.production_cutover_gate import _summarize_manifest_delta
+        old = ManifestEntry(
+            project_id="codebridge", index_kind=ManifestIndexKind.CODE,
+            path="removed.py", size=10, mtime_ns=1,
+            sha256="a" * 64, chunk_ids=("chunk1",), model_version="code-v1",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            a = Path(tmp) / "a.json"
+            b = Path(tmp) / "b.json"
+            save_index_manifest(a, IndexManifest(entries=(old,)))
+            save_index_manifest(b, IndexManifest(entries=()))
+            result = _summarize_manifest_delta(a, b)
+            self.assertEqual(result["removed_paths"], ["removed.py"])
+            self.assertEqual(result["removed_count"], 1)
+            self.assertEqual(result["added_count"], 0)

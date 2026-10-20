@@ -83,6 +83,32 @@ def _verify_versioned(root: Path, name: str, label: str) -> dict:
     return {"generation": name, "validation": validated, "sha_verified": True}
 
 
+
+def _summarize_manifest_delta(baseline_manifest: Path, candidate_manifest: Path) -> dict:
+    """Read-only exact source/chunk delta between two validated closed bundles."""
+    from rag.index.manifest import load_index_manifest
+
+    old = load_index_manifest(baseline_manifest)
+    updated = load_index_manifest(candidate_manifest)
+    before = {e.key: e for e in old.entries}
+    after = {e.key: e for e in updated.entries}
+    added = sorted(after[key].path for key in after.keys() - before.keys())
+    removed = sorted(before[key].path for key in before.keys() - after.keys())
+    modified = sorted(
+        after[key].path for key in before.keys() & after.keys()
+        if (before[key].sha256 != after[key].sha256
+            or before[key].chunk_ids != after[key].chunk_ids)
+    )
+    return {
+        "added_count": len(added), "added_paths": added,
+        "modified_count": len(modified), "modified_paths": modified,
+        "removed_count": len(removed), "removed_paths": removed,
+        "unchanged_count": len(before.keys() & after.keys()) - len(modified),
+        "before_entries": len(before), "after_entries": len(after),
+        "operator_content_review_attested": False,
+        "read_only": True,
+    }
+
 def assess_real_cutover(baseline: str, candidate: str) -> dict:
     state = resolve_rag_sqlite_path().resolve().parent
     if state.name != "rag" or state.parent.name != "CodeBridge":
@@ -114,10 +140,28 @@ def assess_real_cutover(baseline: str, candidate: str) -> dict:
             reasons.append("CANDIDATE_SOURCE_DRIFT_REQUIRES_REINDEX")
         before = base["validation"]
         after = updated["validation"]
-        if after["documents"] != before["documents"] + 1 or (
-            after["vectors"] != before["vectors"] + 5
+        manifest_delta = _summarize_manifest_delta(
+            state / "generations" / baseline / "rag-index-manifest.json",
+            state / "generations" / candidate / "rag-index-manifest.json",
+        )
+        checked["candidate_manifest_delta"] = manifest_delta
+        # A revised source can have any number of new chunks; hard-coding
+        # +5 vectors (the initial one-file smoke case) incorrectly rejects
+        # legitimate subsequent incremental replacements. Instead require
+        # identical source coverage apart from the specific new document,
+        # no removals, and full cross-store counts already verified above.
+        if (
+            manifest_delta["removed_count"] != 0
+            or manifest_delta["added_count"] != 1
+            or after["documents"] != before["documents"] + manifest_delta["added_count"]
+            or after["chunks"] != after["vectors"]
+            or after["chunks"] < after["documents"]
         ):
             reasons.append("UNEXPECTED_GENERATION_DELTA")
+        # This is evidence of changed files, NOT an operator's approval of
+        # their hashes. The public cutover remains blocked independently.
+        if manifest_delta["modified_count"] > 0:
+            reasons.append("CHANGED_SOURCE_CONTENT_REVIEW_NOT_ATTESTED")
         active = inspect_live_index()
         checked["legacy"] = {
             "documents": active["documents"], "chunks": active["chunks"],
