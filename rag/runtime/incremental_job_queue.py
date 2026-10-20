@@ -441,12 +441,15 @@ def acknowledge_staged_bundle(
     except (Exception,) as exc:
         return _report("STAGING_INVALID", acknowledged=False,
                        error_type=type(exc).__name__)
+    # Validation may take minutes. Never rely on the time captured at entry
+    # when approving a lease after potentially expensive validation.
+    commit_now = time.time() if now_epoch is None else float(now_epoch)
     # Recheck the current source after potentially expensive vector validation.
     eligible = assess_commit_index_event(
         project_root, source, approved_paths=approved_paths,
         observed_commit=commit, observed_sha256=digest,
         changed_at_epoch=changed, debounce_seconds=debounce,
-        now_epoch=now, indexing_enabled=True,
+        now_epoch=commit_now, indexing_enabled=True,
     )
     if eligible["state"] != "ELIGIBLE_FOR_DURABLE_QUEUE":
         return _report("SOURCE_NO_LONGER_ELIGIBLE", acknowledged=False)
@@ -459,7 +462,7 @@ def acknowledge_staged_bundle(
                 lease_token=NULL,lease_until_epoch=NULL,updated_at_epoch=?
                 WHERE job_id=? AND state='CLAIMED' AND lease_token=?
                 AND lease_until_epoch>?""",
-                (now, job_id, lease_token, now),
+                (commit_now, job_id, lease_token, commit_now),
             )
             if changed_row.rowcount == 1:
                 cn.execute("""INSERT INTO staging_receipts
@@ -467,7 +470,7 @@ def acknowledge_staged_bundle(
                      chunk_count,vector_count,validated_at_epoch)
                     VALUES(?,?,?,?,?,?,?)""",
                     (job_id, str(stage), digest, verified["documents"],
-                     verified["chunks"], verified["vectors"], now))
+                     verified["chunks"], verified["vectors"], commit_now))
             cn.execute("COMMIT")
         except BaseException:
             cn.execute("ROLLBACK")

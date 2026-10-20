@@ -125,3 +125,19 @@ class OfflineStagingReceiptTests(DurableQueueTests):
             now_epoch=142,queue_enabled=True)
         self.assertEqual(result["state"],"UNTRUSTED_STAGING_PATH")
         self.assertEqual(inspect_job_queue(self.db)["by_state"],{"CLAIMED":1})
+
+    def test_lease_expiring_during_validation_cannot_commit(self):
+        from unittest.mock import patch
+        self.enqueue(queue_enabled=True,now_epoch=140)
+        claim=self.claim(now_epoch=141,lease_seconds=10)
+        stage=self.make_stage()
+        # Entry is within lease, but validation returns after its expiry.
+        with patch("rag.runtime.incremental_job_queue.time.time",
+                   side_effect=[142.0, 152.0]):
+            result=acknowledge_staged_bundle(
+                self.db,self.root,claim["job_id"],claim["lease_token"],
+                stage,approved_paths=("sample.py",),queue_enabled=True)
+        self.assertEqual(result["state"],"STALE_OR_EXPIRED_LEASE")
+        self.assertEqual(inspect_job_queue(self.db)["by_state"],{"CLAIMED":1})
+        with closing(sqlite3.connect(self.db)) as db:
+            self.assertEqual(db.execute("SELECT count(*) FROM staging_receipts").fetchone()[0],0)
