@@ -21,10 +21,14 @@ def process_offline_job_once(
     queue_enabled: bool = False, worker_enabled: bool = False,
     builder: Callable | None = None,
     now_epoch: float | None = None,
+    heartbeat_interval_seconds: float = 30,
 ) -> dict:
     """One reservation and one isolated staging attempt; never loops."""
     if queue_enabled is not True or worker_enabled is not True:
         return {"state": "OFFLINE_WORKER_DISABLED", "executed": False,
+                "safe_to_publish": False, "active_index_updated": False}
+    if not 0.01 <= heartbeat_interval_seconds <= 30:
+        return {"state": "INVALID_HEARTBEAT_POLICY", "executed": False,
                 "safe_to_publish": False, "active_index_updated": False}
     approved = tuple(approved_paths)
     claim = claim_approved_job(
@@ -37,7 +41,7 @@ def process_offline_job_once(
     heartbeat_stop = Event()
     lease_lost = Event()
     def heartbeat():
-        while not heartbeat_stop.wait(30):
+        while not heartbeat_stop.wait(heartbeat_interval_seconds):
             try:
                 renewed = renew_job_lease(
                     db_path, job_id, token, queue_enabled=True,
