@@ -204,6 +204,7 @@ Section "CodeBridge" SEC_MAIN
   File "runtime_maintenance_preflight.py"
   File "runtime_fingerprints.py"
   File "runtime_recovery_archive.py"
+  File "runtime_postupdate_verify.py"
   File "company_setup.py"
   File "extension_setup.py"
   File "updater.py"
