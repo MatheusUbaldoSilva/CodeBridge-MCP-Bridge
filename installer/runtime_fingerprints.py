@@ -7,7 +7,9 @@ from pathlib import Path
 
 def fingerprint(path: Path) -> dict:
     path = Path(path)
-    if not path.is_file():
+    if (path.is_symlink() or
+            (hasattr(path, "is_junction") and path.is_junction())
+            or not path.is_file()):
         return {"exists": False, "sha256": None, "bytes": None}
     digest = hashlib.sha256()
     count = 0

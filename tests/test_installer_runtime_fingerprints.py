@@ -197,3 +197,17 @@ class RuntimeFingerprintTests(unittest.TestCase):
             self.assertEqual(result.returncode,2,result.stderr)
             self.assertIn("PUBLIC_BASELINE_INVALID",result.stdout)
             self.assertFalse((base/"rag").exists())
+
+    def test_symlinked_public_manifest_is_not_accepted(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            external=root/"outside.txt"
+            external.write_text("outside")
+            manifest=root/"rag-index-manifest.json"
+            try:
+                manifest.symlink_to(external)
+            except OSError:
+                self.skipTest("Windows symlink permission unavailable")
+            result=fingerprint(manifest)
+            self.assertFalse(result["exists"])
+            self.assertIsNone(result["sha256"])
