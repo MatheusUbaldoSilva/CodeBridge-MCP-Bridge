@@ -438,3 +438,57 @@ class ProductionSingleUseTrialReplayTests(unittest.TestCase):
                 self.assertFalse(rejected["safe_to_activate"])
                 self.assertIn("SUPERVISED_TRIAL_ALREADY_CONSUMED", rejected["blockers"])
                 self.assertFalse(rejected["supervised_trial"])
+
+
+class IncrementalPrequeueTests(unittest.TestCase):
+    def test_approved_committed_change_debounces_without_enqueuing(self):
+        import subprocess
+        from rag.chunking.provenance import source_sha256
+        from rag.runtime.incremental_job_prequeue import assess_commit_index_event as gate
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "CodeBridge-MCP-Bridge"
+            repo.mkdir()
+            f = repo / "sample.py"
+            f.write_text("def example():\n    return 42\n", encoding="utf-8")
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            subprocess.run(["git", "-C", str(repo), "add", "sample.py"], check=True)
+            subprocess.run(["git", "-C", str(repo), "-c", "user.name=Test",
+                            "-c", "user.email=test@example.invalid", "commit",
+                            "-q", "-m", "test"], check=True)
+            head = subprocess.check_output(
+                ["git", "-C", str(repo), "rev-parse", "HEAD"], text=True,
+            ).strip()
+            options = dict(indexing_enabled=True, approved_paths=("sample.py",),
+                           observed_commit=head,
+                           observed_sha256=source_sha256(f.read_text(encoding="utf-8")),
+                           changed_at_epoch=100, debounce_seconds=30)
+            self.assertEqual(gate(repo, "sample.py")["state"], "AUTO_INDEX_DISABLED")
+            self.assertEqual(gate(repo, "sample.py", now_epoch=119, **options)["state"],
+                             "AWAITING_STABLE_COMMIT")
+            ready = gate(repo, "sample.py", now_epoch=135, **options)
+            self.assertEqual(ready["state"], "ELIGIBLE_FOR_DURABLE_QUEUE")
+            self.assertFalse(ready["queued"])
+            self.assertFalse(ready["safe_to_publish"])
+            self.assertFalse(ready["worker_available"])
+            self.assertEqual(gate(repo, "sample.py", now_epoch=135,
+                                  **{**options, "approved_paths": ()})["state"],
+                             "SOURCE_NOT_APPROVED")
+            self.assertEqual(gate(repo, "sample.py", now_epoch=135,
+                                  **{**options, "observed_commit": "0"*40})["state"],
+                             "COMMIT_SUPERSEDED")
+            f.write_text("def example():\n    return 43\n", encoding="utf-8")
+            self.assertEqual(gate(repo, "sample.py", now_epoch=135, **options)["state"],
+                             "SOURCE_NOT_COMMITTED")
+
+    def test_parent_traversal_is_rejected(self):
+        from rag.runtime.incremental_job_prequeue import assess_commit_index_event
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "CodeBridge-MCP-Bridge"
+            repo.mkdir()
+            (repo / ".git").mkdir()
+            result = assess_commit_index_event(
+                repo, "../outside.py", approved_paths=("../outside.py",),
+                indexing_enabled=True,
+            )
+            self.assertEqual(result["state"], "INVALID_SOURCE_PATH")
+            self.assertFalse(result["queued"])

@@ -422,3 +422,10 @@
 - Em author_mcp/v1_supervised_live_trial.py o preflight recusa repetir o ensaio antes de iniciar consultas MCP; o indice ativo nao e tocado.
 - Novo teste deterministico em tests/test_incremental_preflight.py: evidencia fresca e escopo correto permitem apenas a primeira tentativa; arquivar ponteiro torna a reutilizacao BLOCKED. 12 testes PASS.
 - A autorizacao do usuario ja foi consumida pelo ensaio bem-sucedido; NAO publicar permanentemente ou executar segundo ensaio sem novo escopo explicito.
+
+### V1.03-D-A - gate de elegibilidade read-only para futuros jobs
+- Auditado codigo RAG/author_mcp: sem scheduler/job persistente RAG existente para reaproveitar.
+- Criado rag/runtime/incremental_job_prequeue.py: somente avalia fonte explicitamente autorizada no checkout CodeBridge-MCP-Bridge, HEAD commit valido, Git worktree limpo no arquivo, hash SHA de proveniencia, escopo do index_request, segredo/denylist e debounce estavel.
+- Estados AUTO_INDEX_DISABLED por padrao, AWAITING_STABLE_COMMIT, ELIGIBLE_FOR_DURABLE_QUEUE e recusas fail-closed. Mesmo quando elegivel retorna queued=false, executed=false, safe_to_publish=false e worker_available=false.
+- Testes adicionais em tests/test_incremental_preflight.py: repo Git temporario commitado, fonte elegivel, debounce, fonte nao aprovada, HEAD divergente, arquivo editado sem commit, path traversal. Suite total 14 PASS.
+- Nenhum watcher, timer, fila persistente, worker ou reindexacao de producao foi ativado; V1.03-D permanece PARCIAL ate agendamento autonomo real e fila/erros/progresso.
