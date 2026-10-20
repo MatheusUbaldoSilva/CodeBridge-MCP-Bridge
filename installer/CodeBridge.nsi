@@ -207,6 +207,7 @@ Section "CodeBridge" SEC_MAIN
   File "runtime_postupdate_verify.py"
   File "runtime_full_restore_preflight.py"
   File "runtime_full_snapshot.py"
+  File "runtime_restore_rehearsal.py"
   File "company_setup.py"
   File "extension_setup.py"
   File "updater.py"

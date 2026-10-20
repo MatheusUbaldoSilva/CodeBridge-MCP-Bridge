@@ -79,6 +79,10 @@ def verify_offline_runtime_snapshot(archive_path: Path) -> dict:
     try:
         with ZipFile(path) as archive:
             names=archive.namelist()
+            infos=archive.infolist()
+            if (sum(item.file_size for item in infos) > 8 * 1024**3
+                    or any(item.file_size > 4 * 1024**3 for item in infos)):
+                raise ValueError("Archive too large")
             if len(names)!=len(set(names)) or "RUNTIME_SHA256.json" not in names:
                 raise ValueError("missing or duplicate entries")
             metadata=json.loads(archive.read("RUNTIME_SHA256.json"))

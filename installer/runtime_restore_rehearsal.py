@@ -27,6 +27,16 @@ def rehearse_runtime_restore(
     validation = verify_offline_runtime_snapshot(archive_path)
     if not validation["verified"]:
         return {**baseline, "state": "SNAPSHOT_NOT_VERIFIED"}
+    # Reject oversized archives before creating any directory.
+    try:
+        with ZipFile(archive_path) as check:
+            members = check.infolist()
+            total = sum(entry.file_size for entry in members)
+            max_single = max(entry.file_size for entry in members)
+        if total > 8 * 1024**3 or max_single > 4 * 1024**3:
+            return {**baseline, "state": "RESTORE_SIZE_POLICY_REJECTED"}
+    except Exception:
+        return {**baseline, "state": "SNAPSHOT_NOT_VERIFIED"}
     if not execute:
         return {**baseline, "state": "RESTORE_REHEARSAL_DRY_RUN",
                 "file_count": validation["file_count"]}
