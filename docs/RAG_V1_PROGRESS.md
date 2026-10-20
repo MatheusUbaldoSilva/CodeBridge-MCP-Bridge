@@ -415,3 +415,10 @@
 - Pointer archived recovered-pointer-v1_delta_bebee8b8a49943.json; active-generation.json and production-generation-transition.json absent; candidate SHA and Qdrant vector identity still valid.
 - Authoritative evidence: docs/RAG_V1_03_C_SUPERVISED_LIVE_TRIAL_2026-10-19.json, LIVE_TRIAL_PASSED_AND_ROLLED_BACK, exit 0.
 - Technical reversible publication test PASS, but NOT a permanent GO-LIVE or final release. production_release_approved=false; source and legacy versions preserved.
+
+### V1.03-C - autorizacao single-use consumida apos rollback (anti-replay)
+- O ensaio LIVE_TRIAL_PASSED_AND_ROLLED_BACK criou recovered-pointer-v1_delta_bebee8b8a49943.json; este registro passa a impedir qualquer repeticao com a mesma autorizacao.
+- Em rag/runtime/production_supervised_trial.py o gate real verifica o ponteiro arquivado e retorna SUPERVISED_TRIAL_ALREADY_CONSUMED, sob o mesmo lock exclusivo do writer, mesmo se timestamp MCP e hashes forem validos.
+- Em author_mcp/v1_supervised_live_trial.py o preflight recusa repetir o ensaio antes de iniciar consultas MCP; o indice ativo nao e tocado.
+- Novo teste deterministico em tests/test_incremental_preflight.py: evidencia fresca e escopo correto permitem apenas a primeira tentativa; arquivar ponteiro torna a reutilizacao BLOCKED. 12 testes PASS.
+- A autorizacao do usuario ja foi consumida pelo ensaio bem-sucedido; NAO publicar permanentemente ou executar segundo ensaio sem novo escopo explicito.

@@ -336,3 +336,105 @@ class ProductionContentReviewTests(unittest.TestCase):
                 summarize_versioned_source_review(old, new)
             with self.assertRaises(ValueError):
                 summarize_versioned_source_review(old, old)
+
+
+class ProductionSingleUseTrialReplayTests(unittest.TestCase):
+    def test_valid_fresh_evidence_passes_once_then_archived_pointer_blocks_replay(self):
+        import hashlib
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+        from rag.runtime.production_supervised_trial import assess_supervised_trial
+
+        candidate = "v1_delta_test"
+        baseline = "v1_base_test"
+        allowed = {
+            "author_mcp/mcp_server.py", "author_mcp/rag_bridge.py",
+            "rag/runtime/production_index.py",
+            "rag/runtime/production_search.py", "rag/runtime/status.py",
+        }
+        policy = [
+            "PUBLIC_MCP_READERS_RESTART_NOT_ATTESTED",
+            "ATOMIC_PRODUCTION_POINTER_WRITER_AND_ROLLBACK_NOT_VALIDATED",
+            "CHANGED_SOURCE_CONTENT_REVIEW_NOT_ATTESTED",
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "CodeBridge" / "rag"
+            candidate_root = root / "generations" / candidate
+            candidate_root.mkdir(parents=True)
+            receipt = candidate_root / "generation-receipt.json"
+            receipt.write_bytes(b"validated-candidate-receipt")
+            candidate_sha = hashlib.sha256(receipt.read_bytes()).hexdigest()
+            date = datetime.now(timezone.utc).isoformat()
+            proof = {
+                "schema_version": 1,
+                "operator_authorization": "CODEBRIDGE_RAG_V1_ACTIVATE:" + candidate,
+                "authorization_scope":
+                    "APPROVED_SOURCE_CHANGES_AND_SUPERVISED_TRIAL_WITH_ROLLBACK",
+                "rollback_rehearsal": "REAL_WIN32_GENERATION_TRANSITION_TESTS_PASS",
+                "source_review_fingerprint": "a" * 64,
+                "candidate_receipt_sha256": candidate_sha,
+                "public_mcp_pid": 1304,
+                "public_readiness": {
+                    "recorded_at_utc": date,
+                    "state": "PUBLIC_HYBRID_CONCURRENCY_PASS_READONLY",
+                    "candidate": candidate,
+                    "candidate_receipt_sha256": candidate_sha,
+                    "activation_permitted": False,
+                    "public_proof": {
+                        "state": "PUBLIC_HYBRID_CONCURRENCY_PASS",
+                        "safe_to_activate": False,
+                        "index_pointer_updated": False,
+                        "public_reader": {
+                            "public_server_pid": 1304,
+                            "reader_pin_proved": True,
+                            "semantic_worker_serialization_loaded": True,
+                            "public_runtime_ready_for_hybrid_acceptance": True,
+                            "generation": "legacy",
+                        },
+                        "status": {
+                            "generation": "legacy",
+                            "documents": 210, "chunks": 8761,
+                        },
+                        "cross_store_integrity": {
+                            "state": "OBSERVED_CONSISTENT",
+                            "generation": "legacy",
+                            "documents": 210, "chunks": 8761,
+                        },
+                        "hybrid_concurrent": [
+                            {"ok": True, "route": "HYBRID",
+                             "results": 3, "error_type": None}
+                            for _ in range(3)
+                        ],
+                    },
+                },
+            }
+            with patch(
+                "rag.runtime.production_supervised_trial.resolve_rag_sqlite_path",
+                return_value=root / "rag_index.sqlite3",
+            ), patch(
+                "rag.runtime.production_supervised_trial.assess_real_cutover",
+                return_value={
+                    "blockers": policy,
+                    "state": "BLOCKED",
+                    "safe_to_activate": False,
+                    "verified": {"candidate": {"validation": {}}},
+                },
+            ), patch(
+                "rag.runtime.production_supervised_trial.summarize_versioned_source_review",
+                return_value={
+                    "evidence_sha256_not_signature": "a" * 64,
+                    "modified_paths": sorted(allowed),
+                    "added_paths": ["rag/runtime/live_integrity.py"],
+                    "removed_paths": [],
+                },
+            ):
+                initial = assess_supervised_trial(baseline, candidate, proof)
+                self.assertEqual(initial["state"], "READY_FOR_SUPERVISED_TRIAL")
+                self.assertTrue(initial["safe_to_activate"])
+                archive = root / ("recovered-pointer-" + candidate + ".json")
+                archive.write_text('{"generation":"v1_delta_test"}', encoding="utf-8")
+                rejected = assess_supervised_trial(baseline, candidate, proof)
+                self.assertEqual(rejected["state"], "BLOCKED")
+                self.assertFalse(rejected["safe_to_activate"])
+                self.assertIn("SUPERVISED_TRIAL_ALREADY_CONSUMED", rejected["blockers"])
+                self.assertFalse(rejected["supervised_trial"])

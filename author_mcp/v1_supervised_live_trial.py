@@ -81,6 +81,8 @@ def run() -> int:
     repo = Path(os.environ["USERPROFILE"]) / "CodeBridge-MCP-Bridge"
     if (root / "active-generation.json").exists() or (root / "production-generation-transition.json").exists():
         raise RuntimeError("production has prior active pointer/journal")
+    if (root / ("recovered-pointer-" + CANDIDATE + ".json")).exists():
+        raise RuntimeError("single-use supervised trial already consumed; archived pointer exists")
     before = asyncio.run(_audit(concurrent=True))
     if before.get("state") != "PUBLIC_HYBRID_CONCURRENCY_PASS":
         raise RuntimeError("fresh public MCP concurrency proof failed")

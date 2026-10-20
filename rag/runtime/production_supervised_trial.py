@@ -45,6 +45,13 @@ def assess_supervised_trial(
     proof = evidence if isinstance(evidence, dict) else {}
     state = resolve_rag_sqlite_path().resolve().parent
     root = state / "generations"
+    # A successful reversible trial archives its candidate pointer.
+    # Refuse replay even with a freshly constructed public proof and the
+    # same previously authorized generation-specific string. This check
+    # runs again under the publisher's exclusive writer lock.
+    archived = state / ("recovered-pointer-" + candidate + ".json")
+    if archived.exists():
+        errors.append("SUPERVISED_TRIAL_ALREADY_CONSUMED")
     if not proof or proof.get("schema_version") != 1:
         errors.append("SUPERVISION_EVIDENCE_MISSING")
     if proof.get("operator_authorization") != "CODEBRIDGE_RAG_V1_ACTIVATE:" + candidate:
