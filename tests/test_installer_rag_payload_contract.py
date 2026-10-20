@@ -9,7 +9,8 @@ class InstallerRuntimePayloadTests(unittest.TestCase):
         config=(root/"installer"/"CodeBridge.nsi").read_text(encoding="utf-8")
         for filename in ("runtime_readiness.py", "runtime_staging_verify.py",
                          "runtime_maintenance_preflight.py", "runtime_fingerprints.py",
-                         "runtime_recovery_archive.py", "runtime_postupdate_verify.py"):
+                         "runtime_recovery_archive.py", "runtime_postupdate_verify.py",
+                         "runtime_full_restore_preflight.py"):
             self.assertTrue((root/"installer"/filename).is_file())
             self.assertIn('File "'+filename+'"',config)
 
