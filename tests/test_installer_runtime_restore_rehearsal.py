@@ -55,3 +55,28 @@ class RestoreRehearsalTests(unittest.TestCase):
             self.archive, self.scratch, self.install, execute=True)
         self.assertEqual(result["state"], "SNAPSHOT_NOT_VERIFIED")
         self.assertFalse(self.scratch.exists())
+
+    def test_tampered_archive_is_rejected_before_restore(self):
+        import json
+        from zipfile import ZipFile, ZIP_DEFLATED
+        altered = Path(self.temp.name) / "tampered.zip"
+        with ZipFile(self.archive) as original:
+            with ZipFile(altered, "w", compression=ZIP_DEFLATED) as edited:
+                for item in original.namelist():
+                    data = original.read(item)
+                    if item.endswith("python.exe"):
+                        data = b"tampered-python"
+                    edited.writestr(item, data)
+        result = rehearse_runtime_restore(
+            altered, self.scratch, self.install, execute=True)
+        self.assertEqual(result["state"], "SNAPSHOT_NOT_VERIFIED")
+        self.assertFalse(self.scratch.exists())
+
+    def test_existing_restore_target_is_never_overwritten(self):
+        self.scratch.mkdir()
+        marker = self.scratch / "keep.txt"
+        marker.write_text("unchanged")
+        result = rehearse_runtime_restore(
+            self.archive, self.scratch, self.install, execute=True)
+        self.assertEqual(result["state"], "RESTORE_TARGET_UNAVAILABLE")
+        self.assertEqual(marker.read_text(), "unchanged")
