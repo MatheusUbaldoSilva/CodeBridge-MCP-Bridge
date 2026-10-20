@@ -2,7 +2,7 @@ import hashlib
 import tempfile
 import unittest
 from pathlib import Path
-from installer.runtime_fingerprints import fingerprint, fingerprint_tree, collect_runtime_fingerprints, compare_runtime_fingerprints
+from installer.runtime_fingerprints import fingerprint, fingerprint_tree, collect_runtime_fingerprints, compare_runtime_fingerprints, compare_saved_public_baseline
 
 class RuntimeFingerprintTests(unittest.TestCase):
     def test_binary_sha256_exact_and_read_only(self):
@@ -147,3 +147,38 @@ class RuntimeFingerprintTests(unittest.TestCase):
                 result=fingerprint_tree(tree)
             self.assertFalse(result["exists"])
             self.assertIsNone(result["sha256"])
+
+    def test_saved_baseline_detects_historical_drift(self):
+        import json
+        from unittest.mock import patch
+        import installer.runtime_fingerprints as module
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp)/"saved.json"
+            baseline = {"schema_version": 1,
+                        "purpose": "rag-public-index-read-only-maintenance-baseline",
+                        "files": {
+                            "rag_manifest": {"exists":True,"sha256":"m","bytes":1},
+                            "rag_sqlite": {"exists":True,"sha256":"s","bytes":2},
+                            "rag_qdrant": {"exists":True,"sha256":"q","bytes":3,"file_count":1},
+                        }}
+            path.write_text(json.dumps(baseline),encoding="utf-8")
+            current = {"files":dict(baseline["files"])}
+            with patch.object(module,"collect_runtime_fingerprints",return_value=current):
+                ok=compare_saved_public_baseline(path,Path(temp),Path(temp))
+            self.assertTrue(ok["public_index_intact"])
+            self.assertEqual(ok["changed_entries"],[])
+            altered={"files": {**baseline["files"],
+                              "rag_qdrant":{"exists":True,"sha256":"altered","bytes":3,"file_count":1}}}
+            with patch.object(module,"collect_runtime_fingerprints",return_value=altered):
+                result=compare_saved_public_baseline(path,Path(temp),Path(temp))
+            self.assertFalse(result["public_index_intact"])
+
+    def test_missing_or_invalid_saved_baseline_fails_closed(self):
+        import json
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/"missing.json"
+            result=compare_saved_public_baseline(path,Path(temp),Path(temp))
+            self.assertEqual(result["state"],"PUBLIC_BASELINE_INVALID")
+            path.write_text('{"schema_version":1,"purpose":"wrong","files":{}}')
+            result=compare_saved_public_baseline(path,Path(temp),Path(temp))
+            self.assertFalse(result["public_index_intact"])

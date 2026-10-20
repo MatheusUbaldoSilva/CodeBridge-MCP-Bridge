@@ -108,6 +108,32 @@ def compare_runtime_fingerprints(before: dict, after: dict) -> dict:
     }
 
 
+
+def compare_saved_public_baseline(baseline_path: Path, install_root: Path,
+                                  rag_state: Path) -> dict:
+    """Read a previously captured public SHA baseline and compare it to live files."""
+    try:
+        saved = json.loads(Path(baseline_path).read_text(encoding="utf-8"))
+        if (not isinstance(saved, dict) or saved.get("schema_version") != 1
+                or saved.get("purpose") != "rag-public-index-read-only-maintenance-baseline"):
+            raise ValueError("Invalid public baseline schema")
+        required = ("rag_manifest", "rag_sqlite", "rag_qdrant")
+        entries = saved.get("files")
+        if not isinstance(entries, dict) or not all(
+                isinstance(entries.get(item), dict) for item in required):
+            raise ValueError("Incomplete public baseline")
+        before = {"files": {item: entries[item] for item in required}}
+        live = collect_runtime_fingerprints(install_root, rag_state)
+        after = {"files": {item: live.get("files", {}).get(item)
+                           for item in required}}
+        result = compare_runtime_fingerprints(before, after)
+    except (OSError, ValueError, TypeError):
+        return {"state": "PUBLIC_BASELINE_INVALID", "public_index_intact": False,
+                "writes_performed": False}
+    return result
+
+
+
 def main() -> int:
     import argparse
     parser = argparse.ArgumentParser()

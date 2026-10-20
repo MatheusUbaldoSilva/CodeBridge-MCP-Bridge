@@ -1,0 +1,22 @@
+{
+  "files": {
+    "rag_manifest": {
+      "bytes": 793969,
+      "exists": true,
+      "sha256": "eeb40201617444898f9f327fe73b2c50cd73d079b682f6576ac5f60ebf84fd1c"
+    },
+    "rag_qdrant": {
+      "bytes": 98178081,
+      "exists": true,
+      "file_count": 4,
+      "sha256": "18ed78113780d9e12489aff4e0ddad4674f4ea458af37b69262847f9d4578e5c"
+    },
+    "rag_sqlite": {
+      "bytes": 14229504,
+      "exists": true,
+      "sha256": "5bf26a6dd4e26334899b043a608ac3c8e316b7712e24b6ca1c17b7f9342cb764"
+    }
+  },
+  "purpose": "rag-public-index-read-only-maintenance-baseline",
+  "schema_version": 1
+}
