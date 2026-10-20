@@ -28,7 +28,7 @@ _SCHEMA = """CREATE TABLE IF NOT EXISTS jobs (
  due_at_epoch REAL NOT NULL,
  debounce_seconds REAL NOT NULL,
  state TEXT NOT NULL CHECK(state IN
-   ('PENDING','RETRY','CLAIMED','REJECTED','FAILED')),
+   ('PENDING','RETRY','CLAIMED','REJECTED','FAILED','STAGED_OFFLINE_VALIDATED')),
  attempts INTEGER NOT NULL DEFAULT 0,
  lease_token TEXT,
  lease_until_epoch REAL,
@@ -61,7 +61,7 @@ def _connection(db: Path, *, create: bool):
     if create:
         # Refuse accidentally attaching or migrating an unrelated SQLite DB.
         version = cn.execute("PRAGMA user_version").fetchone()[0]
-        if version not in (0, 1):
+        if version not in (0, 1, 2):
             cn.close()
             raise ValueError("unsupported queue schema version")
         if version == 0 and cn.execute(
@@ -69,7 +69,7 @@ def _connection(db: Path, *, create: bool):
         ).fetchone()[0]:
             cn.close()
             raise ValueError("unversioned nonempty SQLite database")
-        if version == 1:
+        if version in (1, 2):
             columns = {
                 row[1] for row in cn.execute("PRAGMA table_info(jobs)")
             }
@@ -81,8 +81,30 @@ def _connection(db: Path, *, create: bool):
         cn.execute("PRAGMA journal_mode=WAL")
         cn.execute("PRAGMA synchronous=FULL")
         cn.execute(_SCHEMA)
-        cn.execute("PRAGMA user_version=1")
-    elif cn.execute("PRAGMA user_version").fetchone()[0] != 1:
+        if version == 1:
+            # Schema version 1 CHECK did not allow offline terminal receipt.
+            # Rebuild only this dedicated queue, preserving existing rows.
+            cn.execute("BEGIN IMMEDIATE")
+            try:
+                cn.execute("ALTER TABLE jobs RENAME TO jobs_v1")
+                cn.execute(_SCHEMA)
+                cn.execute("""INSERT INTO jobs SELECT * FROM jobs_v1""")
+                cn.execute("DROP TABLE jobs_v1")
+                cn.execute("COMMIT")
+            except BaseException:
+                cn.execute("ROLLBACK")
+                raise
+        cn.execute("""CREATE TABLE IF NOT EXISTS staging_receipts (
+            job_id TEXT PRIMARY KEY REFERENCES jobs(job_id),
+            staging_path TEXT NOT NULL,
+            document_sha256 TEXT NOT NULL,
+            document_count INTEGER NOT NULL,
+            chunk_count INTEGER NOT NULL,
+            vector_count INTEGER NOT NULL,
+            validated_at_epoch REAL NOT NULL
+        )""")
+        cn.execute("PRAGMA user_version=2")
+    elif cn.execute("PRAGMA user_version").fetchone()[0] not in (1,2):
         cn.close()
         raise ValueError("unsupported queue schema")
     return cn
@@ -280,7 +302,7 @@ def inspect_job_queue(db_path: Path) -> dict:
         return _report("QUEUE_NOT_INITIALIZED", total=0, by_state={})
     with closing(sqlite3.connect(db.as_uri() + "?mode=ro", uri=True)) as cn:
         cn.execute("PRAGMA query_only=ON")
-        if cn.execute("PRAGMA user_version").fetchone()[0] != 1:
+        if cn.execute("PRAGMA user_version").fetchone()[0] not in (1,2):
             raise ValueError("unexpected job queue schema")
         items = cn.execute(
             "SELECT state,count(*) FROM jobs GROUP BY state"
@@ -300,7 +322,7 @@ def inspect_job(db_path: Path, job_id: str) -> dict:
         return _report("QUEUE_NOT_INITIALIZED", job_id=job_id)
     with closing(sqlite3.connect(db.as_uri() + "?mode=ro", uri=True)) as cn:
         cn.execute("PRAGMA query_only=ON")
-        if cn.execute("PRAGMA user_version").fetchone()[0] != 1:
+        if cn.execute("PRAGMA user_version").fetchone()[0] not in (1,2):
             raise ValueError("unexpected job queue schema")
         row = cn.execute(
             """SELECT state, source_path, attempts, due_at_epoch,
@@ -356,4 +378,90 @@ def renew_job_lease(
         "LEASE_RENEWED" if renewed else "STALE_OR_EXPIRED_LEASE",
         renewed=renewed, job_id=job_id if renewed else None,
         lease_until_epoch=now + lease_seconds if renewed else None,
+    )
+def acknowledge_staged_bundle(
+    db_path: Path, project_root: Path, job_id: str, lease_token: str,
+    staging_path: Path, *, approved_paths: Iterable[str] = (),
+    now_epoch: float | None = None, queue_enabled: bool = False,
+) -> dict:
+    """Durable offline-only acknowledgment; never publishes a generation."""
+    if queue_enabled is not True:
+        return _report("AUTO_INDEX_DISABLED", acknowledged=False)
+    if not (isinstance(job_id, str) and len(job_id) == 64
+            and all(c in "0123456789abcdef" for c in job_id)
+            and isinstance(lease_token, str) and len(lease_token) == 32
+            and all(c in "0123456789abcdef" for c in lease_token)):
+        return _report("INVALID_LEASE_IDENTITY", acknowledged=False)
+    now = time.time() if now_epoch is None else float(now_epoch)
+    db = _database_path(db_path)
+    connection = _connection(db, create=False)
+    if connection is None:
+        return _report("QUEUE_EMPTY", acknowledged=False)
+    with closing(connection) as cn:
+        row = cn.execute(
+            """SELECT source_path,observed_commit,observed_sha256,
+               changed_at_epoch,debounce_seconds,lease_until_epoch
+               FROM jobs WHERE job_id=? AND lease_token=? AND state='CLAIMED'""",
+            (job_id, lease_token),
+        ).fetchone()
+    if row is None or row[5] <= now:
+        return _report("STALE_OR_EXPIRED_LEASE", acknowledged=False)
+    source, commit, digest, changed, debounce, _ = row
+    stage = Path(staging_path)
+    if stage.is_symlink() or stage.name[:6] != "build-" or stage.parent.name != "staging":
+        return _report("UNTRUSTED_STAGING_PATH", acknowledged=False)
+    stage = stage.resolve()
+    try:
+        from rag.runtime.incremental_bundle_validate import validate_incremental_bundle
+        verified = validate_incremental_bundle(stage)
+        if verified["state"] != "VALIDATED_OFFLINE_NOT_PUBLISHED" or verified["documents"] < 1:
+            return _report("STAGING_INVALID", acknowledged=False)
+        with closing(sqlite3.connect(
+                (stage / "rag_index.sqlite3").as_uri() + "?mode=ro", uri=True)) as sc:
+            matches = sc.execute(
+                """SELECT count(*) FROM rag_documents
+                WHERE project_id='codebridge' AND path=? AND sha256=?""",
+                (source, digest),
+            ).fetchone()[0]
+        if matches != 1:
+            return _report("STAGING_SOURCE_MISMATCH", acknowledged=False)
+    except (Exception,) as exc:
+        return _report("STAGING_INVALID", acknowledged=False,
+                       error_type=type(exc).__name__)
+    # Recheck the current source after potentially expensive vector validation.
+    eligible = assess_commit_index_event(
+        project_root, source, approved_paths=approved_paths,
+        observed_commit=commit, observed_sha256=digest,
+        changed_at_epoch=changed, debounce_seconds=debounce,
+        now_epoch=now, indexing_enabled=True,
+    )
+    if eligible["state"] != "ELIGIBLE_FOR_DURABLE_QUEUE":
+        return _report("SOURCE_NO_LONGER_ELIGIBLE", acknowledged=False)
+    # Reopen under a write transaction; the reservation can change at any time.
+    with closing(_connection(db, create=True)) as cn:
+        cn.execute("BEGIN IMMEDIATE")
+        try:
+            changed_row = cn.execute(
+                """UPDATE jobs SET state='STAGED_OFFLINE_VALIDATED',
+                lease_token=NULL,lease_until_epoch=NULL,updated_at_epoch=?
+                WHERE job_id=? AND state='CLAIMED' AND lease_token=?
+                AND lease_until_epoch>?""",
+                (now, job_id, lease_token, now),
+            )
+            if changed_row.rowcount == 1:
+                cn.execute("""INSERT INTO staging_receipts
+                    (job_id,staging_path,document_sha256,document_count,
+                     chunk_count,vector_count,validated_at_epoch)
+                    VALUES(?,?,?,?,?,?,?)""",
+                    (job_id, str(stage), digest, verified["documents"],
+                     verified["chunks"], verified["vectors"], now))
+            cn.execute("COMMIT")
+        except BaseException:
+            cn.execute("ROLLBACK")
+            raise
+    return _report(
+        "STAGED_OFFLINE_VALIDATED" if changed_row.rowcount == 1
+        else "STALE_OR_EXPIRED_LEASE", acknowledged=changed_row.rowcount == 1,
+        job_id=job_id if changed_row.rowcount == 1 else None,
+        staging_only=True, worker_started=False,
     )
