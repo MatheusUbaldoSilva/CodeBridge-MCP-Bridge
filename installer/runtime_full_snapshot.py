@@ -84,10 +84,15 @@ def verify_offline_runtime_snapshot(archive_path: Path) -> dict:
                 if (not key.startswith("runtime/python/") or ".." in Path(key).parts
                         or key.startswith("/") or "\\" in key):
                     raise ValueError("path escape")
-                contents=archive.read(key)
-                if _digest(contents)!=expected["sha256"] or len(contents)!=expected["bytes"]:
+                digest=hashlib.sha256()
+                size=0
+                with archive.open(key, "r") as source:
+                    for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                        digest.update(chunk)
+                        size+=len(chunk)
+                if digest.hexdigest()!=expected["sha256"] or size!=expected["bytes"]:
                     raise ValueError("invalid hash")
             return {"state":"SNAPSHOT_CONTENT_VERIFIED","verified":True,
                     "file_count":len(metadata),"restore_performed":False}
-    except (OSError, ValueError, KeyError, TypeError, RuntimeError, Exception):
+    except Exception:
         return {"state":"SNAPSHOT_INTEGRITY_BLOCKED","verified":False}
