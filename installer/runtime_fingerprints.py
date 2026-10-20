@@ -124,6 +124,19 @@ def compare_saved_public_baseline(baseline_path: Path, install_root: Path,
         if not isinstance(entries, dict) or not all(
                 isinstance(entries.get(item), dict) for item in required):
             raise ValueError("Incomplete public baseline")
+        for item in required:
+            value = entries[item]
+            digest = value.get("sha256")
+            size = value.get("bytes")
+            if (value.get("exists") is not True
+                    or not isinstance(digest, str) or len(digest) != 64
+                    or any(ch not in "0123456789abcdef" for ch in digest)
+                    or type(size) is not int or size < 0):
+                raise ValueError("Invalid saved public fingerprint")
+            if item == "rag_qdrant":
+                count = value.get("file_count")
+                if type(count) is not int or count < 1:
+                    raise ValueError("Invalid Qdrant file count")
         before = {"files": {item: entries[item] for item in required}}
         live = collect_runtime_fingerprints(install_root, rag_state)
         after = {"files": {item: live.get("files", {}).get(item)

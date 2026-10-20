@@ -64,7 +64,7 @@ class RuntimeFingerprintTests(unittest.TestCase):
             second=fingerprint_tree(tree)
             self.assertNotEqual(first["sha256"],second["sha256"])
             baseline={"files":{
-                "rag_manifest":{"exists":True,"sha256":"m","bytes":1},
+                "rag_manifest":{"exists":True,"sha256":"a"*64,"bytes":1},
                 "rag_sqlite":{"exists":True,"sha256":"s","bytes":1},
                 "rag_qdrant":first,
             }}
@@ -157,9 +157,9 @@ class RuntimeFingerprintTests(unittest.TestCase):
             baseline = {"schema_version": 1,
                         "purpose": "rag-public-index-read-only-maintenance-baseline",
                         "files": {
-                            "rag_manifest": {"exists":True,"sha256":"m","bytes":1},
-                            "rag_sqlite": {"exists":True,"sha256":"s","bytes":2},
-                            "rag_qdrant": {"exists":True,"sha256":"q","bytes":3,"file_count":1},
+                            "rag_manifest": {"exists":True,"sha256":"a"*64,"bytes":1},
+                            "rag_sqlite": {"exists":True,"sha256":"b"*64,"bytes":2},
+                            "rag_qdrant": {"exists":True,"sha256":"c"*64,"bytes":3,"file_count":1},
                         }}
             path.write_text(json.dumps(baseline),encoding="utf-8")
             current = {"files":dict(baseline["files"])}
@@ -211,3 +211,26 @@ class RuntimeFingerprintTests(unittest.TestCase):
             result=fingerprint(manifest)
             self.assertFalse(result["exists"])
             self.assertIsNone(result["sha256"])
+
+    def test_historical_baseline_rejects_malformed_digest_and_counts(self):
+        import json
+        import installer.runtime_fingerprints as module
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp)/"baseline.json"
+            valid = json.loads((Path(__file__).resolve().parents[1] /
+                "docs/RAG_V1_03_D_C_PUBLIC_INDEX_BASELINE_2026-10-20.json").read_text())
+            for field, invalid in (("sha256", "not-a-hash"),
+                                   ("bytes", -1), ("exists", False)):
+                modified = json.loads(json.dumps(valid))
+                modified["files"]["rag_manifest"][field] = invalid
+                path.write_text(json.dumps(modified), encoding="utf-8")
+                with patch.object(module, "collect_runtime_fingerprints") as probe:
+                    result = compare_saved_public_baseline(path, Path(temp), Path(temp))
+                self.assertEqual(result["state"], "PUBLIC_BASELINE_INVALID")
+                probe.assert_not_called()
+            modified = json.loads(json.dumps(valid))
+            modified["files"]["rag_qdrant"]["file_count"] = 0
+            path.write_text(json.dumps(modified), encoding="utf-8")
+            self.assertEqual(compare_saved_public_baseline(path, Path(temp), Path(temp))["state"],
+                             "PUBLIC_BASELINE_INVALID")
