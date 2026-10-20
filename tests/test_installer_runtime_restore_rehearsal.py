@@ -80,3 +80,15 @@ class RestoreRehearsalTests(unittest.TestCase):
             self.archive, self.scratch, self.install, execute=True)
         self.assertEqual(result["state"], "RESTORE_TARGET_UNAVAILABLE")
         self.assertEqual(marker.read_text(), "unchanged")
+
+    def test_cli_defaults_to_dry_run(self):
+        import subprocess
+        import sys
+        root=Path(__file__).resolve().parents[1]
+        command=[sys.executable,"-m","installer.runtime_restore_rehearsal",
+                 "--archive",str(self.archive),"--scratch-root",str(self.scratch),
+                 "--install-root",str(self.install)]
+        result=subprocess.run(command,cwd=root,capture_output=True,text=True,timeout=30)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn("RESTORE_REHEARSAL_DRY_RUN",result.stdout)
+        self.assertFalse(self.scratch.exists())

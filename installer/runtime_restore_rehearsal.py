@@ -74,3 +74,26 @@ def rehearse_runtime_restore(
         # Never delete automatically: preserve the scratch copy as failure evidence.
         return {**baseline, "state": "RESTORE_REHEARSAL_FAILED",
                 "scratch_path": str(target) if owned else None}
+
+
+def main() -> int:
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="Isolated CodeBridge Python snapshot restore rehearsal")
+    parser.add_argument("--archive", type=Path, required=True)
+    parser.add_argument("--scratch-root", type=Path, required=True)
+    parser.add_argument("--install-root", type=Path, required=True)
+    parser.add_argument("--execute-in-scratch", action="store_true")
+    args = parser.parse_args()
+    result = rehearse_runtime_restore(
+        args.archive, args.scratch_root, args.install_root,
+        execute=args.execute_in_scratch,
+    )
+    print(json.dumps(result, sort_keys=True))
+    return 0 if result["state"] in (
+        "RESTORE_REHEARSAL_DRY_RUN", "ISOLATED_RUNTIME_RESTORE_REHEARSED"
+    ) else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
