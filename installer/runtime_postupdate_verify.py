@@ -6,6 +6,7 @@ from pathlib import Path
 
 from installer.runtime_fingerprints import (
     collect_runtime_fingerprints, compare_runtime_fingerprints,
+    compare_saved_public_baseline,
 )
 from installer.runtime_readiness import inspect_embedded_runtime
 
@@ -36,9 +37,13 @@ def main() -> int:
     parser.add_argument("--baseline-json", type=Path, required=True)
     args=parser.parse_args()
     try:
-        baseline=json.loads(args.baseline_json.read_text(encoding="utf-8"))
-        if not isinstance(baseline,dict):
-            raise ValueError("invalid baseline")
+        # Historical baselines must carry the documented schema and valid hashes.
+        saved_check=compare_saved_public_baseline(
+            args.baseline_json,args.install_root,args.rag_state)
+        if saved_check.get("state") == "PUBLIC_BASELINE_INVALID":
+            raise ValueError("Invalid historical baseline")
+        saved=json.loads(args.baseline_json.read_text(encoding="utf-8"))
+        baseline={"files":saved["files"]}
         result=verify_installed_update(args.install_root,args.rag_state,baseline)
     except (OSError,ValueError,TypeError):
         result={"state":"POST_UPDATE_BASELINE_INVALID",

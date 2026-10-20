@@ -38,3 +38,27 @@ class PostUpdateVerifierTests(unittest.TestCase):
         result=self.check(True,changed)
         self.assertEqual(result["state"],"POST_UPDATE_BLOCKED")
         self.assertFalse(result["public_index_intact"])
+
+    def test_cli_rejects_schema_less_baseline_without_runtime_change(self):
+        import json
+        import subprocess
+        import sys
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            baseline=root/"baseline.json"
+            baseline.write_text(json.dumps({"files":{
+                "rag_manifest":{"exists":True,"sha256":"a"*64,"bytes":1},
+                "rag_sqlite":{"exists":True,"sha256":"b"*64,"bytes":2},
+                "rag_qdrant":{"exists":True,"sha256":"c"*64,"bytes":3,
+                              "file_count":1},
+            }}))
+            command=[sys.executable,"-m","installer.runtime_postupdate_verify",
+                     "--install-root",str(root/"install"),
+                     "--rag-state",str(root/"rag"),
+                     "--baseline-json",str(baseline)]
+            run=subprocess.run(command,cwd=Path(__file__).resolve().parents[1],
+                               capture_output=True,text=True,timeout=30)
+            self.assertEqual(run.returncode,2,run.stderr)
+            self.assertIn("POST_UPDATE_BASELINE_INVALID",run.stdout)
+            self.assertFalse((root/"install").exists())
