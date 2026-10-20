@@ -125,6 +125,7 @@ def _verify_target_after_pointer(
 def publish_validated_generation(
     *, baseline: str, candidate: str, operator_authorization: str,
     public_reader_attestation: dict[str, Any],
+    trial_evidence: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Fail closed until live MCP reload is proven and gate explicitly READY.
 
@@ -148,8 +149,12 @@ def publish_validated_generation(
     with production_generation_lock(exclusive=True):
         # No time-of-check/time-of-use gap: version hashes, source state and
         # journal/pointer are checked under the SAME exclusive writer lock.
-        readiness = assess_real_cutover(baseline, candidate)
-        if readiness["state"] != "READY" or not readiness["safe_to_activate"]:
+        if trial_evidence is not None:
+            from rag.runtime.production_supervised_trial import assess_supervised_trial
+            readiness = assess_supervised_trial(baseline, candidate, trial_evidence)
+        else:
+            readiness = assess_real_cutover(baseline, candidate)
+        if readiness["state"] not in ("READY", "READY_FOR_SUPERVISED_TRIAL") or not readiness["safe_to_activate"]:
             raise GenerationTransitionBlocked(
                 "cutover blocked: " + ",".join(readiness["blockers"])
             )
