@@ -23,8 +23,8 @@ def assess_runtime_maintenance(install_root: Path, repo_root: Path,
     baseline = collect_runtime_fingerprints(
         install, Path.home() / "AppData" / "Local" / "CodeBridge" / "rag")
     public_complete = all(
-        baseline["files"][name]["exists"]
-        for name in ("rag_manifest", "rag_sqlite")
+        baseline.get("files", {}).get(name, {}).get("exists", False)
+        for name in ("rag_manifest", "rag_sqlite", "rag_qdrant")
     )
     return {
         "state": ("MISSING_PUBLIC_INDEX_BASELINE" if not public_complete else
@@ -34,7 +34,8 @@ def assess_runtime_maintenance(install_root: Path, repo_root: Path,
         "current_runtime": active,
         "isolated_stage": staged,
         "public_index_fingerprints": {
-            k: baseline["files"][k] for k in ("rag_manifest", "rag_sqlite")
+            k: baseline.get("files", {}).get(k, {"exists": False})
+            for k in ("rag_manifest", "rag_sqlite", "rag_qdrant")
         },
         "requires_codebridge_closed": not active["ready"],
         "operator_approval_required": not active["ready"],

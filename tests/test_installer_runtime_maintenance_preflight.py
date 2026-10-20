@@ -9,6 +9,8 @@ from installer.runtime_maintenance_preflight import assess_runtime_maintenance
 _PUBLIC_BASELINE = {"files": {
     "rag_manifest": {"exists": True, "sha256": "a", "bytes": 1},
     "rag_sqlite": {"exists": True, "sha256": "b", "bytes": 2},
+            "rag_qdrant": {"exists": True, "sha256": "q", "bytes": 3, "file_count": 2},
+            "rag_qdrant": {"exists": True, "sha256": "q", "bytes": 3, "file_count": 2},
 }}
 
 

@@ -2,7 +2,7 @@ import hashlib
 import tempfile
 import unittest
 from pathlib import Path
-from installer.runtime_fingerprints import fingerprint, collect_runtime_fingerprints, compare_runtime_fingerprints
+from installer.runtime_fingerprints import fingerprint, fingerprint_tree, collect_runtime_fingerprints, compare_runtime_fingerprints
 
 class RuntimeFingerprintTests(unittest.TestCase):
     def test_binary_sha256_exact_and_read_only(self):
@@ -31,6 +31,8 @@ class RuntimeFingerprintTests(unittest.TestCase):
         baseline = {"files": {
             "rag_manifest": {"exists": True, "sha256": "a", "bytes": 1},
             "rag_sqlite": {"exists": True, "sha256": "b", "bytes": 2},
+            "rag_qdrant": {"exists": True, "sha256": "q", "bytes": 3, "file_count": 2},
+            "rag_qdrant": {"exists": True, "sha256": "q", "bytes": 3, "file_count": 2},
             "python_path": {"exists": True, "sha256": "c", "bytes": 3},
         }}
         updated = {"files": {
@@ -49,3 +51,30 @@ class RuntimeFingerprintTests(unittest.TestCase):
         baseline={"files":{"rag_sqlite":{"exists":True,"sha256":"x","bytes":1}}}
         result=compare_runtime_fingerprints(baseline,baseline)
         self.assertFalse(result["public_index_intact"])
+
+    def test_qdrant_tree_hash_detects_vector_file_mutation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            tree=Path(temp)/"qdrant"
+            tree.mkdir()
+            vector=tree/"storage.bin"
+            vector.write_bytes(b"original")
+            first=fingerprint_tree(tree)
+            self.assertEqual(first["file_count"],1)
+            vector.write_bytes(b"modified")
+            second=fingerprint_tree(tree)
+            self.assertNotEqual(first["sha256"],second["sha256"])
+            baseline={"files":{
+                "rag_manifest":{"exists":True,"sha256":"m","bytes":1},
+                "rag_sqlite":{"exists":True,"sha256":"s","bytes":1},
+                "rag_qdrant":first,
+            }}
+            current={"files":{**baseline["files"],"rag_qdrant":second}}
+            result=compare_runtime_fingerprints(baseline,current)
+            self.assertFalse(result["public_index_intact"])
+            self.assertFalse(result["protected_matches"]["rag_qdrant"])
+
+    def test_empty_qdrant_tree_blocks_baseline(self):
+        with tempfile.TemporaryDirectory() as temp:
+            tree=Path(temp)/"qdrant"
+            tree.mkdir()
+            self.assertFalse(fingerprint_tree(tree)["exists"])

@@ -8,6 +8,7 @@ def baseline():
     return {"files": {
         "rag_manifest": {"exists": True, "sha256": "m", "bytes": 10},
         "rag_sqlite": {"exists": True, "sha256": "s", "bytes": 20},
+        "rag_qdrant": {"exists": True, "sha256": "q", "bytes": 30, "file_count": 2},
     }}
 
 class PostUpdateVerifierTests(unittest.TestCase):

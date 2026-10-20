@@ -18,6 +18,33 @@ def fingerprint(path: Path) -> dict:
     return {"exists": True, "sha256": digest.hexdigest(), "bytes": count}
 
 
+
+def fingerprint_tree(root: Path) -> dict:
+    """SHA-256 of canonical sorted relative paths, sizes and file hashes."""
+    root = Path(root)
+    if not root.is_dir() or root.is_symlink():
+        return {"exists": False, "sha256": None, "bytes": None, "file_count": None}
+    digest = hashlib.sha256()
+    total = 0
+    count = 0
+    for path in sorted(root.rglob("*"), key=lambda p: p.relative_to(root).as_posix()):
+        if path.is_symlink():
+            return {"exists": False, "sha256": None, "bytes": None,
+                    "file_count": None}
+        if path.is_file():
+            relative = path.relative_to(root).as_posix()
+            evidence = fingerprint(path)
+            payload = json.dumps([relative, evidence["bytes"], evidence["sha256"]],
+                                 ensure_ascii=False, separators=(",", ":"))
+            digest.update(payload.encode("utf-8") + b"\n")
+            total += evidence["bytes"]
+            count += 1
+    if count == 0:
+        return {"exists": False, "sha256": None, "bytes": None, "file_count": 0}
+    return {"exists": True, "sha256": digest.hexdigest(), "bytes": total,
+            "file_count": count}
+
+
 def collect_runtime_fingerprints(install_root: Path, rag_state: Path) -> dict:
     """Compute only file hashes; no writes and no directory modifications."""
     root = Path(install_root)
@@ -30,9 +57,11 @@ def collect_runtime_fingerprints(install_root: Path, rag_state: Path) -> dict:
         "rag_manifest": rag / "rag-index-manifest.json",
         "rag_sqlite": rag / "rag_index.sqlite3",
     }
+    evidence = {name: fingerprint(path) for name, path in paths.items()}
+    evidence["rag_qdrant"] = fingerprint_tree(rag / "qdrant")
     return {
         "state": "READ_ONLY_RUNTIME_FINGERPRINTS",
-        "files": {name: fingerprint(path) for name, path in paths.items()},
+        "files": evidence,
         "writes_performed": False,
         "public_index_updated": False,
     }
@@ -40,17 +69,18 @@ def collect_runtime_fingerprints(install_root: Path, rag_state: Path) -> dict:
 
 
 def compare_runtime_fingerprints(before: dict, after: dict) -> dict:
-    """Fail closed if either public SQLite or manifest changes."""
+    """Fail closed on public manifest, SQLite or Qdrant tree drift."""
     before_files = before.get("files", {})
     after_files = after.get("files", {})
-    protected = ("rag_manifest", "rag_sqlite")
+    protected = ("rag_manifest", "rag_sqlite", "rag_qdrant")
     matches = {}
     for name in protected:
         old, new = before_files.get(name, {}), after_files.get(name, {})
         matches[name] = bool(
             old.get("exists") and new.get("exists")
             and old.get("sha256") and old.get("sha256") == new.get("sha256")
-            and old.get("bytes") == new.get("bytes"))
+            and old.get("bytes") == new.get("bytes")
+            and old.get("file_count") == new.get("file_count"))
     changed = sorted(
         name for name in set(before_files) | set(after_files)
         if before_files.get(name) != after_files.get(name)
