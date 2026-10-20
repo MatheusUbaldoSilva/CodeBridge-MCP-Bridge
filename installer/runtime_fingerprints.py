@@ -70,12 +70,16 @@ def collect_runtime_fingerprints(install_root: Path, rag_state: Path) -> dict:
 
 def compare_runtime_fingerprints(before: dict, after: dict) -> dict:
     """Fail closed on public manifest, SQLite or Qdrant tree drift."""
-    before_files = before.get("files", {})
-    after_files = after.get("files", {})
+    before_files = before.get("files") if isinstance(before, dict) else None
+    after_files = after.get("files") if isinstance(after, dict) else None
+    before_files = before_files if isinstance(before_files, dict) else {}
+    after_files = after_files if isinstance(after_files, dict) else {}
     protected = ("rag_manifest", "rag_sqlite", "rag_qdrant")
     matches = {}
     for name in protected:
-        old, new = before_files.get(name, {}), after_files.get(name, {})
+        old, new = before_files.get(name), after_files.get(name)
+        old = old if isinstance(old, dict) else {}
+        new = new if isinstance(new, dict) else {}
         matches[name] = bool(
             old.get("exists") and new.get("exists")
             and old.get("sha256") and old.get("sha256") == new.get("sha256")

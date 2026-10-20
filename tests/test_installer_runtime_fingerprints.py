@@ -111,3 +111,13 @@ class RuntimeFingerprintTests(unittest.TestCase):
                 self.skipTest("Windows symlink permission unavailable")
             result=fingerprint_tree(tree)
             self.assertFalse(result["exists"])
+
+    def test_malformed_public_baselines_fail_closed_without_exception(self):
+        cases = [None, {}, {"files": None}, {"files": []},
+                 {"files": {"rag_manifest": None}},
+                 {"files": {"rag_manifest": "bad"}}]
+        for before in cases:
+            with self.subTest(before=before):
+                result = compare_runtime_fingerprints(before, before)
+                self.assertEqual(result["state"], "PUBLIC_INDEX_INTEGRITY_BLOCKED")
+                self.assertFalse(result["public_index_intact"])
