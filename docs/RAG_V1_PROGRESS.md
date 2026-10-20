@@ -372,3 +372,11 @@
 - Report candidate_manifest_delta fornece added/modified/removed/unchanged e caminhos; novo v1_delta_bebee8b8a49943 tem 1 adicionado (rag/runtime/live_integrity.py), 5 modificados e 205 inalterados. 8778 vetores sao consistentes com 8778 chunks, diferenca total +17 versus baseline 8761 devido a 5 revisoes de codigo.
 - Gate permanece BLOQUEADO e exige CHANGED_SOURCE_CONTENT_REVIEW_NOT_ATTESTED, PUBLIC_MCP_READERS_RESTART_NOT_ATTESTED e ATOMIC_PRODUCTION_POINTER_WRITER_AND_ROLLBACK_NOT_VALIDATED. Nao reconhecer receipt de staging como aprovacao do operador nem alterar safe_to_activate=false.
 - tests/test_incremental_preflight.py ampliados: 9 PASS incluindo adicao/modificacao/rechunk/remocao de entradas de manifesto. Nenhum dado ativo mutado nem processo MCP encerrado.
+
+### V1.03-C - evidence de revisao de fontes do manifesto versionado
+- Criado rag/runtime/production_content_review.py: compara somente leitura de dois SQLite de geracoes imutaveis e manifestos, confere SHA pelo contrato do indexador, detecta fontes adicionadas/modificadas/removidas e gera hunks/linhas sem copiar conteudo sensivel para o relatorio.
+- Corrigido fechamento explicito da conexao SQLite com contextlib.closing; sem isso os testes Windows impediam a exclusao do TemporaryDirectory (WinError 32).
+- Ampliada suite existente tests/test_incremental_preflight.py: 11 PASS incluindo alteracoes/add, fonte adulterada e tentativa de comparar a mesma geracao; nunca autoriza publicacao.
+- Gerado docs/RAG_V1_03_C_SOURCE_REVIEW_2026-10-19.md com 6 arquivos, old/new SHA256, contagens de linhas e chunks, intervalos e fingerprint de evidencia b8757eb7f10b32ac1728ff10dfb4fd54f352d5b691ac7a88bb26262a57418e2c.
+- Comparacao precisa: 1 fonte adicionada (rag/runtime/live_integrity.py), 5 modificadas, 0 removidas; 205 inalteradas. Revisao humana PENDENTE. Impressao digital nao e assinatura nem aprovacao.
+- Gate assess_real_cutover da nova geracao v1_delta_bebee8b8a49943 permanece BLOCKED pelos leitores MCP nao recarregados, conteudo nao aprovado e corte/rollback supervisionado nao comprovado. Indice original READY 210docs/8761chunks preservado.

@@ -252,3 +252,87 @@ class CutoverManifestDeltaTests(unittest.TestCase):
             self.assertEqual(result["removed_paths"], ["removed.py"])
             self.assertEqual(result["removed_count"], 1)
             self.assertEqual(result["added_count"], 0)
+
+
+class ProductionContentReviewTests(unittest.TestCase):
+    def _fixture(self, home):
+        import hashlib
+        import sqlite3
+        from rag.index.manifest import (
+            IndexManifest, ManifestEntry, ManifestIndexKind,
+            save_index_manifest,
+        )
+        generations = home / "generations"
+        old = generations / "v1_base_review"
+        new = generations / "v1_delta_review"
+        old.mkdir(parents=True)
+        new.mkdir(parents=True)
+
+        def make(folder, rows):
+            conn = sqlite3.connect(folder / "rag_index.sqlite3")
+            conn.execute(
+                "CREATE TABLE rag_documents"
+                "(path TEXT,content TEXT,sha256 TEXT,project_id TEXT)"
+            )
+            items = []
+            for path, content, chunks in rows:
+                digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+                conn.execute(
+                    "INSERT INTO rag_documents VALUES(?,?,?,?)",
+                    (path, content, digest, "codebridge"),
+                )
+                items.append(ManifestEntry(
+                    project_id="codebridge", index_kind=ManifestIndexKind.CODE,
+                    path=path, size=len(content), mtime_ns=1,
+                    sha256=digest, chunk_ids=chunks, model_version="model-v1",
+                ))
+            conn.commit()
+            conn.close()
+            save_index_manifest(
+                folder / "rag-index-manifest.json",
+                IndexManifest(entries=tuple(items)),
+            )
+        make(old, [("old.py", "before\n", ("chunk_old",))])
+        make(new, [
+            ("old.py", "after\n", ("chunk_new",)),
+            ("new.py", "first\nsecond\n", ("chunk_added",)),
+        ])
+        return old, new
+
+    def test_compares_exact_content_and_never_authenticates_review(self):
+        from rag.runtime.production_content_review import (
+            summarize_versioned_source_review,
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            old, new = self._fixture(Path(temp))
+            original = (new / "rag_index.sqlite3").read_bytes()
+            report = summarize_versioned_source_review(old, new)
+            self.assertEqual(report["state"], "CONTENT_COMPARISON_ONLY_NOT_APPROVED")
+            self.assertEqual(report["added_paths"], ["new.py"])
+            self.assertEqual(report["modified_paths"], ["old.py"])
+            self.assertEqual(report["removed_paths"], [])
+            self.assertEqual(len(report["details"]), 2)
+            self.assertFalse(report["operator_content_review_attested"])
+            self.assertFalse(report["safe_to_activate"])
+            self.assertEqual(len(report["evidence_sha256_not_signature"]), 64)
+            self.assertEqual(
+                (new / "rag_index.sqlite3").read_bytes(), original,
+            )
+
+    def test_refuses_tampered_indexed_content_and_unsafe_generation(self):
+        import sqlite3
+        from rag.runtime.production_content_review import (
+            summarize_versioned_source_review,
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            old, new = self._fixture(Path(temp))
+            with __import__("contextlib").closing(sqlite3.connect(new / "rag_index.sqlite3")) as db:
+                db.execute(
+                    "UPDATE rag_documents SET content=? WHERE path='old.py'",
+                    ("tampered",),
+                )
+                db.commit()
+            with self.assertRaisesRegex(ValueError, "source SHA"):
+                summarize_versioned_source_review(old, new)
+            with self.assertRaises(ValueError):
+                summarize_versioned_source_review(old, old)
