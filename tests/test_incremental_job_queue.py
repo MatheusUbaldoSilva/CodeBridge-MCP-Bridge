@@ -12,7 +12,7 @@ import unittest
 from rag.chunking.provenance import source_sha256
 from rag.runtime.incremental_job_queue import (
     claim_approved_job, enqueue_source_event, inspect_job_queue,
-    report_staging_failure,
+    inspect_job, report_staging_failure,
 )
 
 
@@ -193,6 +193,49 @@ class DurableQueueTests(unittest.TestCase):
         self.assertEqual(second["state"], "EXISTING_JOB_TERMINAL")
         self.assertFalse(second["queued"])
         self.assertEqual(inspect_job_queue(self.db)["by_state"]["REJECTED"], 1)
+
+    def test_existing_foreign_versioned_sqlite_is_never_repurposed(self):
+        self.db.parent.mkdir()
+        with closing(sqlite3.connect(self.db)) as c:
+            c.execute("CREATE TABLE foreign_data(secret TEXT)")
+            c.execute("INSERT INTO foreign_data VALUES('keep me')")
+            c.execute("PRAGMA user_version=1")
+            c.commit()
+        with self.assertRaisesRegex(ValueError, "schema invalid"):
+            self.enqueue(now_epoch=140, queue_enabled=True)
+        with closing(sqlite3.connect(self.db)) as c:
+            self.assertEqual(
+                c.execute("SELECT secret FROM foreign_data").fetchone()[0],
+                "keep me",
+            )
+            self.assertFalse(c.execute(
+                "SELECT count(*) FROM sqlite_master WHERE name='jobs'"
+            ).fetchone()[0])
+
+    def test_read_only_job_detail_tracks_retry_and_never_exposes_lease_secret(self):
+        first = self.enqueue(queue_enabled=True, now_epoch=140)
+        job_id = first["job_id"]
+        before = self.db.read_bytes()
+        waiting = inspect_job(self.db, job_id)
+        self.assertEqual(waiting["job_state"], "PENDING")
+        self.assertEqual(self.db.read_bytes(), before)
+        self.assertNotIn("lease_token", waiting)
+        lease = self.claim(now_epoch=141)
+        assigned = inspect_job(self.db, job_id)
+        self.assertEqual(assigned["job_state"], "CLAIMED")
+        self.assertEqual(assigned["attempts"], 1)
+        self.assertEqual(
+            report_staging_failure(
+                self.db, lease["job_id"], lease["lease_token"],
+                reason="temporary-offline-error", queue_enabled=True,
+                now_epoch=142, retry_delay_seconds=10,
+            )["state"], "SCHEDULED_RETRY",
+        )
+        pending = inspect_job(self.db, job_id)
+        self.assertEqual(pending["job_state"], "RETRY")
+        self.assertEqual(pending["last_error"], "temporary-offline-error")
+        self.assertFalse(pending["safe_to_publish"])
+        self.assertEqual(inspect_job(self.db, "bad")["state"], "INVALID_JOB_ID")
 
     def test_new_git_commit_supersedes_queued_event(self):
         self.enqueue(queue_enabled=True, now_epoch=105)

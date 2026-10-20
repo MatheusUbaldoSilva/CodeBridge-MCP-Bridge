@@ -440,3 +440,10 @@
 - Testes 10 PASS em tests/test_incremental_job_queue.py: Win32 TemporaryDirectory, Git real, debounce, idempotencia, revalidacao, dois claimers paralelos, expiro token/retry, persistencia em novo Python, esquema estranho, estado default off. Regressao ampliada com preflight14, journal14, status8 = 46 PASS.
 - Teste real no repositorio Windows com queue_enabled=False: nao criou DB em LocalAppData/CodeBridge/rag/jobs e preservou indice legacy, pointer/journal ausentes.
 - IMPORTANTE: este marco D-B entrega persistencia e reserva segura, NAO inicia job automaticamente, nao gera embedding, nao tem worker agendado nem conclui V1.03-D. D-C sera worker offline com registro de etapa/conclusao e auditoria; aprovacao de publicacao permanece separada.
+
+### V1.03-D-B — bloqueios adicionais e observabilidade por job
+- Revisao de seguranca da fila: se DB versionada user_version=1 for de outro sistema, confirma colunas exigidas antes de alterar journal_mode ou criar tabela; recusa banco estrangeiro sem alterar dados.
+- Nova funcao inspect_job abre somente leitura e retorna status PENDING/CLAIMED/RETRY/REJECTED/FAILED, tentativas, prazo, proxima tentativa e ultimo erro; nao retorna token do lease nem modifica a fila.
+- Testes adicionais para DB estranha com dados preservados e leitura de job com erro/retry; 12 testes em tests/test_incremental_job_queue.py PASS.
+- Aplicativo CodeBridge instalou seletivamente modulo D-A e fila D-B com hashes SHA iguais ao Git; nao criou banco nem executou job/modelo no LocalAppData.
+- Proxima fase V1.03-D-C: consumidor offline explicitamente habilitado, status de conclusao somente com staging/manifest/SQLite/Qdrant revalidados e zero publicacao; scheduler/servico autonomo so depois de gates e testes completos.

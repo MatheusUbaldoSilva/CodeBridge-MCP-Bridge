@@ -69,6 +69,15 @@ def _connection(db: Path, *, create: bool):
         ).fetchone()[0]:
             cn.close()
             raise ValueError("unversioned nonempty SQLite database")
+        if version == 1:
+            columns = {
+                row[1] for row in cn.execute("PRAGMA table_info(jobs)")
+            }
+            if not {"job_id", "state", "lease_token", "lease_until_epoch",
+                    "source_path", "observed_commit", "observed_sha256",
+                    "attempts"}.issubset(columns):
+                cn.close()
+                raise ValueError("existing job queue schema invalid")
         cn.execute("PRAGMA journal_mode=WAL")
         cn.execute("PRAGMA synchronous=FULL")
         cn.execute(_SCHEMA)
@@ -278,3 +287,33 @@ def inspect_job_queue(db_path: Path) -> dict:
         ).fetchall()
     return _report("QUEUE_INSPECTED", total=sum(x[1] for x in items),
                    by_state=dict(items))
+
+
+def inspect_job(db_path: Path, job_id: str) -> dict:
+    """Read a single job's durable status, without creating or mutating jobs."""
+    if not isinstance(job_id, str) or len(job_id) != 64 or any(
+        c not in "0123456789abcdef" for c in job_id
+    ):
+        return _report("INVALID_JOB_ID")
+    db = _database_path(db_path)
+    if not db.is_file():
+        return _report("QUEUE_NOT_INITIALIZED", job_id=job_id)
+    with closing(sqlite3.connect(db.as_uri() + "?mode=ro", uri=True)) as cn:
+        cn.execute("PRAGMA query_only=ON")
+        if cn.execute("PRAGMA user_version").fetchone()[0] != 1:
+            raise ValueError("unexpected job queue schema")
+        row = cn.execute(
+            """SELECT state, source_path, attempts, due_at_epoch,
+            next_attempt_epoch, lease_until_epoch, last_error
+            FROM jobs WHERE job_id=?""",
+            (job_id,),
+        ).fetchone()
+    if row is None:
+        return _report("JOB_NOT_FOUND", job_id=job_id)
+    return _report(
+        "JOB_STATUS", job_id=job_id, job_state=row[0],
+        source_path=row[1], attempts=row[2],
+        due_at_epoch=row[3], next_attempt_epoch=row[4],
+        lease_until_epoch=row[5], last_error=row[6],
+        staged_offline=False, worker_started=False,
+    )
