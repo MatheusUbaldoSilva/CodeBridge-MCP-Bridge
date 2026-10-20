@@ -317,3 +317,43 @@ def inspect_job(db_path: Path, job_id: str) -> dict:
         lease_until_epoch=row[5], last_error=row[6],
         staged_offline=False, worker_started=False,
     )
+def renew_job_lease(
+    db_path: Path, job_id: str, lease_token: str, *,
+    now_epoch: float | None = None, lease_seconds: float = 120,
+    queue_enabled: bool = False,
+) -> dict:
+    """Renew only a live reservation owned by this exact token."""
+    if queue_enabled is not True:
+        return _report("AUTO_INDEX_DISABLED", renewed=False)
+    if not (10 <= lease_seconds <= 3600):
+        return _report("INVALID_LEASE_POLICY", renewed=False)
+    if not isinstance(job_id, str) or len(job_id) != 64 or any(
+        ch not in "0123456789abcdef" for ch in job_id
+    ) or not isinstance(lease_token, str) or len(lease_token) != 32 or any(
+        ch not in "0123456789abcdef" for ch in lease_token
+    ):
+        return _report("INVALID_LEASE_IDENTITY", renewed=False)
+    now = time.time() if now_epoch is None else float(now_epoch)
+    db = _database_path(db_path)
+    connection = _connection(db, create=False)
+    if connection is None:
+        return _report("QUEUE_EMPTY", renewed=False)
+    with closing(connection) as cn:
+        cn.execute("BEGIN IMMEDIATE")
+        try:
+            cursor = cn.execute(
+                """UPDATE jobs SET lease_until_epoch=?,updated_at_epoch=?
+                WHERE job_id=? AND state='CLAIMED' AND lease_token=?
+                AND lease_until_epoch>?""",
+                (now + lease_seconds, now, job_id, lease_token, now),
+            )
+            renewed = cursor.rowcount == 1
+            cn.execute("COMMIT")
+        except BaseException:
+            cn.execute("ROLLBACK")
+            raise
+    return _report(
+        "LEASE_RENEWED" if renewed else "STALE_OR_EXPIRED_LEASE",
+        renewed=renewed, job_id=job_id if renewed else None,
+        lease_until_epoch=now + lease_seconds if renewed else None,
+    )
