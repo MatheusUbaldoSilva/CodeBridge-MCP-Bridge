@@ -396,3 +396,13 @@
 - Criado author_mcp/v1_supervised_live_trial.py para obter prova MCP fresca, validar gate, fazer troca controlada, confirmar candidate via status/integridade e fonte nova na busca semantica CODE, e SEMPRE voltar para legacy em finally; se journal pendente recupera, senao rollback documentado. Resultado gera recibo JSON, nunca aprova release.
 - Suites existentes executadas antes do teste: 14 testes de journal/rollback, 11 de source preflight/review, 8 de status MCP, todos PASS (33). Nenhuma mudanca do indice ate aqui.
 - Risco controlado: troca do pointer ativo APENAS no trial apos verificacao de provas frescas, com legacy e candidata completos e rollback automatico. Se acesso MCP parar, journal fail-closed e procedimento de recovery permanecem disponiveis.
+
+### V1.03-C — incidente do primeiro ensaio supervisionado, antes de qualquer ponteiro
+- Usuario escreveu AUTORIZADO para a revisao das alteracoes documentadas e um ensaio de corte com rollback; nao corresponde a GO-LIVE permanente.
+- Novo gate evidence-based e writer opcional de teste sob lock EXCLUSIVE foram commitados c120016. Ensaios read-only validaram recusa por prova MCP expirada e SHA de revisao adulterado, e READY_FOR_SUPERVISED_TRIAL somente com escopo/hashes/provas especificas. Gate default permanece BLOCKED.
+- Primeira execucao autoriza ensaio, obteve preflight HYBRID, mas abortou ANTES da ativacao com ModuleNotFoundError: No module named rag ao carregar o import do writer no script de supervisor por caminho absoluto.
+- Verificacao imediatamente apos erro: indice legado READY, active-generation.json ausente, production-generation-transition.json ausente, recovered-pointer da candidata ausente. Portanto NENHUM corte/rollback foi executado.
+- Corrigido sys.path para raiz real do CodeBridge instalado no script author_mcp/v1_supervised_live_trial.py. Commit 0cb1d2f com push; instalacao validada por SHA; import no Python embarcado PASSED.
+- O ensaio supervisionado de verdade segue PENDENTE. NAO chamar marco completo, NAO atribuir sucesso de corte/rollback ate provar publicamente a candidata e o retorno ao legado.
+- Proxima janela normal: com tempo suficiente para 3 buscas publicas simultaneas, switch, busca publica da candidata e rollback, executar o supervisor e registrar o JSON de evidencia. Sempre conferindo PID atual e ausencia de pointer/journal antes da execucao.
+- Dois arquivos historicos nao relacionados no Git foram preservados.
