@@ -19,3 +19,10 @@ class OfflineWorkerCliTests(unittest.TestCase):
                 self.assertEqual(cp.returncode,0,cp.stderr)
                 self.assertEqual(json.loads(cp.stdout)["state"],"OFFLINE_WORKER_DISABLED")
                 self.assertFalse(db.exists())
+
+            denied=subprocess.run(command+["--enable-queue","--enable-offline-worker"],
+                capture_output=True,text=True,
+                cwd=str(Path(__file__).resolve().parents[1]),timeout=30)
+            self.assertEqual(denied.returncode,1)
+            self.assertEqual(json.loads(denied.stdout)["state"],"NO_APPROVED_SOURCES")
+            self.assertFalse(db.exists())

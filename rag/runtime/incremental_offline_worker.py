@@ -31,6 +31,9 @@ def process_offline_job_once(
         return {"state": "INVALID_HEARTBEAT_POLICY", "executed": False,
                 "safe_to_publish": False, "active_index_updated": False}
     approved = tuple(approved_paths)
+    if not approved:
+        return {"state": "NO_APPROVED_SOURCES", "executed": False,
+                "safe_to_publish": False, "active_index_updated": False}
     claim = claim_approved_job(
         db_path, project_root, approved_paths=approved,
         now_epoch=now_epoch, queue_enabled=True,
