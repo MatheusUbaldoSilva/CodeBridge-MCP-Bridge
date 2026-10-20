@@ -199,6 +199,8 @@ Section "CodeBridge" SEC_MAIN
 
   SetOutPath "$INSTDIR\installer"
   File "bootstrap.ps1"
+  File "runtime_readiness.py"
+  File "runtime_staging_verify.py"
   File "company_setup.py"
   File "extension_setup.py"
   File "updater.py"
