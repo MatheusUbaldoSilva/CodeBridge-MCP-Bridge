@@ -29,6 +29,23 @@ _ALLOWED_CHANGED = frozenset({
     "rag/runtime/status.py",
 })
 _ALLOWED_ADDED = ("rag/runtime/live_integrity.py",)
+# Separately reviewed incremental generation. Never relax the legacy path.
+_INCREMENTAL_GENERATION = "v1_delta_3ab9c095605b4a"
+_INCREMENTAL_ALLOWED_ADDED = ("rag/runtime/incremental_scheduler_gate.py",)
+_INCREMENTAL_ALLOWED_CHANGED = _ALLOWED_CHANGED
+_INCREMENTAL_EXPECTED_COUNTS = (211, 8774, 8774, 211)
+
+
+def _matches_incremental_scope(candidate: str, validation: dict, content: dict) -> bool:
+    return (
+        candidate == _INCREMENTAL_GENERATION
+        and tuple(validation.get(key) for key in (
+            "documents", "chunks", "vectors", "manifest_entries"
+        )) == _INCREMENTAL_EXPECTED_COUNTS
+        and set(content.get("modified_paths", [])) == _INCREMENTAL_ALLOWED_CHANGED
+        and tuple(content.get("added_paths", [])) == _INCREMENTAL_ALLOWED_ADDED
+        and content.get("removed_paths") == []
+    )
 
 
 def _sha(path: Path) -> str:
@@ -74,10 +91,14 @@ def assess_supervised_trial(
         )
         if scope["state"] != "SCOPE_MATCHED_NOT_AUTHORIZED":
             errors.append("EXACT_SOURCE_SCOPE_NOT_ATTESTED")
+        incremental = _matches_incremental_scope(
+            candidate, result["verified"]["candidate"]["validation"], content,
+        )
+        legacy = (set(content["modified_paths"]) == _ALLOWED_CHANGED
+                  and tuple(content["added_paths"]) == _ALLOWED_ADDED
+                  and not content["removed_paths"])
         if (content["evidence_sha256_not_signature"] != proof.get("source_review_fingerprint")
-                or set(content["modified_paths"]) != _ALLOWED_CHANGED
-                or tuple(content["added_paths"]) != _ALLOWED_ADDED
-                or content["removed_paths"]):
+                or not (legacy or incremental)):
             errors.append("SOURCE_APPROVAL_SCOPE_OR_FINGERPRINT_MISMATCH")
     except (OSError, ValueError, KeyError) as exc:
         errors.append("SOURCE_REVIEW_INVALID:" + str(exc)[:140])
