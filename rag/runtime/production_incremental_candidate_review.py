@@ -140,3 +140,36 @@ def inspect_offline_candidate_sources(baseline_dir, candidate_dir, expected_sour
         "read_only": True, "activation_authorized": False,
         "safe_to_publish": False, "vector_integrity_proved": False,
     }
+
+def assess_offline_incremental_candidate(baseline_dir, candidate_dir, expected_source_sha256: str) -> dict:
+    """One read-only P3 evidence report. Never implies publication approval."""
+    from rag.runtime.incremental_bundle_validate import validate_incremental_bundle
+
+    source = inspect_offline_candidate_sources(
+        baseline_dir, candidate_dir, expected_source_sha256,
+    )
+    issues = list(source["issues"])
+    stores = {}
+    for name, directory, expected in (
+        ("baseline", baseline_dir, (210, 8761, 8761, 210)),
+        ("candidate", candidate_dir, (211, 8763, 8763, 211)),
+    ):
+        try:
+            proof = validate_incremental_bundle(directory)
+            stores[name] = proof
+            if (proof.get("state") != "VALIDATED_OFFLINE_NOT_PUBLISHED"
+                    or tuple(proof.get(key) for key in (
+                        "documents", "chunks", "vectors", "manifest_entries"
+                    )) != expected):
+                issues.append("CROSS_STORE_COUNTS_MISMATCH_" + name.upper())
+        except (OSError, ValueError, RuntimeError) as exc:
+            issues.append("CROSS_STORE_VALIDATION_FAILED_" + name.upper() + ":" + type(exc).__name__)
+    return {
+        "state": "P3_OFFLINE_VERIFIED_NOT_AUTHORIZED" if not issues else "BLOCKED",
+        "issues": sorted(set(issues)),
+        "source_review": source,
+        "cross_store": stores,
+        "read_only": True, "safe_to_publish": False,
+        "activation_authorized": False,
+        "public_generation_updated": False,
+    }

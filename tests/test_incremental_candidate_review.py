@@ -105,6 +105,44 @@ class IncrementalCandidateReviewTests(unittest.TestCase):
         )
         self.assertEqual(result["state"], "BLOCKED")
         self.assertIn("INCREMENTAL_SOURCE_SHA_MISMATCH", result["issues"])
+    def test_full_offline_report_never_authorizes_activation(self):
+        from unittest.mock import patch
+        from rag.runtime.production_incremental_candidate_review import assess_offline_incremental_candidate
+        expected = {"state": "VALIDATED_OFFLINE_NOT_PUBLISHED",
+                    "documents": 210, "chunks": 8761,
+                    "vectors": 8761, "manifest_entries": 210}
+        candidate = dict(expected, documents=211, chunks=8763,
+                         vectors=8763, manifest_entries=211)
+        with patch(
+            "rag.runtime.production_incremental_candidate_review.inspect_offline_candidate_sources",
+            return_value={"issues": [], "state": "OFFLINE_SOURCE_SCOPE_MATCH_NOT_AUTHORIZED"},
+        ), patch(
+            "rag.runtime.incremental_bundle_validate.validate_incremental_bundle",
+            side_effect=[expected, candidate],
+        ):
+            report = assess_offline_incremental_candidate("base", "candidate", "a" * 64)
+        self.assertEqual(report["state"], "P3_OFFLINE_VERIFIED_NOT_AUTHORIZED")
+        self.assertFalse(report["safe_to_publish"])
+        self.assertFalse(report["activation_authorized"])
+
+    def test_full_offline_report_blocks_wrong_vector_count(self):
+        from unittest.mock import patch
+        from rag.runtime.production_incremental_candidate_review import assess_offline_incremental_candidate
+        expected = {"state": "VALIDATED_OFFLINE_NOT_PUBLISHED",
+                    "documents": 210, "chunks": 8761,
+                    "vectors": 8761, "manifest_entries": 210}
+        wrong = dict(expected, documents=211, chunks=8763,
+                     vectors=8762, manifest_entries=211)
+        with patch(
+            "rag.runtime.production_incremental_candidate_review.inspect_offline_candidate_sources",
+            return_value={"issues": []},
+        ), patch(
+            "rag.runtime.incremental_bundle_validate.validate_incremental_bundle",
+            side_effect=[expected, wrong],
+        ):
+            report = assess_offline_incremental_candidate("base", "candidate", "a" * 64)
+        self.assertEqual(report["state"], "BLOCKED")
+        self.assertIn("CROSS_STORE_COUNTS_MISMATCH_CANDIDATE", report["issues"])
     def test_exact_scope_is_still_not_authorization(self):
         result = self.run_review()
         self.assertEqual(result["state"], "CANDIDATE_SCOPE_VERIFIED_NOT_AUTHORIZED")
