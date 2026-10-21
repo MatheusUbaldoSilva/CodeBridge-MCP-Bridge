@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from rag.runtime.incremental_supervisor_lab_runner import SupervisorLabRunner
+from rag.runtime.incremental_supervisor_fence import observe_generation
 
 
 @unittest.skipUnless(os.name == "nt", "Windows locking laboratory")
@@ -71,3 +72,35 @@ class SupervisorLabRunnerTests(unittest.TestCase):
                     child.wait(timeout=8)
                 child.stdout.close()
                 child.stderr.close()
+
+    def test_explicit_durable_runner_issues_distinct_tokens(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            store=root/"supervisor_fence.sqlite3"
+            first=SupervisorLabRunner(root/"lab.lock",durable_store=store)
+            result=first.run_once(lambda: None)
+            self.assertEqual(result["state"],"LAB_CYCLE_COMPLETE")
+            g1=result["durable_generation"]
+            self.assertEqual(g1,1)
+            self.assertTrue(observe_generation(store,g1))
+            second=SupervisorLabRunner(root/"lab.lock",durable_store=store)
+            result2=second.run_once(lambda: None)
+            self.assertEqual(result2["state"],"LAB_CYCLE_COMPLETE")
+            self.assertEqual(result2["durable_generation"],g1+1)
+            self.assertFalse(observe_generation(store,g1))
+            self.assertTrue(observe_generation(store,g1+1))
+            self.assertFalse(result2["safe_to_publish"])
+
+    def test_runner_denies_foreign_store_before_callback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            foreign=root/"other"
+            foreign.mkdir()
+            store=foreign/"supervisor_fence.sqlite3"
+            executed=[]
+            runner=SupervisorLabRunner(root/"lab.lock",durable_store=store)
+            result=runner.run_once(lambda: executed.append(True))
+            self.assertEqual(result["state"],"DURABLE_FENCE_UNAVAILABLE")
+            self.assertEqual(result["supervisor_state"],"STOPPED")
+            self.assertEqual(executed,[])
+            self.assertFalse(store.exists())

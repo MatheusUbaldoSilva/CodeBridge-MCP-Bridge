@@ -13,11 +13,14 @@ from rag.runtime.incremental_supervisor_lifecycle import (
     SupervisorSnapshot, SupervisorState, transition,
 )
 from rag.runtime.incremental_supervisor_lock import SupervisorLock
+from rag.runtime.incremental_supervisor_fence import issue_generation, observe_generation
 
 
 @dataclass
 class SupervisorLabRunner:
     lock_path: Path
+    durable_store: Path | None = None
+    durable_generation: int | None = field(default=None, init=False)
     snapshot: SupervisorSnapshot = field(default_factory=SupervisorSnapshot)
 
     def run_once(self, callback: Callable[[], None] | None = None) -> dict:
@@ -29,6 +32,13 @@ class SupervisorLabRunner:
         if not lock.acquire():
             return self._report("LOCK_UNAVAILABLE")
         try:
+            if self.durable_store is not None:
+                try:
+                    self.durable_generation = issue_generation(self.durable_store, lock=lock)
+                except Exception:
+                    return self._report("DURABLE_FENCE_UNAVAILABLE")
+                if not observe_generation(self.durable_store, self.durable_generation):
+                    return self._report("DURABLE_FENCE_UNAVAILABLE")
             self.snapshot, started = transition(self.snapshot, "request_start")
             if not started["accepted"]:
                 return self._report("START_DENIED")
@@ -60,6 +70,7 @@ class SupervisorLabRunner:
         return {
             "state": state, "supervisor_state": self.snapshot.state.value,
             "generation": self.snapshot.generation,
+            "durable_generation": self.durable_generation,
             "worker_started": False, "scheduler_started": False,
             "active_index_updated": False, "safe_to_publish": False,
         }
