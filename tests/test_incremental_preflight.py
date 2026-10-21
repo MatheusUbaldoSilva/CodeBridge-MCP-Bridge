@@ -450,6 +450,12 @@ class ProductionSingleUseTrialReplayTests(unittest.TestCase):
                 self.assertFalse(missing["safe_to_activate"])
                 self.assertIn("EXACT_SOURCE_SCOPE_NOT_ATTESTED", missing["blockers"])
                 proof["approved_source_sha256"]["rag/runtime/live_integrity.py"] = removed
+                original_hash = proof["approved_source_sha256"]["rag/runtime/live_integrity.py"]
+                proof["approved_source_sha256"]["rag/runtime/live_integrity.py"] = "d" * 64
+                mismatched = assess_supervised_trial(baseline, candidate, proof)
+                self.assertEqual(mismatched["state"], "BLOCKED")
+                self.assertIn("EXACT_SOURCE_SCOPE_NOT_ATTESTED", mismatched["blockers"])
+                proof["approved_source_sha256"]["rag/runtime/live_integrity.py"] = original_hash
                 archive = root / ("recovered-pointer-" + candidate + ".json")
                 archive.write_text('{"generation":"v1_delta_test"}', encoding="utf-8")
                 rejected = assess_supervised_trial(baseline, candidate, proof)
