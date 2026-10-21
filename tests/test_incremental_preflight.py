@@ -438,7 +438,7 @@ class ProductionSingleUseTrialReplayTests(unittest.TestCase):
                          "candidate_sha256": "c" * 64},
                     ],
                 },
-            ):
+            ) as review_mock:
                 initial = assess_supervised_trial(baseline, candidate, proof)
                 self.assertEqual(initial["state"], "READY_FOR_SUPERVISED_TRIAL")
                 self.assertTrue(initial["safe_to_activate"])
@@ -456,6 +456,38 @@ class ProductionSingleUseTrialReplayTests(unittest.TestCase):
                 self.assertEqual(mismatched["state"], "BLOCKED")
                 self.assertIn("EXACT_SOURCE_SCOPE_NOT_ATTESTED", mismatched["blockers"])
                 proof["approved_source_sha256"]["rag/runtime/live_integrity.py"] = original_hash
+                # Exact approved SHA matching cannot bypass the historical
+                # allowlist when a different incremental source is added.
+                from copy import deepcopy
+                previous_review = deepcopy(review_mock.return_value)
+                previous_scope = proof["approved_source_sha256"]
+                review_mock.return_value = {
+                    "state": "CONTENT_COMPARISON_ONLY_NOT_APPROVED",
+                    "evidence_sha256_not_signature": "a" * 64,
+                    "modified_paths": [],
+                    "added_paths": ["rag/runtime/incremental_scheduler_gate.py"],
+                    "removed_paths": [],
+                    "details": [{
+                        "path": "rag/runtime/incremental_scheduler_gate.py",
+                        "action": "ADDED", "candidate_sha256": "e" * 64,
+                    }],
+                }
+                proof["approved_source_sha256"] = {
+                    "rag/runtime/incremental_scheduler_gate.py": "e" * 64,
+                }
+                out_of_scope = assess_supervised_trial(baseline, candidate, proof)
+                self.assertEqual(out_of_scope["state"], "BLOCKED")
+                self.assertFalse(out_of_scope["safe_to_activate"])
+                self.assertIn(
+                    "SOURCE_APPROVAL_SCOPE_OR_FINGERPRINT_MISMATCH",
+                    out_of_scope["blockers"],
+                )
+                self.assertNotIn(
+                    "EXACT_SOURCE_SCOPE_NOT_ATTESTED",
+                    out_of_scope["blockers"],
+                )
+                review_mock.return_value = previous_review
+                proof["approved_source_sha256"] = previous_scope
                 archive = root / ("recovered-pointer-" + candidate + ".json")
                 archive.write_text('{"generation":"v1_delta_test"}', encoding="utf-8")
                 rejected = assess_supervised_trial(baseline, candidate, proof)
