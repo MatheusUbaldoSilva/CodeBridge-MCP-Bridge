@@ -104,3 +104,36 @@ class SupervisorLabRunnerTests(unittest.TestCase):
             self.assertEqual(result["supervisor_state"],"STOPPED")
             self.assertEqual(executed,[])
             self.assertFalse(store.exists())
+
+    def test_durable_failure_reset_never_reuses_old_token(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            store=root/"supervisor_fence.sqlite3"
+            runner=SupervisorLabRunner(root/"lab.lock",durable_store=store)
+            def synthetic_failure():
+                raise RuntimeError("synthetic test only")
+            failed=runner.run_once(synthetic_failure)
+            self.assertEqual(failed["state"],"LAB_CALLBACK_FAILED")
+            g1=failed["durable_generation"]
+            self.assertTrue(observe_generation(store,g1))
+            denied=runner.run_once(lambda: None)
+            self.assertEqual(denied["state"],"ALREADY_ACTIVE_OR_FAILED")
+            self.assertEqual(denied["durable_generation"],g1)
+            self.assertTrue(runner.reset_after_failure())
+            recovered=runner.run_once(lambda: None)
+            self.assertEqual(recovered["state"],"LAB_CYCLE_COMPLETE")
+            self.assertEqual(recovered["durable_generation"],g1+1)
+            self.assertFalse(observe_generation(store,g1))
+            self.assertTrue(observe_generation(store,g1+1))
+
+    def test_durable_runner_without_callback_never_creates_store(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            store=root/"supervisor_fence.sqlite3"
+            lock=root/"lab.lock"
+            runner=SupervisorLabRunner(lock,durable_store=store)
+            denied=runner.run_once()
+            self.assertEqual(denied["state"],"NO_LAB_CALLBACK")
+            self.assertIsNone(denied["durable_generation"])
+            self.assertFalse(store.exists())
+            self.assertFalse(lock.exists())
