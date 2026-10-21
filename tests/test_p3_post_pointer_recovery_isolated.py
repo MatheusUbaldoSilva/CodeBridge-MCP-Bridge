@@ -40,6 +40,18 @@ class IsolatedPostPointerFaultTests(unittest.TestCase):
             self.assertEqual((root / writer.JOURNAL_NAME).read_bytes(), journal_before)
             self.assertEqual((root / writer.POINTER_NAME).read_bytes(), pointer_before)
 
+    def test_unapproved_activation_does_not_create_control_files(self):
+        with tempfile.TemporaryDirectory(prefix="codebridge-p3-no-approval-") as tmp:
+            root=Path(tmp)/"CodeBridge"/"rag"
+            (root/"generations"/CANDIDATE).mkdir(parents=True)
+            with patch.object(writer,"_root",return_value=root):
+                with self.assertRaisesRegex(writer.GenerationTransitionBlocked,
+                                            "explicit generation-specific approval"):
+                    writer.publish_validated_generation(
+                        **{**OPTIONS,"operator_authorization":"NOT_AUTHORIZED"})
+            self.assertFalse((root/writer.JOURNAL_NAME).exists())
+            self.assertFalse((root/writer.POINTER_NAME).exists())
+
     def test_failure_after_pointer_swap_requires_explicit_rollback(self):
         with tempfile.TemporaryDirectory(prefix="codebridge-p3-post-pointer-") as tmp:
             root = Path(tmp) / "CodeBridge" / "rag"
