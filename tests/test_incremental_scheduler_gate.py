@@ -49,7 +49,13 @@ class AutonomousWorkerGateTests(unittest.TestCase):
             from contextlib import closing
             with closing(sqlite3.connect(store)) as db:
                 db.execute("PRAGMA user_version=2")
-                db.execute("CREATE TABLE jobs (state TEXT)")
+                from rag.runtime.incremental_job_queue import _SCHEMA
+                db.execute(_SCHEMA)
+                db.execute("""CREATE TABLE staging_receipts (
+                    job_id TEXT PRIMARY KEY, staging_path TEXT,
+                    document_sha256 TEXT, document_count INTEGER,
+                    chunk_count INTEGER, vector_count INTEGER,
+                    validated_at_epoch REAL)""")
                 db.commit()
             result=assess_autonomous_worker_gate(
                 store,queue_enabled=True,worker_enabled=True,
@@ -60,3 +66,20 @@ class AutonomousWorkerGateTests(unittest.TestCase):
             self.assertFalse(result["activation_authorized"])
             with closing(sqlite3.connect(store)) as db:
                 self.assertEqual(db.execute("SELECT count(*) FROM jobs").fetchone()[0],0)
+
+    def test_partial_versioned_jobs_table_is_blocked(self):
+        with tempfile.TemporaryDirectory() as td:
+            store=Path(td)/"jobs"/"incremental_jobs.sqlite3"
+            store.parent.mkdir()
+            from contextlib import closing
+            with closing(sqlite3.connect(store)) as db:
+                db.execute("PRAGMA user_version=2")
+                db.execute("CREATE TABLE jobs (state TEXT)")
+                db.commit()
+            result=assess_autonomous_worker_gate(
+                store,queue_enabled=True,worker_enabled=True,
+                scheduler_enabled=True,approved_source_paths=("src/main.py",),
+                installed_runtime_verified=True,recovery_verified=True,
+                public_integrity_verified=True)
+            self.assertIn("QUEUE_STORE_INVALID",result["blockers"])
+            self.assertFalse(result["activation_authorized"])

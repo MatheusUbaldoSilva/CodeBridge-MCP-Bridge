@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sqlite3
+from contextlib import closing
 from rag.runtime.incremental_job_queue import inspect_job_queue
 
 
@@ -44,6 +45,25 @@ def assess_autonomous_worker_gate(
             inspection = inspect_job_queue(Path(queue_db))
             if inspection.get("state") != "QUEUE_INSPECTED":
                 blockers.append("QUEUE_STORE_INVALID")
+            else:
+                uri = Path(queue_db).resolve().as_uri() + "?mode=ro"
+                with closing(sqlite3.connect(uri, uri=True)) as connection:
+                    connection.execute("PRAGMA query_only=ON")
+                    version = connection.execute("PRAGMA user_version").fetchone()[0]
+                    columns = {row[1] for row in connection.execute(
+                        "PRAGMA table_info(jobs)")}
+                    receipts = {row[1] for row in connection.execute(
+                        "PRAGMA table_info(staging_receipts)")}
+                    if (version != 2 or not {
+                        "job_id", "state", "source_path", "observed_commit",
+                        "observed_sha256", "attempts", "lease_token",
+                        "lease_until_epoch", "due_at_epoch", "next_attempt_epoch",
+                    }.issubset(columns) or not {
+                        "job_id", "staging_path", "document_sha256",
+                        "document_count", "chunk_count", "vector_count",
+                        "validated_at_epoch",
+                    }.issubset(receipts)):
+                        blockers.append("QUEUE_STORE_INVALID")
         except (sqlite3.Error, OSError, ValueError):
             blockers.append("QUEUE_STORE_INVALID")
     # This is only a diagnostic assessment, including when all prerequisites
