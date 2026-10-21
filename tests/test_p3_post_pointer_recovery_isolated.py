@@ -60,6 +60,28 @@ class IsolatedPostPointerFaultTests(unittest.TestCase):
             self.assertEqual((root/writer.JOURNAL_NAME).read_bytes(),journal_before)
             self.assertEqual((root/writer.POINTER_NAME).read_bytes(),pointer_before)
 
+    def test_preserved_pointer_collision_blocks_rollback_without_mutation(self):
+        with tempfile.TemporaryDirectory(prefix="codebridge-p3-rollback-collision-") as tmp:
+            root=Path(tmp)/"CodeBridge"/"rag"
+            (root/"generations"/CANDIDATE).mkdir(parents=True)
+            writer._atomic_json(root/writer.JOURNAL_NAME, {
+                "schema_version":1, "state":"PREPARED",
+                "previous":"legacy", "candidate":CANDIDATE})
+            writer._atomic_json(root/writer.POINTER_NAME, {
+                "schema_version":1, "generation":CANDIDATE})
+            preserved=root/("recovered-pointer-"+CANDIDATE+".json")
+            preserved.write_text("prior-record",encoding="utf-8")
+            pointer_before=(root/writer.POINTER_NAME).read_bytes()
+            journal_before=(root/writer.JOURNAL_NAME).read_bytes()
+            with patch.object(writer,"_root",return_value=root), patch.object(
+                writer,"production_generation_lock",side_effect=lambda **_:nullcontext()
+            ):
+                with self.assertRaisesRegex(writer.GenerationTransitionBlocked,"artifact collision"):
+                    writer.rollback_pending_to_legacy(expected_candidate=CANDIDATE)
+            self.assertEqual(preserved.read_text(encoding="utf-8"),"prior-record")
+            self.assertEqual((root/writer.JOURNAL_NAME).read_bytes(),journal_before)
+            self.assertEqual((root/writer.POINTER_NAME).read_bytes(),pointer_before)
+
     def test_unapproved_activation_does_not_create_control_files(self):
         with tempfile.TemporaryDirectory(prefix="codebridge-p3-no-approval-") as tmp:
             root=Path(tmp)/"CodeBridge"/"rag"
