@@ -78,6 +78,33 @@ class IncrementalCandidateReviewTests(unittest.TestCase):
             db.commit()
             db.close()
             self.assertEqual(inspect_offline_candidate_counts(base, candidate)["state"], "BLOCKED")
+    def test_real_offline_candidate_scope_passes_read_only(self):
+        import os
+        from pathlib import Path
+        from rag.runtime.production_incremental_candidate_review import inspect_offline_candidate_sources
+        root = Path(os.environ["TEMP"]) / "codebridge-rag-p2-closed-baseline"
+        if not (root / "legacy" / "rag_index.sqlite3").exists():
+            self.skipTest("Real closed bundle not present on this machine")
+        result = inspect_offline_candidate_sources(
+            root / "legacy", root / "candidate-merged-211",
+            "6d0e790e82ee9bea7f163cf0b5244accc794a87bf6032d97144f73ab21c3feed",
+        )
+        self.assertEqual(result["state"], "OFFLINE_SOURCE_SCOPE_MATCH_NOT_AUTHORIZED")
+        self.assertFalse(result["activation_authorized"])
+        self.assertFalse(result["safe_to_publish"])
+
+    def test_real_offline_candidate_wrong_sha_blocks(self):
+        import os
+        from pathlib import Path
+        from rag.runtime.production_incremental_candidate_review import inspect_offline_candidate_sources
+        root = Path(os.environ["TEMP"]) / "codebridge-rag-p2-closed-baseline"
+        if not (root / "legacy" / "rag_index.sqlite3").exists():
+            self.skipTest("Real closed bundle not present on this machine")
+        result = inspect_offline_candidate_sources(
+            root / "legacy", root / "candidate-merged-211", "f" * 64,
+        )
+        self.assertEqual(result["state"], "BLOCKED")
+        self.assertIn("INCREMENTAL_SOURCE_SHA_MISMATCH", result["issues"])
     def test_exact_scope_is_still_not_authorization(self):
         result = self.run_review()
         self.assertEqual(result["state"], "CANDIDATE_SCOPE_VERIFIED_NOT_AUTHORIZED")
