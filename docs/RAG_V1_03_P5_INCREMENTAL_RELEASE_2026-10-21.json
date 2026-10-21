@@ -1,0 +1,69 @@
+{
+  "candidate": "v1_delta_1ae1d01ea84f4e",
+  "state": "RELEASE_ACTIVE_PUBLIC_VERIFIED",
+  "public_before": {
+    "check": "CODEBRIDGE_RAG_V103_PUBLIC_READONLY",
+    "state": "PUBLIC_HYBRID_CONCURRENCY_PASS",
+    "public_reader": {
+      "public_server_pid": 9300,
+      "generation": "legacy",
+      "reader_pin_proved": true,
+      "semantic_worker_serialization_loaded": true,
+      "public_runtime_ready_for_hybrid_acceptance": true
+    },
+    "safe_to_activate": false,
+    "index_pointer_updated": false,
+    "status": {
+      "generation": "legacy",
+      "documents": 210,
+      "chunks": 8761
+    },
+    "cross_store_integrity": {
+      "state": "OBSERVED_CONSISTENT",
+      "generation": "legacy",
+      "documents": 210,
+      "chunks": 8761
+    },
+    "hybrid_concurrent": [
+      {
+        "request": 1,
+        "ok": true,
+        "route": "HYBRID",
+        "results": 3,
+        "error_type": null
+      },
+      {
+        "request": 2,
+        "ok": true,
+        "route": "HYBRID",
+        "results": 3,
+        "error_type": null
+      },
+      {
+        "request": 3,
+        "ok": true,
+        "route": "HYBRID",
+        "results": 3,
+        "error_type": null
+      }
+    ]
+  },
+  "release_authorized": true,
+  "source_fingerprint": "d3279df2f89129e02b042d30adeda45aac81aeef1458583e0b8148384d38b77b",
+  "public_after": {
+    "status": "v1_delta_1ae1d01ea84f4e",
+    "documents": 211,
+    "chunks": 8774,
+    "integrity": "OBSERVED_CONSISTENT",
+    "new_source_found": true,
+    "semantic_route": "CODE"
+  },
+  "rollback": null,
+  "error": null,
+  "switch": {
+    "state": "POINTER_ACTIVATED_PENDING_PUBLIC_QUERY_PROOF",
+    "previous": "legacy",
+    "candidate": "v1_delta_1ae1d01ea84f4e"
+  },
+  "completed_at_utc": "2026-10-21T18:12:59.001811+00:00"
+}
