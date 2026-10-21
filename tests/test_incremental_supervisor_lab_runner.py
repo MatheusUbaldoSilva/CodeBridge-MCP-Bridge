@@ -137,3 +137,25 @@ class SupervisorLabRunnerTests(unittest.TestCase):
             self.assertIsNone(denied["durable_generation"])
             self.assertFalse(store.exists())
             self.assertFalse(lock.exists())
+
+    def test_noncooperative_generation_change_fails_closed(self):
+        import sqlite3
+        from contextlib import closing
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            store=root/"supervisor_fence.sqlite3"
+            runner=SupervisorLabRunner(root/"lab.lock",durable_store=store)
+            def changed_under_callback():
+                # Deliberately bypasses cooperative lock in a synthetic store.
+                with closing(sqlite3.connect(store)) as db:
+                    db.execute("UPDATE supervisor_fence SET generation=generation+1 WHERE singleton=1")
+                    db.commit()
+            result=runner.run_once(changed_under_callback)
+            self.assertEqual(result["state"],"DURABLE_FENCE_LOST")
+            self.assertEqual(result["supervisor_state"],"FAILED")
+            self.assertFalse(result["safe_to_publish"])
+            self.assertFalse(observe_generation(store,result["durable_generation"]))
+            self.assertEqual(runner.run_once(lambda: None)["state"],"ALREADY_ACTIVE_OR_FAILED")
+            self.assertTrue(runner.reset_after_failure())
+            recovered=runner.run_once(lambda: None)
+            self.assertEqual(recovered["state"],"LAB_CYCLE_COMPLETE")

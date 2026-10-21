@@ -53,6 +53,15 @@ class SupervisorLabRunner:
                 self.snapshot, _ = transition(
                     self.snapshot, "failed", expected_generation=gen)
                 return self._report("LAB_CALLBACK_FAILED")
+            # An uncooperative writer may bypass the cooperative lock. Do not
+            # report a successful cycle if our durable generation was replaced.
+            if self.durable_store is not None and (
+                not lock.is_held() or
+                not observe_generation(self.durable_store, self.durable_generation)
+            ):
+                self.snapshot, _ = transition(
+                    self.snapshot, "failed", expected_generation=gen)
+                return self._report("DURABLE_FENCE_LOST")
             self.snapshot, _ = transition(self.snapshot, "request_stop")
             self.snapshot, _ = transition(
                 self.snapshot, "stopped", expected_generation=gen)
