@@ -372,6 +372,10 @@ class ProductionSingleUseTrialReplayTests(unittest.TestCase):
                     "APPROVED_SOURCE_CHANGES_AND_SUPERVISED_TRIAL_WITH_ROLLBACK",
                 "rollback_rehearsal": "REAL_WIN32_GENERATION_TRANSITION_TESTS_PASS",
                 "source_review_fingerprint": "a" * 64,
+                "approved_source_sha256": {
+                    **{path: "b" * 64 for path in allowed},
+                    "rag/runtime/live_integrity.py": "c" * 64,
+                },
                 "candidate_receipt_sha256": candidate_sha,
                 "public_mcp_pid": 1304,
                 "public_readiness": {
@@ -422,15 +426,30 @@ class ProductionSingleUseTrialReplayTests(unittest.TestCase):
             ), patch(
                 "rag.runtime.production_supervised_trial.summarize_versioned_source_review",
                 return_value={
+                    "state": "CONTENT_COMPARISON_ONLY_NOT_APPROVED",
                     "evidence_sha256_not_signature": "a" * 64,
                     "modified_paths": sorted(allowed),
                     "added_paths": ["rag/runtime/live_integrity.py"],
                     "removed_paths": [],
+                    "details": [
+                        *[{"path": path, "action": "MODIFIED",
+                           "candidate_sha256": "b" * 64} for path in sorted(allowed)],
+                        {"path": "rag/runtime/live_integrity.py", "action": "ADDED",
+                         "candidate_sha256": "c" * 64},
+                    ],
                 },
             ):
                 initial = assess_supervised_trial(baseline, candidate, proof)
                 self.assertEqual(initial["state"], "READY_FOR_SUPERVISED_TRIAL")
                 self.assertTrue(initial["safe_to_activate"])
+                # A scope match is mandatory; dropping one reviewed hash
+                # must block even an otherwise complete supervised proof.
+                removed = proof["approved_source_sha256"].pop("rag/runtime/live_integrity.py")
+                missing = assess_supervised_trial(baseline, candidate, proof)
+                self.assertEqual(missing["state"], "BLOCKED")
+                self.assertFalse(missing["safe_to_activate"])
+                self.assertIn("EXACT_SOURCE_SCOPE_NOT_ATTESTED", missing["blockers"])
+                proof["approved_source_sha256"]["rag/runtime/live_integrity.py"] = removed
                 archive = root / ("recovered-pointer-" + candidate + ".json")
                 archive.write_text('{"generation":"v1_delta_test"}', encoding="utf-8")
                 rejected = assess_supervised_trial(baseline, candidate, proof)

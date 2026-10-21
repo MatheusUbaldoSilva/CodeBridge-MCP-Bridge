@@ -65,6 +65,15 @@ def assess_supervised_trial(
         errors.append("STANDARD_GATE_NOT_SAFELY_PROVEN")
     try:
         content = summarize_versioned_source_review(root / baseline, root / candidate)
+        # Additional exact source/hash scope proof; never replaces the old,
+        # stricter legacy trial policy or grants activation by itself.
+        from rag.runtime.production_source_scope_attestation import inspect_approved_source_scope
+        scope = inspect_approved_source_scope(
+            content, proof.get("approved_source_sha256"),
+            expected_fingerprint=proof.get("source_review_fingerprint"),
+        )
+        if scope["state"] != "SCOPE_MATCHED_NOT_AUTHORIZED":
+            errors.append("EXACT_SOURCE_SCOPE_NOT_ATTESTED")
         if (content["evidence_sha256_not_signature"] != proof.get("source_review_fingerprint")
                 or set(content["modified_paths"]) != _ALLOWED_CHANGED
                 or tuple(content["added_paths"]) != _ALLOWED_ADDED
