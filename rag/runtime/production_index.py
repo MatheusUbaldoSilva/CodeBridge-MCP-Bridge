@@ -32,7 +32,7 @@ def _source_type(path: str, code: bool) -> SourceType:
     return SourceType.DOCUMENTATION
 
 
-def build_staged_index(plan: RagIndexPlan) -> dict[str, object]:
+def build_staged_index(plan: RagIndexPlan, *, isolated_staging_parent: Path | None = None) -> dict[str, object]:
     """Build a complete project-specific staging corpus and vectors, never publish it."""
     if not isinstance(plan, RagIndexPlan):
         raise ValueError("plan must be RagIndexPlan")
@@ -45,7 +45,17 @@ def build_staged_index(plan: RagIndexPlan) -> dict[str, object]:
     branch=git_state.branch if git_state else None
     commit=git_state.head_commit if git_state else None
     state=resolve_rag_sqlite_path().parent
-    staging=state/"staging"/("build-"+uuid4().hex)
+    if isolated_staging_parent is None:
+        staging_parent = state / "staging"
+    else:
+        staging_parent = Path(isolated_staging_parent).resolve(strict=True)
+        if (not staging_parent.is_dir() or
+                staging_parent.is_relative_to(state.resolve()) or
+                state.resolve().is_relative_to(staging_parent) or
+                staging_parent == root or staging_parent.is_relative_to(root) or
+                staging_parent.is_symlink()):
+            raise ValueError("isolated staging must remain outside production and source roots")
+    staging=staging_parent/("build-"+uuid4().hex)
     staging.mkdir(parents=True, exist_ok=False)
     db_path=staging/"rag_index.sqlite3"
     connection=connect_rag_index(db_path)
