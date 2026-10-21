@@ -1,7 +1,8 @@
-﻿import json
+import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from rag.runtime.production_incremental_generation_selection import select_incremental_generation
 
@@ -33,7 +34,17 @@ class GenerationSelectionTests(unittest.TestCase):
                 "validation": {"documents": 211, "chunks": 8763, "vectors": 8763, "manifest_entries": 211},
             }
             (folder / "generation-receipt.json").write_text(json.dumps(receipt))
-            result = select_incremental_generation(temp)
+            official = Path(temp) / "generations"
+            official.mkdir()
+            folder.rename(official / folder.name)
+            with patch(
+                "rag.runtime.status.resolve_rag_sqlite_path",
+                return_value=Path(temp) / "rag_index.sqlite3",
+            ), patch(
+                "rag.runtime.production_cutover_gate._verify_versioned",
+                return_value={"validation": receipt["validation"], "sha_verified": True},
+            ):
+                result = select_incremental_generation(official)
             self.assertEqual(result["state"], "MATCHED_NOT_AUTHORIZED")
             self.assertEqual(result["candidate"], folder.name)
             self.assertFalse(result["activation_authorized"])

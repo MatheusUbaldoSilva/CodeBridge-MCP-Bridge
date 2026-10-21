@@ -1,4 +1,4 @@
-﻿"""Fail-closed selection of an existing immutable RAG candidate for supervised cutover."""
+"""Fail-closed selection of an existing immutable RAG candidate for supervised cutover."""
 from __future__ import annotations
 
 import json
@@ -23,6 +23,16 @@ def select_incremental_generation(generations_dir: str | Path) -> dict:
                     and validation.get("chunks") == 8763
                     and validation.get("vectors") == 8763
                     and validation.get("manifest_entries") == 211):
+                # A matching receipt is not enough: verify immutable files,
+                # SQLite and vector identity with the existing production verifier.
+                from rag.runtime.production_cutover_gate import _verify_versioned
+                from rag.runtime.status import resolve_rag_sqlite_path
+                official = resolve_rag_sqlite_path().resolve().parent
+                if root.resolve() != (official / "generations").resolve():
+                    raise ValueError("generation selector outside official RAG root")
+                verified = _verify_versioned(official, folder.name, "delta")
+                if verified.get("validation") != validation or not verified.get("sha_verified"):
+                    raise ValueError("versioned candidate receipt unverified")
                 matches.append(folder.name)
         except (OSError, ValueError, KeyError, TypeError):
             issues.append("INVALID_GENERATION_RECEIPT")
