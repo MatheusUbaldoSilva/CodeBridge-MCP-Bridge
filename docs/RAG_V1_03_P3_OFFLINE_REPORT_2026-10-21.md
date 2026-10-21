@@ -37,3 +37,19 @@ The historical supervised trial allowlist intentionally rejects this different c
 Production pointer switch, real rollback, MCP reader restart attestation and generation-specific authorization are not completed.
 Do not bypass the old gate or mark GO_LIVE_APPROVED.
 Before a supervised cutover, repeat actual read-only public status and consistency checks and obtain distinct explicit approval.
+
+## Public MCP acceptance probes after offline validation
+
+- codebridge_rag_status still reports generation=legacy, 210 documents, 8761 chunks.
+- MCP text search returned 3 results with effective_route=TEXT, no fallback, including vector and lexical retrieval evidence.
+- MCP code search returned 3 results with effective_route=CODE and no fallback.
+- Path-filtered search for rag/runtime/incremental_scheduler_gate.py returned zero results, confirming this candidate-only source is not yet in the public generation.
+- Public SQLite SHA256 remained 5bf26a6dd4e26334899b043a608ac3c8e316b7712e24b6ca1c17b7f9342cb764.
+- Public manifest SHA256 remained eeb40201617444898f9f327fe73b2c50cd73d079b682f6576ac5f60ebf84fd1c.
+- These observations are read-only and do not override the explicit GO_LIVE_BLOCKED state.
+
+## Next actionable phase
+
+The P3 offline data and actual MCP legacy-path checks are evidenced.
+A real supervised generation transition is still a distinct operation and needs a generation-specific operator approval and verified rollback/readers evidence.
+Without that authorization, the correct next action is preserve both stores and wait for operator review, not to modify or restart the installed public MCP.
