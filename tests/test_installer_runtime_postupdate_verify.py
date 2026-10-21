@@ -28,6 +28,7 @@ class PostUpdateVerifierTests(unittest.TestCase):
         self.assertFalse(result["phase_closed"])
         self.assertTrue(result["does_not_activate_worker"])
         self.assertFalse(result["writes_performed"])
+        self.assertEqual(result["integrity"]["changed_entries"], [])
 
     def test_missing_qdrant_blocks_release(self):
         self.assertEqual(self.check(False,baseline())["state"],"POST_UPDATE_BLOCKED")

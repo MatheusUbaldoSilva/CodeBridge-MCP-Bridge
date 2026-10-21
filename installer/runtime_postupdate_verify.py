@@ -14,7 +14,12 @@ from installer.runtime_readiness import inspect_embedded_runtime
 def verify_installed_update(install_root: Path, rag_state: Path, before: dict) -> dict:
     current = inspect_embedded_runtime(install_root)
     after = collect_runtime_fingerprints(install_root, rag_state)
-    integrity = compare_runtime_fingerprints(before, after)
+    public_keys = ("rag_manifest", "rag_sqlite", "rag_qdrant")
+    expected = {"files": {key: before.get("files", {}).get(key)
+                          for key in public_keys}}
+    observed = {"files": {key: after.get("files", {}).get(key)
+                          for key in public_keys}}
+    integrity = compare_runtime_fingerprints(expected, observed)
     ok = bool(current["ready"] and integrity["public_index_intact"])
     return {
         "state": "POST_UPDATE_PREREQUISITES_VERIFIED" if ok else "POST_UPDATE_BLOCKED",
