@@ -24,12 +24,23 @@ class SupervisorSnapshot:
     stop_requested: bool = False
 
 
-def transition(snapshot: SupervisorSnapshot, event: str) -> tuple[SupervisorSnapshot, dict]:
+def transition(
+    snapshot: SupervisorSnapshot, event: str, *, expected_generation: int | None = None,
+) -> tuple[SupervisorSnapshot, dict]:
     """Model a single atomic event; never start/kill a process or consume a job."""
     if not isinstance(snapshot, SupervisorSnapshot):
         raise TypeError("expected SupervisorSnapshot")
     old = snapshot.state
     event = str(event)
+    # A delayed completion from a prior start must not modify the current
+    # supervisor. Runner callbacks will be required to carry generation IDs.
+    if event in ("started", "stopped", "failed"):
+        if type(expected_generation) is not int or expected_generation != snapshot.generation:
+            return snapshot, {
+                "state": old.value, "accepted": False,
+                "reason": "STALE_OR_MISSING_GENERATION",
+                "worker_started": False, "safe_to_publish": False,
+            }
     allowed = {
         (SupervisorState.STOPPED, "request_start"): SupervisorState.STARTING,
         (SupervisorState.STARTING, "started"): SupervisorState.RUNNING,

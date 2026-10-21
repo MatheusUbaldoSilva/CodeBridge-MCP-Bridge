@@ -14,7 +14,11 @@ class SupervisorLifecycleTests(unittest.TestCase):
             ("request_stop", SupervisorState.STOPPING),
             ("stopped", SupervisorState.STOPPED),
         ):
-            snapshot, result = transition(snapshot, event)
+            snapshot, result = transition(
+                snapshot, event,
+                **({"expected_generation": snapshot.generation}
+                   if event in ("started", "stopped", "failed") else {}),
+            )
             self.assertTrue(result["accepted"])
             self.assertEqual(snapshot.state, expected)
             self.assertFalse(result["worker_started"])
@@ -30,7 +34,7 @@ class SupervisorLifecycleTests(unittest.TestCase):
 
     def test_failure_must_reset_not_restart(self):
         snapshot, _ = transition(SupervisorSnapshot(), "request_start")
-        failed, _ = transition(snapshot, "failed")
+        failed, _ = transition(snapshot, "failed", expected_generation=snapshot.generation)
         self.assertEqual(failed.state, SupervisorState.FAILED)
         denied, result = transition(failed, "request_start")
         self.assertFalse(result["accepted"])
@@ -51,3 +55,19 @@ class SupervisorLifecycleTests(unittest.TestCase):
         unchanged, result = transition(original, "request_stop")
         self.assertIs(unchanged, original)
         self.assertFalse(result["accepted"])
+
+    def test_stale_started_callback_after_restart_denied(self):
+        old, _ = transition(SupervisorSnapshot(), "request_start")
+        running, _ = transition(old, "started", expected_generation=old.generation)
+        stopping, _ = transition(running, "request_stop")
+        stopped, _ = transition(stopping, "stopped", expected_generation=stopping.generation)
+        restarting, _ = transition(stopped, "request_start")
+        unchanged, result = transition(restarting, "started", expected_generation=old.generation)
+        self.assertEqual(unchanged, restarting)
+        self.assertEqual(result["reason"], "STALE_OR_MISSING_GENERATION")
+
+    def test_missing_generation_callbacks_denied(self):
+        starting, _ = transition(SupervisorSnapshot(), "request_start")
+        unchanged, result = transition(starting, "started")
+        self.assertIs(unchanged, starting)
+        self.assertEqual(result["reason"], "STALE_OR_MISSING_GENERATION")
