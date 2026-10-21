@@ -19,7 +19,7 @@ from v1_public_readiness import _audit, _call
 
 BASE = "v1_base_6142ab6e3b534f"
 CANDIDATE = "v1_delta_3ab9c095605b4a"
-FINGERPRINT = "64619c191808b6d084d0507d03d9adff93909ab8bd6abd00c8ed2df4cb4afb79f"
+FINGERPRINT = "64619c191808b6d084d0507d03d9adff93909ab8bd6abd0c8ed2df4cb4afb79f"
 
 
 async def _post_switch_proof() -> dict:
