@@ -5,6 +5,8 @@ This module never starts a worker, enables settings or mutates persistent state.
 from __future__ import annotations
 
 from pathlib import Path
+import sqlite3
+from rag.runtime.incremental_job_queue import inspect_job_queue
 
 
 def assess_autonomous_worker_gate(
@@ -37,6 +39,13 @@ def assess_autonomous_worker_gate(
         blockers.append("PUBLIC_INDEX_INTEGRITY_UNVERIFIED")
     if not Path(queue_db).is_file():
         blockers.append("QUEUE_STORE_ABSENT")
+    else:
+        try:
+            inspection = inspect_job_queue(Path(queue_db))
+            if inspection.get("state") != "QUEUE_INSPECTED":
+                blockers.append("QUEUE_STORE_INVALID")
+        except (sqlite3.Error, OSError, ValueError):
+            blockers.append("QUEUE_STORE_INVALID")
     # This is only a diagnostic assessment, including when all prerequisites
     # appear present. No scheduler exists here and no activation is issued.
     return {

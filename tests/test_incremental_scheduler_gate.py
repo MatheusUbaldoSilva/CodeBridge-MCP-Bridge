@@ -1,4 +1,5 @@
 import tempfile
+import sqlite3
 import unittest
 from pathlib import Path
 from rag.runtime.incremental_scheduler_gate import assess_autonomous_worker_gate
@@ -23,7 +24,8 @@ class AutonomousWorkerGateTests(unittest.TestCase):
                 scheduler_enabled=True,approved_source_paths=("src/main.py",),
                 installed_runtime_verified=True,recovery_verified=True,
                 public_integrity_verified=True)
-            self.assertEqual(result["state"],"PREREQUISITES_OBSERVED_ONLY")
+            self.assertEqual(result["state"],"AUTONOMOUS_SCHEDULING_BLOCKED")
+            self.assertIn("QUEUE_STORE_INVALID",result["blockers"])
             self.assertFalse(result["activation_authorized"])
             self.assertFalse(result["worker_started"])
             self.assertFalse(result["safe_to_publish"])
@@ -39,3 +41,22 @@ class AutonomousWorkerGateTests(unittest.TestCase):
                 installed_runtime_verified=True,recovery_verified=True,
                 public_integrity_verified=True)
             self.assertIn("SOURCE_APPROVAL_REQUIRED",result["blockers"])
+
+    def test_versioned_synthetic_queue_still_cannot_activate(self):
+        with tempfile.TemporaryDirectory() as td:
+            store=Path(td)/"jobs"/"incremental_jobs.sqlite3"
+            store.parent.mkdir()
+            from contextlib import closing
+            with closing(sqlite3.connect(store)) as db:
+                db.execute("PRAGMA user_version=2")
+                db.execute("CREATE TABLE jobs (state TEXT)")
+                db.commit()
+            result=assess_autonomous_worker_gate(
+                store,queue_enabled=True,worker_enabled=True,
+                scheduler_enabled=True,approved_source_paths=("src/main.py",),
+                installed_runtime_verified=True,recovery_verified=True,
+                public_integrity_verified=True)
+            self.assertEqual(result["state"],"PREREQUISITES_OBSERVED_ONLY")
+            self.assertFalse(result["activation_authorized"])
+            with closing(sqlite3.connect(store)) as db:
+                self.assertEqual(db.execute("SELECT count(*) FROM jobs").fetchone()[0],0)
