@@ -8,6 +8,7 @@ from pathlib import Path
 import sqlite3
 from contextlib import closing
 from rag.runtime.incremental_job_queue import inspect_job_queue
+from rag.runtime.incremental_supervisor_fence import observe_generation
 
 
 def assess_autonomous_worker_gate(
@@ -17,9 +18,16 @@ def assess_autonomous_worker_gate(
     installed_runtime_verified: bool = False,
     recovery_verified: bool = False,
     public_integrity_verified: bool = False,
+    durable_store: Path | None = None,
+    expected_durable_generation: int | None = None,
 ) -> dict:
     """Report blocking prerequisites; never grant publication authority."""
     blockers = []
+    if durable_store is not None or expected_durable_generation is not None:
+        if (durable_store is None or
+                type(expected_durable_generation) is not int or
+                not observe_generation(durable_store, expected_durable_generation)):
+            blockers.append("DURABLE_FENCE_UNVERIFIED")
     if queue_enabled is not True:
         blockers.append("QUEUE_DISABLED")
     if worker_enabled is not True:

@@ -83,3 +83,35 @@ class AutonomousWorkerGateTests(unittest.TestCase):
                 public_integrity_verified=True)
             self.assertIn("QUEUE_STORE_INVALID",result["blockers"])
             self.assertFalse(result["activation_authorized"])
+
+    def test_optional_durable_fence_invalid_generation_is_blocked(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            store=root/"supervisor_fence.sqlite3"
+            queue=root/"queue.sqlite3"
+            from rag.runtime.incremental_supervisor_lock import SupervisorLock
+            from rag.runtime.incremental_supervisor_fence import issue_generation
+            with SupervisorLock(root/"lab.lock") as lock:
+                older=issue_generation(store,lock=lock)
+                current=issue_generation(store,lock=lock)
+            denied=assess_autonomous_worker_gate(
+                queue,durable_store=store,expected_durable_generation=older)
+            self.assertIn("DURABLE_FENCE_UNVERIFIED",denied["blockers"])
+            observed=assess_autonomous_worker_gate(
+                queue,durable_store=store,expected_durable_generation=current)
+            self.assertNotIn("DURABLE_FENCE_UNVERIFIED",observed["blockers"])
+            self.assertFalse(observed["activation_authorized"])
+            self.assertFalse(observed["safe_to_publish"])
+            self.assertFalse(queue.exists())
+
+    def test_optional_durable_fence_requires_both_arguments(self):
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            queue=root/"queue.sqlite3"
+            missing=assess_autonomous_worker_gate(
+                queue,expected_durable_generation=1)
+            self.assertIn("DURABLE_FENCE_UNVERIFIED",missing["blockers"])
+            missing_token=assess_autonomous_worker_gate(
+                queue,durable_store=root/"supervisor_fence.sqlite3")
+            self.assertIn("DURABLE_FENCE_UNVERIFIED",missing_token["blockers"])
+            self.assertFalse(queue.exists())
