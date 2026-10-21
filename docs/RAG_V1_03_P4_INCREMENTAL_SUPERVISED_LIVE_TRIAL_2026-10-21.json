@@ -1,0 +1,87 @@
+{
+  "state": "LIVE_TRIAL_PASSED_AND_ROLLED_BACK",
+  "candidate": "v1_delta_3ab9c095605b4a",
+  "public_pid": 9300,
+  "git_head": null,
+  "trial_authorized": true,
+  "production_release_approved": false,
+  "live_public_preflight": {
+    "check": "CODEBRIDGE_RAG_V103_PUBLIC_READONLY",
+    "state": "PUBLIC_HYBRID_CONCURRENCY_PASS",
+    "public_reader": {
+      "public_server_pid": 9300,
+      "generation": "legacy",
+      "reader_pin_proved": true,
+      "semantic_worker_serialization_loaded": true,
+      "public_runtime_ready_for_hybrid_acceptance": true
+    },
+    "safe_to_activate": false,
+    "index_pointer_updated": false,
+    "status": {
+      "generation": "legacy",
+      "documents": 210,
+      "chunks": 8761
+    },
+    "cross_store_integrity": {
+      "state": "OBSERVED_CONSISTENT",
+      "generation": "legacy",
+      "documents": 210,
+      "chunks": 8761
+    },
+    "hybrid_concurrent": [
+      {
+        "request": 1,
+        "ok": true,
+        "route": "HYBRID",
+        "results": 3,
+        "error_type": null
+      },
+      {
+        "request": 2,
+        "ok": true,
+        "route": "HYBRID",
+        "results": 3,
+        "error_type": null
+      },
+      {
+        "request": 3,
+        "ok": true,
+        "route": "HYBRID",
+        "results": 3,
+        "error_type": null
+      }
+    ]
+  },
+  "candidate_public_proof": {
+    "status": {
+      "generation": "v1_delta_3ab9c095605b4a",
+      "docs": 211,
+      "chunks": 8774
+    },
+    "integrity": {
+      "generation": "v1_delta_3ab9c095605b4a",
+      "state": "OBSERVED_CONSISTENT"
+    },
+    "semantic_route": "CODE",
+    "hits": 2,
+    "new_source_found": true
+  },
+  "rollback": {
+    "state": "RECOVERED_LEGACY",
+    "retained_generation": "v1_delta_3ab9c095605b4a",
+    "legacy_index_unmodified": true
+  },
+  "legacy_public_post_rollback": {
+    "generation": "legacy",
+    "docs": 210,
+    "chunks": 8761,
+    "integrity": "OBSERVED_CONSISTENT"
+  },
+  "activation_permitted_after_trial": false,
+  "publish_result": {
+    "state": "POINTER_ACTIVATED_PENDING_PUBLIC_QUERY_PROOF",
+    "previous": "legacy",
+    "candidate": "v1_delta_3ab9c095605b4a"
+  },
+  "completed_at_utc": "2026-10-21T18:08:46.664552+00:00"
+}
