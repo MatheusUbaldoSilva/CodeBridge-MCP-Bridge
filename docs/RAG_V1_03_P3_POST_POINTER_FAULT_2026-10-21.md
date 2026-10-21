@@ -10,3 +10,5 @@ Verificacoes PASS:
 - rollback_pending_to_legacy esperado remove pointer ativo e journal, arquiva pointer candidato, conserva a candidata e dados legacy originais imutaveis.
 
 Limitacao: lock e readiness foram mockados, pois foco e a janela de falha do escritor. Os testes anteriores validaram LockFileEx em processos Windows separados. Nao demonstra que a publicacao real e autorizada. GO_LIVE_BLOCKED; nenhum arquivo do RAG publico foi alterado.
+
+Teste adicional: rollback solicitado com candidate ID diferente do journal e recusado, sem alterar os bytes originais do pointer ou journal da fixture. Duas provas nesse arquivo de testes, ambas PASS.

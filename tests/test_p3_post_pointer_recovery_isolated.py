@@ -20,6 +20,26 @@ OPTIONS = {
 
 
 class IsolatedPostPointerFaultTests(unittest.TestCase):
+    def test_wrong_rollback_candidate_keeps_evidence_and_state(self):
+        with tempfile.TemporaryDirectory(prefix="codebridge-p3-wrong-target-") as tmp:
+            root = Path(tmp) / "CodeBridge" / "rag"
+            (root / "generations" / CANDIDATE).mkdir(parents=True)
+            writer._atomic_json(root / writer.JOURNAL_NAME, {
+                "schema_version": 1, "state": "PREPARED",
+                "previous": "legacy", "candidate": CANDIDATE})
+            writer._atomic_json(root / writer.POINTER_NAME, {
+                "schema_version": 1, "generation": CANDIDATE})
+            journal_before = (root / writer.JOURNAL_NAME).read_bytes()
+            pointer_before = (root / writer.POINTER_NAME).read_bytes()
+            with patch.object(writer, "_root", return_value=root), patch.object(
+                writer, "production_generation_lock", side_effect=lambda **_: nullcontext()
+            ):
+                with self.assertRaisesRegex(writer.GenerationTransitionBlocked, "no matching pending journal"):
+                    writer.rollback_pending_to_legacy(
+                        expected_candidate="v1_delta_ffffffff")
+            self.assertEqual((root / writer.JOURNAL_NAME).read_bytes(), journal_before)
+            self.assertEqual((root / writer.POINTER_NAME).read_bytes(), pointer_before)
+
     def test_failure_after_pointer_swap_requires_explicit_rollback(self):
         with tempfile.TemporaryDirectory(prefix="codebridge-p3-post-pointer-") as tmp:
             root = Path(tmp) / "CodeBridge" / "rag"
