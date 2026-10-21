@@ -56,6 +56,28 @@ class IncrementalCandidateReviewTests(unittest.TestCase):
                     "invalid-base", "invalid-candidate",
                     {self.path: self.digest}, expected_fingerprint="a" * 64,
                 )
+    def test_offline_counts_read_only(self):
+        import sqlite3
+        import tempfile
+        from pathlib import Path
+        from rag.runtime.production_incremental_candidate_review import inspect_offline_candidate_counts
+        with tempfile.TemporaryDirectory() as temp:
+            base, candidate = Path(temp) / "baseline", Path(temp) / "candidate"
+            for folder, docs, chunks in ((base, 210, 8761), (candidate, 211, 8763)):
+                folder.mkdir()
+                db = sqlite3.connect(folder / "rag_index.sqlite3")
+                db.execute("CREATE TABLE rag_index_state (project_id TEXT, document_count INT, chunk_count INT, state TEXT)")
+                db.execute("INSERT INTO rag_index_state VALUES ('codebridge',?,?, 'READY')", (docs, chunks))
+                db.commit()
+                db.close()
+            good = inspect_offline_candidate_counts(base, candidate)
+            self.assertEqual(good["state"], "COUNTS_MATCH_NOT_AUTHORIZED")
+            self.assertFalse(good["safe_to_publish"])
+            db = sqlite3.connect(candidate / "rag_index.sqlite3")
+            db.execute("UPDATE rag_index_state SET chunk_count=8766")
+            db.commit()
+            db.close()
+            self.assertEqual(inspect_offline_candidate_counts(base, candidate)["state"], "BLOCKED")
     def test_exact_scope_is_still_not_authorization(self):
         result = self.run_review()
         self.assertEqual(result["state"], "CANDIDATE_SCOPE_VERIFIED_NOT_AUTHORIZED")

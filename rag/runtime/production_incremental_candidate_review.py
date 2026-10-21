@@ -55,3 +55,41 @@ def review_closed_incremental_generations(
         baseline_generation=report["baseline"],
         candidate_generation=report["candidate"],
     )
+
+def inspect_offline_candidate_counts(baseline_dir, candidate_dir) -> dict:
+    """Verify exact persisted counts using SQLite read-only, without publication."""
+    import sqlite3
+    from contextlib import closing
+    from pathlib import Path
+
+    actual = []
+    issues = []
+    for location, expected in ((baseline_dir, (210, 8761, "READY")),
+                               (candidate_dir, (211, 8763, "READY"))):
+        database = Path(location) / "rag_index.sqlite3"
+        if not database.is_file():
+            issues.append("CLOSED_SQLITE_MISSING")
+            actual.append(None)
+            continue
+        try:
+            with closing(sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True)) as db:
+                row = db.execute(
+                    "SELECT document_count,chunk_count,state FROM rag_index_state "
+                    "WHERE project_id='codebridge'"
+                ).fetchone()
+            actual.append(tuple(row) if row is not None else None)
+            if row != expected:
+                issues.append("CLOSED_GENERATION_COUNT_MISMATCH")
+        except (sqlite3.Error, OSError, ValueError):
+            issues.append("CLOSED_SQLITE_INVALID")
+            actual.append(None)
+    return {
+        "state": "COUNTS_MATCH_NOT_AUTHORIZED" if not issues else "BLOCKED",
+        "issues": sorted(set(issues)),
+        "baseline_counts": actual[0],
+        "candidate_counts": actual[1],
+        "read_only": True,
+        "activation_authorized": False,
+        "safe_to_publish": False,
+        "integrity_proved": False,
+    }
