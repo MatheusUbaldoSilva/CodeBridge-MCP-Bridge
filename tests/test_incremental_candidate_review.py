@@ -12,6 +12,7 @@ class IncrementalCandidateReviewTests(unittest.TestCase):
             "evidence_sha256_not_signature": "a" * 64,
             "added_paths": [self.path], "modified_paths": [],
             "removed_paths": [], "unchanged_count": 210,
+            "base_entries": 210, "candidate_entries": 211,
             "details": [{"path": self.path, "action": "ADDED",
                          "candidate_sha256": self.digest}],
         }
@@ -73,6 +74,13 @@ class IncrementalCandidateReviewTests(unittest.TestCase):
         self.review["unchanged_count"] = 209
         self.assertEqual(self.run_review()["state"], "BLOCKED")
 
+    def test_wrong_candidate_document_count_blocks(self):
+        self.review["candidate_entries"] = 212
+        self.assertEqual(self.run_review()["state"], "BLOCKED")
+
+    def test_missing_document_counts_blocks(self):
+        del self.review["candidate_entries"]
+        self.assertEqual(self.run_review()["state"], "BLOCKED")
     def test_equal_generation_blocks(self):
         result = self.run_review(candidate_generation="legacy-210")
         self.assertEqual(result["state"], "BLOCKED")

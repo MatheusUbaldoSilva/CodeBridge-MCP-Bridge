@@ -1,4 +1,4 @@
-﻿"""Read-only eligibility of the closed V1 incremental source delta.
+"""Read-only eligibility of the closed V1 incremental source delta.
 
 A scope match is evidence for a future operator decision, not permission
 to activate a generation or bypass the existing supervised cutover gate.
@@ -22,6 +22,8 @@ def inspect_incremental_candidate_review(
         issues.append("GENERATION_IDENTITY_INVALID")
     if review.get("added_paths") != [_INCREMENTAL_PATH] or review.get("modified_paths") != [] or review.get("removed_paths") != []:
         issues.append("INCREMENTAL_CANDIDATE_DELTA_MISMATCH")
+    if review.get("base_entries") != 210 or review.get("candidate_entries") != 211:
+        issues.append("GENERATION_DOCUMENT_COUNTS_MISMATCH")
     if not isinstance(review.get("unchanged_count"), int) or review["unchanged_count"] != 210:
         issues.append("BASELINE_SOURCE_COUNT_MISMATCH")
     return {
