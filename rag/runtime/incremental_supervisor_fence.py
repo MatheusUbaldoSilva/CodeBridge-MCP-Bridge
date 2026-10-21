@@ -9,11 +9,15 @@ from contextlib import closing
 from pathlib import Path
 import sqlite3
 
+from rag.runtime.incremental_supervisor_lock import SupervisorLock
 
-def issue_generation(store: Path, *, lock_held: bool = False) -> int:
-    if lock_held is not True:
+
+def issue_generation(store: Path, *, lock: SupervisorLock) -> int:
+    if not isinstance(lock, SupervisorLock) or not lock.is_held():
         raise PermissionError("SUPERVISOR_LOCK_REQUIRED")
     path = Path(store)
+    if lock.path.parent.resolve() != path.parent.resolve():
+        raise PermissionError("SUPERVISOR_LOCK_SCOPE_MISMATCH")
     if path.is_symlink() or path.parent.is_symlink() or path.name != "supervisor_fence.sqlite3":
         raise ValueError("INVALID_FENCE_PATH")
     if not path.parent.is_dir():

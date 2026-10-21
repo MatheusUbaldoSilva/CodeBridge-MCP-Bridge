@@ -16,6 +16,17 @@ class SupervisorLock:
     def __init__(self, path: Path):
         self.path = Path(path)
         self._handle = None
+        self._owner_pid = None
+
+    def is_held(self) -> bool:
+        handle = self._handle
+        if handle is None or handle.closed or self._owner_pid != os.getpid():
+            return False
+        try:
+            os.fstat(handle.fileno())
+            return True
+        except (OSError, ValueError):
+            return False
 
     def acquire(self) -> bool:
         if self._handle is not None:
@@ -44,6 +55,7 @@ class SupervisorLock:
                 pass
             return False
         self._handle = handle
+        self._owner_pid = os.getpid()
         return True
 
     def release(self) -> bool:
@@ -51,6 +63,7 @@ class SupervisorLock:
         if handle is None:
             return False
         self._handle = None
+        self._owner_pid = None
         try:
             handle.seek(0)
             msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
