@@ -35,3 +35,21 @@ def inspect_incremental_candidate_review(
         "safe_to_publish": False,
         "legacy_supervised_gate_unchanged": True,
     }
+
+
+def review_closed_incremental_generations(
+    baseline_dir, candidate_dir, approved_sha256: dict[str, str],
+    *, expected_fingerprint: str,
+) -> dict:
+    """Review actual closed source stores; never touch active/published pointers."""
+    from pathlib import Path
+    from rag.runtime.production_content_review import summarize_versioned_source_review
+
+    base = Path(baseline_dir)
+    candidate = Path(candidate_dir)
+    report = summarize_versioned_source_review(base, candidate)
+    return inspect_incremental_candidate_review(
+        report, approved_sha256, expected_fingerprint=expected_fingerprint,
+        baseline_generation=report["baseline"],
+        candidate_generation=report["candidate"],
+    )
