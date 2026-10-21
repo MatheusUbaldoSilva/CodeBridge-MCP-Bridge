@@ -115,3 +115,42 @@ class AutonomousWorkerGateTests(unittest.TestCase):
                 queue,durable_store=root/"supervisor_fence.sqlite3")
             self.assertIn("DURABLE_FENCE_UNVERIFIED",missing_token["blockers"])
             self.assertFalse(queue.exists())
+
+    def test_complete_synthetic_gate_cannot_activate_or_consume_jobs(self):
+        from contextlib import closing
+        from rag.runtime.incremental_job_queue import _SCHEMA
+        from rag.runtime.incremental_supervisor_lock import SupervisorLock
+        from rag.runtime.incremental_supervisor_fence import issue_generation
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            jobs=root/"jobs"
+            jobs.mkdir()
+            queue=jobs/"incremental_jobs.sqlite3"
+            store=root/"supervisor_fence.sqlite3"
+            with closing(sqlite3.connect(queue)) as db:
+                db.execute("PRAGMA user_version=2")
+                db.execute(_SCHEMA)
+                db.execute("""CREATE TABLE staging_receipts (
+                    job_id TEXT PRIMARY KEY, staging_path TEXT,
+                    document_sha256 TEXT, document_count INTEGER,
+                    chunk_count INTEGER, vector_count INTEGER,
+                    validated_at_epoch REAL)""")
+                db.commit()
+            with SupervisorLock(root/"lab.lock") as held:
+                generation=issue_generation(store,lock=held)
+            original_bytes=queue.read_bytes()
+            result=assess_autonomous_worker_gate(
+                queue,queue_enabled=True,worker_enabled=True,
+                scheduler_enabled=True,approved_source_paths=("src/main.py",),
+                installed_runtime_verified=True,recovery_verified=True,
+                public_integrity_verified=True,durable_store=store,
+                expected_durable_generation=generation)
+            self.assertEqual(result["state"],"PREREQUISITES_OBSERVED_ONLY",result)
+            self.assertEqual(result["blockers"],[])
+            self.assertFalse(result["activation_authorized"])
+            self.assertFalse(result["scheduler_started"])
+            self.assertFalse(result["worker_started"])
+            self.assertFalse(result["safe_to_publish"])
+            self.assertEqual(queue.read_bytes(),original_bytes)
+            with closing(sqlite3.connect(queue)) as db:
+                self.assertEqual(db.execute("SELECT count(*) FROM jobs").fetchone()[0],0)
