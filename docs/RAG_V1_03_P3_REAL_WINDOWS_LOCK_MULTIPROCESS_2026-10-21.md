@@ -6,6 +6,6 @@ Dois novos testes test_p3_real_windows_generation_lock_isolated.py executaram Py
 - Com o lock compartilhado do leitor retido no processo pai, processo filho com exclusivo falha fechado (BUSY_CONFIRMED); apos liberacao, passa a ACQUIRED.
 - Com o lock exclusivo do escritor retido no processo pai, processo filho leitor compartilhado falha fechado; apos liberacao, passa a ACQUIRED.
 
-Ambos PASS, Windows real e processos diferentes. Raiz fake temporaria CodeBridge/rag, sem patch do mecanismo Win32: somente resolve_rag_sqlite_path foi apontado para a fixture. Nao foi feito publish, corte real, restart ou transicao da geracao publica.
+Tres testes PASS, Windows real e processos diferentes. Terceiro teste valida que production_generation_read mantem o lock compartilhado desde a escolha da geracao ate o final do contexto, impedindo escritor concorrente em processo filho e liberando depois. Raiz fake temporaria CodeBridge/rag, sem patch do mecanismo Win32: somente resolve_rag_sqlite_path foi apontado para a fixture. Nao foi feito publish, corte real, restart ou transicao da geracao publica.
 
 Limites: prova sincronizacao do byte lock, mas nao demonstra atomicidade de todas as etapas da publicacao ou configuracao completa do MCP instalado. GO_LIVE_BLOCKED ate plano de corte verificado e autorizacao especifica.
