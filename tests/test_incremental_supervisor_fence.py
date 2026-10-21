@@ -1,6 +1,7 @@
 import tempfile
 import subprocess
 import sys
+import time
 from contextlib import closing
 import unittest
 from pathlib import Path
@@ -117,3 +118,49 @@ class DurableFenceTests(unittest.TestCase):
             self.assertEqual(second,first+1)
             self.assertFalse(observe_generation(store,first))
             self.assertTrue(observe_generation(store,second))
+
+    def test_crashed_isolated_owner_releases_lock_and_fences_old_generation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            store=root/"supervisor_fence.sqlite3"
+            ready=root/"child_ready.txt"
+            script=(
+                "import sys,time\n"
+                "from pathlib import Path\n"
+                "from rag.runtime.incremental_supervisor_lock import SupervisorLock\n"
+                "from rag.runtime.incremental_supervisor_fence import issue_generation\n"
+                "root=Path(sys.argv[1])\n"
+                "with SupervisorLock(root/'lab.lock') as lock:\n"
+                "    generation=issue_generation(root/'supervisor_fence.sqlite3',lock=lock)\n"
+                "    (root/'child_ready.txt').write_text(str(generation),encoding='ascii')\n"
+                "    time.sleep(30)\n"
+            )
+            process=subprocess.Popen(
+                [sys.executable,"-c",script,str(root)],
+                cwd=str(Path(__file__).resolve().parents[1]),
+                stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,
+            )
+            try:
+                deadline=time.monotonic()+10
+                while not ready.exists() and process.poll() is None and time.monotonic()<deadline:
+                    time.sleep(.03)
+                self.assertTrue(ready.exists(),"synthetic child failed to start")
+                first=int(ready.read_text(encoding='ascii'))
+                self.assertTrue(observe_generation(store,first))
+                competitor=SupervisorLock(root/"lab.lock")
+                self.assertFalse(competitor.acquire())
+                with self.assertRaises(PermissionError):
+                    issue_generation(store,lock=competitor)
+                process.kill()  # Strictly this test-owned isolated child, never GUI/MCP.
+                process.wait(timeout=10)
+                with SupervisorLock(root/"lab.lock") as successor:
+                    second=issue_generation(store,lock=successor)
+                self.assertEqual(second,first+1)
+                self.assertFalse(observe_generation(store,first))
+                self.assertTrue(observe_generation(store,second))
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                process.wait(timeout=10)
+                if process.stderr is not None:
+                    process.stderr.close()
