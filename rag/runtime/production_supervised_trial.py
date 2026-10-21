@@ -30,7 +30,7 @@ _ALLOWED_CHANGED = frozenset({
 })
 _ALLOWED_ADDED = ("rag/runtime/live_integrity.py",)
 # Separately reviewed incremental generation. Never relax the legacy path.
-_INCREMENTAL_GENERATION = "v1_delta_3ab9c095605b4a"
+_INCREMENTAL_GENERATIONS = frozenset({"v1_delta_3ab9c095605b4a", "v1_delta_1ae1d01ea84f4e"})
 _INCREMENTAL_ALLOWED_ADDED = ("rag/runtime/incremental_scheduler_gate.py",)
 _INCREMENTAL_ALLOWED_CHANGED = _ALLOWED_CHANGED
 _INCREMENTAL_EXPECTED_COUNTS = (211, 8774, 8774, 211)
@@ -38,7 +38,7 @@ _INCREMENTAL_EXPECTED_COUNTS = (211, 8774, 8774, 211)
 
 def _matches_incremental_scope(candidate: str, validation: dict, content: dict) -> bool:
     return (
-        candidate == _INCREMENTAL_GENERATION
+        candidate in _INCREMENTAL_GENERATIONS
         and tuple(validation.get(key) for key in (
             "documents", "chunks", "vectors", "manifest_entries"
         )) == _INCREMENTAL_EXPECTED_COUNTS

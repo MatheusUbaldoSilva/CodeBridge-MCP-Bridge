@@ -1,4 +1,4 @@
-﻿import unittest
+import unittest
 from rag.runtime.production_supervised_trial import _matches_incremental_scope
 
 class IncrementalSupervisedPolicyTests(unittest.TestCase):
@@ -11,6 +11,7 @@ class IncrementalSupervisedPolicyTests(unittest.TestCase):
            "rag/runtime/status.py"],"removed_paths":[]}
     def test_correct_exact_generation(self):
         self.assertTrue(_matches_incremental_scope(self.candidate,self.validation,self.content))
+        self.assertTrue(_matches_incremental_scope("v1_delta_1ae1d01ea84f4e",self.validation,self.content))
         self.assertFalse(_matches_incremental_scope("v1_delta_bebee8b8a49943",self.validation,self.content))
     def test_wrong_counts(self):
         self.validation["chunks"]=8763
