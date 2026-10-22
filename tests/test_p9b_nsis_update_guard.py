@@ -28,6 +28,20 @@ class InstallerAndUpdaterGuardTests(unittest.TestCase):
         self.assertLess(source.index("Function CheckRunningCodeBridgeBeforeUpdate"),
                         source.index('Section "CodeBridge" SEC_MAIN'))
 
+    def test_missing_registry_entry_checks_existing_install(self):
+        oninit=self.nsis.split("Function .onInit",1)[1].split("FunctionEnd",1)[0]
+        self.assertIn("check_default_path:",oninit)
+        fallback=oninit.split("check_default_path:",1)[1]
+        self.assertIn('IfFileExists "$INSTDIR\\app_rewrite\\main.py" 0 init_done',fallback)
+        self.assertIn("Call CheckRunningCodeBridgeBeforeUpdate",fallback)
+
+    def test_recheck_at_section_start_before_first_write(self):
+        section=self.nsis.split('Section "CodeBridge" SEC_MAIN',1)[1]
+        head=section.split('  SetOutPath "$INSTDIR"',1)[0]
+        self.assertIn("Call CheckRunningCodeBridgeBeforeUpdate",head)
+        self.assertLess(head.index("Call CheckRunningCodeBridgeBeforeUpdate"),
+                        head.index('DetailPrint "Atualizando'))
+
     def test_nsis_payload_includes_postupdate_guard_source(self):
         self.assertEqual(self.nsis.count('  File "p9b_update_process_guard.py"'),2)
 

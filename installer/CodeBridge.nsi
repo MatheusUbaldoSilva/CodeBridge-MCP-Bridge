@@ -95,10 +95,16 @@ Function .onInit
 
   ReadRegStr $InstalledVersion HKCU "${APP_REGKEY}" "Version"
   ReadRegStr $0 HKCU "${APP_REGKEY}" "InstallDir"
-  StrCmp $0 "" init_done
-  IfFileExists "$0\app_rewrite\main.py" 0 init_done
-
+  StrCmp $0 "" check_default_path
+  IfFileExists "$0\app_rewrite\main.py" 0 check_default_path
   StrCpy $INSTDIR "$0"
+  StrCpy $IsUpdate "1"
+  Call CheckRunningCodeBridgeBeforeUpdate
+  Goto init_done
+
+check_default_path:
+  ; Existing installation may have lost its registry entry.
+  IfFileExists "$INSTDIR\app_rewrite\main.py" 0 init_done
   StrCpy $IsUpdate "1"
   Call CheckRunningCodeBridgeBeforeUpdate
 
@@ -181,6 +187,9 @@ Section "CodeBridge" SEC_MAIN
   SetShellVarContext current
 
   StrCmp $IsUpdate "1" 0 installing
+    ; Recheck immediately before file overwrites: a process might
+    ; have restarted after the installer UI was opened.
+    Call CheckRunningCodeBridgeBeforeUpdate
     DetailPrint "Atualizando CodeBridge em $INSTDIR..."
     Goto mode_ready
   installing:
