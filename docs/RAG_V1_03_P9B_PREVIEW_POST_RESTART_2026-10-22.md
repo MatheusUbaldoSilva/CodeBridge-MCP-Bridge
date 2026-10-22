@@ -19,7 +19,7 @@ Auditoria P9B_NSIS_GIT_PAYLOAD_VERIFIED,
 
 Snapshot exclusivamente dos destinos sobrescritos pelo NSIS:
 FULL_NSIS_PREINSTALL_SNAPSHOT.zip
-SHA256 ad8d8c63397a1421a5858fb2f1b1746cfbda941d378cedd7b268b3931bb5fdf0d
+SHA256 ad8d8c6397a1421a5858fb2f1b1746cfbda941d378cedd7b268b3931bb5fdf0d
 258 destinos de installer, 236 arquivos existentes instalados.
 INSTALLER_ROLLBACK_SNAPSHOT_VERIFIED.
 INSTALLED_BASELINE_MATCH: 236/236.
@@ -46,3 +46,13 @@ prova de aus?ncia deve ser revalidada na hora do update real.
 Instalador de preview segue nao promovido e nao executado.
 O conjunto de 165 testes P9-B + lifecycle + NSIS voltou a passar
 APOS a recuperacao publica da stack.
+
+## Gate de par SHA256
+
+A checagem adicional identificou um erro de transcricao no hash
+anterior do snapshot (65 caracteres). Corrigido apos leitura
+SHA256 direta do ZIP no disco; nenhuma alteracao no arquivo ZIP.
+O modulo rag_p9b_artifact_pair_gate.py confirmou
+ARTIFACT_PAIR_VERIFIED_ONLY, com 236 arquivos conferidos,
+installer e snapshot ligados pelo manifesto interno e os dois
+hashes corretos. O resultado nao autoriza NSIS nem altera instalado.
