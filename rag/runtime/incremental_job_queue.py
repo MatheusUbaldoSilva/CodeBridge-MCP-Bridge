@@ -18,6 +18,10 @@ import uuid
 
 from rag.runtime.incremental_job_prequeue import assess_commit_index_event
 
+def _finite_nonnegative_time(value) -> bool:
+    return type(value) in (int, float) and math.isfinite(value) and value >= 0
+
+
 _DB_NAME = "incremental_jobs.sqlite3"
 _SCHEMA = """CREATE TABLE IF NOT EXISTS jobs (
  job_id TEXT PRIMARY KEY,
@@ -187,9 +191,13 @@ def claim_approved_job(
     """Transactional reservation ONLY: never execute worker/indexer."""
     if queue_enabled is not True:
         return _report("AUTO_INDEX_DISABLED", claimed=False)
-    if not (10 <= lease_seconds <= 3600 and 1 <= max_attempts <= 10):
+    if (not _finite_nonnegative_time(lease_seconds)
+            or not 10 <= lease_seconds <= 3600
+            or type(max_attempts) is not int or not 1 <= max_attempts <= 10):
         return _report("INVALID_CLAIM_POLICY", claimed=False)
-    now = time.time() if now_epoch is None else float(now_epoch)
+    now = time.time() if now_epoch is None else now_epoch
+    if not _finite_nonnegative_time(now):
+        return _report("INVALID_CLAIM_POLICY", claimed=False)
     db = _database_path(db_path)
     connection = _connection(db, create=False)
     if connection is None:
@@ -261,10 +269,14 @@ def report_staging_failure(
     """Bounded retry; only the current unexpired lease owner can act."""
     if queue_enabled is not True:
         return _report("AUTO_INDEX_DISABLED")
-    if not (1 <= max_attempts <= 10 and 0 <= retry_delay_seconds <= 3600
-            and isinstance(reason, str) and 0 < len(reason) <= 200):
+    if (type(max_attempts) is not int or not 1 <= max_attempts <= 10
+            or not _finite_nonnegative_time(retry_delay_seconds)
+            or retry_delay_seconds > 3600
+            or not isinstance(reason, str) or not 0 < len(reason) <= 200):
         return _report("INVALID_FAILURE_POLICY")
-    now = time.time() if now_epoch is None else float(now_epoch)
+    now = time.time() if now_epoch is None else now_epoch
+    if not _finite_nonnegative_time(now):
+        return _report("INVALID_FAILURE_POLICY")
     db = _database_path(db_path)
     connection = _connection(db, create=False)
     if connection is None:
@@ -363,7 +375,7 @@ def renew_job_lease(
     """Renew only a live reservation owned by this exact token."""
     if queue_enabled is not True:
         return _report("AUTO_INDEX_DISABLED", renewed=False)
-    if not (10 <= lease_seconds <= 3600):
+    if not _finite_nonnegative_time(lease_seconds) or not 10 <= lease_seconds <= 3600:
         return _report("INVALID_LEASE_POLICY", renewed=False)
     if not isinstance(job_id, str) or len(job_id) != 64 or any(
         ch not in "0123456789abcdef" for ch in job_id
@@ -371,7 +383,9 @@ def renew_job_lease(
         ch not in "0123456789abcdef" for ch in lease_token
     ):
         return _report("INVALID_LEASE_IDENTITY", renewed=False)
-    now = time.time() if now_epoch is None else float(now_epoch)
+    now = time.time() if now_epoch is None else now_epoch
+    if not _finite_nonnegative_time(now):
+        return _report("INVALID_LEASE_POLICY", renewed=False)
     db = _database_path(db_path)
     connection = _connection(db, create=False)
     if connection is None:
@@ -408,7 +422,9 @@ def acknowledge_staged_bundle(
             and isinstance(lease_token, str) and len(lease_token) == 32
             and all(c in "0123456789abcdef" for c in lease_token)):
         return _report("INVALID_LEASE_IDENTITY", acknowledged=False)
-    now = time.time() if now_epoch is None else float(now_epoch)
+    now = time.time() if now_epoch is None else now_epoch
+    if not _finite_nonnegative_time(now):
+        return _report("INVALID_LEASE_POLICY", acknowledged=False)
     db = _database_path(db_path)
     connection = _connection(db, create=False)
     if connection is None:
@@ -446,7 +462,7 @@ def acknowledge_staged_bundle(
                        error_type=type(exc).__name__)
     # Validation may take minutes. Never rely on the time captured at entry
     # when approving a lease after potentially expensive validation.
-    commit_now = time.time() if now_epoch is None else float(now_epoch)
+    commit_now = time.time() if now_epoch is None else now_epoch
     # Recheck the current source after potentially expensive vector validation.
     eligible = assess_commit_index_event(
         project_root, source, approved_paths=approved_paths,
