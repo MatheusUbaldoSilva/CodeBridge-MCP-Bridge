@@ -37,6 +37,16 @@ class FileRestoreTests(unittest.TestCase):
         self.assertEqual((self.lab/"pkg"/"old.py").read_bytes(),b"changed")
     def test_refuses_modified_snapshot(self):
         self.assertEqual(self.go(expected_sha256="f"*64)["reason"],"SNAPSHOT_DIGEST_INVALID")
+    def test_failed_replace_preserves_current_content(self):
+        with patch("installer.rag_p9b_file_restore_executor_lab.os.replace",
+                   side_effect=OSError("INJECTED_ATOMIC_REPLACE_ERROR")):
+            r=self.go()
+        self.assertEqual(r["reason"],"RESTORE_EXCEPTION")
+        self.assertEqual((self.lab/"pkg"/"old.py").read_bytes(),b"changed")
+        self.assertEqual((self.lab/"pkg"/"new.py").read_bytes(),
+                         b"P9B_LAB_INSTALLER_CREATED_V1")
+        self.assertEqual(list((self.lab/"pkg").glob(".p9b-restore-*")),[])
+
     def test_refuses_production_root(self):
         self.assertEqual(self.go(lab_root=self.installed)["reason"],"LAB_SCOPE_INVALID")
 if __name__=="__main__":unittest.main()

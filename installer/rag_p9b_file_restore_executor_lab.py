@@ -7,9 +7,32 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from tempfile import NamedTemporaryFile
 from pathlib import Path, PurePosixPath
 from zipfile import ZipFile
 from installer.rag_p9b_installer_rollback_scope import verify_installer_rollback_snapshot
+
+def _replace_old_file_atomically(target, data):
+    """Use same-directory fsync and replace; no half-written destination."""
+    target=Path(target)
+    if target.is_symlink() or not target.is_file() or target.parent.is_symlink():
+        raise ValueError("LAB_TARGET_NOT_REGULAR_FILE")
+    temp=None
+    try:
+        with NamedTemporaryFile(mode="wb",dir=target.parent,
+                                prefix=".p9b-restore-",suffix=".tmp",delete=False) as stream:
+            temp=Path(stream.name)
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if target.is_symlink() or not target.is_file():
+            raise ValueError("LAB_DESTINATION_CHANGED")
+        os.replace(temp,target)
+        temp=None
+    finally:
+        if temp is not None:
+            temp.unlink(missing_ok=True)
+
 
 def restore_files_in_lab(*, snapshot, installed, lab_root, expected_sha256,
                          new_file_marker=b"P9B_LAB_INSTALLER_CREATED_V1",
@@ -48,7 +71,8 @@ def restore_files_in_lab(*, snapshot, installed, lab_root, expected_sha256,
                 if hashlib.sha256(data).hexdigest()!=meta["sha256"]:
                     return {**result,"reason":"BACKUP_FILE_MISMATCH"}
             for rel in originals:
-                root.joinpath(*PurePosixPath(rel).parts).write_bytes(archive.read("old/"+rel))
+                _replace_old_file_atomically(root.joinpath(*PurePosixPath(rel).parts),
+                                             archive.read("old/"+rel))
             for rel in fresh:
                 root.joinpath(*PurePosixPath(rel).parts).unlink()
             verified=all(
