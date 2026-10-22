@@ -67,6 +67,15 @@ class RagIntegrityResult(ProtocolOutcome):
     error_message: str | None = None
 
 
+class RagQueueBootstrapResult(ProtocolOutcome):
+    state: str
+    executed: bool
+    safe_to_publish: bool
+    details: dict[str, Any]
+    error_type: str | None = None
+    error_message: str | None = None
+
+
 class RagIndexResult(ProtocolOutcome):
     action: str | None
     executed: bool
@@ -802,6 +811,55 @@ def codebridge_rag_integrity() -> RagIntegrityResult:
 
 
 @mcp.tool(
+    name="codebridge_rag_queue_bootstrap",
+    description=(
+        "Inspeciona ou inicializa, com autorizacao explicita vinculada "
+        "a geracao, SOMENTE a fila SQLite e o fence do RAG V1. "
+        "execute=false e o padrao somente leitura; NUNCA inicia worker, "
+        "scheduler ou publicacao."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        idempotent_hint=False,
+        open_world_hint=False,
+    ),
+    structured_output=True,
+)
+def codebridge_rag_queue_bootstrap(
+    execute: bool = False,
+    operator_approved: bool = False,
+    confirmation: str | None = None,
+    expected_generation: str | None = None,
+) -> RagQueueBootstrapResult:
+    try:
+        from rag.runtime.incremental_authorized_queue_bootstrap import (
+            bootstrap_installed_queue,
+        )
+        details = bootstrap_installed_queue(
+            execute=execute, operator_approved=operator_approved,
+            confirmation=confirmation, expected_generation=expected_generation,
+        )
+        return RagQueueBootstrapResult(
+            operation_ok=True,
+            state=str(details["state"]),
+            executed=bool(details["executed"]),
+            safe_to_publish=False,
+            details=details,
+        )
+    except Exception as exc:
+        error = _rag_public_error(exc)
+        return RagQueueBootstrapResult(
+            operation_ok=False,
+            operation_error_type=str(error["error_type"]),
+            operation_error_message=str(error["error_message"]),
+            state="QUEUE_BOOTSTRAP_ERROR", executed=False,
+            safe_to_publish=False, details={},
+            error_type=str(error["error_type"]),
+            error_message=str(error["error_message"]),
+        )
+
+
+@mcp.tool(
     name="codebridge_rag_index",
     description=(
         "Planeja ou executa indexacao RAG somente quando solicitada explicitamente. "
@@ -999,6 +1057,7 @@ def codebridge_capabilities() -> CapabilitiesResult:
     preferred_tools = [
         "codebridge_status",
         "codebridge_rag_status",
+        "codebridge_rag_queue_bootstrap",
         "codebridge_rag_index",
         "codebridge_search_context",
         "codebridge_get_context",
