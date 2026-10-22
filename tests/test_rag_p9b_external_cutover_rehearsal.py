@@ -64,6 +64,25 @@ class CutoverTests(unittest.TestCase):
         self.assertEqual(r["state"],"CUTOVER_GUI_RECOVERED")
         self.assertFalse(r["mcp_handshake_verified"])
 
+    def test_poststop_probe_exception_still_relaunches(self):
+        recover=Mock(return_value=dict(state="GUI_PROCESS_RECOVERED"))
+        def explode(root): raise RuntimeError("synthetic")
+        r=rehearse_cutover(".",expected_digest="abc",external_channel=True,
+                           execute=True,plan=plan,
+                           stop=lambda *a,**kw:dict(processes_stopped=True),
+                           verify=explode,recover=recover)
+        self.assertEqual(r["state"],"CUTOVER_POSTSTOP_UNVERIFIED")
+        recover.assert_called_once()
+
+    def test_recovery_exception_not_reported_success(self):
+        def explode(root): raise RuntimeError("synthetic")
+        r=rehearse_cutover(".",expected_digest="abc",external_channel=True,
+                           execute=True,plan=plan,
+                           stop=lambda *a,**kw:dict(processes_stopped=True),
+                           verify=lambda root:dict(observed_stopped=True),
+                           recover=explode)
+        self.assertEqual(r["state"],"CUTOVER_RECOVERY_UNVERIFIED")
+
     def test_failed_recovery_remains_unverified(self):
         r=rehearse_cutover(".",expected_digest="abc",external_channel=True,
                            execute=True,plan=plan,

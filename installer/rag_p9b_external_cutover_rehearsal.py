@@ -35,7 +35,10 @@ def rehearse_cutover(installed:Path, *, expected_digest:str,
                  execute=True,independent=True)
     if not stopped.get("processes_stopped"):
         if stopped.get("state")=="PARTIAL_SHUTDOWN":
-            restored=recover(installed)
+            try:
+                restored=recover(installed)
+            except Exception:
+                restored={"state":"RECOVERY_EXCEPTION"}
             return {**base,"state":"CUTOVER_PARTIAL_SHUTDOWN_RECOVERY_ATTEMPTED",
                     "stop_reason":stopped.get("reason"),
                     "recovery_state":restored.get("state"),
@@ -43,8 +46,15 @@ def rehearse_cutover(installed:Path, *, expected_digest:str,
         return {**base,"state":"CUTOVER_STOP_FAILED",
                 "stop_state":stopped.get("state"),
                 "reason":stopped.get("reason")}
-    proof=verify(installed)
-    recovery=recover(installed)
+    try:
+        proof=verify(installed)
+    except Exception:
+        proof={"state":"POSTSTOP_CHECK_EXCEPTION",
+               "observed_stopped":False,"reason":"POSTSTOP_CHECK_EXCEPTION"}
+    try:
+        recovery=recover(installed)
+    except Exception:
+        recovery={"state":"RECOVERY_EXCEPTION"}
     if recovery.get("state")!="GUI_PROCESS_RECOVERED":
         return {**base,"state":"CUTOVER_RECOVERY_UNVERIFIED",
                 "poststop":proof.get("state"),
