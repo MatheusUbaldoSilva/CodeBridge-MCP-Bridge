@@ -32,6 +32,18 @@ def inspect_installed_scheduler_preflight(
             "active_index_updated": False, "safe_to_publish": False,
             "activation_authorized": False,
         }
+    # A half-finished public generation transition forbids scheduling,
+    # even when all feature switches were previously enabled.
+    if (root / "production-generation-transition.json").exists():
+        return {
+            "state": "AUTONOMOUS_SCHEDULING_BLOCKED",
+            "blockers": ["PUBLIC_GENERATION_TRANSITION_PENDING"],
+            "worker_started": False, "scheduler_started": False,
+            "active_index_updated": False, "safe_to_publish": False,
+            "activation_authorized": False,
+            "queue_db": str(path), "queue_present": path.is_file(),
+            "installed_rag_root": str(root), "mode": "READ_ONLY_PREFLIGHT",
+        }
     gate = assess_autonomous_worker_gate(
         path, queue_enabled=queue_enabled, worker_enabled=worker_enabled,
         scheduler_enabled=scheduler_enabled, approved_source_paths=approved_source_paths,
