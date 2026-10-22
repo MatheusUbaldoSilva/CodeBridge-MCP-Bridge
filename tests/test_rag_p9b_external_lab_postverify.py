@@ -42,4 +42,20 @@ class ExternalLabVerifyGuardTests(unittest.TestCase):
                 journal=Path(root)/"missing.jsonl")
             self.assertEqual(r["reason"],"JOURNAL_CHAIN_INCOMPLETE")
 
+    def test_refuses_mismatched_archive_hash(self):
+        import hashlib,uuid
+        with tempfile.TemporaryDirectory() as root:
+            lab=Path(root)/"disposable"
+            lab.mkdir()
+            a=Path(root)/"archive-a.zip"
+            b=Path(root)/"archive-b.zip"
+            a.write_bytes(b"backup-a")
+            b.write_bytes(b"backup-b")
+            r=verify(lab=lab,snapshot=a,shell_snapshot=b,
+                appdata=lab,desktop=lab,registry_token=uuid.uuid4().hex,
+                snapshot_sha256="f"*64,
+                shell_sha256=hashlib.sha256(b.read_bytes()).hexdigest(),
+                journal=Path(root)/"not-used.jsonl")
+            self.assertEqual(r["reason"],"ARTIFACT_DIGEST_MISMATCH")
+
 if __name__=="__main__":unittest.main()
