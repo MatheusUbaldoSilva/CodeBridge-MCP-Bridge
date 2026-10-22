@@ -51,6 +51,14 @@ class ExternalSupervisorPreflightTests(unittest.TestCase):
         self.assertEqual(r["blockers"],["GUI","MCP"])
         self.assertFalse(r["safe_to_apply"])
 
+    def test_unrelated_system_process_age_unavailable_does_not_hide_mcp(self):
+        service=dict(pid=40,ppid=0,cmdline=["system.exe"],
+                     create_time=0.0)
+        r=self.check(service,self.proc(10,2,self.gui),
+                     self.proc(20,99,self.mcp))
+        self.assertEqual(r["state"],"SUPERVISOR_UPDATE_BLOCKED_RUNNING")
+        self.assertEqual(r["mcp_parent_absent"],[20])
+
     def test_duplicate_pid_blocks(self):
         r=self.check(self.proc(10,2,self.gui),self.proc(10,3,self.mcp))
         self.assertEqual(r["reason"],"DUPLICATE_OR_INVALID_PID")

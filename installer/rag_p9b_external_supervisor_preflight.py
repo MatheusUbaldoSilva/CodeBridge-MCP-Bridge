@@ -50,13 +50,13 @@ def assess_external_supervisor(installed: Path, *, records=None) -> dict:
             if not isinstance(cmdline, (list, tuple)):
                 opaque += 1
                 continue
-            if item.get("create_time") is not None:
-                birth = float(item["create_time"])
-                if not (0 < birth < float("inf")):
-                    return {**result, "reason": "PROCESS_CREATION_UNVERIFIED"}
-                births[pid] = birth
             arguments = {_path(token) for token in cmdline}
             matches = [kind for kind,path in scripts.items() if path in arguments]
+            external_age = item.get("create_time")
+            if external_age is not None:
+                external_age = float(external_age)
+                if 0 < external_age < float("inf"):
+                    births[pid] = external_age
             if not matches:
                 continue
             created = float(item["create_time"])
