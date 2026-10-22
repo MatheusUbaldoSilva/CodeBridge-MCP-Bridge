@@ -83,7 +83,9 @@ def main(argv=None):
     args=p.parse_args(argv)
     report=assess_external_supervisor(args.install_root)
     print(json.dumps(report,sort_keys=True))
-    return 0 if report["state"]=="SUPERVISOR_UPDATE_BLOCKED_RUNNING" else 2
+    # This CLI intentionally never returns a deployment-allowing exit code.
+    # An observed running stack is a blocker, not a successful cutover.
+    return 2
 
 
 if __name__=="__main__":

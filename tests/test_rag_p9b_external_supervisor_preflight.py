@@ -3,7 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from installer.rag_p9b_external_supervisor_preflight import assess_external_supervisor
+from installer.rag_p9b_external_supervisor_preflight import assess_external_supervisor,main
+from unittest.mock import patch
 
 
 class ExternalSupervisorPreflightTests(unittest.TestCase):
@@ -63,6 +64,11 @@ class ExternalSupervisorPreflightTests(unittest.TestCase):
         r=self.check(self.proc(10,2,self.gui))
         self.assertEqual(r["state"],"SUPERVISOR_TOPOLOGY_INCOMPLETE")
         self.assertFalse(r["safe_to_apply"])
+
+    def test_cli_never_reports_success_when_live_stack_blocked(self):
+        with patch("installer.rag_p9b_external_supervisor_preflight.assess_external_supervisor",
+                   return_value={"state":"SUPERVISOR_UPDATE_BLOCKED_RUNNING"}):
+            self.assertEqual(main(["--install-root",str(self.root)]),2)
 
     def test_nan_process_age_blocks(self):
         r=self.check(self.proc(10,2,self.gui,float("nan")))
