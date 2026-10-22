@@ -43,3 +43,12 @@ Esses testes NAO comprovam fechamento Win32 real nem reconexao MCP.
    e comprovar recuperacao; instalacao ainda NAO autorizada.
 
 P9-B continua ABERTA.
+
+## Correcao de falha apos primeiro sinal
+
+A excecao apos WM_CLOSE passa a registrar explicitamente
+PARTIAL_SHUTDOWN, recovery_required=true e lista de processos ja
+encerrados. Nao reporta SHUTDOWN_REFUSED inocuo depois de iniciar
+alteracoes no ciclo de vida. Teste simulado cobre erro de acesso
+ao tentar finalizar o MCP apos fechamento da GUI.
+Nao foi enviado qualquer sinal real ao sistema instalado.

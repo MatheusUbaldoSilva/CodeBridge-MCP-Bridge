@@ -25,6 +25,8 @@ def execute_shutdown(installed, *, expected_digest, execute=False,
         return {**result, "reason": "INDEPENDENT_EXECUTION_REQUIRED"}
     import psutil
     ps = psutil_module or psutil
+    shutdown_started = False
+    stopped = []
     try:
         records = [proc.info for proc in ps.process_iter(
             attrs=["pid", "ppid", "name", "exe", "cmdline", "create_time"])]
@@ -63,6 +65,7 @@ def execute_shutdown(installed, *, expected_digest, execute=False,
         gui=processes["GUI"]
         if not gui_close(gui.pid):
             return {**result,"reason":"GUI_WM_CLOSE_FAILED"}
+        shutdown_started = True
         for _ in range(50):
             if not gui.is_running():
                 break
@@ -93,4 +96,8 @@ def execute_shutdown(installed, *, expected_digest, execute=False,
                 "processes_stopped":True,"stopped":stopped,
                 "requires_official_process_guard":True}
     except (OSError, ValueError, KeyError, ps.AccessDenied, ps.NoSuchProcess):
+        if shutdown_started:
+            return {**result, "state":"PARTIAL_SHUTDOWN",
+                    "reason":"PROCESS_IDENTITY_OR_ACCESS_ERROR_AFTER_SIGNAL",
+                    "stopped":stopped,"recovery_required":True}
         return {**result,"reason":"PROCESS_IDENTITY_OR_ACCESS_ERROR"}

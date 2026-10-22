@@ -81,6 +81,20 @@ class ExecutorTests(unittest.TestCase):
         self.assertEqual(sum(p.terminated for p in fake.procs.values()),0)
 
     @patch("installer.rag_p9b_shutdown_executor.make_shutdown_plan",return_value=PLAN)
+    def test_failure_after_gui_signal_reports_partial_shutdown(self,_):
+        fake=self.setup_controller()
+        def gui_close(pid):
+            fake.procs[pid].running=False
+            return True
+        fake.procs[20].terminate=lambda: (_ for _ in ()).throw(OSError("access"))
+        r=execute_shutdown(".",expected_digest="abc",execute=True,
+                           independent=True,psutil_module=fake,
+                           gui_close=gui_close,sleep=lambda _:None)
+        self.assertEqual(r["state"],"PARTIAL_SHUTDOWN")
+        self.assertTrue(r["recovery_required"])
+        self.assertEqual(r["stopped"],["GUI"])
+
+    @patch("installer.rag_p9b_shutdown_executor.make_shutdown_plan",return_value=PLAN)
     def test_order_and_complete_stopped(self,_):
         fake=self.setup_controller()
         def gui_close(pid):
