@@ -66,3 +66,17 @@ Provar o bootstrap legitimo da fila instalada quando permitido, o ciclo
 supervisionado unico com lock + fence duravel + lease, recuperacao e rollback.
 Depois validar um unico arquivo de teste aprovado no CodeBridge real.
 Nao declarar RAG V1 concluida antes disso.
+
+## Auditoria de encerramento P9-A
+
+- Regressao integrada de 10 modulos relacionados a preview, fila, worker,
+  discovery e supervisor de laboratorio: 96 testes PASS (20,217 segundos).
+- Git rev-parse HEAD e upstream coincidiram em fad1680.
+- Tres entradas pendentes anteriores preservadas:
+  benchmarks/rag017_code_only_extended_smoke.json,
+  docs/RAG_017_J_VM_ROLLBACK_RUNBOOK_2026-10-10.md,
+  rag/runtime/incremental_installed_queue_init.py.
+- O teste de modelo real Jina executado nesta sessao passou isoladamente;
+  staging gerado em diretorio temporario, sem trocar o indice publico.
+- Esta auditoria nao autoriza criar fila no armazenamento instalado e nao
+  representa conclusao do agendador de producao.
