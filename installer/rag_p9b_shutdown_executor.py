@@ -27,6 +27,7 @@ def execute_shutdown(installed, *, expected_digest, execute=False,
     ps = psutil_module or psutil
     shutdown_started = False
     stopped = []
+    gui_diagnostic = []
     try:
         records = [proc.info for proc in ps.process_iter(
             attrs=["pid", "ppid", "name", "exe", "cmdline", "create_time"])]
@@ -52,11 +53,20 @@ def execute_shutdown(installed, *, expected_digest, execute=False,
                 if len(matched)!=1 or matched[0].get("visible") is not True:
                     return False
                 hwnd=matched[0]["hwnd"]
-                api=ctypes.windll.user32
-                return bool(api.PostMessageW(ctypes.c_void_p(hwnd),WM_CLOSE,0,0))
+                api=ctypes.WinDLL("user32",use_last_error=True)
+                api.PostMessageW.argtypes=[ctypes.c_void_p,ctypes.c_uint,ctypes.c_void_p,ctypes.c_void_p]
+                api.PostMessageW.restype=ctypes.c_int
+                allowed=bool(api.PostMessageW(ctypes.c_void_p(hwnd),WM_CLOSE,None,None))
+                if not allowed:
+                    gui_diagnostic.append(int(ctypes.get_last_error()))
+                return allowed
         gui=processes["GUI"]
         if not gui_close(gui.pid):
-            return {**result,"reason":"GUI_WM_CLOSE_FAILED"}
+            last_error=gui_diagnostic[0] if gui_diagnostic else None
+            reason=("GUI_WM_CLOSE_ACCESS_DENIED"
+                    if last_error==5 else "GUI_WM_CLOSE_FAILED")
+            return {**result,"reason":reason,
+                    "win32_last_error":last_error}
         shutdown_started = True
         for _ in range(50):
             if not gui.is_running():

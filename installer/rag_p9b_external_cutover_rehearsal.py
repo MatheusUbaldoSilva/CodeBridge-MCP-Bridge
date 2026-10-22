@@ -48,7 +48,8 @@ def rehearse_cutover(installed:Path, *, expected_digest:str,
                     "mcp_handshake_verified":False}
         return {**base,"state":"CUTOVER_STOP_FAILED",
                 "stop_state":stopped.get("state"),
-                "reason":stopped.get("reason")}
+                "reason":stopped.get("reason"),
+                "win32_last_error":stopped.get("win32_last_error")}
     try:
         proof=verify(installed)
     except Exception:

@@ -81,6 +81,16 @@ class ExecutorTests(unittest.TestCase):
         self.assertEqual(sum(p.terminated for p in fake.procs.values()),0)
 
     @patch("installer.rag_p9b_shutdown_executor.make_shutdown_plan",return_value=PLAN)
+    def test_denied_window_message_does_not_kill_gui(self,_):
+        fake=self.setup_controller()
+        r=execute_shutdown(".",expected_digest="abc",execute=True,
+                           independent=True,psutil_module=fake,
+                           gui_close=lambda pid:False)
+        self.assertEqual(r["reason"],"GUI_WM_CLOSE_FAILED")
+        self.assertFalse(r["processes_stopped"])
+        self.assertEqual(sum(p.terminated for p in fake.procs.values()),0)
+
+    @patch("installer.rag_p9b_shutdown_executor.make_shutdown_plan",return_value=PLAN)
     def test_failure_after_gui_signal_reports_partial_shutdown(self,_):
         fake=self.setup_controller()
         def gui_close(pid):

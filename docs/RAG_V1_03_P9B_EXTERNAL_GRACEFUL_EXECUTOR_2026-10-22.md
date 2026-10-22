@@ -63,3 +63,13 @@ HWND459010, titulo exato e visible=true, tanto via CodeBridge quanto
 Remote Desktop. O executor passou a reutilizar este preflight validado
 e a enviar WM_CLOSE com HWND explicitamente convertido a c_void_p.
 Ainda nao ha evidencia de parada real nem reconexao.
+
+## Bloqueio real Win32
+
+O canal independente tentou o WM_CLOSE sobre a janela correta.
+O user32/PostMessageW retornou 0, GetLastError=5 (ACCESS_DENIED).
+Estado CUTOVER_STOP_FAILED, GUI_WM_CLOSE_FAILED, nenhum sinal aceito
+e nenhum processo encerrado. Nao escalar para TerminateProcess por
+conveniencia. Recomenda-se fechamento controlado iniciado pela GUI
+em seu proprio contexto de integridade, com recuperacao independente
+ja armada e hash/estado novamente conferidos antes de NSIS.
