@@ -26,7 +26,7 @@ A inspecao nao alterou nenhum processo.
 ## Qualidade
 
 Suite integrada atual de P9-B, update guard e recovery:
-103 testes PASS na bateria integrada final atualizada, em Python portatil do CodeBridge.
+104 testes PASS na bateria integrada atualizada, em Python portatil do CodeBridge.
 Os arquivos preexistentes continuaram intocados.
 
 ## Artefatos de reversao e instalacao
@@ -54,6 +54,7 @@ Foram observadas 53 linhas de comando de processos opacos no contexto
 de permissao dessa execucao externa. A regra preserva o bloqueio e
 nao trata processos desconhecidos como autorizacao para install.
 A leitura foi bem sucedida; nenhuma parada foi executada.
+O preflight tambem rejeita identificador de pai negativo (commit 093cb11).
 A mesma superficie independente executou tambem o guard oficial:
 installer/p9b_update_process_guard.py.
 Resultado UPDATE_PROCESS_BLOCKED, bloqueadores
