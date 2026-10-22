@@ -20,3 +20,9 @@ reconexao externa ou inicializacao do tunel e servidor MCP.
 Nao executou GUI, MCP, tunnel, NSIS ou alterou indice RAG.
 O reinicio real continua dependente de canal externo supervisionado,
 processos realmente parados e snapshot compat?vel.
+
+## Regress?o integrada atual
+
+129 testes PASS abrangendo preflight, processo, desligamento
+simulado, pos-parada, reinicio por inventario, rollback e NSIS.
+Esse numero nao representa ensaio real de parada/restart.
