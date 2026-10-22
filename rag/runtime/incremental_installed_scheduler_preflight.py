@@ -5,6 +5,7 @@ from pathlib import Path
 
 from rag.runtime.incremental_scheduler_gate import assess_autonomous_worker_gate
 from rag.runtime.status import resolve_rag_sqlite_path
+from rag.runtime.incremental_scheduler_public_pointer import inspect_public_pointer_for_scheduler
 
 
 def inspect_installed_scheduler_preflight(
@@ -38,6 +39,18 @@ def inspect_installed_scheduler_preflight(
         return {
             "state": "AUTONOMOUS_SCHEDULING_BLOCKED",
             "blockers": ["PUBLIC_GENERATION_TRANSITION_PENDING"],
+            "worker_started": False, "scheduler_started": False,
+            "active_index_updated": False, "safe_to_publish": False,
+            "activation_authorized": False,
+            "queue_db": str(path), "queue_present": path.is_file(),
+            "installed_rag_root": str(root), "mode": "READ_ONLY_PREFLIGHT",
+        }
+    public_pointer = inspect_public_pointer_for_scheduler()
+    if public_pointer["state"] not in ("PUBLIC_POINTER_OBSERVED", "PUBLIC_LEGACY_POINTER"):
+        return {
+            "state": "AUTONOMOUS_SCHEDULING_BLOCKED",
+            "blockers": ["PUBLIC_POINTER_UNVERIFIED"],
+            "public_pointer": public_pointer,
             "worker_started": False, "scheduler_started": False,
             "active_index_updated": False, "safe_to_publish": False,
             "activation_authorized": False,
