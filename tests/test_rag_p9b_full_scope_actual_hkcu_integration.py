@@ -144,6 +144,17 @@ class FullScopeActualHKCUTests(unittest.TestCase):
                           result["fake_registry_keys"]),(236,22,5,2))
         self.assertTrue(self.postverify()["verified"])
         self.assertEqual(read_journal(self.journal_path)["count"],7)
+        # Re-open the restored files and live isolated HKCU from a fresh
+        # interpreter, with no reliance on in-process cached postchecks.
+        inspector=Path.cwd()/"installer"/"rag_p9b_external_lab_postverify.py"
+        child=subprocess.run([__import__("sys").executable,str(inspector),str(self.lab),
+            str(self.files_zip),str(self.shell_zip),str(self.appdata),
+            str(self.desktop),self.token,self.file_sha,self.shell_sha,str(self.journal_path)],capture_output=True,text=True,timeout=40)
+        self.assertEqual(child.returncode,0,child.stderr[-500:]+child.stdout[-500:])
+        report=json.loads(child.stdout.strip())
+        self.assertEqual(report["state"],"P9B_EXTERNAL_LAB_POSTVERIFY_MATCHED")
+        self.assertEqual((report["old_files"],report["new_targets_absent"],
+                          report["shortcuts"],report["hkcu_keys"]),(236,22,5,2))
 
     def test_foreign_file_refuses_before_real_hkcu(self):
         with ZipFile(self.files_zip) as z:
