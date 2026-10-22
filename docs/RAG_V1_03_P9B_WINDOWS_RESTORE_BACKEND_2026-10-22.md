@@ -36,3 +36,12 @@ scratch e journal de 2 etapas; segundo teste recusou
 journal j? existente antes de muta??o.
 Resultado continua APPLIED_POSTVERIFY_REQUIRED, nunca verified.
 Nenhuma opera??o de escrita em HKCU real foi executada.
+
+
+## Identidade exata do backup
+
+O backend agora recebe expected_sha256 obrigatorio. Recusa
+SNAPSHOT_DIGEST_MISMATCH se o arquivo ZIP do rollback nao
+corresponder ao hash exigido pelo controlador de cutover.
+Teste de backup divergente garante ausencia de mutacao.
+Os 9 testes combinados do backend/ensaio integrado passaram.

@@ -14,12 +14,18 @@ from installer.rag_p9b_shell_snapshot import verify_shell_snapshot
 from installer.rag_p9b_windows_shell_scope import APP_KEYS,MENU_LINKS,DESKTOP_LINK
 
 
-def restore_shell(*, snapshot, appdata, desktop, registry, stopped=False,
+def restore_shell(*, snapshot, expected_sha256, appdata, desktop, registry, stopped=False,
                   external=False, execute=False, journal=None):
     base={"state":"SHELL_BACKEND_REFUSED","verified":False,
           "rollback_attempted":False}
     if stopped is not True or external is not True or execute is not True or journal is None:
         return {**base,"reason":"EXPLICIT_INDEPENDENT_STOPPED_GATES_REQUIRED"}
+    expected=str(expected_sha256).lower()
+    file=Path(snapshot)
+    if (len(expected)!=64 or any(c not in "0123456789abcdef" for c in expected)
+            or not file.is_file() or file.is_symlink()
+            or hashlib.sha256(file.read_bytes()).hexdigest()!=expected):
+        return {**base,"reason":"SNAPSHOT_DIGEST_MISMATCH"}
     if not verify_shell_snapshot(snapshot).get("verified"):
         return {**base,"reason":"SNAPSHOT_UNVERIFIED"}
     targets=[Path(appdata)/"Microsoft"/"Windows"/"Start Menu"/"Programs"/"CodeBridge"/n

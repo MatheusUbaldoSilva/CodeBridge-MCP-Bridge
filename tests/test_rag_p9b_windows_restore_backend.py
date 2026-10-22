@@ -1,3 +1,4 @@
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -37,7 +38,7 @@ class BackendTests(unittest.TestCase):
         self.logs=[]
 
     def run_it(self,**kwargs):
-        options=dict(snapshot=self.snapshot,appdata=self.appdata,desktop=self.desktop,
+        options=dict(snapshot=self.snapshot,expected_sha256=hashlib.sha256(self.snapshot.read_bytes()).hexdigest(),appdata=self.appdata,desktop=self.desktop,
                      registry=self.registry,stopped=True,external=True,execute=True,
                      journal=lambda *x:self.logs.append(x))
         options.update(kwargs)
@@ -62,6 +63,12 @@ class BackendTests(unittest.TestCase):
         self.assertTrue(r["rollback_attempted"])
         self.assertTrue(r["compensation_verified"])
         self.assertEqual(self.link.read_bytes(),b"new-link")
+
+    def test_wrong_snapshot_digest_refused(self):
+        self.link.write_bytes(b"live")
+        r=self.run_it(expected_sha256="f"*64)
+        self.assertEqual(r["reason"],"SNAPSHOT_DIGEST_MISMATCH")
+        self.assertEqual(self.link.read_bytes(),b"live")
 
     def test_external_channel_required(self):
         r=self.run_it(external=False)
