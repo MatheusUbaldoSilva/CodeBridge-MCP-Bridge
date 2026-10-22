@@ -40,7 +40,9 @@ class BackendTests(unittest.TestCase):
 
     def run_it(self,**kwargs):
         options=dict(snapshot=self.snapshot,expected_sha256=hashlib.sha256(self.snapshot.read_bytes()).hexdigest(),appdata=self.appdata,desktop=self.desktop,
-                     registry=self.registry,stopped=True,external=True,execute=True,
+                     registry=self.registry,installed=self.root,
+                     process_guard=lambda _:{"state":"NO_RUNNING_CODEBRIDGE"},
+                     stopped=True,external=True,execute=True,
                      journal=lambda *x:self.logs.append(x))
         options.update(kwargs)
         return restore_shell(**options)
@@ -88,6 +90,12 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(r["state"],"SHELL_BACKEND_RECOVERY_REVIEW_REQUIRED")
         self.assertTrue(r["compensation_verified"])
         self.assertEqual(self.link.read_bytes(),b"before-transaction")
+
+    def test_process_guard_blocks_active_gui(self):
+        self.link.write_bytes(b"live")
+        r=self.run_it(process_guard=lambda _:{"state":"UPDATE_PROCESS_BLOCKED"})
+        self.assertEqual(r["reason"],"CODEBRIDGE_PROCESS_STILL_ACTIVE")
+        self.assertEqual(self.link.read_bytes(),b"live")
 
     def test_external_channel_required(self):
         r=self.run_it(external=False)

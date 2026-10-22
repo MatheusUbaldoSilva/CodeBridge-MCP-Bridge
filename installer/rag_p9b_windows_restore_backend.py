@@ -11,11 +11,13 @@ from pathlib import Path
 from zipfile import ZipFile
 
 from installer.rag_p9b_shell_snapshot import verify_shell_snapshot
+from installer.p9b_update_process_guard import inspect_update_processes
 from installer.rag_p9b_windows_shell_scope import APP_KEYS,MENU_LINKS,DESKTOP_LINK
 
 
-def restore_shell(*, snapshot, expected_sha256, appdata, desktop, registry, stopped=False,
-                  external=False, execute=False, journal=None):
+def restore_shell(*, snapshot, expected_sha256, appdata, desktop, registry, installed,
+                  stopped=False, external=False, execute=False, journal=None,
+                  process_guard=inspect_update_processes):
     base={"state":"SHELL_BACKEND_REFUSED","verified":False,
           "rollback_attempted":False}
     if stopped is not True or external is not True or execute is not True or journal is None:
@@ -28,6 +30,12 @@ def restore_shell(*, snapshot, expected_sha256, appdata, desktop, registry, stop
         return {**base,"reason":"SNAPSHOT_DIGEST_MISMATCH"}
     if not verify_shell_snapshot(snapshot).get("verified"):
         return {**base,"reason":"SNAPSHOT_UNVERIFIED"}
+    try:
+        guard=process_guard(installed)
+    except Exception:
+        return {**base,"reason":"PROCESS_GUARD_UNAVAILABLE"}
+    if not isinstance(guard,dict) or guard.get("state")!="NO_RUNNING_CODEBRIDGE":
+        return {**base,"reason":"CODEBRIDGE_PROCESS_STILL_ACTIVE"}
     targets=[Path(appdata)/"Microsoft"/"Windows"/"Start Menu"/"Programs"/"CodeBridge"/n
              for n in MENU_LINKS]+[Path(desktop)/DESKTOP_LINK]
     prior={}
