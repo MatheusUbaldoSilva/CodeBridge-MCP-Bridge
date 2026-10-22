@@ -42,3 +42,11 @@ P9-B + lifecycle + guard NSIS passou 152 testes.
 O preflight independente no Remote Desktop ainda observa GUI1376,
 MCP9300, adapter10768 e tunnel5608; 54 processos opacos gerais mas
 zero candidatos CodeBridge opacos. Nao foi efetuada parada real.
+
+## Gate integrado adicional
+
+O orquestrador agora exige verificar LOCAL_ADAPTER_AND_MCP_READY
+apos recuperar GUI e antes de retornar estado de stack local.
+Mesmo o estado CUTOVER_LOCAL_STACK_RECOVERED mantem
+mcp_handshake_verified=false, e exige reconexao publica real.
+Nao ha ainda prova de reinicio real do processo MCP.

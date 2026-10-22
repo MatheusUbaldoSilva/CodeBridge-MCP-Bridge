@@ -60,8 +60,10 @@ class CutoverTests(unittest.TestCase):
                            execute=True,plan=plan,
                            stop=lambda *a,**kw:dict(processes_stopped=True),
                            verify=lambda root:dict(observed_stopped=True),
-                           recover=lambda root:dict(state="GUI_PROCESS_RECOVERED"))
-        self.assertEqual(r["state"],"CUTOVER_GUI_RECOVERED")
+                           recover=lambda root:dict(state="GUI_PROCESS_RECOVERED"),
+                           local_health=lambda root:dict(verified=False,
+                                                         state="LOCAL_MCP_NOT_READY"))
+        self.assertEqual(r["state"],"CUTOVER_MCP_LOCAL_UNVERIFIED")
         self.assertFalse(r["mcp_handshake_verified"])
 
     def test_poststop_probe_exception_still_relaunches(self):
@@ -82,6 +84,17 @@ class CutoverTests(unittest.TestCase):
                            verify=lambda root:dict(observed_stopped=True),
                            recover=explode)
         self.assertEqual(r["state"],"CUTOVER_RECOVERY_UNVERIFIED")
+
+    def test_local_health_ready_still_requires_public_handshake(self):
+        r=rehearse_cutover(".",expected_digest="abc",external_channel=True,
+                           execute=True,plan=plan,
+                           stop=lambda *a,**kw:dict(processes_stopped=True),
+                           verify=lambda root:dict(observed_stopped=True),
+                           recover=lambda root:dict(state="GUI_PROCESS_RECOVERED"),
+                           local_health=lambda root:dict(verified=True,
+                                                         state="LOCAL_ADAPTER_AND_MCP_READY"))
+        self.assertEqual(r["state"],"CUTOVER_LOCAL_STACK_RECOVERED")
+        self.assertFalse(r["mcp_handshake_verified"])
 
     def test_failed_recovery_remains_unverified(self):
         r=rehearse_cutover(".",expected_digest="abc",external_channel=True,
