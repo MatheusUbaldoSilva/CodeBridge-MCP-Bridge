@@ -27,3 +27,14 @@ NSIS supervisionado com snapshot correspondente.
 125 testes PASS no conjunto P9-B + process lifecycle + update guard.
 Esse numero inclui as verificacoes de plano, pos-parada e simulacao.
 Nenhuma afirmacao de encerramento da GUI/MCP, update real ou job real.
+
+## Identificacao externa da janela GUI
+
+Remote Desktop observou o processo GUI pythonw.exe PID1376
+com titulo CodeBridge 2.0 - MCP Bridge e MainWindowHandle=459010.
+Essa prova torna possivel direcionar um pedido futuro de WM_CLOSE
+a janela correta, apos revalidacao de PID/create_time/HWND.
+O handle pertence a esta observacao e pode mudar apos reinicio.
+Nenhuma mensagem Win32 de fechamento foi enviada nesta fase.
+O MCP independente PID9300 requer fluxo proprio e nao pode ser
+presumido filho dessa janela.
