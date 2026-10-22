@@ -146,10 +146,12 @@ class AuthorMCPLifecycleTests(unittest.TestCase):
             return_value={
                 "adapter": [{
                     "pid": 10,
+                    "create_time": 100.0,
                     "live_codebridge_ancestor": True,
                 }],
                 "mcp": [{
                     "pid": 11,
+                    "create_time": 100.0,
                     "live_codebridge_ancestor": True,
                 }],
             }
@@ -176,16 +178,19 @@ class AuthorMCPLifecycleTests(unittest.TestCase):
                 "adapter": [
                     {
                         "pid": 20,
+                        "create_time": 100.0,
                         "live_codebridge_ancestor": False,
                     },
                     {
                         "pid": 21,
+                        "create_time": 100.0,
                         "live_codebridge_ancestor": False,
                     },
                 ],
                 "mcp": [
                     {
                         "pid": 30,
+                        "create_time": 100.0,
                         "live_codebridge_ancestor": False,
                     },
                 ],
@@ -211,6 +216,20 @@ class AuthorMCPLifecycleTests(unittest.TestCase):
             manager._recycled_pids,
             [20, 21, 30],
         )
+
+    def test_pid_reuse_aborts_before_terminating_any_process(self):
+        original=Mock()
+        original.create_time.return_value=100.0
+        reused=Mock()
+        reused.create_time.return_value=300.0
+        with patch("author_mcp_manager.psutil.Process",
+                   side_effect=lambda pid: {20:original,30:reused}[pid]):
+            with self.assertRaisesRegex(OSError,"PROCESS_PID_REUSED_BEFORE_SHUTDOWN"):
+                AuthorMCPManager._terminate_pids(
+                    [20,30],expected_create_times={20:100.0,30:100.0}
+                )
+        original.terminate.assert_not_called()
+        reused.terminate.assert_not_called()
 
     def test_unknown_partial_stack_is_not_killed(self):
         manager = self.make_manager()
