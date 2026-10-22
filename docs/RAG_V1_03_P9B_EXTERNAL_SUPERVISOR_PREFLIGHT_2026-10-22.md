@@ -54,6 +54,13 @@ Foram observadas 53 linhas de comando de processos opacos no contexto
 de permissao dessa execucao externa. A regra preserva o bloqueio e
 nao trata processos desconhecidos como autorizacao para install.
 A leitura foi bem sucedida; nenhuma parada foi executada.
+A mesma superficie independente executou tambem o guard oficial:
+installer/p9b_update_process_guard.py.
+Resultado UPDATE_PROCESS_BLOCKED, bloqueadores
+CODEBRIDGE_GUI_RUNNING / CODEBRIDGE_MCP_RUNNING,
+PIDs GUI=1376 e MCP=9300, com installer_launch_authorized=false.
+Nenhuma modificacao instalada; essa verificacao nao concede cutover.
+
 Commit de compatibilidade com processos sistemicos sem idade legivel:
 b91d371.
 
