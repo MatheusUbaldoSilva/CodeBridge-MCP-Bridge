@@ -62,7 +62,10 @@ def restore_files_in_lab(*, snapshot, installed, lab_root, expected_sha256,
                 target=root.joinpath(*relative.parts)
                 if target.is_symlink() or any(parent.is_symlink() for parent in target.parents if root in parent.parents):
                     return {**result,"reason":"TARGET_SYMLINK"}
-                if rel in fresh and (not target.is_file() or target.read_bytes()!=new_file_marker):
+                # Absent new files may indicate a previous interrupted
+                # rollback; a present file still needs exact ownership proof.
+                if rel in fresh and (target.exists() and (
+                        not target.is_file() or target.read_bytes()!=new_file_marker)):
                     return {**result,"reason":"UNRECOGNIZED_NEW_TARGET"}
                 if rel in originals and not target.is_file():
                     return {**result,"reason":"ORIGINAL_TARGET_MISSING"}
@@ -74,7 +77,7 @@ def restore_files_in_lab(*, snapshot, installed, lab_root, expected_sha256,
                 _replace_old_file_atomically(root.joinpath(*PurePosixPath(rel).parts),
                                              archive.read("old/"+rel))
             for rel in fresh:
-                root.joinpath(*PurePosixPath(rel).parts).unlink()
+                root.joinpath(*PurePosixPath(rel).parts).unlink(missing_ok=True)
             verified=all(
                 hashlib.sha256(root.joinpath(*PurePosixPath(rel).parts).read_bytes()).hexdigest()==meta["sha256"]
                 for rel,meta in originals.items())

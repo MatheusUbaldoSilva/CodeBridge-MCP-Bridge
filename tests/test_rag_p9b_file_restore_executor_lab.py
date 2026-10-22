@@ -31,6 +31,17 @@ class FileRestoreTests(unittest.TestCase):
         self.assertEqual(r["state"],"FILE_RESTORE_LAB_VERIFIED")
         self.assertEqual((self.lab/"pkg"/"old.py").read_bytes(),b"before")
         self.assertFalse((self.lab/"pkg"/"new.py").exists())
+    def test_recovery_is_idempotent_after_success(self):
+        self.assertTrue(self.go()["verified"])
+        again=self.go()
+        self.assertEqual(again["state"],"FILE_RESTORE_LAB_VERIFIED")
+        self.assertEqual((self.lab/"pkg"/"old.py").read_bytes(),b"before")
+        self.assertFalse((self.lab/"pkg"/"new.py").exists())
+    def test_missing_new_file_from_partial_rollback_is_accepted(self):
+        (self.lab/"pkg"/"new.py").unlink()
+        r=self.go()
+        self.assertEqual(r["state"],"FILE_RESTORE_LAB_VERIFIED")
+
     def test_refuses_unknown_new_file(self):
         (self.lab/"pkg"/"new.py").write_bytes(b"foreign")
         self.assertEqual(self.go()["reason"],"UNRECOGNIZED_NEW_TARGET")
