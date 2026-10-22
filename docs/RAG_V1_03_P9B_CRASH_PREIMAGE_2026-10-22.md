@@ -34,3 +34,16 @@ CRASH_RECOVERY_REFUSED/CODEBRIDGE_STILL_ACTIVE.
 Six testes simulados PASS. O hash antigo desta preimagem
 tinha erro de transcricao; o SHA256 correto foi extraido
 diretamente do arquivo e tem 64 caracteres.
+
+
+## Conferencia direta de preimagem e falha simultanea de journal
+
+O backend agora exige caminho do ZIP de preimagem e SHA256
+e chama o verificador de conteudo diretamente antes de
+qualquer mutacao. O ensaio integrado passou usando ZIP real
+de laboratorio, nao uma prova simulada injetada.
+Se a gravacao do evento SHELL_BACKEND_PARTIAL_FAILURE falhar,
+a compensacao de arquivos e registro ainda e tentada,
+e JOURNAL_WRITE_FAILED fica explicito no resultado.
+Teste combinado de falha do registro e journal PASS.
+Nao houve escrita no HKCU da maquina em uso.

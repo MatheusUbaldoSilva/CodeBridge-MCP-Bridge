@@ -42,7 +42,8 @@ class BackendTests(unittest.TestCase):
         options=dict(snapshot=self.snapshot,expected_sha256=hashlib.sha256(self.snapshot.read_bytes()).hexdigest(),appdata=self.appdata,desktop=self.desktop,
                      registry=self.registry,installed=self.root,
                      process_guard=lambda _:{"state":"NO_RUNNING_CODEBRIDGE"},
-                     preimage_proof=lambda:{"state":"CRASH_PREIMAGE_VERIFIED","verified":True},
+                     preimage="proof.zip",preimage_sha256="a"*64,
+                     preimage_verifier=lambda *a:{"state":"CRASH_PREIMAGE_VERIFIED","verified":True},
                      stopped=True,external=True,execute=True,
                      journal=lambda *x:self.logs.append(x))
         options.update(kwargs)
@@ -92,6 +93,17 @@ class BackendTests(unittest.TestCase):
         self.assertTrue(r["compensation_verified"])
         self.assertEqual(self.link.read_bytes(),b"before-transaction")
 
+    def test_journal_failure_does_not_skip_compensation(self):
+        self.link.write_bytes(b"new-link")
+        self.registry.fail=True
+        def journal(state,detail):
+            if state=="SHELL_BACKEND_PARTIAL_FAILURE":
+                raise OSError("disk journal failed")
+        r=self.run_it(journal=journal)
+        self.assertEqual(r["state"],"SHELL_BACKEND_RECOVERY_REVIEW_REQUIRED")
+        self.assertIn("JOURNAL_WRITE_FAILED",r["compensation_errors"])
+        self.assertEqual(self.link.read_bytes(),b"new-link")
+
     def test_process_guard_blocks_active_gui(self):
         self.link.write_bytes(b"live")
         r=self.run_it(process_guard=lambda _:{"state":"UPDATE_PROCESS_BLOCKED"})
@@ -100,13 +112,13 @@ class BackendTests(unittest.TestCase):
 
     def test_missing_preimage_refuses_mutation(self):
         self.link.write_bytes(b"live")
-        r=self.run_it(preimage_proof=None)
+        r=self.run_it(preimage=None)
         self.assertEqual(r["reason"],"DURABLE_PREIMAGE_REQUIRED")
         self.assertEqual(self.link.read_bytes(),b"live")
 
     def test_unverified_preimage_refuses_mutation(self):
         self.link.write_bytes(b"live")
-        r=self.run_it(preimage_proof=lambda:{"verified":False})
+        r=self.run_it(preimage_verifier=lambda *a:{"verified":False})
         self.assertEqual(r["reason"],"DURABLE_PREIMAGE_UNVERIFIED")
         self.assertEqual(self.link.read_bytes(),b"live")
 

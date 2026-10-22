@@ -12,12 +12,14 @@ from zipfile import ZipFile
 
 from installer.rag_p9b_shell_snapshot import verify_shell_snapshot
 from installer.p9b_update_process_guard import inspect_update_processes
+from installer.rag_p9b_crash_preimage import verify_crash_preimage
 from installer.rag_p9b_windows_shell_scope import APP_KEYS,MENU_LINKS,DESKTOP_LINK
 
 
 def restore_shell(*, snapshot, expected_sha256, appdata, desktop, registry, installed,
                   stopped=False, external=False, execute=False, journal=None,
-                  process_guard=inspect_update_processes, preimage_proof=None):
+                  process_guard=inspect_update_processes, preimage=None,
+                  preimage_sha256=None, preimage_verifier=verify_crash_preimage):
     base={"state":"SHELL_BACKEND_REFUSED","verified":False,
           "rollback_attempted":False}
     if stopped is not True or external is not True or execute is not True or journal is None:
@@ -36,10 +38,10 @@ def restore_shell(*, snapshot, expected_sha256, appdata, desktop, registry, inst
         return {**base,"reason":"PROCESS_GUARD_UNAVAILABLE"}
     if not isinstance(guard,dict) or guard.get("state")!="NO_RUNNING_CODEBRIDGE":
         return {**base,"reason":"CODEBRIDGE_PROCESS_STILL_ACTIVE"}
-    if preimage_proof is None:
+    if preimage is None or preimage_sha256 is None:
         return {**base,"reason":"DURABLE_PREIMAGE_REQUIRED"}
     try:
-        attestation=preimage_proof()
+        attestation=preimage_verifier(preimage,preimage_sha256)
     except Exception:
         return {**base,"reason":"DURABLE_PREIMAGE_UNVERIFIED"}
     if (not isinstance(attestation,dict)
@@ -82,8 +84,12 @@ def restore_shell(*, snapshot, expected_sha256, appdata, desktop, registry, inst
             return {"state":"SHELL_BACKEND_APPLIED_POSTVERIFY_REQUIRED",
                     "verified":False,"rollback_attempted":False}
         except Exception as exc:
-            journal("SHELL_BACKEND_PARTIAL_FAILURE",{"exception":type(exc).__name__})
-            compensation_errors=[]
+            journal_failure=False
+            try:
+                journal("SHELL_BACKEND_PARTIAL_FAILURE",{"type":type(exc).__name__})
+            except Exception:
+                journal_failure=True
+            compensation_errors=["JOURNAL_WRITE_FAILED"] if journal_failure else []
             for key in reversed(registry_touched):
                 try:registry.replace_key(key,old_registry[key])
                 except Exception:compensation_errors.append("REGISTRY")
