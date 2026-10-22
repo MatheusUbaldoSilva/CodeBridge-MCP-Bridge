@@ -77,7 +77,12 @@ def inspect_installed_scheduler_preflight(
         durable_store=durable_store,
         expected_durable_generation=expected_durable_generation,
     )
+    # A read-only snapshot is not an atomic release fence. Detect a changed
+    # public pointer/journal and invalidate the apparent readiness.
+    pointer_after = inspect_public_pointer_for_scheduler()
     blockers = list(gate["blockers"])
+    if pointer_after != public_pointer or (root / "production-generation-transition.json").exists():
+        blockers.append("PUBLIC_POINTER_CHANGED_DURING_PREFLIGHT")
     if not installed_fence_valid:
         blockers.append("INSTALLED_DURABLE_FENCE_REQUIRED")
     return {
