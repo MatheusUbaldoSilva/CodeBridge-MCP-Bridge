@@ -41,9 +41,10 @@ def assess_external_supervisor(installed: Path, *, records=None) -> dict:
     try:
         for item in records:
             pid = int(item["pid"])
+            parent_pid = int(item.get("ppid") or 0)
             if pid == 0:
                 continue
-            if pid <= 0 or pid in seen:
+            if pid <= 0 or parent_pid < 0 or pid in seen:
                 return {**result, "reason": "DUPLICATE_OR_INVALID_PID"}
             seen.add(pid)
             cmdline = item.get("cmdline")
@@ -65,7 +66,7 @@ def assess_external_supervisor(installed: Path, *, records=None) -> dict:
             if len(matches) != 1:
                 return {**result, "reason": "AMBIGUOUS_PROCESS_ROLE"}
             found.append(dict(component=matches[0], pid=pid,
-                              parent_pid=int(item.get("ppid") or 0),
+                              parent_pid=parent_pid,
                               create_time=created))
     except (KeyError, TypeError, ValueError, OverflowError):
         return {**result, "reason": "PROCESS_IDENTITY_UNVERIFIED"}
