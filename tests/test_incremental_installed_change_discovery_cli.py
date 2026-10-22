@@ -53,6 +53,33 @@ class InstalledChangeDiscoveryCliTests(unittest.TestCase):
             self.assertEqual(main(["--approve-source", "sample.py",
                                    "--changed-at-epoch", "123"]), 2)
 
+    def test_explicit_handoff_is_display_only(self):
+        with patch("rag.runtime.incremental_installed_change_discovery_cli.discover_installed_reindex_scope",
+                   return_value={"state": "INDEXED_SOURCES_CURRENT"}), patch(
+            "rag.runtime.incremental_installed_change_discovery_cli.preview_approved_unindexed_sources",
+            return_value={"state": "EXPLICIT_SOURCE_PREVIEW_ONLY",
+                          "candidates": [{"path": "sample.py",
+                                          "state": "ELIGIBLE_FOR_DURABLE_QUEUE"}]},
+        ), patch(
+            "rag.runtime.incremental_installed_change_discovery_cli.prepare_preview_queue_handoff",
+            return_value={"state": "ADVISORY_QUEUE_INTENTS_PREPARED",
+                          "queued": False, "intents": [{"source_path": "sample.py"}]},
+        ) as handoff, patch("sys.stdout", new_callable=StringIO) as out:
+            code = main(["--approve-source", "sample.py",
+                         "--changed-at-epoch", "123", "--show-queue-intent"])
+        self.assertEqual(code, 0)
+        report = json.loads(out.getvalue())
+        self.assertFalse(report["queue_updated"])
+        self.assertFalse(report["queue_intent"]["queued"])
+        self.assertEqual(handoff.call_args.kwargs["approved_paths"], ("sample.py",))
+
+    def test_intent_without_approval_fails_closed(self):
+        with patch("rag.runtime.incremental_installed_change_discovery_cli.discover_installed_reindex_scope",
+                   return_value={"state": "INDEXED_SOURCES_CURRENT"}), patch(
+            "sys.stdout", new_callable=StringIO,
+        ):
+            self.assertEqual(main(["--show-queue-intent"]), 2)
+
     def test_preview_produces_read_only_report(self):
         with patch("rag.runtime.incremental_installed_change_discovery_cli.discover_installed_reindex_scope",
                    return_value={"state": "INDEXED_SOURCES_CURRENT"}), patch(
