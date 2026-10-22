@@ -35,3 +35,14 @@ Ensaio separado de reinicio real anterior:
 journal LOCAL_MCP_RECOVERED_PUBLIC_RECHECK_REQUIRED;
 recuperacao GUI/MCP/tunnel confirmada por canal independente e
 handshake publico ChatGPT CBMCP/1 READY. P9-B continua aberta.
+
+## Gate operacional atual e regressao
+
+A rotina official_update_preflight encontrou unicamente:
+ACTIVE_MCP_MUST_SHUT_DOWN e ACTIVE_CODEBRIDGE_GUI_MUST_SHUT_DOWN.
+Nao existe autorizacao para disparar NSIS com esses processos vivos.
+Independente de uma parada anterior recuperada com sucesso, a
+prova de aus?ncia deve ser revalidada na hora do update real.
+Instalador de preview segue nao promovido e nao executado.
+O conjunto de 165 testes P9-B + lifecycle + NSIS voltou a passar
+APOS a recuperacao publica da stack.
