@@ -79,6 +79,8 @@ def verify_crash_preimage(path, expected_sha256):
         with ZipFile(source) as archive:
             names=archive.namelist()
             if len(names)!=len(set(names)):return {**base,"reason":"DUPLICATE_MEMBERS"}
+            if archive.getinfo("manifest.json").file_size > 16384:
+                return {**base,"reason":"MANIFEST_OVERSIZED"}
             meta=json.loads(archive.read("manifest.json"))
             if (meta.get("schema")!=1 or meta.get("purpose")!="P9B_CRASH_PREIMAGE"
                     or set(meta.get("registry",{}))!=set(APP_KEYS)
@@ -99,7 +101,11 @@ def verify_crash_preimage(path, expected_sha256):
             if set(names)!=expected_members:return {**base,"reason":"EXTRA_MEMBERS"}
             for key,allowed in zip(APP_KEYS,_ALLOWED_REGISTRY_NAMES):
                 entry=meta["registry"][key]
-                if not isinstance(entry.get("exists"),bool) or set(entry.get("values",{}))-set(allowed):
+                if (not isinstance(entry,dict)
+                        or not isinstance(entry.get("exists"),bool)
+                        or not isinstance(entry.get("values"),dict)
+                        or set(entry["values"])-set(allowed)
+                        or (not entry["exists"] and entry["values"])):
                     return {**base,"reason":"REGISTRY_SCOPE_INVALID"}
                 for value in entry["values"].values():
                     if (value.get("type") not in (1,4)

@@ -59,3 +59,13 @@ CRASH_REPLAY_SCRATCH_VERIFIED; restored_shortcuts=5;
 reviewed_registry_keys=2; registry_modified=false;
 real_shortcuts_modified=false. Tres testes PASS.
 Nao equivale a execucao real de rollback do registro ou NSIS.
+
+
+## Defesa contra metadados malformados
+
+O verificador de preimagem limita manifest.json a 16 KiB antes
+de carrega-lo e exige coerencia do estado da chave HKCU (uma
+chave ausente nao pode conter valores). Um teste adulterou o
+ZIP com estado impossivel e recalculou o SHA256 valido:
+o verificador recusou REGISTRY_SCOPE_INVALID.
+Seis testes do componente PASS.

@@ -1,4 +1,7 @@
+import json
+import hashlib
 import tempfile
+from zipfile import ZipFile
 import unittest
 from pathlib import Path
 from installer.rag_p9b_crash_preimage import create_crash_preimage,verify_crash_preimage
@@ -44,6 +47,23 @@ class CrashPreimageTests(unittest.TestCase):
         self.file.write_bytes(b"tampered")
         self.assertEqual(verify_crash_preimage(self.file,r["sha256"])["reason"],
                          "SHA256_MISMATCH")
+
+    def test_inconsistent_registry_archive_rejected(self):
+        r=self.make()
+        with ZipFile(self.file) as archive:
+            meta=json.loads(archive.read("manifest.json"))
+            saved={name:archive.read(name) for name in archive.namelist()
+                   if name!="manifest.json"}
+        first=next(iter(meta["registry"]))
+        meta["registry"][first]={"exists":False,"values":
+                                    {"Version":{"type":1,"value":"2.0"}}}
+        self.file.unlink()
+        with ZipFile(self.file,"w") as archive:
+            archive.writestr("manifest.json",json.dumps(meta))
+            for name,data in saved.items():archive.writestr(name,data)
+        digest=hashlib.sha256(self.file.read_bytes()).hexdigest()
+        self.assertEqual(verify_crash_preimage(self.file,digest)["reason"],
+                         "REGISTRY_SCOPE_INVALID")
 
     def test_foreign_registry_value_refused(self):
         class Foreign:
