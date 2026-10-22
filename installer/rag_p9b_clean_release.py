@@ -132,8 +132,12 @@ def build_p9b_preview(repo: Path, payload: Path, output: Path,
                  exported["commit"]],
                 capture_output=True, text=True, timeout=15, check=True,
             ).stdout.splitlines())
+            plugin_gate = "$PLUGINSDIR/p9b_update_process_guard.py"
+            if (plugin_gate not in paths
+                    or "installer/p9b_update_process_guard.py" not in tracked):
+                return {**fail, "reason": "NSIS_PROCESS_GUARD_MISSING"}
             rogue = sorted(name for name in paths if name.endswith(".py")
-                           and name not in tracked)
+                           and name not in tracked and name != plugin_gate)
             if rogue:
                 return {**fail, "reason": "UNCOMMITTED_PYTHON_PAYLOAD",
                         "rejected_paths": rogue[:10]}

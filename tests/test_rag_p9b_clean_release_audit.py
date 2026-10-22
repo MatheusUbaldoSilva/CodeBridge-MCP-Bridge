@@ -44,9 +44,13 @@ class NsIsPayloadAuditTests(unittest.TestCase):
         self.assertFalse(result["verified"])
 
     def test_untracked_python_draft_rejected_from_binary_listing(self):
-        tracked = CompletedProcess([], 0, stdout="author_mcp/mcp_server.py\n")
+        tracked = CompletedProcess([], 0, stdout=(
+            "author_mcp/mcp_server.py\n"
+            "installer/p9b_update_process_guard.py\n"
+        ))
         binary = CompletedProcess([], 0, stdout=(
             "Path = author_mcp\\mcp_server.py\n"
+            "Path = $PLUGINSDIR\\p9b_update_process_guard.py\n"
             "Path = rag\\runtime\\incremental_installed_queue_init.py\n"
         ))
         with patch(
@@ -60,6 +64,23 @@ class NsIsPayloadAuditTests(unittest.TestCase):
                       result["unexpected"])
         self.assertEqual(run.call_count, 2)
         self.assertFalse(result["installed_modified"])
+
+    def test_missing_embedded_process_guard_is_rejected(self):
+        tracked = CompletedProcess([], 0, stdout=(
+            "author_mcp/mcp_server.py\n"
+            "installer/p9b_update_process_guard.py\n"
+        ))
+        binary = CompletedProcess([], 0, stdout=(
+            "Path = author_mcp\\mcp_server.py\n"
+        ))
+        with patch(
+            "installer.rag_p9b_clean_release_audit.subprocess.run",
+            side_effect=[tracked, binary],
+        ):
+            report=self.inspect()
+        self.assertFalse(report["verified"])
+        self.assertEqual(report["reason"],"NSIS_PROCESS_GUARD_MISSING")
+
 
 
 if __name__ == "__main__":

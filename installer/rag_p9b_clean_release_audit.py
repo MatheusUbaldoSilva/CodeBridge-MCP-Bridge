@@ -33,8 +33,12 @@ def audit_p9b_nsis_payload(repo: Path, installer: Path, seven_zip: Path,
             line.split(" = ", 1)[1].replace("\\", "/")
             for line in metadata.stdout.splitlines() if line.startswith("Path = ")
         }
+        plugin_gate = "$PLUGINSDIR/p9b_update_process_guard.py"
+        if (plugin_gate not in filenames
+                or "installer/p9b_update_process_guard.py" not in tracked):
+            return {**blocked, "reason": "NSIS_PROCESS_GUARD_MISSING"}
         untracked = sorted(name for name in filenames if name.endswith(".py")
-                           and name not in tracked)
+                           and name not in tracked and name != plugin_gate)
         if (untracked or any(name not in filenames for name in OVERLAY_FILES)
                 or "rag/runtime/incremental_installed_queue_init.py" in filenames):
             return {**blocked, "reason": "UNCOMMITTED_OR_MISSING_PYTHON",
@@ -42,7 +46,7 @@ def audit_p9b_nsis_payload(repo: Path, installer: Path, seven_zip: Path,
         with TemporaryDirectory(prefix="codebridge_p9b_nsis_audit_") as temp:
             unpack = subprocess.run(
                 [str(seven_zip), "x", "-y", "-o"+str(temp),
-                 str(installer), *OVERLAY_FILES],
+                 str(installer), *OVERLAY_FILES, plugin_gate],
                 capture_output=True, text=True, check=True, timeout=70,
             )
             if unpack.returncode != 0:
@@ -58,6 +62,15 @@ def audit_p9b_nsis_payload(repo: Path, installer: Path, seven_zip: Path,
                 ).stdout
                 if path.read_bytes().replace(b"\r\n", b"\n") != git_bytes:
                     return {**blocked, "reason": "MODULE_CONTENT_MISMATCH"}
+            plugin_file = Path(temp) / "$PLUGINSDIR" / "p9b_update_process_guard.py"
+            git_gate = subprocess.run(
+                ["git", "-C", str(repo), "show",
+                 f"{expected_commit}:installer/p9b_update_process_guard.py"],
+                capture_output=True, check=True, timeout=10,
+            ).stdout
+            if (not plugin_file.is_file() or
+                    plugin_file.read_bytes().replace(b"\r\n", b"\n") != git_gate):
+                return {**blocked, "reason": "PROCESS_GUARD_BYTES_MISMATCH"}
         return {"state": "P9B_NSIS_GIT_PAYLOAD_VERIFIED", "verified": True,
                 "source_commit": expected_commit, "module_count": len(OVERLAY_FILES),
                 "noncommitted_python": 0, "payload_entries": len(filenames),
