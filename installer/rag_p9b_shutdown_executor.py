@@ -46,22 +46,14 @@ def execute_shutdown(installed, *, expected_digest, execute=False,
             if os.name != "nt":
                 return {**result,"reason":"WINDOWS_REQUIRED"}
             def gui_close(pid):
-                user32=ctypes.windll.user32
-                found=[]
-                @ctypes.WINFUNCTYPE(ctypes.c_bool,ctypes.c_void_p,ctypes.c_void_p)
-                def each(hwnd,_):
-                    target=ctypes.c_ulong()
-                    user32.GetWindowThreadProcessId(hwnd,ctypes.byref(target))
-                    if target.value==pid and user32.IsWindowVisible(hwnd):
-                        buf=ctypes.create_unicode_buffer(256)
-                        user32.GetWindowTextW(hwnd,buf,256)
-                        if buf.value=="CodeBridge 2.0 - MCP Bridge":
-                            found.append(hwnd)
-                    return True
-                user32.EnumWindows(each,None)
-                if len(found)!=1:
+                from installer.rag_p9b_gui_window_preflight import inspect_gui_windows
+                report=inspect_gui_windows(pid)
+                matched=report.get("matched",[])
+                if len(matched)!=1 or matched[0].get("visible") is not True:
                     return False
-                return bool(user32.PostMessageW(found[0],WM_CLOSE,0,0))
+                hwnd=matched[0]["hwnd"]
+                api=ctypes.windll.user32
+                return bool(api.PostMessageW(ctypes.c_void_p(hwnd),WM_CLOSE,0,0))
         gui=processes["GUI"]
         if not gui_close(gui.pid):
             return {**result,"reason":"GUI_WM_CLOSE_FAILED"}

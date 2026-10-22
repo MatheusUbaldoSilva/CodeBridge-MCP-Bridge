@@ -52,3 +52,14 @@ encerrados. Nao reporta SHUTDOWN_REFUSED inocuo depois de iniciar
 alteracoes no ciclo de vida. Teste simulado cobre erro de acesso
 ao tentar finalizar o MCP apos fechamento da GUI.
 Nao foi enviado qualquer sinal real ao sistema instalado.
+
+## Primeira tentativa real externa e diagnostico
+
+A rotina foi chamada exclusivamente pelo Remote Desktop com plano
+de identidade fresco. Resultado: CUTOVER_STOP_FAILED /
+GUI_WM_CLOSE_FAILED. Nenhum processo foi encerrado.
+A janela GUI foi reconhecida por preflight Win32 independente, PID1376,
+HWND459010, titulo exato e visible=true, tanto via CodeBridge quanto
+Remote Desktop. O executor passou a reutilizar este preflight validado
+e a enviar WM_CLOSE com HWND explicitamente convertido a c_void_p.
+Ainda nao ha evidencia de parada real nem reconexao.
