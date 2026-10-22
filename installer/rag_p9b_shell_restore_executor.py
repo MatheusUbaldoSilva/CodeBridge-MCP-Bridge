@@ -26,10 +26,12 @@ def execute_shell_restore(snapshot, *, appdata, desktop, expected_sha256,
                 "plan_reason":plan.get("reason")}
     try:
         journal("SHELL_RESTORE_ARMED",plan)
-        # One atomic backend transaction is required. Partial completion
-        # must raise rather than claim success.
+        # Backend may only report application, not final verification.
+        # HKCU and shortcut operations are not atomic; postverify is mandatory.
         outcome=backend(plan,snapshot)
-        if not isinstance(outcome,dict) or outcome.get("verified") is not True:
+        if (not isinstance(outcome,dict)
+                or (outcome.get("verified") is not True
+                    and outcome.get("state")!="SHELL_BACKEND_APPLIED_POSTVERIFY_REQUIRED")):
             journal("SHELL_RESTORE_UNVERIFIED",{})
             return {**base,"state":"SHELL_RESTORE_REVIEW_REQUIRED",
                     "reason":"BACKEND_COMPLETION_UNVERIFIED"}

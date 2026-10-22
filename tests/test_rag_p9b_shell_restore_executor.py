@@ -31,6 +31,19 @@ class ExecutorTests(unittest.TestCase):
         self.assertEqual(r["state"],"SHELL_RESTORE_VERIFIED")
 
     @patch("installer.rag_p9b_shell_restore_executor.build_shell_restore_plan",return_value=PLAN)
+    def test_backend_requires_independent_verification(self,_):
+        r=self.run_it(backend=lambda *args:{"state":"SHELL_BACKEND_APPLIED_POSTVERIFY_REQUIRED",
+                                               "verified":False})
+        self.assertEqual(r["state"],"SHELL_RESTORE_VERIFIED")
+
+    @patch("installer.rag_p9b_shell_restore_executor.build_shell_restore_plan",return_value=PLAN)
+    def test_backend_application_not_sufficient(self,_):
+        r=self.run_it(backend=lambda *args:{"state":"SHELL_BACKEND_APPLIED_POSTVERIFY_REQUIRED",
+                                               "verified":False},
+                      postverify=lambda *args:{"verified":False})
+        self.assertEqual(r["reason"],"INDEPENDENT_POSTVERIFY_FAILED")
+
+    @patch("installer.rag_p9b_shell_restore_executor.build_shell_restore_plan",return_value=PLAN)
     def test_unverified_backend(self,_):
         r=self.run_it(backend=lambda *args:{"verified":False})
         self.assertEqual(r["state"],"SHELL_RESTORE_REVIEW_REQUIRED")

@@ -49,3 +49,14 @@ SHELL_POSTRESTORE_MATCHED, verified=true, registry_keys_checked=2,
 shortcuts_checked=5; nenhuma alteracao.
 Essa prova descreve o baseline existente, nao comprova que
 uma restauracao de producao tenha sido executada.
+
+
+## Integra??o com backend real (contrato)
+
+O executor reconhece o retorno
+SHELL_BACKEND_APPLIED_POSTVERIFY_REQUIRED de um backend
+que realizou as opera??es mas ainda NAO possui prova final.
+A verificacao independente continua obrigatoria. Simulacoes
+confirmaram que um backend aplicado + postverify falho
+retorna INDEPENDENT_POSTVERIFY_FAILED, jamais sucesso.
+Nao foi realizada restauracao no Windows real.
