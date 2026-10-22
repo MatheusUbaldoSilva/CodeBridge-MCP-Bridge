@@ -37,7 +37,18 @@ class ExternalSupervisorPreflightTests(unittest.TestCase):
 
     def test_unreadable_cmdline_blocks(self):
         r=self.check(dict(pid=11,ppid=2,cmdline=None,create_time=1))
-        self.assertEqual(r["reason"],"PROCESS_COMMANDLINE_UNAVAILABLE")
+        self.assertEqual(r["reason"],"OPAQUE_PROCESSES")
+        self.assertEqual(r["opaque_processes"],1)
+        self.assertFalse(r["safe_to_apply"])
+
+    def test_known_active_processes_reported_even_with_opaque_windows_service(self):
+        unknown=dict(pid=40,ppid=0,cmdline=None,create_time=2)
+        r=self.check(self.proc(10,2,self.gui),
+                     unknown,self.proc(20,3,self.mcp))
+        self.assertEqual(r["state"],"SUPERVISOR_UPDATE_BLOCKED_RUNNING")
+        self.assertEqual(r["opaque_processes"],1)
+        self.assertEqual(r["blockers"],["GUI","MCP"])
+        self.assertFalse(r["safe_to_apply"])
 
     def test_duplicate_pid_blocks(self):
         r=self.check(self.proc(10,2,self.gui),self.proc(10,3,self.mcp))

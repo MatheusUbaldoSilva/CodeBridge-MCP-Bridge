@@ -35,6 +35,7 @@ def assess_external_supervisor(installed: Path, *, records=None) -> dict:
         "TUNNEL": _path(root/"tools"/"tunnel-client.exe"),
     }
     found = []
+    opaque = 0
     seen = set()
     try:
         for item in records:
@@ -46,7 +47,8 @@ def assess_external_supervisor(installed: Path, *, records=None) -> dict:
             seen.add(pid)
             cmdline = item.get("cmdline")
             if not isinstance(cmdline, (list, tuple)):
-                return {**result, "reason": "PROCESS_COMMANDLINE_UNAVAILABLE"}
+                opaque += 1
+                continue
             arguments = {_path(token) for token in cmdline}
             matches = [kind for kind,path in scripts.items() if path in arguments]
             if not matches:
@@ -63,10 +65,14 @@ def assess_external_supervisor(installed: Path, *, records=None) -> dict:
         return {**result, "reason": "PROCESS_IDENTITY_UNVERIFIED"}
     roles = {record["component"] for record in found}
     if not {"GUI", "MCP"}.issubset(roles):
-        return {**result, "state": "SUPERVISOR_TOPOLOGY_INCOMPLETE",
-                "processes": found}
+        return {**result,
+                "state": ("SUPERVISOR_PREFLIGHT_UNVERIFIED" if opaque
+                          else "SUPERVISOR_TOPOLOGY_INCOMPLETE"),
+                "reason": "OPAQUE_PROCESSES" if opaque else "KNOWN_COMPONENT_MISSING",
+                "opaque_processes": opaque, "processes": found}
     return {**result, "state": "SUPERVISOR_UPDATE_BLOCKED_RUNNING",
-            "blockers": sorted(roles), "processes": found}
+            "blockers": sorted(roles), "opaque_processes": opaque,
+            "processes": found}
 
 
 def main(argv=None):
