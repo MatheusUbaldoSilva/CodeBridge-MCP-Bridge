@@ -1,0 +1,86 @@
+import tempfile
+import unittest
+from pathlib import Path
+from installer.rag_p9b_shell_snapshot import snapshot_shell_state
+from installer.rag_p9b_windows_restore_backend import restore_shell
+
+
+class FakeRegistry:
+    def __init__(self):
+        self.keys={}
+        self.fail=False
+    def read_key(self,key):
+        return self.keys.get(key,{"exists":False,"values":{}})
+    def replace_key(self,key,value):
+        if self.fail:
+            self.fail=False
+            raise OSError("injected registry failure")
+        self.keys[key]=value
+
+
+class BackendTests(unittest.TestCase):
+    def setUp(self):
+        t=tempfile.TemporaryDirectory()
+        self.addCleanup(t.cleanup)
+        self.root=Path(t.name)
+        self.appdata=self.root/"roaming"
+        self.desktop=self.root/"desktop"
+        self.desktop.mkdir()
+        self.menu=self.appdata/"Microsoft"/"Windows"/"Start Menu"/"Programs"/"CodeBridge"
+        self.menu.mkdir(parents=True)
+        self.link=self.menu/"CodeBridge.lnk"
+        self.link.write_bytes(b"old-link")
+        self.snapshot=self.root/"shell.zip"
+        snapshot_shell_state(appdata=self.appdata,desktop=self.desktop,
+            snapshot=self.snapshot,registry_values=lambda k,n:{"exists":True,"values":{}})
+        self.registry=FakeRegistry()
+        self.logs=[]
+
+    def run_it(self,**kwargs):
+        options=dict(snapshot=self.snapshot,appdata=self.appdata,desktop=self.desktop,
+                     registry=self.registry,stopped=True,external=True,execute=True,
+                     journal=lambda *x:self.logs.append(x))
+        options.update(kwargs)
+        return restore_shell(**options)
+
+    def test_disabled(self):
+        self.assertEqual(self.run_it(execute=False)["reason"],
+                         "EXPLICIT_INDEPENDENT_STOPPED_GATES_REQUIRED")
+
+    def test_synthetic_restore_requires_postverify(self):
+        self.link.write_bytes(b"new-link")
+        r=self.run_it()
+        self.assertEqual(r["state"],"SHELL_BACKEND_APPLIED_POSTVERIFY_REQUIRED")
+        self.assertFalse(r["verified"])
+        self.assertEqual(self.link.read_bytes(),b"old-link")
+
+    def test_registry_failure_compensation(self):
+        self.link.write_bytes(b"new-link")
+        self.registry.fail=True
+        r=self.run_it()
+        self.assertEqual(r["state"],"SHELL_BACKEND_RECOVERY_REVIEW_REQUIRED")
+        self.assertTrue(r["rollback_attempted"])
+        self.assertTrue(r["compensation_verified"])
+        self.assertEqual(self.link.read_bytes(),b"new-link")
+
+    def test_external_channel_required(self):
+        r=self.run_it(external=False)
+        self.assertEqual(r["reason"],"EXPLICIT_INDEPENDENT_STOPPED_GATES_REQUIRED")
+
+    def test_snapshot_corrupt_blocks_mutation(self):
+        self.link.write_bytes(b"live-new")
+        self.snapshot.write_bytes(b"bad zip")
+        r=self.run_it()
+        self.assertEqual(r["reason"],"SNAPSHOT_UNVERIFIED")
+        self.assertEqual(self.link.read_bytes(),b"live-new")
+
+    def test_reject_symlink(self):
+        self.link.unlink()
+        try:self.link.symlink_to(self.snapshot)
+        except OSError:self.skipTest("symlinks disabled")
+        r=self.run_it()
+        self.assertEqual(r["reason"],"UNTRUSTED_DESTINATION")
+
+
+if __name__=="__main__":
+    unittest.main()
