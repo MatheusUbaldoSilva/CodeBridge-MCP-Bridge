@@ -47,15 +47,22 @@ class AuthorMCPManager:
 
     @staticmethod
     def _has_live_codebridge_ancestor(process):
-        ancestor_pid = int(process.ppid() or 0)
-        for _ in range(5):
-            if ancestor_pid <= 0:
-                break
-            try:
+        # Windows may reuse a dead parent's PID. A newer process cannot
+        # be the parent of an already running older child.
+        try:
+            child_created = process.create_time()
+            ancestor_pid = int(process.ppid() or 0)
+            seen = {int(process.pid)}
+            for _ in range(5):
+                if ancestor_pid <= 0 or ancestor_pid in seen:
+                    return False
+                seen.add(ancestor_pid)
                 parent = psutil.Process(ancestor_pid)
+                parent_created = parent.create_time()
+                if parent_created > child_created:
+                    return False
                 command = " ".join(
-                    str(part)
-                    for part in parent.cmdline()
+                    str(part) for part in parent.cmdline()
                 ).lower()
                 if (
                     parent.is_running()
@@ -63,13 +70,16 @@ class AuthorMCPManager:
                     and "codebridge" in command
                 ):
                     return True
+                child_created = parent_created
                 ancestor_pid = int(parent.ppid() or 0)
-            except (
-                psutil.NoSuchProcess,
-                psutil.AccessDenied,
-                OSError,
-            ):
-                break
+        except (
+            psutil.NoSuchProcess,
+            psutil.AccessDenied,
+            OSError,
+            ValueError,
+            TypeError,
+        ):
+            return False
         return False
 
     def _matching_stack_processes(self):

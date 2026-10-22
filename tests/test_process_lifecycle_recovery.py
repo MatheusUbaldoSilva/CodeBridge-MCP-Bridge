@@ -2,7 +2,7 @@
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = ROOT / "app_rewrite"
@@ -89,6 +89,34 @@ class AuthorMCPLifecycleTests(unittest.TestCase):
         manager._last_error = None
         manager._recycled_pids = []
         return manager
+
+    def test_reused_gui_pid_is_not_treated_as_live_ancestor(self):
+        child=Mock()
+        child.pid=30
+        child.ppid.return_value=12
+        child.create_time.return_value=100.0
+        new_gui=Mock()
+        new_gui.pid=12
+        new_gui.ppid.return_value=0
+        new_gui.create_time.return_value=200.0
+        new_gui.cmdline.return_value=["pythonw.exe","C:/CodeBridge/app_rewrite/main.py"]
+        new_gui.is_running.return_value=True
+        with patch("author_mcp_manager.psutil.Process", return_value=new_gui):
+            self.assertFalse(AuthorMCPManager._has_live_codebridge_ancestor(child))
+
+    def test_older_gui_is_still_recognized(self):
+        child=Mock()
+        child.pid=30
+        child.ppid.return_value=12
+        child.create_time.return_value=200.0
+        gui=Mock()
+        gui.pid=12
+        gui.ppid.return_value=0
+        gui.create_time.return_value=100.0
+        gui.cmdline.return_value=["pythonw.exe","C:/CodeBridge/app_rewrite/main.py"]
+        gui.is_running.return_value=True
+        with patch("author_mcp_manager.psutil.Process", return_value=gui):
+            self.assertTrue(AuthorMCPManager._has_live_codebridge_ancestor(child))
 
     def test_live_stack_is_never_killed(self):
         manager = self.make_manager()
