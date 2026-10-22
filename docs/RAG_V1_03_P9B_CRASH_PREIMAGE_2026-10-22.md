@@ -47,3 +47,15 @@ a compensacao de arquivos e registro ainda e tentada,
 e JOURNAL_WRITE_FAILED fica explicito no resultado.
 Teste combinado de falha do registro e journal PASS.
 Nao houve escrita no HKCU da maquina em uso.
+
+
+## Reconstrucao independente em scratch
+
+installer/rag_p9b_crash_replay_lab.py reconstruiu cinco atalhos
+e os dados das duas chaves HKCU da preimagem real no diret?rio
+descartavel CRASH_PREIMAGE_INDEPENDENT_REPLAY_20261022.
+Executado por Remote Desktop Commander fora do MCP e confirmado:
+CRASH_REPLAY_SCRATCH_VERIFIED; restored_shortcuts=5;
+reviewed_registry_keys=2; registry_modified=false;
+real_shortcuts_modified=false. Tres testes PASS.
+Nao equivale a execucao real de rollback do registro ou NSIS.
