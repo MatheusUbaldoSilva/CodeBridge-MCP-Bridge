@@ -5,6 +5,7 @@ A future scheduled worker must revalidate this exact scope at claim time.
 """
 from __future__ import annotations
 
+import math
 import re
 import subprocess
 import time
@@ -58,10 +59,16 @@ def assess_commit_index_event(
         return report("SOURCE_MISSING_OR_ESCAPED")
     if not (_SHA.fullmatch(observed_commit) and _CONTENT.fullmatch(observed_sha256)):
         return report("INVALID_COMMIT_OR_SHA")
-    if not 0 <= debounce_seconds <= 3600 or changed_at_epoch < 0:
+    timestamps = (changed_at_epoch, debounce_seconds)
+    if now_epoch is not None:
+        timestamps += (now_epoch,)
+    if (any(type(value) not in (float, int) or not math.isfinite(value)
+            for value in timestamps)
+            or changed_at_epoch < 0
+            or not 0 <= debounce_seconds <= 3600):
         return report("INVALID_STABILITY_CONTRACT")
-    now = time.time() if now_epoch is None else float(now_epoch)
-    if now < changed_at_epoch:
+    now = time.time() if now_epoch is None else now_epoch
+    if not math.isfinite(now) or now < changed_at_epoch:
         return report("INVALID_STABILITY_CONTRACT")
 
     def git(*args: str) -> str:

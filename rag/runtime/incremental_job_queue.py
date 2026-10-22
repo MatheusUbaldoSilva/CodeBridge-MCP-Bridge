@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from contextlib import closing
 import hashlib
+import math
 from pathlib import Path
 import sqlite3
 import time
@@ -128,7 +129,9 @@ def enqueue_source_event(
     """Event must be explicitly enabled and individually allowlisted."""
     if queue_enabled is not True:
         return _report("AUTO_INDEX_DISABLED", queued=False)
-    now = time.time() if now_epoch is None else float(now_epoch)
+    now = time.time() if now_epoch is None else now_epoch
+    if type(now) not in (float, int) or not math.isfinite(now):
+        return _report("INVALID_STABILITY_CONTRACT", queued=False)
     eligible = assess_commit_index_event(
         project_root, source_path, approved_paths=approved_paths,
         observed_commit=observed_commit,
