@@ -53,3 +53,14 @@ SHELL_RESTORE_PLAN_ONLY. Nunca modificou registro ou atalhos.
 O hash anterior do snapshot de shell tinha transcricao com um
 caractere a mais. SHA256 correto obtido por Get-FileHash diretamente
 do ZIP: 7d2e39b928e829b7be8d23e03def48e97127d78e093f183f159c58c633d2e511.
+
+
+## Verificacao estrita do manifesto
+
+verify_shell_snapshot agora valida nomes/ordem/slots exatos dos
+5 atalhos; whitelist de nomes e tipos dos 2 registros HKCU;
+ausencia de arquivos extras no ZIP, limites de tamanho de
+atalhos, bytes e SHA256. O ZIP real anterior continua
+SHELL_BACKUP_VERIFIED. Testes negativos rejeitam arquivo
+extra, chave desconhecida e atalho renomeado. Nao alterou
+o registro real ou o pacote NSIS.

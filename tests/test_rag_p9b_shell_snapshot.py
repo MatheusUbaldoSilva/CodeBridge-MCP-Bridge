@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from zipfile import ZipFile
+import json
 from installer.rag_p9b_shell_snapshot import (
     snapshot_shell_state,verify_shell_snapshot
 )
@@ -45,6 +46,29 @@ class ShellSnapshotTests(unittest.TestCase):
              "values":{"PASSWORD":{"type":1,"value":"secret"}}})
         self.assertEqual(s["reason"],"UNEXPECTED_REGISTRY_VALUES")
         self.assertFalse(self.output.exists())
+
+    def test_extra_member_refused(self):
+        self.make()
+        with ZipFile(self.output,"a") as z:
+            z.writestr("unapproved.txt",b"extra")
+        self.assertFalse(verify_shell_snapshot(self.output)["verified"])
+
+    def test_unapproved_registry_value_refused(self):
+        def bad(key,names):
+            return {"exists":True,
+                    "values":{"UNEXPECTED_SECRET":{"type":1,"value":"s"}}}
+        r=self.make(registry=bad)
+        self.assertFalse(r["created"])
+
+    def test_shortcut_name_mutation_refused(self):
+        self.make()
+        with ZipFile(self.output,"r") as z:
+            meta=json.loads(z.read("manifest.json"))
+        meta["shortcuts"][0]["name"]="Different.lnk"
+        self.output.unlink()
+        with ZipFile(self.output,"w") as z:
+            z.writestr("manifest.json",json.dumps(meta))
+        self.assertFalse(verify_shell_snapshot(self.output)["verified"])
 
     def test_corrupt_snapshot_refused(self):
         self.output.write_bytes(b"corrupt")

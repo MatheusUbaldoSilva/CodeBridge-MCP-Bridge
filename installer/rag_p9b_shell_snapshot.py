@@ -104,15 +104,43 @@ def verify_shell_snapshot(snapshot):
                 return result
             meta=json.loads(z.read("manifest.json"))
             if (meta.get("schema")!=1 or meta.get("state")!="P9B_SHELL_BACKUP"
-                    or set(meta.get("registry",{}))!=set(APP_KEYS)
-                    or len(meta.get("shortcuts",[]))!=5):
+                    or not isinstance(meta.get("registry"),dict)
+                    or set(meta["registry"])!=set(APP_KEYS)
+                    or not isinstance(meta.get("shortcuts"),list)
+                    or len(meta["shortcuts"])!=5):
                 return result
-            for item in meta["shortcuts"]:
-                if item.get("exists"):
-                    member=f"links/{item['slot']}.bin"
-                    payload=z.read(member)
-                    if hashlib.sha256(payload).hexdigest()!=item["sha256"]:
+            for key,allowed in zip(APP_KEYS,_ALLOWED_REGISTRY_NAMES):
+                entry=meta["registry"][key]
+                if (not isinstance(entry,dict)
+                        or not isinstance(entry.get("exists"),bool)
+                        or not isinstance(entry.get("values"),dict)
+                        or set(entry["values"])-set(allowed)):
+                    return result
+                for v in entry["values"].values():
+                    if (not isinstance(v,dict)
+                            or v.get("type") not in (1,4)
+                            or isinstance(v.get("value"),bool)
+                            or not isinstance(v.get("value"),str if v.get("type")==1 else int)):
                         return result
+            expected_links=["CodeBridge.lnk","Configurar CodeBridge.lnk",
+                            "Extens\u00e3o ChatGPT Timer.lnk","Atualizar CodeBridge.lnk",
+                            DESKTOP_LINK]
+            expected_members={"manifest.json"}
+            for index,item in enumerate(meta["shortcuts"]):
+                if (not isinstance(item,dict) or item.get("slot")!=index
+                        or item.get("name")!=expected_links[index]
+                        or not isinstance(item.get("exists"),bool)):
+                    return result
+                if item["exists"]:
+                    member=f"links/{index}.bin"
+                    expected_members.add(member)
+                    payload=z.read(member)
+                    if (not 0<len(payload)<=65536
+                            or item.get("bytes")!=len(payload)
+                            or hashlib.sha256(payload).hexdigest()!=item.get("sha256")):
+                        return result
+            if set(names)!=expected_members:
+                return result
             return {**result,"state":"SHELL_BACKUP_VERIFIED","verified":True,
                     "shortcut_count":5,"registry_keys":len(APP_KEYS)}
     except (OSError,ValueError,KeyError,TypeError,BadZipFile):
