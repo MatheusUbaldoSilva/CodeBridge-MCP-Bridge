@@ -60,22 +60,14 @@ def inspect_installed_scheduler_preflight(
     # Installed operation must prove ownership of the exact durable supervisor
     # generation; the generic lab gate supports omissions, production cannot.
     expected_fence = root / "jobs" / "supervisor_fence.sqlite3"
-    if (durable_store is None or
-            Path(durable_store).is_symlink() or
-            Path(durable_store).parent.is_symlink() or
-            Path(durable_store).resolve() != expected_fence.resolve() or
-            type(expected_durable_generation) is not int or
-            expected_durable_generation < 1):
-        return {
-            "state": "AUTONOMOUS_SCHEDULING_BLOCKED",
-            "blockers": ["INSTALLED_DURABLE_FENCE_REQUIRED"],
-            "public_pointer": public_pointer,
-            "worker_started": False, "scheduler_started": False,
-            "active_index_updated": False, "safe_to_publish": False,
-            "activation_authorized": False,
-            "queue_db": str(path), "queue_present": path.is_file(),
-            "installed_rag_root": str(root), "mode": "READ_ONLY_PREFLIGHT",
-        }
+    installed_fence_valid = (
+        durable_store is not None
+        and not Path(durable_store).is_symlink()
+        and not Path(durable_store).parent.is_symlink()
+        and Path(durable_store).resolve() == expected_fence.resolve()
+        and type(expected_durable_generation) is int
+        and expected_durable_generation >= 1
+    )
     gate = assess_autonomous_worker_gate(
         path, queue_enabled=queue_enabled, worker_enabled=worker_enabled,
         scheduler_enabled=scheduler_enabled, approved_source_paths=approved_source_paths,
@@ -85,7 +77,13 @@ def inspect_installed_scheduler_preflight(
         durable_store=durable_store,
         expected_durable_generation=expected_durable_generation,
     )
+    blockers = list(gate["blockers"])
+    if not installed_fence_valid:
+        blockers.append("INSTALLED_DURABLE_FENCE_REQUIRED")
     return {
-        **gate, "queue_db": str(path), "queue_present": path.is_file(),
+        **gate,
+        "state": "AUTONOMOUS_SCHEDULING_BLOCKED" if blockers else gate["state"],
+        "blockers": blockers,
+        "queue_db": str(path), "queue_present": path.is_file(),
         "installed_rag_root": str(root), "mode": "READ_ONLY_PREFLIGHT",
     }

@@ -1,4 +1,4 @@
-﻿import tempfile
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -14,7 +14,7 @@ class InstalledDurableFenceRequirementTests(unittest.TestCase):
             return_value=root / "rag_index.sqlite3",
         ), patch(
             "rag.runtime.incremental_installed_scheduler_preflight.assess_autonomous_worker_gate",
-            side_effect=AssertionError("must not accept unverified installed fence"),
+            return_value={"state": "PREREQUISITES_OBSERVED_ONLY", "blockers": [], "scheduler_started": False, "worker_started": False, "active_index_updated": False, "safe_to_publish": False, "activation_authorized": False},
         ):
             return inspect_installed_scheduler_preflight(
                 queue_db=root / "jobs" / "incremental_jobs.sqlite3",
