@@ -71,7 +71,8 @@ def bootstrap_installed_queue(
     required_confirmation = (
         f"CODEBRIDGE_RAG_QUEUE_BOOTSTRAP:{generation}:{receipt}"
     )
-    if not execute:
+    if execute is not True:
+        # Only the literal boolean True can request a filesystem mutation.
         return result(
             "BOOTSTRAP_PLAN_ONLY", public_generation=generation,
             queue_path=str(queue), confirmation=required_confirmation,

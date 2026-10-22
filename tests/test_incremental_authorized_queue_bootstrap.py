@@ -104,6 +104,39 @@ class IsolatedInstalledQueueBootstrapTests(unittest.TestCase):
         self.assertEqual(result["reason"], "UNRECOGNIZED_JOBS_CONTENT")
         self.assertEqual(unknown.read_text(), "KEEP")
 
+    def test_non_boolean_execute_is_never_mutating(self):
+        plan = self.operation()
+        for execute in (1, "true", [], None):
+            with self.subTest(execute=execute):
+                response = self.operation(
+                    execute=execute, operator_approved=True,
+                    confirmation=plan["confirmation"],
+                    expected_generation=self.generation,
+                )
+                self.assertEqual(response["state"], "BOOTSTRAP_PLAN_ONLY")
+                self.assertFalse(response["executed"])
+                self.assertFalse(self.jobs.exists())
+
+    def test_public_pointer_switched_after_writes_requires_review(self):
+        plan = self.operation()
+        with patch(
+            "rag.runtime.incremental_authorized_queue_bootstrap.inspect_public_pointer_for_scheduler",
+            side_effect=[
+                self.pointer, self.pointer,
+                {"state": "PUBLIC_LEGACY_POINTER", "generation": "legacy"},
+            ],
+        ):
+            response = self.operation(
+                execute=True, operator_approved=True,
+                confirmation=plan["confirmation"],
+                expected_generation=self.generation,
+            )
+        self.assertEqual(response["state"], "BOOTSTRAP_REVIEW_REQUIRED")
+        self.assertEqual(response["reason"], "PUBLIC_GENERATION_CHANGED_AFTER_BOOTSTRAP")
+        self.assertTrue(response["executed"])
+        self.assertFalse(response["safe_to_publish"])
+        self.assertFalse(response["worker_started"])
+
     def test_unapproved_localappdata_root_never_initializes(self):
         with patch.dict(os.environ, {"LOCALAPPDATA": str(self.root)}), patch(
             "rag.runtime.incremental_authorized_queue_bootstrap.resolve_rag_sqlite_path",
