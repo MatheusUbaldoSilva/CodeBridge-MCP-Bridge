@@ -51,11 +51,12 @@ def restore_shell(*, snapshot, expected_sha256, appdata, desktop, registry, stop
         try:
             for t,data in zip(targets,desired):
                 t.parent.mkdir(parents=True,exist_ok=True)
+                # Treat a failing write as potentially modifying the target.
+                affected.append(t)
                 if data is None:
                     t.unlink(missing_ok=True)
                 else:
                     t.write_bytes(data)
-                affected.append(t)
             for key in APP_KEYS:
                 registry_touched.append(key)
                 registry.replace_key(key,wanted_registry[key])

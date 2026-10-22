@@ -45,3 +45,15 @@ SNAPSHOT_DIGEST_MISMATCH se o arquivo ZIP do rollback nao
 corresponder ao hash exigido pelo controlador de cutover.
 Teste de backup divergente garante ausencia de mutacao.
 Os 9 testes combinados do backend/ensaio integrado passaram.
+
+
+## Escrita parcialmente falha
+
+Na transacao de atalhos, cada alvo agora entra na lista
+de compensacao ANTES de executar write_bytes/unlink, pois
+uma operacao com excecao pode ter modificado parte do arquivo.
+Um teste provocou escrita parcial seguida por OSError e
+comprovou restitui??o dos bytes anteriores em scratch.
+Resultado SHELL_BACKEND_RECOVERY_REVIEW_REQUIRED e
+compensation_verified=true (somente no teste injetado).
+Nao representa prova de restauracao do Windows em producao.

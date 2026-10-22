@@ -1,6 +1,7 @@
 import hashlib
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from installer.rag_p9b_shell_snapshot import snapshot_shell_state
 from installer.rag_p9b_windows_restore_backend import restore_shell
@@ -69,6 +70,24 @@ class BackendTests(unittest.TestCase):
         r=self.run_it(expected_sha256="f"*64)
         self.assertEqual(r["reason"],"SNAPSHOT_DIGEST_MISMATCH")
         self.assertEqual(self.link.read_bytes(),b"live")
+
+    def test_partially_written_link_is_compensated(self):
+        self.link.write_bytes(b"before-transaction")
+        ordinary=Path.write_bytes
+        failed=[False]
+        target=self.link
+        def interrupted(file,data):
+            if Path(file)==target and not failed[0]:
+                failed[0]=True
+                ordinary(file,b"partial")
+                raise OSError("INJECTED_AFTER_PARTIAL_WRITE")
+            return ordinary(file,data)
+        with patch.object(Path,"write_bytes",interrupted):
+            r=self.run_it()
+        self.assertTrue(failed[0])
+        self.assertEqual(r["state"],"SHELL_BACKEND_RECOVERY_REVIEW_REQUIRED")
+        self.assertTrue(r["compensation_verified"])
+        self.assertEqual(self.link.read_bytes(),b"before-transaction")
 
     def test_external_channel_required(self):
         r=self.run_it(external=False)
