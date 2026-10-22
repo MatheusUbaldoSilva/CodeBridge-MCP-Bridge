@@ -70,6 +70,17 @@ class ShellSnapshotTests(unittest.TestCase):
             z.writestr("manifest.json",json.dumps(meta))
         self.assertFalse(verify_shell_snapshot(self.output)["verified"])
 
+    def test_oversized_link_refused_before_restore(self):
+        (self.menu/"CodeBridge.lnk").write_bytes(b"ok")
+        self.make()
+        with ZipFile(self.output,"r") as z:
+            manifest=z.read("manifest.json")
+        self.output.unlink()
+        with ZipFile(self.output,"w") as z:
+            z.writestr("manifest.json",manifest)
+            z.writestr("links/0.bin",b"x"*65537)
+        self.assertFalse(verify_shell_snapshot(self.output)["verified"])
+
     def test_corrupt_snapshot_refused(self):
         self.output.write_bytes(b"corrupt")
         self.assertFalse(verify_shell_snapshot(self.output)["verified"])

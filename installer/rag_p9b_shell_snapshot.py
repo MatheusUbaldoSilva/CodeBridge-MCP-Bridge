@@ -134,6 +134,8 @@ def verify_shell_snapshot(snapshot):
                 if item["exists"]:
                     member=f"links/{index}.bin"
                     expected_members.add(member)
+                    if z.getinfo(member).file_size > 65536:
+                        return result
                     payload=z.read(member)
                     if (not 0<len(payload)<=65536
                             or item.get("bytes")!=len(payload)

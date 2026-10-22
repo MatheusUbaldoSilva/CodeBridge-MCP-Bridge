@@ -64,3 +64,11 @@ atalhos, bytes e SHA256. O ZIP real anterior continua
 SHELL_BACKUP_VERIFIED. Testes negativos rejeitam arquivo
 extra, chave desconhecida e atalho renomeado. Nao alterou
 o registro real ou o pacote NSIS.
+
+
+## Limite de descompactacao
+
+O verificador agora consulta o tamanho informado no indice ZIP
+antes de descompactar cada atalho, recusando arquivo >64 KiB.
+Teste de membro oversized PASS. O backup real permanece
+inalterado e a verificacao nao modifica instalacao.
