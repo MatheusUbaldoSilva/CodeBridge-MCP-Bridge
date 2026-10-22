@@ -74,6 +74,39 @@ class SyntheticApprovedQueueContractTests(unittest.TestCase):
             self.assertEqual(inspect_job_queue(synthetic_queue)["total"], 1)
             self.assertFalse(queued["active_index_updated"])
             self.assertFalse((installed / "jobs" / "incremental_jobs.sqlite3").exists())
+            # The advisory preview can NEVER replace the real queue's
+            # fresh Git/content checks. A dirty checkout must not create a DB.
+            source.write_text("def edited_after_review():\n    return -1\n", encoding="utf-8")
+            denied_db = base / "denied" / "jobs" / "incremental_jobs.sqlite3"
+            dirty = enqueue_source_event(
+                denied_db, root, item["source_path"],
+                approved_paths=("sample.py",),
+                observed_commit=item["observed_commit"],
+                observed_sha256=item["observed_sha256"],
+                changed_at_epoch=100.0, debounce_seconds=30.0,
+                now_epoch=201.0, queue_enabled=True,
+            )
+            self.assertEqual(dirty["state"], "SOURCE_NOT_COMMITTED")
+            self.assertFalse(denied_db.exists())
+
+            # Even when the original file is clean again, changing HEAD
+            # invalidates the old source-review intent.
+            source.write_text("def approved():\n    return 42\n", encoding="utf-8")
+            (root / "new-doc.md").write_text("later commit\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(root), "add", "new-doc.md"], check=True)
+            subprocess.run(["git", "-C", str(root), "-c", "user.name=Test",
+                            "-c", "user.email=test@example.invalid", "commit",
+                            "-q", "-m", "move HEAD"], check=True)
+            superseded = enqueue_source_event(
+                denied_db, root, item["source_path"],
+                approved_paths=("sample.py",),
+                observed_commit=item["observed_commit"],
+                observed_sha256=item["observed_sha256"],
+                changed_at_epoch=100.0, debounce_seconds=30.0,
+                now_epoch=202.0, queue_enabled=True,
+            )
+            self.assertEqual(superseded["state"], "COMMIT_SUPERSEDED")
+            self.assertFalse(denied_db.exists())
 
 
 if __name__ == "__main__":
