@@ -1,0 +1,84 @@
+"""External supervisor read-only assessment of live CodeBridge processes.
+
+No shutdown, installer launch, recovery, process adoption, or permissions
+are granted here. An ambiguous process identity always blocks the cutover.
+"""
+from __future__ import annotations
+
+import ntpath
+from pathlib import Path
+
+
+def _path(value):
+    return ntpath.normcase(ntpath.normpath(str(value).strip('"')))
+
+
+def assess_external_supervisor(installed: Path, *, records=None) -> dict:
+    result = dict(state="SUPERVISOR_PREFLIGHT_UNVERIFIED",
+                  inspection_only=True, safe_to_apply=False,
+                  stop_authorized=False, installer_executed=False,
+                  installed_modified=False, processes=[])
+    root = Path(installed).resolve()
+    if not root.is_dir():
+        return {**result, "reason": "INSTALLED_ROOT_MISSING"}
+    if records is None:
+        try:
+            import psutil
+            records = [p.info for p in psutil.process_iter(
+                attrs=["pid", "ppid", "name", "cmdline", "create_time"])]
+        except Exception:
+            return {**result, "reason": "PROCESS_ENUMERATION_FAILED"}
+    scripts = {
+        "GUI": _path(root/"app_rewrite"/"main.py"),
+        "MCP": _path(root/"author_mcp"/"mcp_server.py"),
+        "ADAPTER": _path(root/"author_mcp"/"adapter_server.py"),
+        "TUNNEL": _path(root/"tools"/"tunnel-client.exe"),
+    }
+    found = []
+    seen = set()
+    try:
+        for item in records:
+            pid = int(item["pid"])
+            if pid == 0:
+                continue
+            if pid <= 0 or pid in seen:
+                return {**result, "reason": "DUPLICATE_OR_INVALID_PID"}
+            seen.add(pid)
+            cmdline = item.get("cmdline")
+            if not isinstance(cmdline, (list, tuple)):
+                return {**result, "reason": "PROCESS_COMMANDLINE_UNAVAILABLE"}
+            arguments = {_path(token) for token in cmdline}
+            matches = [kind for kind,path in scripts.items() if path in arguments]
+            if not matches:
+                continue
+            created = float(item["create_time"])
+            if not (0 < created < float("inf")):
+                return {**result, "reason": "PROCESS_CREATION_UNVERIFIED"}
+            if len(matches) != 1:
+                return {**result, "reason": "AMBIGUOUS_PROCESS_ROLE"}
+            found.append(dict(component=matches[0], pid=pid,
+                              parent_pid=int(item.get("ppid") or 0),
+                              create_time=created))
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return {**result, "reason": "PROCESS_IDENTITY_UNVERIFIED"}
+    roles = {record["component"] for record in found}
+    if not {"GUI", "MCP"}.issubset(roles):
+        return {**result, "state": "SUPERVISOR_TOPOLOGY_INCOMPLETE",
+                "processes": found}
+    return {**result, "state": "SUPERVISOR_UPDATE_BLOCKED_RUNNING",
+            "blockers": sorted(roles), "processes": found}
+
+
+def main(argv=None):
+    import argparse
+    import json
+    p=argparse.ArgumentParser()
+    p.add_argument("--install-root",required=True,type=Path)
+    args=p.parse_args(argv)
+    report=assess_external_supervisor(args.install_root)
+    print(json.dumps(report,sort_keys=True))
+    return 0 if report["state"]=="SUPERVISOR_UPDATE_BLOCKED_RUNNING" else 2
+
+
+if __name__=="__main__":
+    raise SystemExit(main())
