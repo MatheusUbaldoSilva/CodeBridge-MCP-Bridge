@@ -37,6 +37,28 @@ print(json.dumps({
 }, sort_keys=True))
 """
 
+_COLD_MCP_DISPATCH_SUFFIX = r"""
+# Dispatches through FastMCP's real tool-call handler with EMPTY arguments.
+# This must use default execute=False; never pass operator approval or a token.
+async def call_default():
+    result = await mcp_server.mcp.call_tool("codebridge_rag_queue_bootstrap", {})
+    response = result.structured_content or {}
+    details = response.get("details") or {}
+    print(json.dumps({
+        "state": "STAGED_MCP_TOOL_DISPATCH_OBSERVED",
+        "operation_ok": response.get("operation_ok"),
+        "bootstrap_state": response.get("state"),
+        "executed": response.get("executed"),
+        "safe_to_publish": response.get("safe_to_publish"),
+        "directory_created": details.get("directory_created"),
+        "queue_created": details.get("queue_initialized"),
+    }, sort_keys=True))
+
+asyncio.run(call_default())
+"""
+
+
+
 
 def rehearse_cold_nsis_bootstrap(
     *, repo: Path, installed: Path, installer: Path, snapshot: Path,
@@ -100,7 +122,8 @@ def rehearse_cold_nsis_bootstrap(
             # -B suppresses bytecode writes, the script checks execute=False.
             check = subprocess.run(
                 [str(portable), "-B", "-c",
-                 _PROBE_SCRIPT + "\n" + _COLD_RAG_STATUS_SUFFIX, str(stage)],
+                 _PROBE_SCRIPT + "\n" + _COLD_RAG_STATUS_SUFFIX
+                 + "\n" + _COLD_MCP_DISPATCH_SUFFIX, str(stage)],
                 cwd=temp,
                 env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
                 capture_output=True, text=True, timeout=35, check=False,
@@ -110,10 +133,11 @@ def rehearse_cold_nsis_bootstrap(
                         "exit_code": check.returncode,
                         "stderr_hint": check.stderr[-250:]}
             outputs = check.stdout.strip().splitlines()
-            if len(outputs) != 2:
+            if len(outputs) != 3:
                 return {**base, "reason": "STAGED_MCP_OUTPUT_UNEXPECTED"}
             report = json.loads(outputs[0])
             status = json.loads(outputs[1])
+            dispatch = json.loads(outputs[2])
             if (report.get("state") != "POSTUPDATE_MCP_TOOL_OBSERVED"
                     or report.get("registered") is not True
                     or report.get("registered_count") != 1
@@ -130,6 +154,14 @@ def rehearse_cold_nsis_bootstrap(
                     or status.get("document_count") != expected_document_count
                     or status.get("chunk_count") != expected_chunk_count):
                 return {**base, "reason": "STAGED_PUBLIC_RAG_STATUS_UNVERIFIED"}
+            if (dispatch.get("state") != "STAGED_MCP_TOOL_DISPATCH_OBSERVED"
+                    or dispatch.get("operation_ok") is not True
+                    or dispatch.get("bootstrap_state") != "BOOTSTRAP_PLAN_ONLY"
+                    or dispatch.get("executed") is not False
+                    or dispatch.get("safe_to_publish") is not False
+                    or dispatch.get("directory_created") is not False
+                    or dispatch.get("queue_created") is True):
+                return {**base, "reason": "STAGED_MCP_DISPATCH_NOT_READONLY"}
         installed_after = inspect_installer_snapshot_baseline(snapshot, installed)
         if not installed_after.get("matches"):
             return {**base, "reason": "INSTALLED_CHANGED_DURING_REHEARSAL"}
@@ -144,6 +176,7 @@ def rehearse_cold_nsis_bootstrap(
                 "public_documents": expected_document_count,
                 "public_chunks": expected_chunk_count,
                 "mcp_tool_registered_offline": True,
+                "mcp_tool_dispatched_readonly": True,
                 "public_index_readonly_observed": True}
     except (OSError, ValueError, TypeError, KeyError,
             subprocess.TimeoutExpired, subprocess.SubprocessError):

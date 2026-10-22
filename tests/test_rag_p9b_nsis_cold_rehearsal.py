@@ -38,6 +38,15 @@ class FullNsisColdRehearsalTests(unittest.TestCase):
         }
         self.targets=["author_mcp/mcp_server.py",
                       "rag/runtime/incremental_authorized_queue_bootstrap.py"]
+        self.dispatch_output={
+            "state":"STAGED_MCP_TOOL_DISPATCH_OBSERVED",
+            "operation_ok":True,
+            "bootstrap_state":"BOOTSTRAP_PLAN_ONLY",
+            "executed":False,
+            "safe_to_publish":False,
+            "directory_created":False,
+            "queue_created":None,
+        }
         self.rag_output={
             "state":"STAGED_MCP_RAG_STATUS_OBSERVED",
             "operation_ok":True,
@@ -69,7 +78,8 @@ class FullNsisColdRehearsalTests(unittest.TestCase):
                 return SimpleNamespace(returncode=0,stdout="",stderr="")
             return SimpleNamespace(returncode=0,
                 stdout=json.dumps(child or self.child_output)
-                + "\n" + json.dumps(self.rag_output), stderr="")
+                + "\n" + json.dumps(self.rag_output)
+                + "\n" + json.dumps(self.dispatch_output), stderr="")
         with patch(
             "benchmarks.rag_p9b_nsis_cold_rehearsal.audit_p9b_nsis_payload",
             return_value={"verified":True,"sha256":"approved"},
@@ -108,6 +118,17 @@ class FullNsisColdRehearsalTests(unittest.TestCase):
         report,_=self.evaluate(child=bad)
         self.assertEqual(report["reason"],"STAGED_MCP_PREVIEW_UNEXPECTED")
         self.assertFalse(report["verified"])
+
+    def test_mcp_default_dispatch_mutation_is_blocked(self):
+        self.dispatch_output["executed"]=True
+        report,_=self.evaluate()
+        self.assertEqual(report["reason"],"STAGED_MCP_DISPATCH_NOT_READONLY")
+        self.assertFalse(report["verified"])
+
+    def test_mcp_default_dispatch_wrong_state_is_blocked(self):
+        self.dispatch_output["bootstrap_state"]="QUEUE_BOOTSTRAPPED_NO_SCHEDULER"
+        report,_=self.evaluate()
+        self.assertEqual(report["reason"],"STAGED_MCP_DISPATCH_NOT_READONLY")
 
     def test_staged_public_rag_wrong_chunk_count_is_blocked(self):
         self.rag_output["chunk_count"]=8775
