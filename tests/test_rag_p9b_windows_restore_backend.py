@@ -42,6 +42,7 @@ class BackendTests(unittest.TestCase):
         options=dict(snapshot=self.snapshot,expected_sha256=hashlib.sha256(self.snapshot.read_bytes()).hexdigest(),appdata=self.appdata,desktop=self.desktop,
                      registry=self.registry,installed=self.root,
                      process_guard=lambda _:{"state":"NO_RUNNING_CODEBRIDGE"},
+                     preimage_proof=lambda:{"state":"CRASH_PREIMAGE_VERIFIED","verified":True},
                      stopped=True,external=True,execute=True,
                      journal=lambda *x:self.logs.append(x))
         options.update(kwargs)
@@ -95,6 +96,18 @@ class BackendTests(unittest.TestCase):
         self.link.write_bytes(b"live")
         r=self.run_it(process_guard=lambda _:{"state":"UPDATE_PROCESS_BLOCKED"})
         self.assertEqual(r["reason"],"CODEBRIDGE_PROCESS_STILL_ACTIVE")
+        self.assertEqual(self.link.read_bytes(),b"live")
+
+    def test_missing_preimage_refuses_mutation(self):
+        self.link.write_bytes(b"live")
+        r=self.run_it(preimage_proof=None)
+        self.assertEqual(r["reason"],"DURABLE_PREIMAGE_REQUIRED")
+        self.assertEqual(self.link.read_bytes(),b"live")
+
+    def test_unverified_preimage_refuses_mutation(self):
+        self.link.write_bytes(b"live")
+        r=self.run_it(preimage_proof=lambda:{"verified":False})
+        self.assertEqual(r["reason"],"DURABLE_PREIMAGE_UNVERIFIED")
         self.assertEqual(self.link.read_bytes(),b"live")
 
     def test_external_channel_required(self):

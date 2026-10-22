@@ -1,0 +1,22 @@
+# P9-B ? Preimagem duravel antes de recuperar HKCU/atalhos
+
+O modulo installer/rag_p9b_crash_preimage.py gera um ZIP exclusivo
+com snapshot dos cinco atalhos NSIS e dos dois registros HKCU do
+CodeBridge, usando apenas valores da whitelist. Persistencia:
+escrita nova exclusiva, flush, fsync, SHA256. Verificador separado
+recusa membros extras, hashes divergentes e escopo inesperado.
+
+Prova real read-only do Windows: CRASH_PREIMAGE_DURABLE,
+CRASH_PREIMAGE_VERIFIED, SHA256
+14d201a576a3827925a8fd4819263840c88e569f992f837763d055438443749b9.
+ZIP guardado fora do Git em release_staging/P9B_CURRENT_2d99ed4.
+Nao foi aplicado NSIS nem alterado registro ou atalhos.
+
+O backend experimental passou a exigir explicitamente
+preimage_proof(), que deve retornar CRASH_PREIMAGE_VERIFIED.
+Treze testes focalizados, com negacao ao faltar a prova, PASS.
+
+LIMITACAO: prova injetavel isolada nao substitui um coordenador
+externo que verifique os bytes da preimagem, os PIDs e o journal
+antes de executar a restauracao. Ainda nao e recuperacao contra
+crash comprovada de ponta a ponta.

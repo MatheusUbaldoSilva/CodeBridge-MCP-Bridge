@@ -31,6 +31,7 @@ class IntegratedTests(unittest.TestCase):
         return restore_shell(snapshot=self.snapshot,expected_sha256=hashlib.sha256(self.snapshot.read_bytes()).hexdigest(),appdata=self.appdata,
             desktop=self.desktop,registry=self.registry,installed=self.appdata,
             process_guard=lambda _:{"state":"NO_RUNNING_CODEBRIDGE"},
+                     preimage_proof=lambda:{"state":"CRASH_PREIMAGE_VERIFIED","verified":True},
             stopped=True,external=True,execute=True,
             journal=RollbackJournal(self.journal_path))
 
