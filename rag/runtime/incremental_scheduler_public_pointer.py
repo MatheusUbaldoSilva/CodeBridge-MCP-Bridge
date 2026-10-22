@@ -1,7 +1,8 @@
-﻿"""Read-only inspection of the active RAG pointer and transition journal."""
+"""Read-only inspection of the active RAG pointer and transition journal."""
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from rag.runtime.status import resolve_rag_sqlite_path
@@ -30,8 +31,7 @@ def inspect_public_pointer_for_scheduler() -> dict:
         value = json.loads(pointer.read_text(encoding="utf-8"))
         generation = value.get("generation")
         if (value.get("schema_version") != 1 or not isinstance(generation, str)
-                or not generation.startswith("v1_delta_") or
-                len(generation) != 23):
+                or re.fullmatch(r"v1_delta_[0-9a-f]{14}", generation) is None):
             raise ValueError("invalid public pointer")
     except (OSError, ValueError, TypeError, AttributeError):
         return {

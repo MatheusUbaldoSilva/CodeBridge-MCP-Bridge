@@ -1,4 +1,4 @@
-﻿import json
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -36,6 +36,14 @@ class PublicPointerDiagnosticTests(unittest.TestCase):
             root = Path(tmp)
             (root / "production-generation-transition.json").write_text("{}")
             self.assertEqual(self.inspect(root)["state"], "PUBLIC_TRANSITION_PENDING")
+
+    def test_rejects_nonhex_generation_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "active-generation.json").write_text(json.dumps(
+                {"schema_version": 1, "generation": "v1_delta_ZZZZZZZZZZZZZZ"}
+            ))
+            self.assertEqual(self.inspect(root)["state"], "PUBLIC_POINTER_INVALID")
 
     def test_invalid_pointer_refused(self):
         with tempfile.TemporaryDirectory() as tmp:
