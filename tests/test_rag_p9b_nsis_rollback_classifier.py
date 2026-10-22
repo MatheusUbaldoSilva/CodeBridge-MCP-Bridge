@@ -4,7 +4,10 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from installer.rag_p9b_nsis_rollback_classifier import classify_rollback_targets
+from installer.rag_p9b_nsis_rollback_classifier import (
+    classify_rollback_targets, main,
+)
+from unittest.mock import patch
 
 
 def digest(data: bytes) -> str:
@@ -35,6 +38,22 @@ class RollbackClassificationTests(unittest.TestCase):
 
     def check(self):
         return classify_rollback_targets(self.root,self.manifest,self.hashes)
+
+    def test_command_line_emits_plan_but_never_restores(self):
+        for state,expected in (
+            ("ROLLBACK_BASELINE_ALREADY_MATCHES",0),
+            ("ROLLBACK_CANDIDATES_OBSERVED_ONLY",0),
+            ("ROLLBACK_UNRECOGNIZED_INSTALLED_CONTENT",2),
+        ):
+            with self.subTest(state=state), patch(
+                "installer.rag_p9b_nsis_rollback_classifier.inspect_nsis_rollback_candidates",
+                return_value={"state":state,
+                              "restorable":state!="ROLLBACK_UNRECOGNIZED_INSTALLED_CONTENT",
+                              "changes_applied":False},
+            ):
+                rc=main(["--snapshot","old.zip","--installer","new.exe",
+                         "--install-root",str(self.root),"--seven-zip","7z.exe"])
+            self.assertEqual(rc,expected)
 
     def test_pristine_installation_no_rollback(self):
         report=self.check()

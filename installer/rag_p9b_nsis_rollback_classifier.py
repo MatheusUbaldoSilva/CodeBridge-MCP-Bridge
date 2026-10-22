@@ -132,3 +132,24 @@ def inspect_nsis_rollback_candidates(snapshot: Path, installer: Path,
         return {**blocked, **classified}
     except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired):
         return {**blocked, "reason": "ROLLBACK_INSPECTION_FAILED"}
+
+
+
+def main(argv=None) -> int:
+    """Read-only command line for supervised post-update recovery triage."""
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--snapshot", required=True, type=Path)
+    parser.add_argument("--installer", required=True, type=Path)
+    parser.add_argument("--install-root", required=True, type=Path)
+    parser.add_argument("--seven-zip", required=True, type=Path)
+    args = parser.parse_args(argv)
+    result = inspect_nsis_rollback_candidates(
+        args.snapshot, args.installer, args.install_root, args.seven_zip,
+    )
+    print(json.dumps(result, sort_keys=True))
+    return 0 if result["restorable"] and not result["changes_applied"] else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
