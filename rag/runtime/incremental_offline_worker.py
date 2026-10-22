@@ -4,6 +4,7 @@ Call from an application-managed process only after operator opt-in.
 Never publishes a generation or modifies the active RAG index.
 """
 from __future__ import annotations
+import math
 from pathlib import Path
 from typing import Callable, Iterable
 from threading import Event, Thread
@@ -27,7 +28,9 @@ def process_offline_job_once(
     if queue_enabled is not True or worker_enabled is not True:
         return {"state": "OFFLINE_WORKER_DISABLED", "executed": False,
                 "safe_to_publish": False, "active_index_updated": False}
-    if not 0.01 <= heartbeat_interval_seconds <= 30:
+    if (type(heartbeat_interval_seconds) not in (float, int)
+            or not math.isfinite(heartbeat_interval_seconds)
+            or not 0.01 <= heartbeat_interval_seconds <= 30):
         return {"state": "INVALID_HEARTBEAT_POLICY", "executed": False,
                 "safe_to_publish": False, "active_index_updated": False}
     # Check installed backend availability before reserving a durable job.
