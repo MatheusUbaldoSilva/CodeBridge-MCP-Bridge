@@ -6,6 +6,7 @@ Never stops a process or modifies local installation.
 from __future__ import annotations
 
 from pathlib import Path
+import ntpath
 
 
 def inspect_update_processes(install_root: Path, *, process_iter=None) -> dict:
@@ -28,7 +29,9 @@ def inspect_update_processes(install_root: Path, *, process_iter=None) -> dict:
         except Exception:
             return result("UPDATE_PROCESS_UNVERIFIED",
                           ["PROCESS_ENUMERATION_UNAVAILABLE"])
-    root_string=str(root).replace("/", "\\").lower().rstrip("\\")
+    root_string=ntpath.normcase(ntpath.normpath(str(root)))
+    gui_path=ntpath.normcase(ntpath.join(root_string, "app_rewrite", "main.py"))
+    mcp_path=ntpath.normcase(ntpath.join(root_string, "author_mcp", "mcp_server.py"))
     checked=0
     matched=[]
     try:
@@ -38,12 +41,12 @@ def inspect_update_processes(install_root: Path, *, process_iter=None) -> dict:
                 parts=info.get("cmdline") or []
                 if isinstance(parts,str):
                     parts=[parts]
-                args=[str(arg).strip('"').replace("/", "\\").lower()
-                      for arg in parts]
-                # Match only CodeBridge's actual installed Python module path,
-                # not generic python.exe processes belonging to other apps.
-                gui=any(root_string+"\\app_rewrite\\main.py" in a for a in args)
-                mcp=any(root_string+"\\author_mcp\\mcp_server.py" in a for a in args)
+                # Compare complete argv tokens. Substring matching can
+                # confuse a foreign script containing the installation path.
+                args={ntpath.normcase(ntpath.normpath(str(arg).strip('"')))
+                      for arg in parts}
+                gui=gui_path in args
+                mcp=mcp_path in args
                 if gui or mcp:
                     matched.append({"pid": int(info.get("pid") or 0),
                                     "component": "GUI" if gui else "MCP"})

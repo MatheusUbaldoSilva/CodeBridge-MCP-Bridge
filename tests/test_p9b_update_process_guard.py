@@ -49,6 +49,16 @@ class UpdaterProcessGateTests(unittest.TestCase):
         self.assertEqual(r["blockers"],[])
         self.assertFalse(r["installer_launch_authorized"])
 
+    def test_substring_of_script_argument_is_not_installed_process(self):
+        foreign=self.mcp+"-other.py"
+        r=self.check(self.p(9,"python.exe",foreign))
+        self.assertEqual(r["state"],"NO_RUNNING_CODEBRIDGE")
+
+    def test_embedded_command_text_not_a_process_script(self):
+        r=self.check(self.p(9,"python.exe","-c",
+            "print('"+self.mcp+"')"))
+        self.assertEqual(r["state"],"NO_RUNNING_CODEBRIDGE")
+
     def test_unknown_process_information_denied(self):
         inaccessible=SimpleNamespace(info={"pid":5,"cmdline":[]})
         class Fault:
