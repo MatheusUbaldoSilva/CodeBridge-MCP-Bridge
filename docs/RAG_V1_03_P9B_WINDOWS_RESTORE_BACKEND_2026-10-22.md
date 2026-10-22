@@ -25,3 +25,14 @@ arquivos e registro; eventual falha de energia ou morte do
 processo requer journal persistente + supervisor externo.
 Ainda NAO existe adaptador winreg real aprovado, nem foi
 aplicada restauracao na maquina em uso. O NSIS segue bloqueado.
+
+
+## Ensaios integrados do adaptador e journal
+
+tests/test_rag_p9b_windows_backend_integrated.py executou
+backend + adaptador fake winreg + journal fsync em diret?rios
+descartaveis. Comprovou restaura??o dos bytes de atalho em
+scratch e journal de 2 etapas; segundo teste recusou
+journal j? existente antes de muta??o.
+Resultado continua APPLIED_POSTVERIFY_REQUIRED, nunca verified.
+Nenhuma opera??o de escrita em HKCU real foi executada.
