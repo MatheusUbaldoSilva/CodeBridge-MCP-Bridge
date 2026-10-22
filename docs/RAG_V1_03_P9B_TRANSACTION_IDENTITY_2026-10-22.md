@@ -9,7 +9,7 @@ Nao copia dados privados do registro para o reposit?rio.
 
 Manifesto real criado apenas em release_staging:
 P9B_TRANSACTION_IDENTITY_20261022.json.
-SHA256: b358a28a0329bb563187a7c36f863316000ca11b1518a601484f9569fef7527f1.
+SHA256: b358a28a0329bb563187a7c36f86331600ca11b1518a601484f9569fef7527f1.
 TRANSACTION_IDENTITY_VERIFIED, quatro artefatos, origem 2d99ed4.
 Cinco testes unitarios passaram: integridade, adulteracao,
 hash invalido, reutilizacao do arquivo e conjunto incompleto.
