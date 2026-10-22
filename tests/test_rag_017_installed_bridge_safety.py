@@ -1,5 +1,7 @@
 """RAG-017 installed MCP bridge safety invariants (no production activation)."""
 import inspect
+import os
+import tempfile
 import sys
 import unittest
 from pathlib import Path
@@ -22,7 +24,11 @@ class InstalledBridgeSafetyTests(unittest.TestCase):
   self.assertIs(params["experimental_cross_route"].default,False)
   self.assertIs(params["experimental_resident_models"].default,False)
  def test_mcp_search_does_not_activate_semantic_executor(self):
-  with patch("rag.runtime.search_service.search_context") as search:
+  # Isolate the default-off test from a real operator V1 semantic opt-in.
+  # The installed RAG may legitimately have its dedicated executor enabled.
+  with tempfile.TemporaryDirectory() as tmp, patch.dict(
+   os.environ, {"LOCALAPPDATA": tmp}
+  ), patch("rag.runtime.search_service.search_context") as search:
    search.return_value.to_dict.return_value={"status":"TEST"}
    self.assertEqual(rag_bridge.search_rag_context(query="code",project_id="codebridge"),{"status":"TEST"})
    self.assertIsNone(search.call_args.kwargs["semantic_executor"])
