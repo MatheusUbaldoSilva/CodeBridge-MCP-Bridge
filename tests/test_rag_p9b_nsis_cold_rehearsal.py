@@ -38,6 +38,14 @@ class FullNsisColdRehearsalTests(unittest.TestCase):
         }
         self.targets=["author_mcp/mcp_server.py",
                       "rag/runtime/incremental_authorized_queue_bootstrap.py"]
+        self.rag_output={
+            "state":"STAGED_MCP_RAG_STATUS_OBSERVED",
+            "operation_ok":True,
+            "index_state":"READY",
+            "generation":self.generation,
+            "document_count":211,
+            "chunk_count":8774,
+        }
         self.child_output={
             "state":"POSTUPDATE_MCP_TOOL_OBSERVED",
             "registered":True,"registered_count":1,
@@ -60,7 +68,8 @@ class FullNsisColdRehearsalTests(unittest.TestCase):
                     target.write_text("# temporary test",encoding="utf-8")
                 return SimpleNamespace(returncode=0,stdout="",stderr="")
             return SimpleNamespace(returncode=0,
-                stdout=json.dumps(child or self.child_output),stderr="")
+                stdout=json.dumps(child or self.child_output)
+                + "\n" + json.dumps(self.rag_output), stderr="")
         with patch(
             "benchmarks.rag_p9b_nsis_cold_rehearsal.audit_p9b_nsis_payload",
             return_value={"verified":True,"sha256":"approved"},
@@ -99,6 +108,17 @@ class FullNsisColdRehearsalTests(unittest.TestCase):
         report,_=self.evaluate(child=bad)
         self.assertEqual(report["reason"],"STAGED_MCP_PREVIEW_UNEXPECTED")
         self.assertFalse(report["verified"])
+
+    def test_staged_public_rag_wrong_chunk_count_is_blocked(self):
+        self.rag_output["chunk_count"]=8775
+        report,_=self.evaluate()
+        self.assertEqual(report["reason"],"STAGED_PUBLIC_RAG_STATUS_UNVERIFIED")
+        self.assertFalse(report["verified"])
+
+    def test_staged_public_rag_operation_failure_is_blocked(self):
+        self.rag_output["operation_ok"]=False
+        report,_=self.evaluate()
+        self.assertEqual(report["reason"],"STAGED_PUBLIC_RAG_STATUS_UNVERIFIED")
 
     def test_wrong_public_generation_is_refused(self):
         bad=dict(self.child_output,public_generation="v1_delta_aaaaaaaaaaaaaa")

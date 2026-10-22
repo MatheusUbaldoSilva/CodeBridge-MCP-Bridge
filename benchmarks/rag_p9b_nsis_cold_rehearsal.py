@@ -23,9 +23,25 @@ from installer.rag_p9b_installer_rollback_scope import (
 from installer.rag_p9b_postupdate_mcp_tool_probe import _PROBE_SCRIPT
 
 
+_COLD_RAG_STATUS_SUFFIX = r"""
+# Executed after the registered-tool check, in the SAME disposable process.
+status = mcp_server.codebridge_rag_status()
+projects = [x for x in status.projects if x.get("project_id") == "codebridge"]
+print(json.dumps({
+    "state": "STAGED_MCP_RAG_STATUS_OBSERVED",
+    "operation_ok": bool(status.operation_ok),
+    "index_state": status.index.get("state"),
+    "generation": status.index.get("generation"),
+    "document_count": (projects[0].get("document_count") if len(projects) == 1 else None),
+    "chunk_count": (projects[0].get("chunk_count") if len(projects) == 1 else None),
+}, sort_keys=True))
+"""
+
+
 def rehearse_cold_nsis_bootstrap(
     *, repo: Path, installed: Path, installer: Path, snapshot: Path,
     seven_zip: Path, expected_commit: str, expected_generation: str,
+    expected_document_count: int = 211, expected_chunk_count: int = 8774,
 ) -> dict:
     base = {
         "state": "COLD_INSTALLER_REHEARSAL_BLOCKED",
@@ -48,7 +64,10 @@ def rehearse_cold_nsis_bootstrap(
     try:
         if (not portable.is_file() or portable.is_symlink()
                 or not seven_zip.is_file()
-                or not expected_generation.startswith("v1_delta_")):
+                or not expected_generation.startswith("v1_delta_")
+                or type(expected_document_count) is not int
+                or type(expected_chunk_count) is not int
+                or expected_document_count < 1 or expected_chunk_count < 1):
             return {**base, "reason": "PREREQUISITES_UNVERIFIED"}
         provenance = audit_p9b_nsis_payload(
             repo, installer, seven_zip, expected_commit=expected_commit,
@@ -80,7 +99,8 @@ def rehearse_cold_nsis_bootstrap(
                             "missing": relative}
             # -B suppresses bytecode writes, the script checks execute=False.
             check = subprocess.run(
-                [str(portable), "-B", "-c", _PROBE_SCRIPT, str(stage)],
+                [str(portable), "-B", "-c",
+                 _PROBE_SCRIPT + "\n" + _COLD_RAG_STATUS_SUFFIX, str(stage)],
                 cwd=temp,
                 env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
                 capture_output=True, text=True, timeout=35, check=False,
@@ -89,7 +109,11 @@ def rehearse_cold_nsis_bootstrap(
                 return {**base, "reason": "STAGED_MCP_IMPORT_FAILED",
                         "exit_code": check.returncode,
                         "stderr_hint": check.stderr[-250:]}
-            report = json.loads(check.stdout.strip())
+            outputs = check.stdout.strip().splitlines()
+            if len(outputs) != 2:
+                return {**base, "reason": "STAGED_MCP_OUTPUT_UNEXPECTED"}
+            report = json.loads(outputs[0])
+            status = json.loads(outputs[1])
             if (report.get("state") != "POSTUPDATE_MCP_TOOL_OBSERVED"
                     or report.get("registered") is not True
                     or report.get("registered_count") != 1
@@ -99,6 +123,13 @@ def rehearse_cold_nsis_bootstrap(
                     or report.get("public_generation") != expected_generation
                     or report.get("preview_state") != "BOOTSTRAP_PLAN_ONLY"):
                 return {**base, "reason": "STAGED_MCP_PREVIEW_UNEXPECTED"}
+            if (status.get("state") != "STAGED_MCP_RAG_STATUS_OBSERVED"
+                    or status.get("operation_ok") is not True
+                    or status.get("index_state") != "READY"
+                    or status.get("generation") != expected_generation
+                    or status.get("document_count") != expected_document_count
+                    or status.get("chunk_count") != expected_chunk_count):
+                return {**base, "reason": "STAGED_PUBLIC_RAG_STATUS_UNVERIFIED"}
         installed_after = inspect_installer_snapshot_baseline(snapshot, installed)
         if not installed_after.get("matches"):
             return {**base, "reason": "INSTALLED_CHANGED_DURING_REHEARSAL"}
@@ -110,7 +141,10 @@ def rehearse_cold_nsis_bootstrap(
                 ),
                 "payload_targets": len(approved),
                 "public_generation": expected_generation,
-                "mcp_tool_registered_offline": True}
+                "public_documents": expected_document_count,
+                "public_chunks": expected_chunk_count,
+                "mcp_tool_registered_offline": True,
+                "public_index_readonly_observed": True}
     except (OSError, ValueError, TypeError, KeyError,
             subprocess.TimeoutExpired, subprocess.SubprocessError):
         return {**base, "reason": "COLD_REHEARSAL_FAILED"}
@@ -126,12 +160,16 @@ def main(argv=None) -> int:
     parser.add_argument("--seven-zip", required=True, type=Path)
     parser.add_argument("--commit", required=True)
     parser.add_argument("--generation", required=True)
+    parser.add_argument("--expected-documents", type=int, default=211)
+    parser.add_argument("--expected-chunks", type=int, default=8774)
     args = parser.parse_args(argv)
     data = rehearse_cold_nsis_bootstrap(
         repo=args.repo, installed=args.installed,
         installer=args.installer, snapshot=args.snapshot,
         seven_zip=args.seven_zip,
         expected_commit=args.commit, expected_generation=args.generation,
+        expected_document_count=args.expected_documents,
+        expected_chunk_count=args.expected_chunks,
     )
     print(json.dumps(data, sort_keys=True))
     return 0 if data["verified"] else 2
