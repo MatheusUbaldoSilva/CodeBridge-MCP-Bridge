@@ -34,3 +34,11 @@ Os executores foram validados somente com mocks/processos simulados.
 A transicao de GUI real requer canal externo, recuperacao garantida
 e novo handshake MCP visto pelo cliente apos o retorno.
 P9-B permanece ABERTA.
+
+## Regressao integrada e verificacao externa
+
+Apos as correcoes de recuperacao e saude local, o conjunto integrado
+P9-B + lifecycle + guard NSIS passou 152 testes.
+O preflight independente no Remote Desktop ainda observa GUI1376,
+MCP9300, adapter10768 e tunnel5608; 54 processos opacos gerais mas
+zero candidatos CodeBridge opacos. Nao foi efetuada parada real.
