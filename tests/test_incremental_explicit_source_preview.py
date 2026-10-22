@@ -28,7 +28,7 @@ class ExplicitSourcePreviewTests(unittest.TestCase):
         folder.mkdir(parents=True)
         (folder / "rag_index.sqlite3").write_bytes(b"candidate")
         self.manifest = folder / "rag-index-manifest.json"
-        self.manifest.write_text(json.dumps({"entries": []}), encoding="utf-8")
+        self.manifest.write_text(json.dumps({"schema_version": 1, "entries": []}), encoding="utf-8")
         self.pointer = {"state": "PUBLIC_POINTER_OBSERVED",
                         "generation": "v1_delta_1ae1d01ea84f4e"}
 
@@ -65,11 +65,21 @@ class ExplicitSourcePreviewTests(unittest.TestCase):
         self.assertEqual(value["candidates"][0]["state"], "SOURCE_NOT_COMMITTED")
 
     def test_already_indexed_source_not_previewed(self):
-        self.manifest.write_text(json.dumps({"entries": [
-            {"path": "sample.py", "project_id": "codebridge"}
+        from rag.index.manifest import ManifestEntry, ManifestIndexKind
+        entry = ManifestEntry(project_id="codebridge", index_kind=ManifestIndexKind.CODE,
+                              path="sample.py", size=10, mtime_ns=1, sha256="a" * 64,
+                              chunk_ids=("chunk-1",), model_version="test")
+        self.manifest.write_text(json.dumps({"schema_version": 1, "entries": [
+            entry.to_dict()
         ]}), encoding="utf-8")
         value = self.evaluate(approved_paths=("sample.py",), changed_at_epoch=0)
         self.assertEqual(value["candidates"][0]["state"], "ALREADY_INDEXED")
+
+    def test_invalid_public_manifest_fails_closed(self):
+        self.manifest.write_text('{"entries":[]}', encoding="utf-8")
+        value = self.evaluate(approved_paths=("sample.py",), changed_at_epoch=0)
+        self.assertEqual(value["state"], "SOURCE_PREVIEW_FAILED")
+        self.assertFalse(value["queued"])
 
     def test_nonfinite_observation_refused(self):
         value = self.evaluate(approved_paths=("sample.py",), changed_at_epoch=float("nan"))

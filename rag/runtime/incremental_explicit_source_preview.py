@@ -4,7 +4,6 @@ No automatic approvals, event generation, queue mutation or watcher.
 """
 from __future__ import annotations
 
-import json
 import math
 from pathlib import Path, PurePosixPath
 import re
@@ -12,6 +11,7 @@ import subprocess
 import time
 
 from rag.chunking.provenance import source_sha256
+from rag.index.manifest import ManifestError, load_index_manifest
 from rag.runtime.incremental_installed_change_discovery import discover_installed_reindex_scope
 from rag.runtime.incremental_job_prequeue import assess_commit_index_event
 from rag.runtime.incremental_scheduler_public_pointer import inspect_public_pointer_for_scheduler
@@ -65,8 +65,11 @@ def preview_approved_unindexed_sources(
         else installed / "generations" / pointer["generation"]
     )
     try:
-        manifest = json.loads((generation / "rag-index-manifest.json").read_text(encoding="utf-8"))
-        indexed = {row["path"] for row in manifest["entries"] if row["project_id"] == "codebridge"}
+        manifest_file = generation / "rag-index-manifest.json"
+        if not manifest_file.is_file():
+            return result("PUBLIC_MANIFEST_MISSING", candidates=[])
+        manifest = load_index_manifest(manifest_file)
+        indexed = {row.path for row in manifest.entries if row.project_id == "codebridge"}
         before = subprocess.run(
             ["git", "-C", str(root), "rev-parse", "HEAD"],
             capture_output=True, text=True, timeout=10, check=True,
@@ -102,5 +105,5 @@ def preview_approved_unindexed_sources(
         return result("EXPLICIT_SOURCE_PREVIEW_ONLY",
                       public_generation=pointer["generation"],
                       observed_commit=before, candidates=candidates)
-    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+    except (OSError, ValueError, KeyError, TypeError, ManifestError, subprocess.SubprocessError):
         return result("SOURCE_PREVIEW_FAILED", candidates=[])
