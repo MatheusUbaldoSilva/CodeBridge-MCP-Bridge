@@ -21,3 +21,9 @@ Nao confundir SIMULATED_SEQUENCE_PASS com evidencia de parada real.
 Segue faltando desenvolver e testar executor independente com fechamento
 gracioso e valida??o posterior, e somente depois decidir cutover
 NSIS supervisionado com snapshot correspondente.
+
+## Regressao integrada
+
+125 testes PASS no conjunto P9-B + process lifecycle + update guard.
+Esse numero inclui as verificacoes de plano, pos-parada e simulacao.
+Nenhuma afirmacao de encerramento da GUI/MCP, update real ou job real.
