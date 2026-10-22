@@ -1,4 +1,5 @@
 ﻿"""MCP one-shot bootstrap tool contract; all execution replaced by stubs."""
+import asyncio
 import sys
 import unittest
 from pathlib import Path
@@ -42,6 +43,19 @@ class RagBootstrapMcpToolTests(unittest.TestCase):
         self.assertFalse(response.executed)
         self.assertFalse(response.safe_to_publish)
         action.assert_called_once()
+
+    def test_fresh_mcp_registration_defaults_to_read_only(self):
+        published = asyncio.run(mcp_server.mcp.list_tools())
+        matching = [
+            tool for tool in published
+            if tool.name == "codebridge_rag_queue_bootstrap"
+        ]
+        self.assertEqual(len(matching), 1)
+        schema = matching[0].input_schema
+        self.assertIs(schema["properties"]["execute"]["default"], False)
+        self.assertIn("operator_approved", schema["properties"])
+        self.assertIn("confirmation", schema["properties"])
+        self.assertIn("expected_generation", schema["properties"])
 
     def test_unexpected_error_returns_structured_non_publication_result(self):
         with patch(
