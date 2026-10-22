@@ -21,3 +21,18 @@ ao conjunto padrao NSIS e permanece intocado; uma restauracao
 integral de todo ambiente deve considera-lo separadamente.
 Quatro testes sinteticos aprovados.
 P9-B ainda nao fechada; nenhum NSIS executado.
+
+
+## Restaura??o isolada do escopo complementar
+
+Implementado installer/rag_p9b_shell_restore_scratch.py e testes.
+Reproduziu os cinco arquivos de atalho para SHELL_SCRATCH_RESTORE
+e exportou as duas chaves para um JSON de revis?o em pasta isolada.
+Resultado independente via Remote Desktop:
+SHELL_SCRATCH_RESTORE_REHEARSED
+shortcut_files=5; registry_keys_reviewed=2;
+real_shortcuts_modified=false; registry_modified=false.
+
+Essa prova NAO restaura o HKCU nem os atalhos em produ??o.
+O rollback do NSIS continua pendente de executor auditado
+e verifica??o p?s-restaura??o real quando apropriada.
