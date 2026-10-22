@@ -240,6 +240,7 @@ Section "CodeBridge" SEC_MAIN
   File "extension_setup.py"
   File "updater.py"
   File "p9b_update_process_guard.py"
+  File "rag_p9b_postupdate_mcp_tool_probe.py"
 
   ; Extensão unpacked em caminho fixo. O Chrome deve apontar sempre
   ; para esta pasta, inclusive depois de futuras atualizações.
