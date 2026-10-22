@@ -1,4 +1,4 @@
-﻿"""Read-only installed RAG scheduler preflight; never claims jobs."""
+"""Read-only installed RAG scheduler preflight; never claims jobs."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -21,8 +21,10 @@ def inspect_installed_scheduler_preflight(
 ) -> dict:
     root = resolve_rag_sqlite_path().resolve().parent
     # Never guess that the installed scheduler has been enabled.
-    path = Path(queue_db) if queue_db is not None else root / "incremental_jobs.sqlite3"
-    if path.is_symlink() or not path.resolve().is_relative_to(root):
+    path = Path(queue_db) if queue_db is not None else root / "jobs" / "incremental_jobs.sqlite3"
+    if (path.is_symlink() or path.parent.is_symlink() or
+            path.name != "incremental_jobs.sqlite3" or path.parent.name != "jobs" or
+            not path.resolve().is_relative_to(root)):
         return {
             "state": "AUTONOMOUS_SCHEDULING_BLOCKED",
             "blockers": ["QUEUE_PATH_OUTSIDE_INSTALLED_RAG"],
