@@ -8,7 +8,7 @@ recusa membros extras, hashes divergentes e escopo inesperado.
 
 Prova real read-only do Windows: CRASH_PREIMAGE_DURABLE,
 CRASH_PREIMAGE_VERIFIED, SHA256
-14d201a576a3827925a8fd4819263840c88e569f992f837763d055438443749b9.
+14d201a576a3827925a8fd4819263840c88e569f992f837763d05438443749b9.
 ZIP guardado fora do Git em release_staging/P9B_CURRENT_2d99ed4.
 Nao foi aplicado NSIS nem alterado registro ou atalhos.
 
@@ -20,3 +20,17 @@ LIMITACAO: prova injetavel isolada nao substitui um coordenador
 externo que verifique os bytes da preimagem, os PIDs e o journal
 antes de executar a restauracao. Ainda nao e recuperacao contra
 crash comprovada de ponta a ponta.
+
+
+## Verificacao independente apos interromper operacao
+
+O modulo installer/rag_p9b_crash_recovery_gate.py cruza
+preimagem SHA256 real, journal persistente e processo
+instalado observado. Nao autoriza escrita: retorna
+CRASH_RESTORATION_REVIEW_REQUIRED em transacoes interrompidas
+com processos efetivamente parados. Nao restaura por conta
+propria. O teste sobre a instalacao ativa retornou
+CRASH_RECOVERY_REFUSED/CODEBRIDGE_STILL_ACTIVE.
+Six testes simulados PASS. O hash antigo desta preimagem
+tinha erro de transcricao; o SHA256 correto foi extraido
+diretamente do arquivo e tem 64 caracteres.
