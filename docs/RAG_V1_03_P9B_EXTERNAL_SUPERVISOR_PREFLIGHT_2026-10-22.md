@@ -26,7 +26,7 @@ A inspecao nao alterou nenhum processo.
 ## Qualidade
 
 Suite integrada atual de P9-B, update guard e recovery:
-102 testes PASS na bateria inicial (antes do ultimo ajuste), em Python portatil do CodeBridge.
+103 testes PASS na bateria integrada final atualizada, em Python portatil do CodeBridge.
 Os arquivos preexistentes continuaram intocados.
 
 ## Artefatos de reversao e instalacao
