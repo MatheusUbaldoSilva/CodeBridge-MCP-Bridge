@@ -27,3 +27,27 @@ exatamente o mesmo journal no disco sem interrupcao do CodeBridge.
 Importante: GUI recuperada e MCP local online nao significam
 conexao publica restaurada. Validar o estado pela API ChatGPT
 apos a conclusao do ensaio sem NSIS.
+
+
+## Ensaio real de parada e recuperacao ? concluido
+
+Executado por um agente elevado independente com journal
+ELEVATED_AGENT_REAL_RESTART_20261022.json guardado fora do Git.
+O Remote Desktop acompanhou o jornal sem depender do MCP.
+
+- Journal final: LOCAL_MCP_RECOVERED_PUBLIC_RECHECK_REQUIRED.
+- Pos-parada: POSTSTOP_OBSERVED_ONLY.
+- Recuperacao GUI: GUI_PROCESS_RECOVERED, novo PID 8516.
+- Nova stack observada via canal externo: GUI8516, MCP11024,
+  adapter2800, tunnel10600; todos associados a GUI nova.
+- Prova local: LOCAL_ADAPTER_AND_MCP_READY.
+- Prova publica: codebridge_capabilities handshake_confirmed=true
+  e protocolo CBMCP/1; codebridge_status READY.
+- RAG apos restart: READY, 211 documentos, 8774 chunks.
+- NSIS nao executado e nenhuma atualizacao de indice ou fila
+  realizada; nenhum dos tres arquivos locais preexistentes alterado.
+
+O estado do journal mantem public_handshake_verified=false por desenho:
+somente a verificacao EXTERNA posterior confirma a reconexao.
+O ensaio valida reinicio supervisionado, NAO valida ainda NSIS real
+nem o bootstrap de fila persistente. P9-B permanece aberta.
