@@ -8,6 +8,8 @@ import tempfile
 import unittest
 
 from rag.chunking.provenance import source_sha256
+from rag.runtime.incremental_supervisor_fence import issue_generation, observe_generation
+from rag.runtime.incremental_supervisor_lock import SupervisorLock
 from rag.runtime.incremental_job_queue import (
     claim_approved_job, enqueue_source_event, inspect_job,
     inspect_job_queue, renew_job_lease, report_staging_failure,
@@ -79,6 +81,36 @@ class InterruptedLeaseRecoveryTests(unittest.TestCase):
         self.assertEqual(state["job_state"], "FAILED")
         self.assertEqual(state["last_error"], "WORKER_LEASE_EXPIRED")
         self.assertEqual(inspect_job_queue(self.db)["by_state"], {"FAILED": 1})
+
+    def test_restart_requires_new_supervisor_generation_and_new_job_lease(self):
+        fence = self.db.parent / "supervisor_fence.sqlite3"
+        lock_file = self.db.parent / "supervisor.lock"
+
+        with SupervisorLock(lock_file) as supervisor:
+            old_generation = issue_generation(fence, lock=supervisor)
+            first = self.claim(141)
+            self.assertTrue(observe_generation(fence, old_generation))
+            self.assertEqual(first["attempts"], 1)
+
+        # A new process can reacquire the OS lock; it must still mint a
+        # strictly newer durable generation, invalidating the old instance.
+        with SupervisorLock(lock_file) as recovered_supervisor:
+            new_generation = issue_generation(fence, lock=recovered_supervisor)
+            self.assertEqual(new_generation, old_generation + 1)
+            self.assertFalse(observe_generation(fence, old_generation))
+            self.assertTrue(observe_generation(fence, new_generation))
+            self.assertEqual(self.claim(149)["state"], "QUEUE_EMPTY")
+            fresh = self.claim(152)
+            self.assertEqual(fresh["attempts"], 2)
+            self.assertNotEqual(fresh["lease_token"], first["lease_token"])
+
+            expired_worker = renew_job_lease(
+                self.db, first["job_id"], first["lease_token"],
+                now_epoch=153, lease_seconds=20, queue_enabled=True,
+            )
+            self.assertFalse(expired_worker["renewed"])
+            self.assertEqual(inspect_job(self.db, first["job_id"])["job_state"], "CLAIMED")
+            self.assertTrue(observe_generation(fence, new_generation))
 
     def test_stale_worker_cannot_erase_recovered_claim(self):
         first = self.claim(141)
