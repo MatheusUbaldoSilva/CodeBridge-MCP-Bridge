@@ -76,8 +76,11 @@ def stage_mcp_bootstrap_overlay(source_root: Path, installed_root: Path, output:
                 ["git", "-C", str(src), "show", f"{commit}:{relative}"],
                 capture_output=True, check=True, timeout=10,
             ).stdout
-            if committed != incoming:
+            if committed != incoming.replace(b"\r\n", b"\n"):
                 raise ValueError("UNCOMMITTED_OVERLAY_SOURCE")
+            # Package Git's canonical exact bytes, never a platform-altered
+            # worktree serialization. This also makes SHA receipts portable.
+            incoming = committed
             previous = _read_bounded(target) if target.exists() else None
             if relative in ("author_mcp/mcp_server.py", "rag/runtime/incremental_job_queue.py") and previous is None:
                 raise ValueError("INSTALLED_MCP_BASELINE_MISSING")

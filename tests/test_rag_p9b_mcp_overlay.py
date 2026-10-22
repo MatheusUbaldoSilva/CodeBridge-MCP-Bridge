@@ -80,6 +80,24 @@ class OfflineOverlayTests(unittest.TestCase):
         )
         self.assertFalse(self.archive.exists())
 
+    def test_crlf_worktree_is_normalized_to_exact_git_object(self):
+        import subprocess
+        rel = "rag/runtime/incremental_authorized_queue_bootstrap.py"
+        target = self.src / rel
+        raw = target.read_bytes()
+        target.write_bytes(raw.replace(b"\n", b"\r\n"))
+        result = stage_mcp_bootstrap_overlay(self.src, self.installed, self.archive)
+        self.assertTrue(result["created"])
+        with ZipFile(self.archive) as z:
+            packaged = z.read("new/" + rel)
+        committed = subprocess.run(
+            ["git", "-C", str(self.src), "show", "HEAD:" + rel],
+            capture_output=True, check=True,
+        ).stdout
+        self.assertEqual(packaged, committed)
+        self.assertTrue(verify_mcp_bootstrap_overlay(
+            self.archive,self.installed)["valid"])
+
     def test_uncommitted_replacement_must_not_be_packaged(self):
         path = self.src / "rag" / "runtime" / "incremental_authorized_queue_bootstrap.py"
         path.write_bytes(b"DIRTY_UNCOMMITTED")
