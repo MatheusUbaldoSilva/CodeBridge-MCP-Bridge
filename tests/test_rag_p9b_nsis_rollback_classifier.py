@@ -106,7 +106,12 @@ class RollbackClassificationTests(unittest.TestCase):
 
     def test_file_symlink_blocked(self):
         self.second_file.parent.mkdir(parents=True)
-        self.second_file.symlink_to(self.first_file)
+        try:
+            self.second_file.symlink_to(self.first_file)
+        except OSError as exc:
+            if getattr(exc, "winerror", None) == 1314:
+                self.skipTest("Windows account cannot create symlinks (WinError 1314)")
+            raise
         result=self.check()
         self.assertFalse(result["restorable"])
         self.assertIn(self.second,result["unrecognized_targets"])
