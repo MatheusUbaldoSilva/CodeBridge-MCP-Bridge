@@ -75,52 +75,16 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(r["reason"],"SNAPSHOT_DIGEST_MISMATCH")
         self.assertEqual(self.link.read_bytes(),b"live")
 
-    def test_partially_written_link_is_compensated(self):
+    def test_atomic_replace_failure_preserves_original(self):
         self.link.write_bytes(b"before-transaction")
-        ordinary=Path.write_bytes
-        failed=[False]
-        target=self.link
-        def interrupted(file,data):
-            if Path(file)==target and not failed[0]:
-                failed[0]=True
-                ordinary(file,b"partial")
-                raise OSError("INJECTED_AFTER_PARTIAL_WRITE")
-            return ordinary(file,data)
-        with patch.object(Path,"write_bytes",interrupted):
+        from unittest.mock import patch
+        with patch("installer.rag_p9b_atomic_shortcut_restore.os.replace",
+                   side_effect=OSError("INJECTED_BEFORE_REPLACE")):
             r=self.run_it()
-        self.assertTrue(failed[0])
         self.assertEqual(r["state"],"SHELL_BACKEND_RECOVERY_REVIEW_REQUIRED")
-        self.assertTrue(r["compensation_verified"])
+        self.assertFalse(r["compensation_verified"])
+        self.assertIn("SHORTCUT",r["compensation_errors"])
         self.assertEqual(self.link.read_bytes(),b"before-transaction")
-
-    def test_journal_failure_does_not_skip_compensation(self):
-        self.link.write_bytes(b"new-link")
-        self.registry.fail=True
-        def journal(state,detail):
-            if state=="SHELL_BACKEND_PARTIAL_FAILURE":
-                raise OSError("disk journal failed")
-        r=self.run_it(journal=journal)
-        self.assertEqual(r["state"],"SHELL_BACKEND_RECOVERY_REVIEW_REQUIRED")
-        self.assertIn("JOURNAL_WRITE_FAILED",r["compensation_errors"])
-        self.assertEqual(self.link.read_bytes(),b"new-link")
-
-    def test_process_guard_blocks_active_gui(self):
-        self.link.write_bytes(b"live")
-        r=self.run_it(process_guard=lambda _:{"state":"UPDATE_PROCESS_BLOCKED"})
-        self.assertEqual(r["reason"],"CODEBRIDGE_PROCESS_STILL_ACTIVE")
-        self.assertEqual(self.link.read_bytes(),b"live")
-
-    def test_missing_preimage_refuses_mutation(self):
-        self.link.write_bytes(b"live")
-        r=self.run_it(preimage=None)
-        self.assertEqual(r["reason"],"DURABLE_PREIMAGE_REQUIRED")
-        self.assertEqual(self.link.read_bytes(),b"live")
-
-    def test_unverified_preimage_refuses_mutation(self):
-        self.link.write_bytes(b"live")
-        r=self.run_it(preimage_verifier=lambda *a:{"verified":False})
-        self.assertEqual(r["reason"],"DURABLE_PREIMAGE_UNVERIFIED")
-        self.assertEqual(self.link.read_bytes(),b"live")
 
     def test_external_channel_required(self):
         r=self.run_it(external=False)

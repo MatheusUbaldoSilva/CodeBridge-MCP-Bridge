@@ -13,6 +13,7 @@ from zipfile import ZipFile
 from installer.rag_p9b_shell_snapshot import verify_shell_snapshot
 from installer.p9b_update_process_guard import inspect_update_processes
 from installer.rag_p9b_crash_preimage import verify_crash_preimage
+from installer.rag_p9b_atomic_shortcut_restore import write_atomic_shortcut,remove_shortcut_if_present
 from installer.rag_p9b_windows_shell_scope import APP_KEYS,MENU_LINKS,DESKTOP_LINK
 
 
@@ -70,13 +71,12 @@ def restore_shell(*, snapshot, expected_sha256, appdata, desktop, registry, inst
         affected=[]
         try:
             for t,data in zip(targets,desired):
-                t.parent.mkdir(parents=True,exist_ok=True)
-                # Treat a failing write as potentially modifying the target.
+                # Register target for compensation before attempting mutation.
                 affected.append(t)
                 if data is None:
-                    t.unlink(missing_ok=True)
+                    remove_shortcut_if_present(t)
                 else:
-                    t.write_bytes(data)
+                    write_atomic_shortcut(t,data)
             for key in APP_KEYS:
                 registry_touched.append(key)
                 registry.replace_key(key,wanted_registry[key])
@@ -95,8 +95,8 @@ def restore_shell(*, snapshot, expected_sha256, appdata, desktop, registry, inst
                 except Exception:compensation_errors.append("REGISTRY")
             for t in reversed(affected):
                 try:
-                    if prior[t] is None:t.unlink(missing_ok=True)
-                    else:t.write_bytes(prior[t])
+                    if prior[t] is None:remove_shortcut_if_present(t)
+                    else:write_atomic_shortcut(t,prior[t])
                 except Exception:compensation_errors.append("SHORTCUT")
             try:
                 for key in registry_touched:
