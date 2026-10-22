@@ -68,7 +68,9 @@ def execute_shutdown(installed, *, expected_digest, execute=False,
             return {**result,"reason":reason,
                     "win32_last_error":last_error}
         shutdown_started = True
-        for _ in range(50):
+        # runtime.stop() closes tunnel, MCP, API and terminal engine;
+        # allow the graceful close to drain without force-killing.
+        for _ in range(200):
             if not gui.is_running():
                 break
             sleep(0.1)
