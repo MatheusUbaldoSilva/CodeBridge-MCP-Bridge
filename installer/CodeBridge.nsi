@@ -100,8 +100,27 @@ Function .onInit
 
   StrCpy $INSTDIR "$0"
   StrCpy $IsUpdate "1"
+  Call CheckRunningCodeBridgeBeforeUpdate
 
 init_done:
+FunctionEnd
+
+; Do not overwrite the embedded MCP and GUI Python modules while active.
+; The helper is bundled inside the installer plugin temp directory before
+; touching the installed tree. Unknown status is a hard stop.
+Function CheckRunningCodeBridgeBeforeUpdate
+  IfFileExists "$INSTDIR\\runtime\\python\\python.exe" 0 update_refused
+  InitPluginsDir
+  SetOutPath "$PLUGINSDIR"
+  File "p9b_update_process_guard.py"
+  nsExec::ExecToStack '"$INSTDIR\\runtime\\python\\python.exe" "$PLUGINSDIR\\p9b_update_process_guard.py" --install-root "$INSTDIR"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" update_safe
+  update_refused:
+    MessageBox MB_ICONSTOP "Atualizacao bloqueada: feche a interface e o MCP do CodeBridge. Nao foi possivel confirmar os processos parados."
+    Abort
+  update_safe:
 FunctionEnd
 
 Function GuiInit
@@ -211,6 +230,7 @@ Section "CodeBridge" SEC_MAIN
   File "company_setup.py"
   File "extension_setup.py"
   File "updater.py"
+  File "p9b_update_process_guard.py"
 
   ; Extensão unpacked em caminho fixo. O Chrome deve apontar sempre
   ; para esta pasta, inclusive depois de futuras atualizações.

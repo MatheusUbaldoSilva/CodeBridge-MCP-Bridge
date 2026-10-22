@@ -15,6 +15,7 @@ if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 
 from constants import APP_VERSION, DATA_DIR
+from p9b_update_process_guard import inspect_update_processes
 
 from PySide6.QtCore import QObject, QThread, Signal
 from PySide6.QtGui import QColor, QIcon, QPalette
@@ -374,12 +375,13 @@ class UpdaterWindow(QWidget):
         layout.addWidget(self.button)
 
     def start_update(self):
-        if codebridge_running():
+        status = inspect_update_processes(ROOT)
+        if status["state"] != "NO_RUNNING_CODEBRIDGE":
             QMessageBox.warning(
                 self,
-                "CodeBridge está aberto",
-                "Feche o CodeBridge completamente e clique novamente em "
-                "Baixar e atualizar.",
+                "Atualizacao bloqueada",
+                "Feche a interface e o MCP do CodeBridge antes de atualizar. "
+                "A verificacao de processos deve estar disponivel.",
             )
             return
 
@@ -421,6 +423,20 @@ class UpdaterWindow(QWidget):
         self.thread.start()
 
     def download_finished(self, installer):
+        # Recheck immediately before launch: GUI/MCP may restart during download.
+        status = inspect_update_processes(ROOT)
+        if status["state"] != "NO_RUNNING_CODEBRIDGE":
+            self.button.setEnabled(True)
+            self.button.setText("Verificar e atualizar")
+            self.status_label.setText(
+                "Atualizacao preservada; feche a interface e o MCP primeiro."
+            )
+            QMessageBox.warning(
+                self, "Atualizacao bloqueada",
+                "O CodeBridge ou seu servidor MCP ainda esta ativo. "
+                "Nenhum instalador foi executado.",
+            )
+            return
         self.button.setText("Atualização pronta")
         self.status_label.setText(
             "Download validado. Abrindo o instalador..."
