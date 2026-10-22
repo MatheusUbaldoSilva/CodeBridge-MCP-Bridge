@@ -76,6 +76,12 @@ def preview_approved_unindexed_sources(
                 and len(manifest.entries) != observed["indexed_entries_checked"]):
             return result("PUBLIC_MANIFEST_SNAPSHOT_MISMATCH", candidates=[])
         indexed = {row.path for row in manifest.entries if row.project_id == "codebridge"}
+        stale_paths = set(observed.get("content_changed_paths", ()))
+        missing_paths = set(observed.get("missing_paths", ()))
+        if (not stale_paths.issubset(indexed)
+                or not missing_paths.issubset(indexed)
+                or stale_paths & missing_paths):
+            return result("PUBLIC_SOURCE_DRIFT_INCONSISTENT", candidates=[])
         before = subprocess.run(
             ["git", "-C", str(root), "rev-parse", "HEAD"],
             capture_output=True, text=True, timeout=10, check=True,
@@ -85,9 +91,14 @@ def preview_approved_unindexed_sources(
         now = time.time() if now_epoch is None else now_epoch
         candidates = []
         for path in approved_paths:
-            if path in indexed:
-                candidates.append({"path": path, "state": "ALREADY_INDEXED"})
+            if path in missing_paths:
+                candidates.append({"path": path, "state": "INDEXED_SOURCE_MISSING_NEEDS_REVIEW"})
                 continue
+            if path in indexed and path not in stale_paths:
+                candidates.append({"path": path, "state": "ALREADY_INDEXED",
+                                   "intent": "UNCHANGED"})
+                continue
+            intent = "REINDEX_CHANGED" if path in stale_paths else "INDEX_NEW"
             file = (root / Path(*PurePosixPath(path).parts)).resolve()
             if not file.is_relative_to(root) or not file.is_file():
                 candidates.append({"path": path, "state": "SOURCE_MISSING_OR_ESCAPED"})
@@ -100,7 +111,7 @@ def preview_approved_unindexed_sources(
                 debounce_seconds=debounce_seconds, indexing_enabled=True,
             )
             candidates.append({"path": path, "state": gate["state"],
-                               "head": gate.get("head"),
+                               "intent": intent, "head": gate.get("head"),
                                "sha256": gate.get("candidate_sha256")})
         after = subprocess.run(
             ["git", "-C", str(root), "rev-parse", "HEAD"],

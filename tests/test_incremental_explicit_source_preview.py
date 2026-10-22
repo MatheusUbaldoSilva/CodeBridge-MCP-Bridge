@@ -32,7 +32,7 @@ class ExplicitSourcePreviewTests(unittest.TestCase):
         self.pointer = {"state": "PUBLIC_POINTER_OBSERVED",
                         "generation": "v1_delta_1ae1d01ea84f4e"}
 
-    def evaluate(self, **kwargs):
+    def evaluate(self, *, observed=None, **kwargs):
         with patch(
             "rag.runtime.incremental_explicit_source_preview.resolve_rag_sqlite_path",
             return_value=self.public / "rag_index.sqlite3",
@@ -41,7 +41,7 @@ class ExplicitSourcePreviewTests(unittest.TestCase):
             return_value=self.pointer,
         ), patch(
             "rag.runtime.incremental_explicit_source_preview.discover_installed_reindex_scope",
-            return_value={"state": "INDEXED_SOURCES_CURRENT"},
+            return_value=observed or {"state": "INDEXED_SOURCES_CURRENT"},
         ):
             return preview_approved_unindexed_sources(self.repo, **kwargs)
 
@@ -74,6 +74,41 @@ class ExplicitSourcePreviewTests(unittest.TestCase):
         ]}), encoding="utf-8")
         value = self.evaluate(approved_paths=("sample.py",), changed_at_epoch=0)
         self.assertEqual(value["candidates"][0]["state"], "ALREADY_INDEXED")
+
+    def test_committed_stale_indexed_source_is_reviewed_for_reindex(self):
+        from rag.index.manifest import ManifestEntry, ManifestIndexKind
+        entry = ManifestEntry(project_id="codebridge", index_kind=ManifestIndexKind.CODE,
+                              path="sample.py", size=10, mtime_ns=1, sha256="a" * 64,
+                              chunk_ids=("chunk-1",), model_version="test")
+        self.manifest.write_text(json.dumps({"schema_version": 1, "entries": [
+            entry.to_dict()
+        ]}), encoding="utf-8")
+        report = self.evaluate(
+            approved_paths=("sample.py",), changed_at_epoch=0, now_epoch=1000,
+            observed={"state": "INDEXED_SOURCES_DRIFT_FOUND",
+                      "indexed_entries_checked": 1,
+                      "content_changed_paths": ["sample.py"], "missing_paths": []},
+        )
+        self.assertEqual(report["candidates"][0]["intent"], "REINDEX_CHANGED")
+        self.assertEqual(report["candidates"][0]["state"], "ELIGIBLE_FOR_DURABLE_QUEUE")
+        self.assertFalse(report["queued"])
+
+    def test_missing_indexed_source_is_not_enqueued(self):
+        from rag.index.manifest import ManifestEntry, ManifestIndexKind
+        entry = ManifestEntry(project_id="codebridge", index_kind=ManifestIndexKind.CODE,
+                              path="sample.py", size=10, mtime_ns=1, sha256="a" * 64,
+                              chunk_ids=("chunk-1",), model_version="test")
+        self.manifest.write_text(json.dumps({"schema_version": 1, "entries": [
+            entry.to_dict()
+        ]}), encoding="utf-8")
+        report = self.evaluate(
+            approved_paths=("sample.py",), changed_at_epoch=0,
+            observed={"state": "INDEXED_SOURCES_DRIFT_FOUND",
+                      "indexed_entries_checked": 1,
+                      "content_changed_paths": [], "missing_paths": ["sample.py"]},
+        )
+        self.assertEqual(report["candidates"][0]["state"], "INDEXED_SOURCE_MISSING_NEEDS_REVIEW")
+        self.assertFalse(report["queued"])
 
     def test_manifest_entry_count_changed_during_discovery_denies_preview(self):
         with patch(
