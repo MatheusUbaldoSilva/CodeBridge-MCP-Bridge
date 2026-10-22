@@ -88,48 +88,59 @@ def bootstrap_installed_queue(
     # A lock in the dedicated jobs directory serializes competing initializers.
     # No operations touch existing public index artifacts.
     created_directory = not jobs.is_dir()
-    if created_directory:
-        jobs.mkdir(exist_ok=False)
-    if jobs.is_symlink() or queue.exists() or fence.exists():
-        return result("BOOTSTRAP_BLOCKED", reason="QUEUE_ALREADY_CHANGED")
-    with SupervisorLock(lock_path) as held:
-        # Revalidate while holding exclusive process ownership.
-        current = inspect_installed_queue_bootstrap()
-        if (set(jobs.iterdir()) != {lock_path}
-                or current.get("blockers") != ["QUEUE_SCHEMA_BOOTSTRAP_PENDING"]
-                or pointer_path.read_bytes() != pointer_before
-                or inspect_public_pointer_for_scheduler() != pointer
-                or journal.exists() or journal.is_symlink()):
-            return result("BOOTSTRAP_BLOCKED", reason="PREFLIGHT_CHANGED_AFTER_LOCK")
-        try:
-            with closing(_connection(queue, create=True)):
-                pass
-            issued = issue_generation(fence, lock=held)
-            verified = inspect_job_queue(queue).get("state") == "QUEUE_INSPECTED"
-            if verified:
-                verified = observe_generation(fence, issued)
-        except Exception as exc:
-            # Never hide partially initialized storage behind executed=False.
-            # Preserve artifacts for inspection; no automatic destructive reset.
+    try:
+        if created_directory:
+            jobs.mkdir(exist_ok=False)
+        if jobs.is_symlink() or queue.exists() or fence.exists():
+            return result("BOOTSTRAP_BLOCKED", reason="QUEUE_ALREADY_CHANGED")
+        with SupervisorLock(lock_path) as held:
+            # Revalidate while holding exclusive process ownership.
+            current = inspect_installed_queue_bootstrap()
+            if (set(jobs.iterdir()) != {lock_path}
+                    or current.get("blockers") != ["QUEUE_SCHEMA_BOOTSTRAP_PENDING"]
+                    or pointer_path.read_bytes() != pointer_before
+                    or inspect_public_pointer_for_scheduler() != pointer
+                    or journal.exists() or journal.is_symlink()):
+                return result("BOOTSTRAP_BLOCKED", reason="PREFLIGHT_CHANGED_AFTER_LOCK")
+            try:
+                with closing(_connection(queue, create=True)):
+                    pass
+                issued = issue_generation(fence, lock=held)
+                verified = inspect_job_queue(queue).get("state") == "QUEUE_INSPECTED"
+                if verified:
+                    verified = observe_generation(fence, issued)
+            except Exception as exc:
+                # Never hide partially initialized storage behind executed=False.
+                # Preserve artifacts for inspection; no automatic destructive reset.
+                return result(
+                    "BOOTSTRAP_REVIEW_REQUIRED",
+                    executed=queue.is_file() or fence.is_file(),
+                    reason="INITIALIZATION_INTERRUPTED",
+                    error_type=type(exc).__name__,
+                    queue_present=queue.is_file(), fence_present=fence.is_file(),
+                )
+            if not verified:
+                return result("BOOTSTRAP_REVIEW_REQUIRED", executed=True,
+                              reason="POST_BOOTSTRAP_SCHEMA_OR_FENCE_UNVERIFIED")
+            if (pointer_path.read_bytes() != pointer_before
+                    or inspect_public_pointer_for_scheduler() != pointer
+                    or journal.exists() or journal.is_symlink()):
+                return result("BOOTSTRAP_REVIEW_REQUIRED", executed=True,
+                              reason="PUBLIC_GENERATION_CHANGED_AFTER_BOOTSTRAP")
             return result(
-                "BOOTSTRAP_REVIEW_REQUIRED",
-                executed=queue.is_file() or fence.is_file(),
-                reason="INITIALIZATION_INTERRUPTED",
-                error_type=type(exc).__name__,
-                queue_present=queue.is_file(), fence_present=fence.is_file(),
+                "QUEUE_BOOTSTRAPPED_NO_SCHEDULER", executed=True,
+                queue_initialized=True, queue_path=str(queue),
+                public_generation=generation,
+                fence_generation=issued, operator_approved=True,
+                directory_created=created_directory,
             )
-        if not verified:
-            return result("BOOTSTRAP_REVIEW_REQUIRED", executed=True,
-                          reason="POST_BOOTSTRAP_SCHEMA_OR_FENCE_UNVERIFIED")
-        if (pointer_path.read_bytes() != pointer_before
-                or inspect_public_pointer_for_scheduler() != pointer
-                or journal.exists() or journal.is_symlink()):
-            return result("BOOTSTRAP_REVIEW_REQUIRED", executed=True,
-                          reason="PUBLIC_GENERATION_CHANGED_AFTER_BOOTSTRAP")
+    except (OSError, RuntimeError, ValueError) as exc:
         return result(
-            "QUEUE_BOOTSTRAPPED_NO_SCHEDULER", executed=True,
-            queue_initialized=True, queue_path=str(queue),
-            public_generation=generation,
-            fence_generation=issued, operator_approved=True,
-            directory_created=created_directory,
+            "BOOTSTRAP_REVIEW_REQUIRED",
+            executed=(queue.is_file() or fence.is_file()
+                      or (created_directory and jobs.is_dir())),
+            directory_created=created_directory and jobs.is_dir(),
+            reason="EXCLUSIVE_BOOTSTRAP_INTERRUPTED",
+            error_type=type(exc).__name__,
+            queue_present=queue.is_file(), fence_present=fence.is_file(),
         )

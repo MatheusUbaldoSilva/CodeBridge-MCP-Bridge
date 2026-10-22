@@ -137,6 +137,35 @@ class IsolatedInstalledQueueBootstrapTests(unittest.TestCase):
         self.assertFalse(response["safe_to_publish"])
         self.assertFalse(response["worker_started"])
 
+    def test_exclusive_lock_failure_reports_created_directory(self):
+        plan = self.operation()
+        with patch(
+            "rag.runtime.incremental_authorized_queue_bootstrap.SupervisorLock.acquire",
+            return_value=False,
+        ):
+            response = self.operation(
+                execute=True, operator_approved=True,
+                confirmation=plan["confirmation"],
+                expected_generation=self.generation,
+            )
+        self.assertEqual(response["state"], "BOOTSTRAP_REVIEW_REQUIRED")
+        self.assertEqual(response["reason"], "EXCLUSIVE_BOOTSTRAP_INTERRUPTED")
+        self.assertTrue(response["executed"])
+        self.assertTrue(response["directory_created"])
+        self.assertFalse(response["queue_present"])
+        self.assertFalse(response["fence_present"])
+
+    def test_existing_empty_jobs_directory_is_not_reported_as_new(self):
+        self.jobs.mkdir()
+        plan = self.operation()
+        response = self.operation(
+            execute=True, operator_approved=True,
+            confirmation=plan["confirmation"],
+            expected_generation=self.generation,
+        )
+        self.assertEqual(response["state"], "QUEUE_BOOTSTRAPPED_NO_SCHEDULER")
+        self.assertFalse(response["directory_created"])
+
     def test_unapproved_localappdata_root_never_initializes(self):
         with patch.dict(os.environ, {"LOCALAPPDATA": str(self.root)}), patch(
             "rag.runtime.incremental_authorized_queue_bootstrap.resolve_rag_sqlite_path",
