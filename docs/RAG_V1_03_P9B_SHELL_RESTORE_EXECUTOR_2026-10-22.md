@@ -19,3 +19,19 @@ e nem comprova rollback total do NSIS. A implementacao concreta
 ainda necessita auditoria de estado anterior, tratamento de erros
 parciais e prova pos-restauracao. Nao usar para recuperar producao
 antes desses requisitos.
+
+
+## Teste integrado e backup real
+
+Criado installer/rag_p9b_shell_restore_scratch_backend.py,
+backend INUTILIZAVEL EM PRODUCAO, limitado a pasta scratch.
+Possui verificador de arquivos por sha256 e registro JSON.
+O controlador foi executado no snapshot verdadeiro:
+NSIS_SHELL_REGISTRY_SHORTCUT_SNAPSHOT.zip
+e escreveu apenas SHELL_TRANSACTION_SCRATCH.
+JOURNAL: SHELL_RESTORE_ARMED -> SHELL_RESTORE_VERIFIED.
+Resultado local restaurado=true aplica-se EXCLUSIVAMENTE a scratch,
+e registry_modified=false/shortcuts_modified=false referem-se
+ao registro e atalhos reais do Windows.
+Duas provas integradas sinteticas PASS.
+Ainda NAO existe backend Windows aprovado para rollback ao vivo.
