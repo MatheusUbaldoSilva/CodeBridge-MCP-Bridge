@@ -35,3 +35,17 @@ e registry_modified=false/shortcuts_modified=false referem-se
 ao registro e atalhos reais do Windows.
 Duas provas integradas sinteticas PASS.
 Ainda NAO existe backend Windows aprovado para rollback ao vivo.
+
+
+## Conferencia posterior independente
+
+O modulo installer/rag_p9b_shell_postverify.py compara os dois
+registros HKCU e cinco atalhos reais com o snapshot, somente
+leitura, inclusive SHA256 dos bytes. Quatro testes PASS:
+baseline identico, arquivo alterado, atalho ausente, chave
+de registro divergente.
+Teste Windows real sobre a instalacao ainda ativa:
+SHELL_POSTRESTORE_MATCHED, verified=true, registry_keys_checked=2,
+shortcuts_checked=5; nenhuma alteracao.
+Essa prova descreve o baseline existente, nao comprova que
+uma restauracao de producao tenha sido executada.
