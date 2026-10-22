@@ -26,7 +26,7 @@ A inspecao nao alterou nenhum processo.
 ## Qualidade
 
 Suite integrada atual de P9-B, update guard e recovery:
-102 testes PASS, em Python portatil do CodeBridge.
+102 testes PASS na bateria inicial (antes do ultimo ajuste), em Python portatil do CodeBridge.
 Os arquivos preexistentes continuaram intocados.
 
 ## Artefatos de reversao e instalacao
@@ -41,6 +41,21 @@ SHA256=6f6cb339afd19e391233368858334a44fccbb86ad7a19422ec07ee79ae54e78b
 Ambos em LOCALAPPDATA/CodeBridge-MCP-Bridge/release_staging/P9B_CURRENT_c7b0a46.
 236 arquivos preservados e confirmados em ensaio isolado; 258 destinos.
 Nunca misturar esse snapshot com executavel de outro hash.
+
+
+## Prova independente via Remote Desktop
+
+O mesmo script foi executado pelo Remote Desktop Commander com o
+Python portatil, fora do canal MCP autoral.
+Resultado: SUPERVISOR_UPDATE_BLOCKED_RUNNING.
+Lista reconhecida: GUI 1376, MCP 9300, adapter 10768, tunnel 5608.
+mcp_parent_absent=[9300].
+Foram observadas 53 linhas de comando de processos opacos no contexto
+de permissao dessa execucao externa. A regra preserva o bloqueio e
+nao trata processos desconhecidos como autorizacao para install.
+A leitura foi bem sucedida; nenhuma parada foi executada.
+Commit de compatibilidade com processos sistemicos sem idade legivel:
+b91d371.
 
 ## Pendencias de operacao
 
