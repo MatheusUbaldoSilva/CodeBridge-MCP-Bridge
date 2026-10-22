@@ -72,14 +72,12 @@ class AuthorMCPManager:
                     return True
                 child_created = parent_created
                 ancestor_pid = int(parent.ppid() or 0)
-        except (
-            psutil.NoSuchProcess,
-            psutil.AccessDenied,
-            OSError,
-            ValueError,
-            TypeError,
-        ):
+        except psutil.NoSuchProcess:
             return False
+        except (psutil.AccessDenied, OSError, ValueError, TypeError):
+            # UNKNOWN is not ORPHAN. Never recycle after an identity
+            # verification failure or inaccessible ancestor.
+            return None
         return False
 
     def _matching_stack_processes(self):
@@ -211,6 +209,16 @@ class AuthorMCPManager:
             processes["mcp"]
             + processes["adapter"]
         )
+        if any(
+            item.get("live_codebridge_ancestor") is None
+            for item in candidates
+        ):
+            self._last_error = (
+                "Propriedade da stack MCP nao verificavel; "
+                "recuperacao automatica bloqueada"
+            )
+            return False
+
         if any(
             item["live_codebridge_ancestor"]
             for item in candidates

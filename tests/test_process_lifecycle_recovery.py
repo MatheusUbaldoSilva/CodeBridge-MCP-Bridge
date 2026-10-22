@@ -3,6 +3,7 @@ import sys
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
+import psutil
 
 ROOT = Path(__file__).resolve().parent.parent
 APP = ROOT / "app_rewrite"
@@ -117,6 +118,27 @@ class AuthorMCPLifecycleTests(unittest.TestCase):
         gui.is_running.return_value=True
         with patch("author_mcp_manager.psutil.Process", return_value=gui):
             self.assertTrue(AuthorMCPManager._has_live_codebridge_ancestor(child))
+
+    def test_ancestor_access_denied_is_not_evidence_of_orphan(self):
+        child=Mock()
+        child.pid=30
+        child.ppid.return_value=12
+        child.create_time.return_value=200.0
+        with patch("author_mcp_manager.psutil.Process", side_effect=psutil.AccessDenied(12)):
+            self.assertIsNone(AuthorMCPManager._has_live_codebridge_ancestor(child))
+
+    def test_unknown_ownership_never_triggers_process_termination(self):
+        manager=self.make_manager()
+        manager._matching_stack_processes=Mock(return_value={
+            "adapter":[{"pid":20,"live_codebridge_ancestor":False}],
+            "mcp":[{"pid":30,"live_codebridge_ancestor":None}]
+        })
+        manager._terminate_pids=Mock()
+        self.assertFalse(manager._recycle_inherited_stack({
+            "adapter_online":True,"mcp_online":True
+        }))
+        manager._terminate_pids.assert_not_called()
+        self.assertIn("nao verificavel",manager._last_error)
 
     def test_live_stack_is_never_killed(self):
         manager = self.make_manager()
