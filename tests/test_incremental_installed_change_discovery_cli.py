@@ -33,11 +33,31 @@ class InstalledChangeDiscoveryCliTests(unittest.TestCase):
             self.assertEqual(main(["--approve-source", "sample.py"]), 2)
         self.assertEqual(preview.call_args.kwargs["approved_paths"], ("sample.py",))
 
+    def test_selected_uncommitted_source_fails_closed(self):
+        with patch("rag.runtime.incremental_installed_change_discovery_cli.discover_installed_reindex_scope",
+                   return_value={"state": "INDEXED_SOURCES_CURRENT"}), patch(
+            "rag.runtime.incremental_installed_change_discovery_cli.preview_approved_unindexed_sources",
+            return_value={"state": "EXPLICIT_SOURCE_PREVIEW_ONLY",
+                          "candidates": [{"state": "SOURCE_NOT_COMMITTED"}]},
+        ), patch("sys.stdout", new_callable=StringIO):
+            status = main(["--approve-source", "sample.py", "--changed-at-epoch", "123"])
+        self.assertEqual(status, 2)
+
+    def test_candidate_awaiting_debounce_fails_closed(self):
+        with patch("rag.runtime.incremental_installed_change_discovery_cli.discover_installed_reindex_scope",
+                   return_value={"state": "INDEXED_SOURCES_CURRENT"}), patch(
+            "rag.runtime.incremental_installed_change_discovery_cli.preview_approved_unindexed_sources",
+            return_value={"state": "EXPLICIT_SOURCE_PREVIEW_ONLY",
+                          "candidates": [{"state": "AWAITING_STABLE_COMMIT"}]},
+        ), patch("sys.stdout", new_callable=StringIO):
+            self.assertEqual(main(["--approve-source", "sample.py",
+                                   "--changed-at-epoch", "123"]), 2)
+
     def test_preview_produces_read_only_report(self):
         with patch("rag.runtime.incremental_installed_change_discovery_cli.discover_installed_reindex_scope",
                    return_value={"state": "INDEXED_SOURCES_CURRENT"}), patch(
             "rag.runtime.incremental_installed_change_discovery_cli.preview_approved_unindexed_sources",
-            return_value={"state": "EXPLICIT_SOURCE_PREVIEW_ONLY", "queued": False},
+            return_value={"state": "EXPLICIT_SOURCE_PREVIEW_ONLY", "queued": False, "candidates": [{"state": "ELIGIBLE_FOR_DURABLE_QUEUE"}]},
         ), patch("sys.stdout", new_callable=StringIO) as out:
             self.assertEqual(main(["--approve-source", "sample.py",
                                    "--changed-at-epoch", "123"]), 0)

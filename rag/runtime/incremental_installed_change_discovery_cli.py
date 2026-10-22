@@ -30,7 +30,13 @@ def main(argv=None) -> int:
     print(json.dumps(report, ensure_ascii=False, sort_keys=True))
     blocked = scope["state"] == "DISCOVERY_BLOCKED"
     if args.sources:
-        blocked = blocked or report["new_source_preview"]["state"] != "EXPLICIT_SOURCE_PREVIEW_ONLY"
+        preview = report["new_source_preview"]
+        blocked = blocked or (
+            preview["state"] != "EXPLICIT_SOURCE_PREVIEW_ONLY"
+            or len(preview.get("candidates", [])) != len(args.sources)
+            or any(candidate.get("state") != "ELIGIBLE_FOR_DURABLE_QUEUE"
+                   for candidate in preview.get("candidates", []))
+        )
     return 2 if blocked else 0
 
 
