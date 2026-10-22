@@ -78,3 +78,27 @@ journal e pointer switch; heartbeat; bloqueio MCP e isolamento do teste.
 Os arquivos anteriores benchmark modificado, rollback runbook e o
 rascunho local incremental_installed_queue_init.py foram preservados.
 Nenhuma fila instalada criada e nenhuma geracao publica substituida.
+
+## Auditoria integrada apos commits
+
+- 110 testes relevantes de bootstrap, fila, worker, P9B, previas Git e
+  contrato MCP passaram em 20,987 segundos.
+- Comando --require-ready --show-bootstrap retornou exit 2 corretamente;
+  reporte QUEUE_DIRECTORY_BOOTSTRAP_PENDING.
+- Publico: v1_delta_1ae1d01ea84f4e, READY, 211 documentos, 8774 chunks.
+- Consulta real de MCP por rota CODE, fonte indexada
+  author_mcp/mcp_server.py, retornou 2 resultados.
+- HEAD e upstream iguais em 6995786.
+- Nenhuma criacao do diretorio rag/jobs, nenhum worker iniciado,
+  nenhuma modificacao na geracao publica e nenhuma tentativa de
+  contornar o bloqueio de execucao.
+- Arquivos anteriores fora do escopo preservados.
+
+Commits desta subetapa:
+- 4f7f8c9: preflight somente leitura de bootstrap e CLI.
+- 6cd7077: heartbeat valido antes de claim do worker.
+- e5eaeea: prova do bloqueio execute=true e isolamento de teste.
+- 6995786: registro do blocker e politica do MCP.
+
+P9-B permanece EM ANDAMENTO. Proximo gate exige mecanismo oficial
+autorizado de inicializacao da fila de producao e ensaio reversivel.
