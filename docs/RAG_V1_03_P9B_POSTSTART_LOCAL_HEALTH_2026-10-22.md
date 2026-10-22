@@ -59,3 +59,11 @@ a SessionId 1 do Windows, assim como MCP, adapter e tunnel.
 A prova de SessionId e somente read-only; nao garante por si
 que o processo pythonw apos restart fara handshake com ChatGPT.
 A recuperacao GUI exige ainda validacao operacional externa.
+
+## Prevencao de duplicacao GUI
+
+A recuperacao por launcher padrao verifica processos python/pythonw
+com caminho exato de app_rewrite/main.py antes de criar nova GUI.
+GUI existente ou processo Python opaco impede relancamento.
+Testes simulados para GUI duplicada e comando inacessivel PASS.
+Nao foi executada parada ou relancamento real.

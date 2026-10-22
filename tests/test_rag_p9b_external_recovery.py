@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from installer.rag_p9b_external_recovery import recover_gui
 from installer.rag_p9b_restart_readiness import REQUIRED
 
@@ -39,6 +39,22 @@ class RecoveryTests(unittest.TestCase):
                       probe=lambda pid:False,sleep=lambda _:None,attempts=2)
         self.assertEqual(r["state"],"RECOVERY_PENDING")
         self.assertFalse(r["mcp_handshake_verified"] if "mcp_handshake_verified" in r else False)
+
+    def test_default_launcher_denies_duplicate_gui(self):
+        app=str(self.root/"app_rewrite"/"main.py")
+        existing=Mock()
+        existing.info={"name":"pythonw.exe","cmdline":["pythonw.exe",app]}
+        with patch("psutil.process_iter", return_value=[existing]):
+            r=recover_gui(self.root)
+        self.assertEqual(r["reason"],"GUI_ALREADY_RUNNING")
+        self.assertFalse(r["launched"])
+
+    def test_unknown_python_prevents_duplicate_launch(self):
+        opaque=Mock()
+        opaque.info={"name":"python.exe","cmdline":None}
+        with patch("psutil.process_iter", return_value=[opaque]):
+            r=recover_gui(self.root)
+        self.assertEqual(r["reason"],"GUI_PROCESS_IDENTITY_UNVERIFIED")
 
     def test_launch_failure_refused(self):
         def fail(args,cwd): raise OSError("synthetic")
