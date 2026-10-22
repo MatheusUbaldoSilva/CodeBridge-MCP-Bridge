@@ -55,6 +55,12 @@ class ExternalSupervisorPreflightTests(unittest.TestCase):
         r=self.check(self.proc(10,2,self.gui),self.proc(10,3,self.mcp))
         self.assertEqual(r["reason"],"DUPLICATE_OR_INVALID_PID")
 
+    def test_missing_mcp_parent_explicitly_reported(self):
+        r=self.check(self.proc(10,1,self.gui,100.0),
+                     self.proc(20,999,self.mcp,200.0))
+        self.assertEqual(r["mcp_parent_absent"],[20])
+        self.assertFalse(r["safe_to_apply"])
+
     def test_extra_script_path_not_matched(self):
         r=self.check(self.proc(10,2,self.gui+"-other.py"),
                      self.proc(20,3,self.mcp))

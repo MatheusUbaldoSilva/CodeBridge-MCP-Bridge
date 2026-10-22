@@ -37,6 +37,7 @@ def assess_external_supervisor(installed: Path, *, records=None) -> dict:
     found = []
     opaque = 0
     seen = set()
+    births = {}
     try:
         for item in records:
             pid = int(item["pid"])
@@ -49,6 +50,11 @@ def assess_external_supervisor(installed: Path, *, records=None) -> dict:
             if not isinstance(cmdline, (list, tuple)):
                 opaque += 1
                 continue
+            if item.get("create_time") is not None:
+                birth = float(item["create_time"])
+                if not (0 < birth < float("inf")):
+                    return {**result, "reason": "PROCESS_CREATION_UNVERIFIED"}
+                births[pid] = birth
             arguments = {_path(token) for token in cmdline}
             matches = [kind for kind,path in scripts.items() if path in arguments]
             if not matches:
@@ -64,15 +70,27 @@ def assess_external_supervisor(installed: Path, *, records=None) -> dict:
     except (KeyError, TypeError, ValueError, OverflowError):
         return {**result, "reason": "PROCESS_IDENTITY_UNVERIFIED"}
     roles = {record["component"] for record in found}
+    mcp_parent_unknown = sorted(
+        record["pid"] for record in found
+        if record["component"] == "MCP"
+        and record["parent_pid"] not in seen
+    )
+    parent_age_conflicts = sorted(
+        record["pid"] for record in found
+        if record["parent_pid"] in births
+        and births[record["parent_pid"]] > record["create_time"]
+    )
+    evidence = {"mcp_parent_absent": mcp_parent_unknown,
+                "parent_age_conflicts": parent_age_conflicts}
     if not {"GUI", "MCP"}.issubset(roles):
         return {**result,
                 "state": ("SUPERVISOR_PREFLIGHT_UNVERIFIED" if opaque
                           else "SUPERVISOR_TOPOLOGY_INCOMPLETE"),
                 "reason": "OPAQUE_PROCESSES" if opaque else "KNOWN_COMPONENT_MISSING",
-                "opaque_processes": opaque, "processes": found}
+                "opaque_processes": opaque, "processes": found, **evidence}
     return {**result, "state": "SUPERVISOR_UPDATE_BLOCKED_RUNNING",
             "blockers": sorted(roles), "opaque_processes": opaque,
-            "processes": found}
+            "processes": found, **evidence}
 
 
 def main(argv=None):
