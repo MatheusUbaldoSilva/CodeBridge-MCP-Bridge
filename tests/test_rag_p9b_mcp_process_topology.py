@@ -58,6 +58,25 @@ class McpOwnershipTopologyTests(unittest.TestCase):
                           self.x(2,1,"python.exe",self.mcp))
         self.assertEqual(report["state"],"MCP_ATTACHED_TO_LIVE_GUI_OBSERVED")
 
+    def test_reused_parent_pid_cannot_establish_gui_ownership(self):
+        gui=self.x(1,0,"pythonw.exe",self.gui)
+        gui["create_time"]=200.0
+        mcp=self.x(2,1,"python.exe",self.mcp)
+        mcp["create_time"]=100.0
+        report=self.check(gui,mcp)
+        self.assertEqual(report["state"],"MCP_INDEPENDENT_PROCESS_OWNERSHIP_UNVERIFIED")
+        self.assertEqual(report["parent_creation_time_conflicts"],[2])
+        self.assertFalse(report["safe_to_stop_processes"])
+
+    def test_valid_process_birth_order_preserves_attached_detection(self):
+        gui=self.x(1,0,"pythonw.exe",self.gui)
+        gui["create_time"]=100.0
+        mcp=self.x(2,1,"python.exe",self.mcp)
+        mcp["create_time"]=200.0
+        report=self.check(gui,mcp)
+        self.assertEqual(report["state"],"MCP_ATTACHED_TO_LIVE_GUI_OBSERVED")
+        self.assertEqual(report["parent_creation_time_conflicts"],[])
+
     def test_no_mcp_is_not_proof_of_recovery(self):
         report=self.check(self.x(1,0,"pythonw.exe",self.gui))
         self.assertEqual(report["state"],"MCP_GUI_TOPOLOGY_INCOMPLETE")

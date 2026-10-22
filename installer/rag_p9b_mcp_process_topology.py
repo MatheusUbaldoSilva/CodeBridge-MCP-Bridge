@@ -31,7 +31,7 @@ def inspect_mcp_process_topology(installed: Path, *, process_records=None) -> di
             import psutil
             records = []
             for process in psutil.process_iter(attrs=[
-                "pid", "ppid", "name", "cmdline",
+                "pid", "ppid", "name", "cmdline", "create_time",
             ]):
                 info = process.info
                 records.append(dict(info))
@@ -40,6 +40,7 @@ def inspect_mcp_process_topology(installed: Path, *, process_records=None) -> di
     else:
         records = list(process_records)
     graph = {}
+    births = {}
     gui = set()
     mcp = set()
     adapter = set()
@@ -59,6 +60,12 @@ def inspect_mcp_process_topology(installed: Path, *, process_records=None) -> di
             if pid < 0 or ppid < 0 or pid in graph:
                 return {**report, "reason": "DUPLICATE_OR_INVALID_PID"}
             graph[pid] = ppid
+            birth = item.get("create_time")
+            if birth is not None:
+                birth = float(birth)
+                if not (birth > 0 and birth < float("inf")):
+                    return {**report, "reason": "PROCESS_CREATION_TIME_INVALID"}
+            births[pid] = birth
             cmd = item.get("cmdline") or []
             if not isinstance(cmd,(list,tuple)):
                 return {**report, "reason": "PROCESS_CMDLINE_UNVERIFIED"}
@@ -78,6 +85,9 @@ def inspect_mcp_process_topology(installed: Path, *, process_records=None) -> di
         current=pid
         for _ in range(32):
             parent=graph.get(current,0)
+            if parent in graph and births.get(parent) is not None and births.get(current) is not None:
+                if births[parent] > births[current]:
+                    return False
             if parent in gui:
                 return True
             if not parent or parent in seen:
@@ -85,6 +95,12 @@ def inspect_mcp_process_topology(installed: Path, *, process_records=None) -> di
             seen.add(parent)
             current=parent
         return False
+    chronology_conflicts = sorted(
+        pid for pid in graph
+        if graph[pid] in graph
+        and births.get(pid) is not None and births.get(graph[pid]) is not None
+        and births[graph[pid]] > births[pid]
+    )
     attached=sorted(pid for pid in mcp if inherited_from_gui(pid))
     detached=sorted(mcp-set(attached))
     lost_parent=sorted(pid for pid in detached if graph.get(pid,0) not in graph)
@@ -95,6 +111,7 @@ def inspect_mcp_process_topology(installed: Path, *, process_records=None) -> di
         "adapter_pids": sorted(adapter),
         "tunnel_pids": sorted(tunnel),
         "mcp_attached_to_gui": attached,
+        "parent_creation_time_conflicts": chronology_conflicts,
         "mcp_independent_of_current_gui": detached,
         "mcp_recorded_parent_absent": lost_parent,
         "active_mcp_count": len(mcp),
