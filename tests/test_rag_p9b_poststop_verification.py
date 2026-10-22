@@ -55,9 +55,21 @@ class PostStopChecks(unittest.TestCase):
         r=self.run_probe([],ports=broken)
         self.assertEqual(r["reason"],"PORT_STATE_UNVERIFIED")
 
+    def test_unrelated_opaque_windows_service_does_not_block(self):
+        records=[{"pid":40,"ppid":1,"name":"svchost.exe",
+                  "cmdline":None,"create_time":100}]
+        r=self.run_probe(records)
+        self.assertEqual(r["state"],"POSTSTOP_OBSERVED_ONLY")
+        self.assertFalse(r["installer_launch_authorized"])
+
+    def test_empty_python_cmdline_fails_closed(self):
+        r=self.run_probe([{"pid":41,"ppid":1,"name":"python.exe",
+                          "cmdline":[],"create_time":100}])
+        self.assertEqual(r["reason"],"OPAQUE_PROCESS_IDENTITY")
+
     def test_inaccessible_process_fails_closed(self):
-        r=self.run_probe([{"pid":40,"ppid":1,"cmdline":None,
-                          "create_time":100}])
+        r=self.run_probe([{"pid":40,"ppid":1,"name":"python.exe",
+                          "cmdline":None,"create_time":100}])
         self.assertEqual(r["reason"],"OPAQUE_PROCESS_IDENTITY")
 
 

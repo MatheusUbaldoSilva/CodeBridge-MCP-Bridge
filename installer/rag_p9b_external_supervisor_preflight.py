@@ -25,7 +25,7 @@ def assess_external_supervisor(installed: Path, *, records=None) -> dict:
         try:
             import psutil
             records = [p.info for p in psutil.process_iter(
-                attrs=["pid", "ppid", "name", "cmdline", "create_time"])]
+                attrs=["pid", "ppid", "name", "cmdline", "create_time", "exe"])]
         except Exception:
             return {**result, "reason": "PROCESS_ENUMERATION_FAILED"}
     scripts = {
@@ -36,6 +36,7 @@ def assess_external_supervisor(installed: Path, *, records=None) -> dict:
     }
     found = []
     opaque = 0
+    opaque_python = 0
     seen = set()
     births = {}
     try:
@@ -48,8 +49,14 @@ def assess_external_supervisor(installed: Path, *, records=None) -> dict:
                 return {**result, "reason": "DUPLICATE_OR_INVALID_PID"}
             seen.add(pid)
             cmdline = item.get("cmdline")
-            if not isinstance(cmdline, (list, tuple)):
+            if not isinstance(cmdline, (list, tuple)) or not cmdline:
                 opaque += 1
+                name = str(item.get("name") or "").lower()
+                executable = str(item.get("exe") or "").lower()
+                if ("python" in name or "python" in executable
+                        or "codebridge" in name or "codebridge" in executable
+                        or not name):
+                    opaque_python += 1
                 continue
             arguments = {_path(token) for token in cmdline}
             matches = [kind for kind,path in scripts.items() if path in arguments]
@@ -88,9 +95,11 @@ def assess_external_supervisor(installed: Path, *, records=None) -> dict:
                 "state": ("SUPERVISOR_PREFLIGHT_UNVERIFIED" if opaque
                           else "SUPERVISOR_TOPOLOGY_INCOMPLETE"),
                 "reason": "OPAQUE_PROCESSES" if opaque else "KNOWN_COMPONENT_MISSING",
-                "opaque_processes": opaque, "processes": found, **evidence}
+                "opaque_processes": opaque, "opaque_codebridge_candidates": opaque_python,
+                "processes": found, **evidence}
     return {**result, "state": "SUPERVISOR_UPDATE_BLOCKED_RUNNING",
             "blockers": sorted(roles), "opaque_processes": opaque,
+            "opaque_codebridge_candidates": opaque_python,
             "processes": found, **evidence}
 
 

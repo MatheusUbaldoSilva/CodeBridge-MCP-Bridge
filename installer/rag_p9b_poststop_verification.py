@@ -32,7 +32,7 @@ def check_poststop(
         try:
             import psutil
             process_records = [p.info for p in psutil.process_iter(
-                attrs=["pid", "ppid", "name", "cmdline", "create_time"]
+                attrs=["pid", "ppid", "name", "cmdline", "create_time", "exe"]
             )]
         except Exception:
             return {**result, "reason": "PROCESS_ENUMERATION_UNAVAILABLE"}
@@ -47,7 +47,7 @@ def check_poststop(
     if inspection.get("processes"):
         return {**result, "reason": "CODEBRIDGE_PROCESSES_STILL_RUNNING",
                 "processes": inspection["processes"]}
-    if inspection.get("opaque_processes", 0):
+    if inspection.get("opaque_codebridge_candidates", 0):
         return {**result, "reason": "OPAQUE_PROCESS_IDENTITY"}
     guard = inspect_update_processes(root, process_iter=official_processes)
     if guard.get("state") != "NO_RUNNING_CODEBRIDGE":
