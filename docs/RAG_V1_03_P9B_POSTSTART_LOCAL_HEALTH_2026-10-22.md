@@ -50,3 +50,12 @@ apos recuperar GUI e antes de retornar estado de stack local.
 Mesmo o estado CUTOVER_LOCAL_STACK_RECOVERED mantem
 mcp_handshake_verified=false, e exige reconexao publica real.
 Nao ha ainda prova de reinicio real do processo MCP.
+
+## Regressao e sessao Windows
+
+153 testes integrados PASS apos o novo gate de MCP local.
+O Remote Desktop e a GUI do CodeBridge pertencem ambos
+a SessionId 1 do Windows, assim como MCP, adapter e tunnel.
+A prova de SessionId e somente read-only; nao garante por si
+que o processo pythonw apos restart fara handshake com ChatGPT.
+A recuperacao GUI exige ainda validacao operacional externa.
