@@ -75,6 +75,24 @@ class ExplicitSourcePreviewTests(unittest.TestCase):
         value = self.evaluate(approved_paths=("sample.py",), changed_at_epoch=0)
         self.assertEqual(value["candidates"][0]["state"], "ALREADY_INDEXED")
 
+    def test_manifest_entry_count_changed_during_discovery_denies_preview(self):
+        with patch(
+            "rag.runtime.incremental_explicit_source_preview.discover_installed_reindex_scope",
+            return_value={"state": "INDEXED_SOURCES_CURRENT",
+                          "indexed_entries_checked": 211},
+        ), patch(
+            "rag.runtime.incremental_explicit_source_preview.resolve_rag_sqlite_path",
+            return_value=self.public / "rag_index.sqlite3",
+        ), patch(
+            "rag.runtime.incremental_explicit_source_preview.inspect_public_pointer_for_scheduler",
+            return_value=self.pointer,
+        ):
+            value = preview_approved_unindexed_sources(
+                self.repo, approved_paths=("sample.py",), changed_at_epoch=0,
+            )
+        self.assertEqual(value["state"], "PUBLIC_MANIFEST_SNAPSHOT_MISMATCH")
+        self.assertFalse(value["queued"])
+
     def test_invalid_public_manifest_fails_closed(self):
         self.manifest.write_text('{"entries":[]}', encoding="utf-8")
         value = self.evaluate(approved_paths=("sample.py",), changed_at_epoch=0)

@@ -5,6 +5,7 @@ No automatic approvals, event generation, queue mutation or watcher.
 from __future__ import annotations
 
 import math
+import hashlib
 from pathlib import Path, PurePosixPath
 import re
 import subprocess
@@ -68,7 +69,12 @@ def preview_approved_unindexed_sources(
         manifest_file = generation / "rag-index-manifest.json"
         if not manifest_file.is_file():
             return result("PUBLIC_MANIFEST_MISSING", candidates=[])
+        manifest_bytes = manifest_file.read_bytes()
+        manifest_digest = hashlib.sha256(manifest_bytes).hexdigest()
         manifest = load_index_manifest(manifest_file)
+        if (observed.get("indexed_entries_checked") is not None
+                and len(manifest.entries) != observed["indexed_entries_checked"]):
+            return result("PUBLIC_MANIFEST_SNAPSHOT_MISMATCH", candidates=[])
         indexed = {row.path for row in manifest.entries if row.project_id == "codebridge"}
         before = subprocess.run(
             ["git", "-C", str(root), "rev-parse", "HEAD"],
@@ -100,7 +106,8 @@ def preview_approved_unindexed_sources(
             ["git", "-C", str(root), "rev-parse", "HEAD"],
             capture_output=True, text=True, timeout=10, check=True,
         ).stdout.strip()
-        if after != before or inspect_public_pointer_for_scheduler() != pointer:
+        if (after != before or inspect_public_pointer_for_scheduler() != pointer
+                or hashlib.sha256(manifest_file.read_bytes()).hexdigest() != manifest_digest):
             return result("SNAPSHOT_CHANGED_DURING_PREVIEW", candidates=[])
         return result("EXPLICIT_SOURCE_PREVIEW_ONLY",
                       public_generation=pointer["generation"],
