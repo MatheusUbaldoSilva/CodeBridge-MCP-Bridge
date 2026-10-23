@@ -39,6 +39,16 @@ class PostverifyTests(unittest.TestCase):
         (self.menu/"CodeBridge.lnk").unlink()
         self.assertEqual(self.verify()["reason"],"SHORTCUT_EXISTENCE_MISMATCH")
 
+    def test_rejects_symlinked_parent(self):
+        actual=self.menu.with_name("real-menu")
+        self.menu.rename(actual)
+        try:
+            self.menu.symlink_to(actual,target_is_directory=True)
+        except OSError:
+            actual.rename(self.menu)
+            self.skipTest("directory symlinks disabled")
+        self.assertEqual(self.verify()["reason"],"SHORTCUT_PATH_CHANGED")
+
     def test_registry_changed(self):
         self.assertEqual(self.verify(registry=lambda k,n:{"exists":False,"values":{}})["reason"],
                          "REGISTRY_BASELINE_MISMATCH")

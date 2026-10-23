@@ -42,7 +42,8 @@ def verify_restored_shell(snapshot, *, appdata, desktop, registry_values=None):
             targets=[Path(appdata)/"Microsoft"/"Windows"/"Start Menu"/"Programs"/"CodeBridge"/n
                      for n in MENU_LINKS]+[Path(desktop)/DESKTOP_LINK]
             for slot,(target,item) in enumerate(zip(targets,manifest["shortcuts"])):
-                if target.is_symlink() or (target.exists() and not target.is_file()):
+                if (any(part.is_symlink() for part in (target, *target.parents))
+                        or (target.exists() and not target.is_file())):
                     return {**result,"reason":"SHORTCUT_PATH_CHANGED","slot":slot}
                 if target.is_file()!=item["exists"]:
                     return {**result,"reason":"SHORTCUT_EXISTENCE_MISMATCH","slot":slot}
