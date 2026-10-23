@@ -58,6 +58,52 @@ class CodeFallbackWiringTests(unittest.TestCase):
         client.upsert.assert_called_once()
         self.assertLess(events.index(("load","CUDA0")),events.index(("load","none")))
 
+    def test_both_backends_fail_without_upserting_vectors(self):
+        from rag.models import code_lifecycle, code_embedding
+        from rag.models.lifecycle import ModelLoadError
+        from rag.index import qdrant_local, vector_ids
+        from rag.models import code_artifact_install
+        from qdrant_client import models
+        events=[]
+        client=Mock()
+        class SimulatedLifecycle:
+            def __init__(self,config):
+                self.config=config
+                events.append(("created",config.device,config.gpu_layers))
+            def load(self,**kwargs):
+                events.append(("load",self.config.device))
+                raise ModelLoadError("simulated backend load failure")
+                return SimpleNamespace()
+            def snapshot(self):
+                return SimpleNamespace()
+            def unload(self,**kwargs):
+                events.append(("unload",self.config.device))
+                return SimpleNamespace()
+        embedding=Mock()
+        embedding.embed_passage.return_value=SimpleNamespace(values=[1.0,2.0])
+        row=("chunk","document","sample","CODE","sample.py",1,2,
+             "a"*64,"branch","b"*40)
+        patches=[
+            patch.object(code_lifecycle,"CodeModelLifecycle",SimulatedLifecycle),
+            patch.object(code_artifact_install,"resolve_selected_code_model_path",return_value=Path("C:/fixture.gguf")),
+            patch.object(qdrant_local,"open_qdrant_local",return_value=client),
+            patch.object(qdrant_local,"close_qdrant_local",side_effect=lambda *_:events.append(("close",))),
+            patch.object(qdrant_local,"ensure_vector_collections"),
+            patch.object(code_embedding,"CodeEmbeddingClient",return_value=embedding),
+            patch.object(vector_ids,"deterministic_vector_point_id",return_value="id"),
+            patch.object(models,"PointStruct",side_effect=lambda **kw:kw),
+        ]
+        with patches[0],patches[1],patches[2],patches[3],patches[4],patches[5],patches[6],patches[7]:
+            from rag.models.fallback import ModelFallbackExhaustedError
+            with self.assertRaises(ModelFallbackExhaustedError):
+                _write_vectors(Path("C:/synthetic-qdrant"),"codebridge",[],[row])
+        self.assertIn(("load","CUDA0"),events)
+        self.assertIn(("load","none"),events)
+        self.assertIn(("created","none",0),events)
+        self.assertIn(("close",),events)
+        client.upsert.assert_not_called()
+        self.assertLess(events.index(("load","CUDA0")),events.index(("load","none")))
+
     def test_code_embeddings_use_manager_and_cleanup(self):
         from rag.models import fallback
         from rag.models import code_embedding
