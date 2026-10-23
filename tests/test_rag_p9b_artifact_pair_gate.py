@@ -50,6 +50,15 @@ class PairGateTests(unittest.TestCase):
         r=self.check(expected_snapshot_sha256="b"*64)
         self.assertEqual(r["reason"],"ARTIFACT_HASH_MISMATCH")
 
+    def test_duplicate_manifest_keys_are_not_trusted(self):
+        raw='{"installer_sha256":"'+self.ehash+'","installer_sha256":"'+self.ehash+'"}'
+        with ZipFile(self.backup,"w") as z:
+            z.writestr("manifest.json",raw)
+        report=self.check(expected_snapshot_sha256=hashlib.sha256(
+            self.backup.read_bytes()).hexdigest())
+        self.assertEqual(report["reason"],"ARTIFACT_READ_UNVERIFIED")
+        self.assertFalse(report["paired"])
+
     def test_wrong_manifest_binding_blocks(self):
         with ZipFile(self.backup,"w") as z:
             z.writestr("manifest.json",json.dumps({"installer_sha256":"b"*64}))

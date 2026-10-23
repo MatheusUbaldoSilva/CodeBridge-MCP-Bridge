@@ -15,6 +15,15 @@ from installer.rag_p9b_installer_rollback_scope import (
 )
 
 
+def _unique_json_pairs(pairs):
+    result={}
+    for name,value in pairs:
+        if name in result:
+            raise ValueError("duplicate rollback metadata key")
+        result[name]=value
+    return result
+
+
 def assess_artifact_pair(installer, snapshot, installed, *,
                          expected_installer_sha256, expected_snapshot_sha256,
                          expected_source_commit):
@@ -40,7 +49,10 @@ def assess_artifact_pair(installer, snapshot, installed, *,
         if exe_hash!=expected_installer_sha256 or zip_hash!=expected_snapshot_sha256:
             return {**result,"reason":"ARTIFACT_HASH_MISMATCH"}
         with ZipFile(snapshot) as z:
-            metadata=json.loads(z.read("manifest.json"))
+            metadata=json.loads(z.read("manifest.json"),
+                                object_pairs_hook=_unique_json_pairs)
+        if not isinstance(metadata,dict):
+            return {**result,"reason":"BACKUP_INSTALLER_BINDING_MISMATCH"}
         if metadata.get("installer_sha256") != exe_hash:
             return {**result,"reason":"BACKUP_INSTALLER_BINDING_MISMATCH"}
         proof=verify_installer_rollback_snapshot(snapshot,installed)
