@@ -63,6 +63,19 @@ def recover_detached_combined(*, file_worker=None, shell_worker=None,
             and getattr(journal,"bound_transaction_sha256",None)
                 != str(identity_sha256).lower()):
         return {**denied, "reason":"RESUMED_JOURNAL_IDENTITY_UNVERIFIED"}
+    def identity_still_bound():
+        try:
+            proof = identity_gate(manifest=identity_manifest,
+                manifest_sha256=identity_sha256, installed=installed,
+                expected_source_commit=source_commit)
+        except Exception:
+            return False
+        return (isinstance(proof, dict)
+                and proof.get("state")=="DETACHED_IDENTITY_OBSERVED_ONLY"
+                and proof.get("identity_verified") is True
+                and proof.get("artifacts_checked")==4
+                and proof.get("cutover_authorized") is False)
+
     def ancestry_still_independent():
         try:
             result = ancestry_probe(installed=installed)
@@ -82,6 +95,10 @@ def recover_detached_combined(*, file_worker=None, shell_worker=None,
             journal("SHELL_DETACHED_ANCESTRY_RECHECK_FAILED", {"stage":"FILES"})
             return {**denied, "state":"DETACHED_COMBINED_REVIEW_REQUIRED",
                     "reason":"ANCESTRY_CHANGED_BEFORE_FILES"}
+        if production is True and not identity_still_bound():
+            journal("SHELL_DETACHED_IDENTITY_RECHECK_FAILED", {"stage":"FILES"})
+            return {**denied, "state":"DETACHED_COMBINED_REVIEW_REQUIRED",
+                    "reason":"IDENTITY_CHANGED_BEFORE_FILES"}
         files = file_worker()
         if (not isinstance(files, dict)
                 or files.get("state") != "DETACHED_FILES_RESTORED_SHELL_PENDING"
@@ -107,6 +124,10 @@ def recover_detached_combined(*, file_worker=None, shell_worker=None,
             journal("SHELL_DETACHED_ANCESTRY_RECHECK_FAILED", {"stage":"SHELL"})
             return {**denied, "state":"DETACHED_COMBINED_REVIEW_REQUIRED",
                     "reason":"ANCESTRY_CHANGED_BEFORE_SHELL"}
+        if production is True and not identity_still_bound():
+            journal("SHELL_DETACHED_IDENTITY_RECHECK_FAILED", {"stage":"SHELL"})
+            return {**denied, "state":"DETACHED_COMBINED_REVIEW_REQUIRED",
+                    "reason":"IDENTITY_CHANGED_BEFORE_SHELL"}
         shell = shell_worker()
         if (not isinstance(shell, dict)
                 or shell.get("state") != "SHELL_RESTORE_VERIFIED"
@@ -131,6 +152,10 @@ def recover_detached_combined(*, file_worker=None, shell_worker=None,
             journal("SHELL_DETACHED_ANCESTRY_RECHECK_FAILED", {"stage":"POSTVERIFY"})
             return {**denied, "state":"DETACHED_COMBINED_REVIEW_REQUIRED",
                     "reason":"ANCESTRY_CHANGED_BEFORE_POSTVERIFY"}
+        if production is True and not identity_still_bound():
+            journal("SHELL_DETACHED_IDENTITY_RECHECK_FAILED", {"stage":"POSTVERIFY"})
+            return {**denied, "state":"DETACHED_COMBINED_REVIEW_REQUIRED",
+                    "reason":"IDENTITY_CHANGED_BEFORE_POSTVERIFY"}
         verified = verify_worker()
         if (not isinstance(verified, dict)
                 or verified.get("verified") is not True):
