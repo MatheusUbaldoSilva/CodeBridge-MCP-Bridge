@@ -125,7 +125,12 @@ def read_journal(path):
     if not p.is_file() or p.is_symlink() or p.stat().st_size>1024*1024:
         return {"state":"JOURNAL_UNVERIFIED"}
     try:
-        entries=[json.loads(line,object_pairs_hook=_strict_journal_pairs,parse_constant=_reject_nonfinite_journal_number) for line in p.read_text(encoding="utf-8").splitlines()]
+        raw=p.read_bytes()
+        # A valid JSON object without the terminating newline is not a
+        # committed fsync journal record after a possible power loss.
+        if raw and not raw.endswith(b"\n"):
+            return {"state":"JOURNAL_UNVERIFIED"}
+        entries=[json.loads(line,object_pairs_hook=_strict_journal_pairs,parse_constant=_reject_nonfinite_journal_number) for line in raw.decode("utf-8").splitlines()]
         if any(not isinstance(item,dict) or type(item.get("seq")) is not int or item["seq"]!=i+1 or not isinstance(item.get("state"),str) or not item["state"].startswith("SHELL_") or not isinstance(item.get("details"),dict) for i,item in enumerate(entries)):
             return {"state":"JOURNAL_UNVERIFIED"}
         return {"state":"JOURNAL_OBSERVED_ONLY","count":len(entries),
