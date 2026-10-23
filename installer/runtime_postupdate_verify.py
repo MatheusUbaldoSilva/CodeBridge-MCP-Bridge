@@ -35,11 +35,15 @@ def verify_installed_update(install_root: Path, rag_state: Path, before: dict) -
     observed = {"files": {key: observed_files.get(key)
                           for key in public_keys}}
     integrity = compare_runtime_fingerprints(expected, observed)
-    ok = bool(current["ready"] and integrity["public_index_intact"])
+    runtime_ready = (isinstance(current,dict)
+                     and current.get("ready") is True)
+    index_intact = (isinstance(integrity,dict)
+                    and integrity.get("public_index_intact") is True)
+    ok = runtime_ready and index_intact
     return {
         "state": "POST_UPDATE_PREREQUISITES_VERIFIED" if ok else "POST_UPDATE_BLOCKED",
-        "installed_runtime_ready": bool(current["ready"]),
-        "public_index_intact": bool(integrity["public_index_intact"]),
+        "installed_runtime_ready": runtime_ready,
+        "public_index_intact": index_intact,
         "integrity": integrity,
         "does_not_activate_worker": True,
         "writes_performed": False,

@@ -43,6 +43,14 @@ class PostUpdateVerifierTests(unittest.TestCase):
                 self.assertFalse(report["deployment_approved"])
                 self.assertFalse(report["writes_performed"])
 
+    def test_truthy_non_boolean_runtime_readiness_does_not_pass(self):
+        for ready in ("true", 1, ["ready"], {"ready":True}):
+            with self.subTest(ready=ready):
+                report=self.check(ready,baseline())
+                self.assertEqual(report["state"],"POST_UPDATE_BLOCKED")
+                self.assertFalse(report["installed_runtime_ready"])
+                self.assertFalse(report["deployment_approved"])
+
     def test_missing_qdrant_blocks_release(self):
         self.assertEqual(self.check(False,baseline())["state"],"POST_UPDATE_BLOCKED")
 
