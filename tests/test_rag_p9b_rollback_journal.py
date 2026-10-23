@@ -96,6 +96,19 @@ class ResumeJournalTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 RollbackJournal.resume(path,expected_transaction_sha256="a"*64)
 
+    def test_incomplete_external_lifecycle_journal_is_observable_for_recovery(self):
+        with tempfile.TemporaryDirectory() as root:
+            path=Path(root)/"lifecycle.jsonl"
+            initial=RollbackJournal(path)
+            initial("SHELL_DETACHED_LIFECYCLE_ARMED",{})
+            initial("SHELL_DETACHED_SHUTDOWN_SIGNALED",{})
+            recovered=RollbackJournal.resume(path)
+            self.assertEqual(recovered._sequence,2)
+            self.assertTrue(recovered.resumed)
+            recovered("SHELL_DETACHED_LIFECYCLE_REVIEW_REQUIRED",{})
+            self.assertEqual(read_journal(path)["last_state"],
+                             "SHELL_DETACHED_LIFECYCLE_REVIEW_REQUIRED")
+
     def test_detached_combined_journal_resumes_after_crash(self):
         with tempfile.TemporaryDirectory() as root:
             path=Path(root)/"combined.jsonl"

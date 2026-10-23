@@ -57,7 +57,8 @@ class RollbackJournal:
                     "SHELL_NSIS_LAB_INTERRUPTED",
                     "SHELL_NSIS_INTERRUPTED",
                     "SHELL_NSIS_FULL_SCOPE_INTERRUPTED",
-                    "SHELL_DETACHED_COMBINED_ARMED")):
+                    "SHELL_DETACHED_COMBINED_ARMED",
+                    "SHELL_DETACHED_LIFECYCLE_ARMED")):
                 raise ValueError("JOURNAL_INITIAL_STATE_INVALID")
             if (any(not isinstance(entry,dict)
                     or not isinstance(entry.get("state"),str)
