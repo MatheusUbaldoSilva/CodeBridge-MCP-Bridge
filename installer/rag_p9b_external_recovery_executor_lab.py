@@ -23,7 +23,10 @@ def recover_externally(*,lab_root,nsis_snapshot,identity_file,identity_sha,
         return {**result,"reason":"LAB_PATH_INVALID"}
     try:
         marker=json.loads((root/"identity.json").read_text(encoding="utf-8"))
-        if marker.get("purpose")!="P9B_DISPOSABLE_UNIFIED_LAB":
+        if (not isinstance(marker,dict)
+                or marker.get("purpose")!="P9B_DISPOSABLE_UNIFIED_LAB"
+                or type(marker.get("schema")) is not int
+                or marker["schema"]!=1):
             return {**result,"reason":"LAB_IDENTITY_INVALID"}
         verified=identity_probe(identity_file,identity_sha)
         if verified.get("verified") is not True:

@@ -8,12 +8,23 @@ class ExternalTests(unittest.TestCase):
         self.root=Path(self.temp.name)
         self.lab=self.root/"lab";self.lab.mkdir()
         (self.lab/"identity.json").write_text(json.dumps({
-           "purpose":"P9B_DISPOSABLE_UNIFIED_LAB","file_sha":"bad"}))
+           "schema":1,"purpose":"P9B_DISPOSABLE_UNIFIED_LAB","file_sha":"bad"}))
         self.snapshot=self.root/"zip";self.snapshot.write_bytes(b"archive")
         self.kw={"lab_root":self.lab,"nsis_snapshot":self.snapshot,
                  "identity_file":"manifest","identity_sha":"a"*64,
                  "installed":self.root/"installed",
                  "identity_probe":lambda *_:{"verified":True}}
+    def test_boolean_and_missing_schema_are_refused_before_recovery(self):
+        for value in (True, None, "1"):
+            with self.subTest(value=value):
+                marker={"purpose":"P9B_DISPOSABLE_UNIFIED_LAB","file_sha":"bad"}
+                if value is not None:
+                    marker["schema"]=value
+                (self.lab/"identity.json").write_text(json.dumps(marker),encoding="utf-8")
+                report=recover_externally(**self.kw)
+                self.assertEqual(report["reason"],"LAB_IDENTITY_INVALID")
+                self.assertFalse(report["verified"])
+
     def test_real_identity_required(self):
         r=recover_externally(**{**self.kw,"identity_probe":lambda *_:{"verified":False}})
         self.assertEqual(r["reason"],"TRANSACTION_IDENTITY_UNVERIFIED")
@@ -26,7 +37,7 @@ class ExternalTests(unittest.TestCase):
     def test_successful_recovery_must_report_verified(self):
         import hashlib
         (self.lab/"identity.json").write_text(json.dumps({
-           "purpose":"P9B_DISPOSABLE_UNIFIED_LAB",
+           "schema":1,"purpose":"P9B_DISPOSABLE_UNIFIED_LAB",
            "file_sha":hashlib.sha256(self.snapshot.read_bytes()).hexdigest()}))
         r=recover_externally(**{**self.kw,"recoverer":lambda *_:{
             "state":"UNIFIED_LAB_RECOVERED","recovered":True,
@@ -37,7 +48,7 @@ class ExternalTests(unittest.TestCase):
     def test_failed_postverification_stays_blocked(self):
         import hashlib
         (self.lab/"identity.json").write_text(json.dumps({
-           "purpose":"P9B_DISPOSABLE_UNIFIED_LAB",
+           "schema":1,"purpose":"P9B_DISPOSABLE_UNIFIED_LAB",
            "file_sha":hashlib.sha256(self.snapshot.read_bytes()).hexdigest()}))
         r=recover_externally(**{**self.kw,"recoverer":lambda *_:{"state":"UNIFIED_LAB_POSTVERIFY_FAILED","recovered":False}})
         self.assertEqual(r["state"],"EXTERNAL_RECOVERY_REVIEW_REQUIRED")
