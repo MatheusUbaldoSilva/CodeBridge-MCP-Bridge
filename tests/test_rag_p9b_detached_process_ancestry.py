@@ -50,6 +50,24 @@ class AncestryTests(unittest.TestCase):
         child=FakeProcess(20,self.python,[self.python])
         child._parent=child
         self.assertEqual(self.assess(child)["reason"],"INVALID_PROCESS_CHAIN")
+    def test_unreadable_unknown_executable_still_refused(self):
+        process=FakeProcess(20,self.python,[self.python])
+        process.cmdline=lambda:(_ for _ in ()).throw(PermissionError("denied"))
+        self.assertEqual(self.assess(process)["reason"],
+                         "PROCESS_CMDLINE_UNAVAILABLE")
+
+    def test_protected_windows_svchost_allows_denied_cmdline(self):
+        import os
+        system=Path(os.environ.get("WINDIR",r"C:\Windows"))/"System32"/"svchost.exe"
+        if not system.is_file():
+            self.skipTest("Windows System32 only")
+        parent=FakeProcess(10,system,[])
+        parent.cmdline=lambda:(_ for _ in ()).throw(PermissionError("denied"))
+        child=FakeProcess(20,self.python,[self.python],parent)
+        result=self.assess(child)
+        self.assertEqual(result["state"],"EXTERNAL_PROCESS_ANCESTRY_VERIFIED")
+        self.assertFalse(result["shutdown_authorized"])
+
     def test_nonexistent_executable_refused(self):
         child=FakeProcess(20,self.external/"missing.exe",[])
         self.assertEqual(self.assess(child)["reason"],"PROCESS_ANCESTRY_UNAVAILABLE")

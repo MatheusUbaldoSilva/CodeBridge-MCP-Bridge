@@ -5,6 +5,7 @@ No process signaling, installation, registry or filesystem mutations.
 """
 from __future__ import annotations
 from pathlib import Path
+import os
 
 
 def inspect_detached_process_ancestry(*,installed,process=None,process_api=None):
@@ -29,8 +30,18 @@ def inspect_detached_process_ancestry(*,installed,process=None,process_api=None)
                 return {**blocked,"reason":"PROCESS_INSIDE_INSTALLED_APP"}
             try:
                 command=current.cmdline()
-            except (OSError,ValueError):
-                return {**blocked,"reason":"PROCESS_CMDLINE_UNAVAILABLE"}
+            except Exception:
+                # Access to command lines of Windows core service processes can
+                # be denied even when the executable path is independently
+                # verifiable. Only allow exact protected System32 binaries.
+                system32=(Path(os.environ.get("WINDIR",r"C:\Windows"))/
+                          "System32")
+                allowed={"svchost.exe","services.exe","wininit.exe"}
+                if (executable.name.lower() not in allowed
+                        or executable != (
+                            system32/executable.name).resolve(strict=True)):
+                    return {**blocked,"reason":"PROCESS_CMDLINE_UNAVAILABLE"}
+                command=[]
             if not isinstance(command,list):
                 return {**blocked,"reason":"PROCESS_CMDLINE_UNAVAILABLE"}
             for part in command:
