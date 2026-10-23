@@ -43,6 +43,19 @@ class PostUpdateVerifierTests(unittest.TestCase):
                 self.assertFalse(report["deployment_approved"])
                 self.assertFalse(report["writes_performed"])
 
+    def test_truthy_non_boolean_integrity_evidence_is_not_approved(self):
+        with patch("installer.runtime_postupdate_verify.inspect_embedded_runtime",
+                   return_value={"ready":True}), patch(
+                   "installer.runtime_postupdate_verify.collect_runtime_fingerprints",
+                   return_value=baseline()), patch(
+                   "installer.runtime_postupdate_verify.compare_runtime_fingerprints",
+                   return_value={"public_index_intact":1,"changed_entries":[]}):
+            report=verify_installed_update(
+                Path("C:/install"),Path("C:/rag"),baseline())
+        self.assertEqual(report["state"],"POST_UPDATE_BLOCKED")
+        self.assertFalse(report["public_index_intact"])
+        self.assertFalse(report["phase_closed"])
+
     def test_truthy_non_boolean_runtime_readiness_does_not_pass(self):
         for ready in ("true", 1, ["ready"], {"ready":True}):
             with self.subTest(ready=ready):
