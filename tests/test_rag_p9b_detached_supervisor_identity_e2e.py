@@ -26,6 +26,8 @@ class DetachedSupervisorIdentityIntegration(unittest.TestCase):
         self.calls=[]
         self.args=dict(installed=self.installed,identity_manifest=self.identity,
             identity_sha256=self.digest,source_commit=self.commit,external_runtime=True,
+            ancestry_probe=lambda **kw:{
+                "state":"EXTERNAL_PROCESS_ANCESTRY_VERIFIED","verified":True},
             shutdown_probe=lambda *a:self.calls.append("plan") or {
                 "state":"SHUTDOWN_PLAN_ONLY","identity_digest":"a"*64},
             stopped_probe=lambda *a:self.calls.append("poststop") or {

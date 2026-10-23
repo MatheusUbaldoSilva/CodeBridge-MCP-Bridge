@@ -9,6 +9,8 @@ class SupervisorGateTests(unittest.TestCase):
             identity_probe=lambda **a:self.events.append("identity") or {
                 "state":"DETACHED_IDENTITY_OBSERVED_ONLY",
                 "identity_verified":True,"artifacts_checked":4},
+            ancestry_probe=lambda **kw:{
+                "state":"EXTERNAL_PROCESS_ANCESTRY_VERIFIED","verified":True},
             shutdown_probe=lambda *a:self.events.append("shutdown") or {
                 "state":"SHUTDOWN_PLAN_ONLY","identity_digest":"f"*64},
             stopped_probe=lambda *a:self.events.append("poststop") or {
@@ -32,6 +34,15 @@ class SupervisorGateTests(unittest.TestCase):
         r=assess_detached_supervisor(**(self.kw|{"external_runtime":False}))
         self.assertEqual(r["reason"],"EXTERNAL_RUNTIME_REQUIRED")
         self.assertEqual(self.events,[])
+    def test_gui_parented_executor_denied_even_with_valid_identity(self):
+        r=assess_detached_supervisor(**(self.kw|{
+            "ancestry_probe":lambda **kw:{
+                "state":"EXTERNAL_ANCESTRY_UNVERIFIED",
+                "reason":"PROCESS_INSIDE_INSTALLED_APP","verified":False}}))
+        self.assertEqual(r["reason"],"EXTERNAL_ANCESTRY_REQUIRED")
+        self.assertEqual(self.events,["identity"])
+        self.assertFalse(r["authorized"])
+
     def test_shutdown_plan_never_authorizes_mutation(self):
         r=assess_detached_supervisor(**self.kw)
         self.assertEqual(r["state"],"DETACHED_SUPERVISOR_SHUTDOWN_PENDING")

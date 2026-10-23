@@ -10,12 +10,14 @@ from pathlib import Path
 from installer.rag_p9b_detached_combined_identity_gate import assess_detached_identity
 from installer.rag_p9b_supervised_shutdown_plan import make_shutdown_plan
 from installer.rag_p9b_poststop_verification import check_poststop
+from installer.rag_p9b_detached_process_ancestry import inspect_detached_process_ancestry
 
 
 def assess_detached_supervisor(*, installed, identity_manifest,
                               identity_sha256, source_commit,
                               external_runtime=False,
                               identity_probe=assess_detached_identity,
+                              ancestry_probe=inspect_detached_process_ancestry,
                               shutdown_probe=make_shutdown_plan,
                               stopped_probe=check_poststop):
     base={"state":"DETACHED_SUPERVISOR_REFUSED",
@@ -33,6 +35,12 @@ def assess_detached_supervisor(*, installed, identity_manifest,
                 or proof.get("identity_verified") is not True
                 or proof.get("artifacts_checked")!=4):
             return {**base,"reason":"BOUND_IDENTITY_INVALID"}
+        ancestry=ancestry_probe(installed=installed)
+        if (not isinstance(ancestry,dict)
+                or ancestry.get("state")!="EXTERNAL_PROCESS_ANCESTRY_VERIFIED"
+                or ancestry.get("verified") is not True):
+            return {**base,"reason":"EXTERNAL_ANCESTRY_REQUIRED",
+                    "process_ancestry_verified":False}
         shutdown=shutdown_probe(Path(installed))
         if not isinstance(shutdown,dict):
             return {**base,"reason":"SHUTDOWN_PLAN_INVALID"}
