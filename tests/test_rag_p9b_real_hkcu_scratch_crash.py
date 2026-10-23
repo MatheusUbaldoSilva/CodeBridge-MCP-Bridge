@@ -1,4 +1,4 @@
-﻿"""Crash and replay in a random Windows HKCU scratch key with durable journal."""
+"""Crash and replay in a random Windows HKCU scratch key with durable journal."""
 import os
 import subprocess
 import sys
@@ -60,6 +60,15 @@ class RealHKCUScratchCrashTests(unittest.TestCase):
                                  "SHELL_REGISTRY_SCRATCH_PREIMAGE_DURABLE")
                 with winreg.OpenKey(winreg.HKEY_CURRENT_USER,key) as handle:
                     self.assertEqual(winreg.QueryValueEx(handle,"State")[0],"partial")
+                # Damaged durable journal must prevent replay before touching HKCU.
+                pristine=journal.read_bytes()
+                journal.write_bytes(pristine+b"not-valid-json\n")
+                rejected=run("replay")
+                self.assertNotEqual(rejected.returncode,0)
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER,key) as handle:
+                    self.assertEqual(winreg.QueryValueEx(handle,"State"),
+                                     ("partial",winreg.REG_SZ))
+                journal.write_bytes(pristine)
                 second=run("replay")
                 self.assertEqual(second.returncode,0,second.stderr)
                 with winreg.OpenKey(winreg.HKEY_CURRENT_USER,key) as handle:
