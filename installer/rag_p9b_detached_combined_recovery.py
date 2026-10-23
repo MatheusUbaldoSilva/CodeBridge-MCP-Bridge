@@ -6,10 +6,16 @@ required after both workers report their own successful completion.
 """
 from __future__ import annotations
 
+from installer.rag_p9b_detached_combined_identity_gate import assess_detached_identity
+
 
 def recover_detached_combined(*, file_worker=None, shell_worker=None,
                               verify_worker=None, journal=None,
-                              independent=False, execute=False):
+                              independent=False, execute=False,
+                              production=False, identity_manifest=None,
+                              identity_sha256=None, installed=None,
+                              source_commit=None,
+                              identity_gate=assess_detached_identity):
     denied = {"state": "DETACHED_COMBINED_RECOVERY_REFUSED",
               "verified": False, "nsis_executed": False,
               "cutover_authorized": False}
@@ -17,6 +23,22 @@ def recover_detached_combined(*, file_worker=None, shell_worker=None,
             or not all(callable(worker) for worker in
                        (file_worker, shell_worker, verify_worker, journal))):
         return {**denied, "reason": "INDEPENDENT_WORKERS_REQUIRED"}
+    if production is True:
+        if not all((identity_manifest, identity_sha256, installed, source_commit)):
+            return {**denied, "reason": "BOUND_TRANSACTION_IDENTITY_REQUIRED"}
+        try:
+            bound = identity_gate(manifest=identity_manifest,
+                                  manifest_sha256=identity_sha256,
+                                  installed=installed,
+                                  expected_source_commit=source_commit)
+        except Exception:
+            return {**denied, "reason": "IDENTITY_VERIFICATION_FAILED"}
+        if (not isinstance(bound, dict)
+                or bound.get("state") != "DETACHED_IDENTITY_OBSERVED_ONLY"
+                or bound.get("identity_verified") is not True
+                or bound.get("artifacts_checked") != 4
+                or bound.get("cutover_authorized") is not False):
+            return {**denied, "reason": "BOUND_TRANSACTION_IDENTITY_REQUIRED"}
     current = "FILES"
     try:
         journal("SHELL_DETACHED_COMBINED_ARMED", {})

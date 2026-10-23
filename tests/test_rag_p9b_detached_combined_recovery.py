@@ -51,6 +51,35 @@ class DetachedCombinedTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 RollbackJournal.resume(path)
 
+    def test_production_refuses_without_verified_identity(self):
+        r=recover_detached_combined(**(self.args|{"production":True}))
+        self.assertEqual(r["reason"],"BOUND_TRANSACTION_IDENTITY_REQUIRED")
+        self.assertEqual(self.events,[])
+
+    def test_production_refuses_invalid_identity(self):
+        r=recover_detached_combined(**(self.args|{
+            "production":True,"identity_manifest":"dummy",
+            "identity_sha256":"bad","installed":"C:/CodeBridge",
+            "source_commit":"a"*40,
+            "identity_gate":lambda **kw:{"state":"DETACHED_COMBINED_IDENTITY_REFUSED"}}))
+        self.assertEqual(r["reason"],"BOUND_TRANSACTION_IDENTITY_REQUIRED")
+        self.assertEqual(self.events,[])
+
+    def test_production_validates_identity_before_workers(self):
+        observed=[]
+        def gate(**kw):
+            observed.append(kw)
+            return {"state":"DETACHED_IDENTITY_OBSERVED_ONLY",
+                    "identity_verified":True,"artifacts_checked":4,
+                    "cutover_authorized":False}
+        r=recover_detached_combined(**(self.args|{
+            "production":True,"identity_manifest":"fixture",
+            "identity_sha256":"a"*64,"installed":"C:/CodeBridge",
+            "source_commit":"b"*40,"identity_gate":gate}))
+        self.assertEqual(r["state"],"DETACHED_COMBINED_RESTORE_VERIFIED")
+        self.assertFalse(r["cutover_authorized"])
+        self.assertEqual(observed[0]["expected_source_commit"],"b"*40)
+
     def test_execute_off_refuses_without_worker_calls(self):
         self.assertEqual(recover_detached_combined(**(self.args|{
             "execute":False}))["reason"],"INDEPENDENT_WORKERS_REQUIRED")
