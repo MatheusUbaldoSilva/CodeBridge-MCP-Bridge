@@ -8,6 +8,11 @@ class DetachedLifecycleTests(unittest.TestCase):
         self.kw=dict(installed="C:/CodeBridge",identity_manifest="id.json",
             identity_sha256="a"*64,source_commit="b"*40,
             expected_process_digest="c"*64,external=True,execute=True,
+            external_interpreter="C:/External/python.exe",
+            external_psutil_origin="C:/External/psutil/__init__.py",
+            external_staged_lib="C:/External",
+            runtime_probe=lambda **kw:{
+                "state":"EXTERNAL_RUNTIME_PATHS_VERIFIED","verified":True},
             journal=lambda state,details:self.events.append(state),
             proof=lambda **kw:{
                 "state":"DETACHED_SUPERVISOR_SHUTDOWN_PENDING",
@@ -34,6 +39,15 @@ class DetachedLifecycleTests(unittest.TestCase):
             "SHELL_DETACHED_SHUTDOWN_SIGNALED",
             "SHELL_DETACHED_POSTSTOP_VERIFIED",
             "SHELL_DETACHED_GUI_RESTARTED"])
+    def test_external_runtime_must_be_verified_before_workers(self):
+        calls=[]
+        r=self.check(runtime_probe=lambda **kw:{
+            "state":"EXTERNAL_RUNTIME_REFUSED","verified":False},
+            proof=lambda **kw:calls.append("proof"))
+        self.assertEqual(r["reason"],"EXTERNAL_RUNTIME_PATHS_REQUIRED")
+        self.assertEqual(calls,[])
+        self.assertEqual(self.events,[])
+
     def test_changed_digest_prevents_first_journal_event(self):
         r=self.check(proof=lambda **kw:{"state":"DETACHED_SUPERVISOR_SHUTDOWN_PENDING",
             "artifacts_verified":True,"shutdown_identity_digest":"d"*64,

@@ -12,12 +12,17 @@ from installer.rag_p9b_detached_supervisor_gate import assess_detached_superviso
 from installer.rag_p9b_shutdown_executor import execute_shutdown
 from installer.rag_p9b_poststop_verification import check_poststop
 from installer.rag_p9b_external_recovery import recover_gui
+from installer.rag_p9b_same_machine_external_probe import inspect_external_runtime
 
 
 def run_detached_shutdown_recovery(*, installed, identity_manifest,
                                    identity_sha256, source_commit,
                                    expected_process_digest, journal=None,
                                    external=False, execute=False,
+                                   external_interpreter=None,
+                                   external_psutil_origin=None,
+                                   external_staged_lib=None,
+                                   runtime_probe=inspect_external_runtime,
                                    proof=assess_detached_supervisor,
                                    shutdown=execute_shutdown,
                                    poststop=check_poststop,
@@ -30,6 +35,14 @@ def run_detached_shutdown_recovery(*, installed, identity_manifest,
             and len(expected_process_digest)==64):
         return {**base,"reason":"INDEPENDENT_CONTROLLER_REQUIRED"}
     try:
+        runtime=runtime_probe(installed=installed,
+            interpreter=external_interpreter,
+            psutil_origin=external_psutil_origin,
+            staged_lib=external_staged_lib)
+        if (not isinstance(runtime,dict)
+                or runtime.get("state")!="EXTERNAL_RUNTIME_PATHS_VERIFIED"
+                or runtime.get("verified") is not True):
+            return {**base,"reason":"EXTERNAL_RUNTIME_PATHS_REQUIRED"}
         report=proof(installed=installed,identity_manifest=identity_manifest,
             identity_sha256=identity_sha256,source_commit=source_commit,
             external_runtime=True)
