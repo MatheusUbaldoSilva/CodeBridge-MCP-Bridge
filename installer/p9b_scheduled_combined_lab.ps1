@@ -92,7 +92,20 @@ try {
     isolated_nsis_test_executed=$true;production_nsis_executed=$false
   }|ConvertTo-Json -Compress
 }finally{
-  if($created){Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction Stop}
+  if($created){
+    $taskState=(Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue).State
+    if($taskState -eq 'Running'){
+      Stop-ScheduledTask -TaskName $task -ErrorAction Stop
+      for($i=0;$i -lt 20;$i++){
+        if((Get-ScheduledTask -TaskName $task -ErrorAction Stop).State -ne 'Running'){break}
+        Start-Sleep -Milliseconds 250
+      }
+      if((Get-ScheduledTask -TaskName $task -ErrorAction Stop).State -eq 'Running'){
+        throw 'LAB_TASK_STILL_RUNNING_CLEANUP_REFUSED'
+      }
+    }
+    Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction Stop
+  }
   if($folder -and (Test-Path -LiteralPath $folder)){
     Remove-Item -LiteralPath $folder -Recurse -Force -ErrorAction Stop
   }
