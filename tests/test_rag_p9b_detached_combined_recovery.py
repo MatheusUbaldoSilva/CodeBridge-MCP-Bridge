@@ -1,0 +1,73 @@
+import unittest
+
+from installer.rag_p9b_detached_combined_recovery import recover_detached_combined
+
+
+class DetachedCombinedTests(unittest.TestCase):
+    def setUp(self):
+        self.events=[]
+        self.files=lambda: {"state":"DETACHED_FILES_RESTORED_SHELL_PENDING",
+                            "verified":True,"shell_restore_required":True}
+        self.shell=lambda: {"state":"SHELL_RESTORE_VERIFIED","restored":True}
+        self.verify=lambda: {"verified":True}
+        self.args=dict(file_worker=self.files,shell_worker=self.shell,
+                       verify_worker=self.verify,
+                       journal=lambda s,d:self.events.append(s),
+                       independent=True,execute=True)
+
+    def test_proven_order_requires_final_independent_verification(self):
+        result=recover_detached_combined(**self.args)
+        self.assertEqual(result["state"],"DETACHED_COMBINED_RESTORE_VERIFIED")
+        self.assertTrue(result["verified"])
+        self.assertFalse(result["cutover_authorized"])
+        self.assertEqual(self.events,[
+            "SHELL_DETACHED_COMBINED_ARMED",
+            "SHELL_DETACHED_FILES_VERIFIED",
+            "SHELL_DETACHED_SHELL_VERIFIED",
+            "SHELL_DETACHED_COMBINED_VERIFIED"])
+
+    def test_execute_off_refuses_without_worker_calls(self):
+        self.assertEqual(recover_detached_combined(**(self.args|{
+            "execute":False}))["reason"],"INDEPENDENT_WORKERS_REQUIRED")
+        self.assertEqual(self.events,[])
+
+    def test_file_failure_never_runs_shell(self):
+        invoked=[]
+        result=recover_detached_combined(**(self.args|{
+            "file_worker":lambda: {"verified":False},
+            "shell_worker":lambda:invoked.append("shell")}))
+        self.assertEqual(result["reason"],"FILES_NOT_VERIFIED")
+        self.assertEqual(invoked,[])
+
+    def test_shell_failure_never_verifies_final(self):
+        invoked=[]
+        result=recover_detached_combined(**(self.args|{
+            "shell_worker":lambda:{"state":"SHELL_RESTORE_REVIEW_REQUIRED"},
+            "verify_worker":lambda:invoked.append("verify")}))
+        self.assertEqual(result["reason"],"SHELL_NOT_VERIFIED")
+        self.assertEqual(invoked,[])
+
+    def test_postverify_failure_never_reports_success(self):
+        result=recover_detached_combined(**(self.args|{
+            "verify_worker":lambda:{"verified":False}}))
+        self.assertEqual(result["reason"],"INDEPENDENT_POSTVERIFY_FAILED")
+        self.assertFalse(result["verified"])
+
+    def test_worker_crash_requires_review(self):
+        def crash():
+            raise OSError("synthetic interruption")
+        result=recover_detached_combined(**(self.args|{"shell_worker":crash}))
+        self.assertEqual(result["state"],"DETACHED_COMBINED_REVIEW_REQUIRED")
+        self.assertEqual(result["failed_stage"],"SHELL")
+        self.assertIn("SHELL_DETACHED_COMBINED_EXCEPTION",self.events)
+
+    def test_journal_failure_is_not_success(self):
+        def fail(state,detail):
+            raise OSError("journal failure")
+        result=recover_detached_combined(**(self.args|{"journal":fail}))
+        self.assertFalse(result["verified"])
+        self.assertEqual(result["reason"],"WORKER_OR_JOURNAL_EXCEPTION")
+
+
+if __name__=="__main__":
+    unittest.main()
