@@ -6,9 +6,9 @@ from installer.runtime_postupdate_verify import verify_installed_update
 
 def baseline():
     return {"files": {
-        "rag_manifest": {"exists": True, "sha256": "m", "bytes": 10},
-        "rag_sqlite": {"exists": True, "sha256": "s", "bytes": 20},
-        "rag_qdrant": {"exists": True, "sha256": "q", "bytes": 30, "file_count": 2},
+        "rag_manifest": {"exists": True, "sha256": "a"*64, "bytes": 10},
+        "rag_sqlite": {"exists": True, "sha256": "b"*64, "bytes": 20},
+        "rag_qdrant": {"exists": True, "sha256": "c"*64, "bytes": 30, "file_count": 2},
     }}
 
 class PostUpdateVerifierTests(unittest.TestCase):

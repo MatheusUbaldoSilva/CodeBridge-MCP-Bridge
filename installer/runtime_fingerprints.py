@@ -105,7 +105,8 @@ def compare_runtime_fingerprints(before: dict, after: dict) -> dict:
         )
         matches[name] = (
             old.get("exists") is True and new.get("exists") is True
-            and isinstance(old_hash, str) and bool(old_hash)
+            and isinstance(old_hash, str) and len(old_hash) == 64
+            and all(ch in "0123456789abcdef" for ch in old_hash)
             and isinstance(new_hash, str) and old_hash == new_hash
             and type(old_bytes) is int and old_bytes >= 0
             and type(new_bytes) is int and old_bytes == new_bytes

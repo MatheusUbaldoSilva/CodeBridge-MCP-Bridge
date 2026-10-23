@@ -29,10 +29,10 @@ class RuntimeFingerprintTests(unittest.TestCase):
 
     def test_protected_index_hashes_must_match(self):
         baseline = {"files": {
-            "rag_manifest": {"exists": True, "sha256": "a", "bytes": 1},
-            "rag_sqlite": {"exists": True, "sha256": "b", "bytes": 2},
-            "rag_qdrant": {"exists": True, "sha256": "q", "bytes": 3, "file_count": 2},
-            "rag_qdrant": {"exists": True, "sha256": "q", "bytes": 3, "file_count": 2},
+            "rag_manifest": {"exists": True, "sha256": "a"*64, "bytes": 1},
+            "rag_sqlite": {"exists": True, "sha256": "b"*64, "bytes": 2},
+            "rag_qdrant": {"exists": True, "sha256": "c"*64, "bytes": 3, "file_count": 2},
+            "rag_qdrant": {"exists": True, "sha256": "c"*64, "bytes": 3, "file_count": 2},
             "python_path": {"exists": True, "sha256": "c", "bytes": 3},
         }}
         updated = {"files": {
@@ -49,9 +49,9 @@ class RuntimeFingerprintTests(unittest.TestCase):
 
     def test_truthy_non_boolean_integrity_metadata_is_rejected(self):
         baseline={"files":{
-            "rag_manifest":{"exists":True,"sha256":"a","bytes":1},
-            "rag_sqlite":{"exists":True,"sha256":"b","bytes":2},
-            "rag_qdrant":{"exists":True,"sha256":"c","bytes":3,"file_count":2},
+            "rag_manifest":{"exists":True,"sha256":"a"*64,"bytes":1},
+            "rag_sqlite":{"exists":True,"sha256":"b"*64,"bytes":2},
+            "rag_qdrant":{"exists":True,"sha256":"c"*64,"bytes":3,"file_count":2},
         }}
         for key, field, value in (
             ("rag_manifest","exists",1),
@@ -68,6 +68,19 @@ class RuntimeFingerprintTests(unittest.TestCase):
                 result=compare_runtime_fingerprints(baseline,forged)
                 self.assertFalse(result["public_index_intact"])
                 self.assertFalse(result["protected_matches"][key])
+
+    def test_identical_invalid_hashes_never_count_as_integrity_proof(self):
+        for malformed in ("a", "z"*64, "A"*64, "", 123):
+            with self.subTest(malformed=malformed):
+                files={
+                    "rag_manifest":{"exists":True,"sha256":malformed,"bytes":1},
+                    "rag_sqlite":{"exists":True,"sha256":"b"*64,"bytes":2},
+                    "rag_qdrant":{"exists":True,"sha256":"c"*64,"bytes":3,
+                                  "file_count":2},
+                }
+                report=compare_runtime_fingerprints({"files":files},{"files":files})
+                self.assertFalse(report["public_index_intact"])
+                self.assertFalse(report["protected_matches"]["rag_manifest"])
 
     def test_missing_public_hash_fails_closed(self):
         baseline={"files":{"rag_sqlite":{"exists":True,"sha256":"x","bytes":1}}}
