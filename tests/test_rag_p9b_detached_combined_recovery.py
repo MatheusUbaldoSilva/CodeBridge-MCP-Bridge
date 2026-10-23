@@ -26,6 +26,31 @@ class DetachedCombinedTests(unittest.TestCase):
             "SHELL_DETACHED_SHELL_VERIFIED",
             "SHELL_DETACHED_COMBINED_VERIFIED"])
 
+    def test_replay_after_shell_crash_with_durable_journal(self):
+        import tempfile
+        from pathlib import Path
+        from installer.rag_p9b_rollback_journal import RollbackJournal,read_journal
+        with tempfile.TemporaryDirectory() as root:
+            path=Path(root)/"transaction.jsonl"
+            first=RollbackJournal(path)
+            calls=[]
+            def crash():
+                calls.append("shell")
+                raise OSError("injected shell interruption")
+            refused=recover_detached_combined(**(self.args|{
+                "journal":first,"shell_worker":crash}))
+            self.assertEqual(refused["state"],"DETACHED_COMBINED_REVIEW_REQUIRED")
+            self.assertEqual(refused["failed_stage"],"SHELL")
+            self.assertEqual(read_journal(path)["last_state"],
+                             "SHELL_DETACHED_COMBINED_EXCEPTION")
+            resumed=RollbackJournal.resume(path)
+            result=recover_detached_combined(**(self.args|{"journal":resumed}))
+            self.assertEqual(result["state"],"DETACHED_COMBINED_RESTORE_VERIFIED")
+            self.assertEqual(read_journal(path)["last_state"],
+                             "SHELL_DETACHED_COMBINED_VERIFIED")
+            with self.assertRaises(ValueError):
+                RollbackJournal.resume(path)
+
     def test_execute_off_refuses_without_worker_calls(self):
         self.assertEqual(recover_detached_combined(**(self.args|{
             "execute":False}))["reason"],"INDEPENDENT_WORKERS_REQUIRED")
