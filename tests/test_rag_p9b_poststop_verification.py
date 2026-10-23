@@ -55,6 +55,13 @@ class PostStopChecks(unittest.TestCase):
         r=self.run_probe([],ports=broken)
         self.assertEqual(r["reason"],"PORT_STATE_UNVERIFIED")
 
+    def test_port_probe_requires_strict_boolean_offline_proof(self):
+        for value in (None, 0, 1, "false", "true", []):
+            with self.subTest(value=value):
+                result=self.run_probe([],ports=lambda h,p:value)
+                self.assertEqual(result["reason"],"PORT_STATE_UNVERIFIED")
+                self.assertFalse(result["observed_stopped"])
+
     def test_unrelated_opaque_windows_service_does_not_block(self):
         records=[{"pid":40,"ppid":1,"name":"svchost.exe",
                   "cmdline":None,"create_time":100}]

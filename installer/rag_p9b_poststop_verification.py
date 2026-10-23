@@ -59,8 +59,12 @@ def check_poststop(
                 s.settimeout(0.3)
                 return s.connect_ex((host, port)) == 0
     try:
-        if any(port_probe("127.0.0.1", p) for p in (8765, 8767)):
-            return {**result, "reason": "MCP_LISTENER_STILL_ONLINE"}
+        for port in (8765, 8767):
+            listening = port_probe("127.0.0.1", port)
+            if type(listening) is not bool:
+                return {**result, "reason": "PORT_STATE_UNVERIFIED"}
+            if listening:
+                return {**result, "reason": "MCP_LISTENER_STILL_ONLINE"}
     except (OSError, ValueError, TypeError):
         return {**result, "reason": "PORT_STATE_UNVERIFIED"}
     return {**result, "state": "POSTSTOP_OBSERVED_ONLY",
