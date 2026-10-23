@@ -92,7 +92,9 @@ class RollbackJournal:
             if (not isinstance(value,str) or len(value)!=64
                     or any(c not in "0123456789abcdef" for c in value.lower())):
                 raise ValueError("INVALID_TRANSACTION_SHA256")
-            if self._sequence!=0 or state!="SHELL_DETACHED_COMBINED_ARMED":
+            if (self._sequence!=0 or state not in (
+                    "SHELL_DETACHED_COMBINED_ARMED",
+                    "SHELL_DETACHED_LIFECYCLE_ARMED")):
                 raise ValueError("TRANSACTION_SHA256_NOT_FIRST")
             safe["transaction_sha256"]=value.lower()
         entry={"seq":self._sequence+1,"state":state,

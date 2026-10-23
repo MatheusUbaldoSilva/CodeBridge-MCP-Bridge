@@ -96,6 +96,19 @@ class ResumeJournalTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 RollbackJournal.resume(path,expected_transaction_sha256="a"*64)
 
+    def test_lifecycle_journal_requires_bound_identity_on_resume(self):
+        with tempfile.TemporaryDirectory() as root:
+            path=Path(root)/"lifecycle-bound.jsonl"
+            initial=RollbackJournal(path)
+            initial("SHELL_DETACHED_LIFECYCLE_ARMED",
+                    {"transaction_sha256":"a"*64})
+            initial("SHELL_DETACHED_SHUTDOWN_SIGNALED",{})
+            with self.assertRaises(ValueError):
+                RollbackJournal.resume(path,expected_transaction_sha256="b"*64)
+            resumed=RollbackJournal.resume(path,expected_transaction_sha256="a"*64)
+            self.assertEqual(resumed.bound_transaction_sha256,"a"*64)
+            self.assertEqual(resumed._sequence,2)
+
     def test_incomplete_external_lifecycle_journal_is_observable_for_recovery(self):
         with tempfile.TemporaryDirectory() as root:
             path=Path(root)/"lifecycle.jsonl"

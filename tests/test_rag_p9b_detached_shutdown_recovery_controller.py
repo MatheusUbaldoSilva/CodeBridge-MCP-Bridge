@@ -29,6 +29,14 @@ class DetachedLifecycleTests(unittest.TestCase):
         r=self.check(external=False)
         self.assertEqual(r["reason"],"INDEPENDENT_CONTROLLER_REQUIRED")
         self.assertEqual(self.events,[])
+    def test_initial_journal_records_exact_release_identity(self):
+        entries=[]
+        result=self.check(journal=lambda state,details:
+                          entries.append((state,details)))
+        self.assertEqual(result["state"],"DETACHED_GUI_RESTARTED_HANDSHAKE_PENDING")
+        self.assertEqual(entries[0],(
+            "SHELL_DETACHED_LIFECYCLE_ARMED",{"transaction_sha256":"a"*64}))
+
     def test_completes_only_gui_restart_handshake_pending(self):
         r=self.check()
         self.assertEqual(r["state"],"DETACHED_GUI_RESTARTED_HANDSHAKE_PENDING")

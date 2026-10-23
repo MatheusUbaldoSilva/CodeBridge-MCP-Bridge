@@ -52,7 +52,8 @@ def run_detached_shutdown_recovery(*, installed, identity_manifest,
                 or report.get("shutdown_identity_digest")!=expected_process_digest
                 or report.get("authorized") is not False):
             return {**base,"reason":"SHUTDOWN_PLAN_OR_IDENTITY_CHANGED"}
-        journal("SHELL_DETACHED_LIFECYCLE_ARMED",{})
+        journal("SHELL_DETACHED_LIFECYCLE_ARMED",
+                {"transaction_sha256":str(identity_sha256).lower()})
         fresh=proof(installed=installed,identity_manifest=identity_manifest,
             identity_sha256=identity_sha256,source_commit=source_commit,
             external_runtime=True)
