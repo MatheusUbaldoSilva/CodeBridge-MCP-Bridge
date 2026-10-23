@@ -84,6 +84,31 @@ class PostUpdateToolProbeTests(unittest.TestCase):
                 report,_=self.probe(stdout=json.dumps(data))
                 self.assertEqual(report["reason"],"MCP_TOOL_CONTRACT_UNVERIFIED")
 
+    def test_non_object_child_json_fails_closed(self):
+        for body in ("[]", "null", "true", "5", '"text"'):
+            with self.subTest(body=body):
+                report,_=self.probe(stdout=body)
+                self.assertEqual(report["reason"],"MCP_TOOL_CONTRACT_UNVERIFIED")
+                self.assertFalse(report["verified"])
+
+    def test_unregistered_tool_must_never_pass_postupdate_gate(self):
+        for value in (False, None, "true", 1):
+            with self.subTest(value=value):
+                data={
+                    "state":"POSTUPDATE_MCP_TOOL_OBSERVED",
+                    "registered":value,
+                    "execute_default":False,
+                    "preview_state":"BOOTSTRAP_PLAN_ONLY",
+                    "public_generation":self.gen,
+                    "bootstrap_executed":False,
+                    "safe_to_publish":False,
+                    "registered_count":1,
+                }
+                report,_=self.probe(stdout=json.dumps(data))
+                self.assertEqual(report["reason"],"MCP_TOOL_CONTRACT_UNVERIFIED")
+                self.assertFalse(report["verified"])
+                self.assertFalse(report["deployment_authorized"])
+
     def test_changed_public_generation_is_blocked(self):
         data={
             "state":"POSTUPDATE_MCP_TOOL_OBSERVED",

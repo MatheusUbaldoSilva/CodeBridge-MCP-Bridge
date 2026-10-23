@@ -90,7 +90,9 @@ def inspect_postupdate_mcp_tool(installed_root: Path, *,
                     "exit_code": child.returncode,
                     "error_hint": child.stderr[-250:]}
         value = json.loads(child.stdout.strip())
-        if (value.get("state") != "POSTUPDATE_MCP_TOOL_OBSERVED"
+        if (not isinstance(value,dict)
+                or value.get("state") != "POSTUPDATE_MCP_TOOL_OBSERVED"
+                or value.get("registered") is not True
                 or value.get("execute_default") is not False
                 or value.get("bootstrap_executed") is not False
                 or value.get("safe_to_publish") is not False
@@ -98,7 +100,7 @@ def inspect_postupdate_mcp_tool(installed_root: Path, *,
                 or value.get("preview_state") != "BOOTSTRAP_PLAN_ONLY"
                 or value.get("registered_count") != 1):
             return {**blocked, "reason": "MCP_TOOL_CONTRACT_UNVERIFIED",
-                    "preview_state": value.get("preview_state")}
+                    "preview_state": value.get("preview_state") if isinstance(value,dict) else None}
         return {**blocked, "state": "POSTUPDATE_MCP_TOOL_READONLY_VERIFIED",
                 "verified": True,
                 "public_generation": value["public_generation"],
