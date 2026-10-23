@@ -97,6 +97,17 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(r["reason"],"SNAPSHOT_UNVERIFIED")
         self.assertEqual(self.link.read_bytes(),b"live-new")
 
+    def test_reject_symlinked_parent_directory(self):
+        self.menu.rename(self.menu.with_name("real-menu"))
+        try:
+            self.menu.symlink_to(self.menu.with_name("real-menu"), target_is_directory=True)
+        except OSError:
+            self.menu.with_name("real-menu").rename(self.menu)
+            self.skipTest("directory symlinks disabled")
+        r=self.run_it()
+        self.assertEqual(r["reason"],"UNTRUSTED_DESTINATION")
+        self.assertFalse(r["rollback_attempted"])
+
     def test_reject_symlink(self):
         self.link.unlink()
         try:self.link.symlink_to(self.snapshot)

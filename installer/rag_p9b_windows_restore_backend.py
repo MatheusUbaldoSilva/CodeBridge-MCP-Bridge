@@ -57,7 +57,9 @@ def restore_shell(*, snapshot, expected_sha256, appdata, desktop, registry, inst
     try:
         # Pre-read every target and HKCU key before writing the first byte.
         for t in targets:
-            if t.is_symlink() or (t.exists() and not t.is_file()):
+            if any(parent.is_symlink() for parent in (t, *t.parents)):
+                return {**base,"reason":"UNTRUSTED_DESTINATION"}
+            if t.exists() and not t.is_file():
                 return {**base,"reason":"UNTRUSTED_DESTINATION"}
             prior[t]=t.read_bytes() if t.is_file() else None
         for key in APP_KEYS:
