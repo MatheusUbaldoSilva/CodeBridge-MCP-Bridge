@@ -68,7 +68,7 @@ try {
     '        suite.addTests(unittest.defaultTestLoader.loadTestsFromName("test_rag_p9b_detached_combined_recovery_lab.DetachedRealRegistryIntegration."+method))'
     '    with (folder/"test.log").open("w",encoding="utf-8") as stream:'
     '        run=unittest.TextTestRunner(stream=stream,verbosity=1).run(suite)'
-    '    result={"state":"SCHEDULER_ISOLATED_COMBINED_ROLLBACK_LAB","verified":run.wasSuccessful(),"passes":run.testsRun,"failures":len(run.failures),"errors":len(run.errors),"ancestry_verified":True,"production_modified":False}'
+    '    result={"state":"SCHEDULER_ISOLATED_COMBINED_ROLLBACK_LAB","verified":run.wasSuccessful(),"passes":run.testsRun,"failures":len(run.failures),"errors":len(run.errors),"skipped":len(run.skipped),"unexpected_successes":len(run.unexpectedSuccesses),"ancestry_verified":True,"production_modified":False}'
     '(folder/"result.json").write_text(json.dumps(result,sort_keys=True),encoding="utf-8")'
   )
   $lines|Set-Content -LiteralPath $worker -Encoding UTF8
@@ -83,7 +83,8 @@ try {
   if ($proof.state -ne 'SCHEDULER_ISOLATED_COMBINED_ROLLBACK_LAB' -or
       $proof.verified -ne $true -or $proof.ancestry_verified -ne $true -or
       $proof.production_modified -ne $false -or $proof.failures -ne 0 -or
-            $proof.errors -ne 0 -or $proof.passes -lt 7){
+            $proof.errors -ne 0 -or $proof.skipped -ne 0 -or
+      $proof.unexpected_successes -ne 0 -or $proof.passes -ne 7){
     $tail=if(Test-Path -LiteralPath (Join-Path $folder 'test.log')) {
       (Get-Content -LiteralPath (Join-Path $folder 'test.log') -Tail 45) -join ' | '
     }else{'LAB_LOG_MISSING'}

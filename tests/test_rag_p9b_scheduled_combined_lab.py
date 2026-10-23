@@ -23,7 +23,9 @@ class IndependentCombinedSchedulerLabTests(unittest.TestCase):
                      "LAB_FAILED_OR_UNVERIFIED",
                      "SOURCE_IDENTITY_MISMATCH","source_sha256",
                      "Get-FileHash","InjectHashMismatchForLab","Stop-ScheduledTask",
-                     "LAB_TASK_STILL_RUNNING_CLEANUP_REFUSED"):
+                     "LAB_TASK_STILL_RUNNING_CLEANUP_REFUSED",
+                     "run.skipped","unexpected_successes",
+                     "$proof.passes -ne 7"):
             self.assertIn(item,script)
         for forbidden in ("Stop-Process","Set-ItemProperty",
                           "Start-Process","makensis.exe","CodeBridge-P9B"):
