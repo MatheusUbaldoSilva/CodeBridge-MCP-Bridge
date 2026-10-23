@@ -89,6 +89,17 @@ class UnifiedTests(unittest.TestCase):
         self.assertEqual(refused.returncode,2)
         self.assertEqual(json.loads(refused.stdout)["reason"],"JOURNAL_INVALID")
 
+    def test_boolean_schema_cannot_claim_disposable_lab(self):
+        from installer.rag_p9b_unified_e2e_lab import recover
+        self.lab.mkdir()
+        (self.lab/"identity.json").write_text(json.dumps({
+            "schema":True,
+            "purpose":"P9B_DISPOSABLE_UNIFIED_LAB",
+            "shell_sha":"placeholder","file_sha":"placeholder"}),encoding="utf-8")
+        result=recover(self.lab,self.snapshot)
+        self.assertEqual(result["reason"],"NOT_DISPOSABLE_LAB")
+        self.assertFalse(result["recovered"])
+
     def test_corrupt_journal_refused(self):
         # Directly verify rejection using prepared lab baseline without
         # tampering with any CodeBridge installation.

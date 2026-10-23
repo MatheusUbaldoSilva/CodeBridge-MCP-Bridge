@@ -53,7 +53,7 @@ def prepare(root,zip_path,installed):
 def interrupt(root,zip_path):
     root=Path(root).resolve()
     identity=json.loads((root/"identity.json").read_text(encoding="utf-8"))
-    if identity.get("purpose")!="P9B_DISPOSABLE_UNIFIED_LAB" or identity.get("schema")!=1:
+    if identity.get("purpose")!="P9B_DISPOSABLE_UNIFIED_LAB" or type(identity.get("schema")) is not int or identity["schema"]!=1:
         raise ValueError("NOT_DISPOSABLE_LAB")
     if not verify_crash_preimage(root/"preimage.zip",identity["shell_sha"])["verified"]:
         raise ValueError("SHELL_INVALID")
@@ -77,7 +77,7 @@ def recover(root,zip_path):
     base={"state":"UNIFIED_LAB_REFUSED","recovered":False,"production_modified":False}
     root=Path(root).resolve()
     identity=json.loads((root/"identity.json").read_text(encoding="utf-8"))
-    if identity.get("purpose")!="P9B_DISPOSABLE_UNIFIED_LAB" or identity.get("schema")!=1:
+    if identity.get("purpose")!="P9B_DISPOSABLE_UNIFIED_LAB" or type(identity.get("schema")) is not int or identity["schema"]!=1:
         return {**base,"reason":"NOT_DISPOSABLE_LAB"}
     if (not verify_crash_preimage(root/"preimage.zip",identity["shell_sha"])["verified"]
             or hashlib.sha256(Path(zip_path).read_bytes()).hexdigest()!=identity["file_sha"]):
