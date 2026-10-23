@@ -150,6 +150,50 @@ class DetachedCombinedTests(unittest.TestCase):
         self.assertEqual(verifier_calls,[])
         self.assertIn("SHELL_DETACHED_FINAL_POSTSTOP_FAILED",self.events)
 
+    def test_production_identity_change_before_files_never_runs_worker(self):
+        calls=[]
+        seen=[]
+        def identity(**kw):
+            seen.append(1)
+            return {"state":"DETACHED_IDENTITY_OBSERVED_ONLY",
+                "identity_verified":len(seen)==1,
+                "artifacts_checked":4,"cutover_authorized":False}
+        r=recover_detached_combined(**(self.args|{
+            "production":True,"identity_manifest":"fixture",
+            "identity_sha256":"a"*64,"installed":"C:/CodeBridge",
+            "source_commit":"b"*40,
+            "identity_gate":identity,
+            "ancestry_probe":lambda **kw:{
+                "state":"EXTERNAL_PROCESS_ANCESTRY_VERIFIED","verified":True},
+            "poststop_probe":lambda *_:{
+                "state":"POSTSTOP_OBSERVED_ONLY","observed_stopped":True},
+            "file_worker":lambda:calls.append("files")}))
+        self.assertEqual(r["reason"],"IDENTITY_CHANGED_BEFORE_FILES")
+        self.assertEqual(calls,[])
+        self.assertIn("SHELL_DETACHED_IDENTITY_RECHECK_FAILED",self.events)
+
+    def test_production_identity_change_before_postverify(self):
+        seen=[]
+        calls=[]
+        def identity(**kw):
+            seen.append(1)
+            return {"state":"DETACHED_IDENTITY_OBSERVED_ONLY",
+                "identity_verified":len(seen)<4,
+                "artifacts_checked":4,"cutover_authorized":False}
+        r=recover_detached_combined(**(self.args|{
+            "production":True,"identity_manifest":"fixture",
+            "identity_sha256":"a"*64,"installed":"C:/CodeBridge",
+            "source_commit":"b"*40,
+            "identity_gate":identity,
+            "ancestry_probe":lambda **kw:{
+                "state":"EXTERNAL_PROCESS_ANCESTRY_VERIFIED","verified":True},
+            "poststop_probe":lambda *_:{
+                "state":"POSTSTOP_OBSERVED_ONLY","observed_stopped":True},
+            "verify_worker":lambda:calls.append("verify")}))
+        self.assertEqual(r["reason"],"IDENTITY_CHANGED_BEFORE_POSTVERIFY")
+        self.assertEqual(calls,[])
+        self.assertIn("SHELL_DETACHED_IDENTITY_RECHECK_FAILED",self.events)
+
     def test_production_identity_change_prevents_shell_worker(self):
         checks=[]
         def identity(**kw):
