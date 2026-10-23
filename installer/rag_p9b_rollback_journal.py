@@ -37,6 +37,12 @@ class RollbackJournal:
             completed={"SHELL_COMBINED_RECOVERY_VERIFIED",
                 "SHELL_NSIS_ISOLATED_RECOVERED",
                 "SHELL_NSIS_FULL_SCOPE_RECOVERED"}
+            if (history[0].get("state") not in (
+                    "SHELL_COMBINED_RECOVERY_ARMED",
+                    "SHELL_NSIS_LAB_INTERRUPTED",
+                    "SHELL_NSIS_INTERRUPTED",
+                    "SHELL_NSIS_FULL_SCOPE_INTERRUPTED")):
+                raise ValueError("JOURNAL_INITIAL_STATE_INVALID")
             if (any(not isinstance(entry,dict)
                     or not isinstance(entry.get("state"),str)
                     or not entry["state"].startswith("SHELL_")

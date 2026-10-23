@@ -74,5 +74,16 @@ class JournalTamperResumeTests(unittest.TestCase):
             target.write_text(json.dumps({"seq":1,"state":"OTHER_EVENT","details":{}})+"\n")
             with self.assertRaises(ValueError):RollbackJournal.resume(target)
 
+class JournalStartGateTests(unittest.TestCase):
+    def test_refuses_arbitrary_first_shell_event(self):
+        import tempfile
+        from pathlib import Path
+        from installer.rag_p9b_rollback_journal import RollbackJournal
+        with tempfile.TemporaryDirectory() as directory:
+            target=Path(directory)/"invalid-start.jsonl"
+            journal=RollbackJournal(target)
+            journal("SHELL_BACKEND_ARMED",{})
+            with self.assertRaises(ValueError):RollbackJournal.resume(target)
+
 if __name__=="__main__":
     unittest.main()
