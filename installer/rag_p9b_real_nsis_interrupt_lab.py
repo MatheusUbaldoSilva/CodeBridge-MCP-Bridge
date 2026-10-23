@@ -26,10 +26,21 @@ def _write_event(path, state, **details):
 def recover(lab, journal):
     lab=Path(lab).resolve()
     allowed=Path(tempfile.gettempdir()).resolve()
-    events=Path(journal).read_text(encoding="utf-8").splitlines()
+    try:
+        journal_path=Path(journal)
+        if journal_path.is_symlink() or not journal_path.is_file():
+            return False
+        events=journal_path.read_text(encoding="utf-8").splitlines()
+        if len(events)!=1:
+            return False
+        event=json.loads(events[0])
+        if not isinstance(event,dict):
+            return False
+    except (OSError,ValueError,UnicodeError):
+        return False
     if (lab.parent!=allowed or not lab.name.startswith(MARKER)
-            or len(events)!=1 or json.loads(events[0]).get("state")!="SHELL_NSIS_INTERRUPTED"
-            or json.loads(events[0]).get("lab")!=str(lab)):
+            or event.get("state")!="SHELL_NSIS_INTERRUPTED"
+            or event.get("lab")!=str(lab)):
         return False
     targets=list(lab.iterdir()) if lab.is_dir() else []
     if len(targets)!=1 or targets[0].name!="first.txt" or targets[0].is_symlink():

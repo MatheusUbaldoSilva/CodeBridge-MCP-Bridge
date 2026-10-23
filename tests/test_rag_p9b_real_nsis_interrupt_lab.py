@@ -29,6 +29,18 @@ class RecoveryTests(unittest.TestCase):
         (self.lab/"second.txt").write_bytes(b"extra")
         self.assertFalse(recover(self.lab,self.journal))
         for f in self.lab.iterdir():f.unlink()
+    def test_corrupt_json_journal_refused_without_mutation(self):
+        self.prepare()
+        self.journal.write_text("{broken json}\n")
+        self.assertFalse(recover(self.lab,self.journal))
+        self.assertEqual((self.lab/"first.txt").read_bytes(),SENTINEL)
+        (self.lab/"first.txt").unlink()
+    def test_nonobject_journal_refused_without_mutation(self):
+        self.prepare()
+        self.journal.write_text("[]\n")
+        self.assertFalse(recover(self.lab,self.journal))
+        self.assertEqual((self.lab/"first.txt").read_bytes(),SENTINEL)
+        (self.lab/"first.txt").unlink()
     def test_bad_journal_refused(self):
         self.prepare()
         self.journal.write_text("{}\n")
