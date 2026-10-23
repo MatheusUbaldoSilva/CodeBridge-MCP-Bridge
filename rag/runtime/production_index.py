@@ -139,6 +139,7 @@ def _write_vectors(path: Path, project_id: str, text_rows, code_rows) -> None:
     from rag.models.code_embedding import CodeEmbeddingClient,CodeRetrievalTask
     from rag.models.lifecycle import LlamaServerConfig,TextModelLifecycle
     from rag.models.code_lifecycle import CodeModelLifecycle,build_code_server_config
+    from rag.models.fallback import TextModelFallbackManager, build_cpu_fallback_config
 
     client=open_qdrant_local(path)
     llama=Path(r"C:\llama\llama-server.exe")
@@ -148,10 +149,18 @@ def _write_vectors(path: Path, project_id: str, text_rows, code_rows) -> None:
             if not rows:
                 continue
             if collection==TEXT_VECTOR_COLLECTION:
+                manager=None
                 life=TextModelLifecycle(LlamaServerConfig(executable_path=llama,model_path=resolve_selected_model_path(),port=0,gpu_layers=99,device="CUDA0"))
+                life.load(timeout_seconds=90)
             else:
-                life=CodeModelLifecycle(build_code_server_config(executable_path=llama,model_path=resolve_selected_code_model_path(),port=0,gpu_layers=99,device="CUDA0"))
-            life.load(timeout_seconds=90)
+                gpu_config=build_code_server_config(executable_path=llama,model_path=resolve_selected_code_model_path(),port=0,gpu_layers=99,device="CUDA0")
+                manager=TextModelFallbackManager(
+                    gpu_config=gpu_config,
+                    cpu_config=build_cpu_fallback_config(gpu_config),
+                    selected_gpu_device="CUDA0",
+                    lifecycle_factory=CodeModelLifecycle)
+                manager.load(timeout_seconds=90)
+                life=manager.active_lifecycle
             try:
                 embed=TextEmbeddingClient(life) if collection==TEXT_VECTOR_COLLECTION else CodeEmbeddingClient(life)
                 batch=[]
@@ -166,6 +175,9 @@ def _write_vectors(path: Path, project_id: str, text_rows, code_rows) -> None:
                 if batch:
                     client.upsert(collection_name=collection,points=batch,wait=True)
             finally:
-                life.unload(timeout_seconds=15)
+                if manager is not None:
+                    manager.unload(timeout_seconds=15)
+                else:
+                    life.unload(timeout_seconds=15)
     finally:
         close_qdrant_local(client)
