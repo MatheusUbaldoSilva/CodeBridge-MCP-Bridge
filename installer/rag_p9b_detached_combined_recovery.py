@@ -63,12 +63,25 @@ def recover_detached_combined(*, file_worker=None, shell_worker=None,
             and getattr(journal,"bound_transaction_sha256",None)
                 != str(identity_sha256).lower()):
         return {**denied, "reason":"RESUMED_JOURNAL_IDENTITY_UNVERIFIED"}
+    def ancestry_still_independent():
+        try:
+            result = ancestry_probe(installed=installed)
+        except Exception:
+            return False
+        return (isinstance(result, dict)
+                and result.get("state")=="EXTERNAL_PROCESS_ANCESTRY_VERIFIED"
+                and result.get("verified") is True)
+
     current = "FILES"
     try:
         if getattr(journal,"resumed",False) is not True:
             journal("SHELL_DETACHED_COMBINED_ARMED",
                     {"transaction_sha256":str(identity_sha256).lower()}
                     if production is True else {})
+        if production is True and not ancestry_still_independent():
+            journal("SHELL_DETACHED_ANCESTRY_RECHECK_FAILED", {"stage":"FILES"})
+            return {**denied, "state":"DETACHED_COMBINED_REVIEW_REQUIRED",
+                    "reason":"ANCESTRY_CHANGED_BEFORE_FILES"}
         files = file_worker()
         if (not isinstance(files, dict)
                 or files.get("state") != "DETACHED_FILES_RESTORED_SHELL_PENDING"
@@ -90,6 +103,10 @@ def recover_detached_combined(*, file_worker=None, shell_worker=None,
                 journal("SHELL_DETACHED_POSTSTOP_RECHECK_FAILED", {})
                 return {**denied, "state": "DETACHED_COMBINED_REVIEW_REQUIRED",
                         "reason": "POSTSTOP_LOST_BEFORE_SHELL"}
+        if production is True and not ancestry_still_independent():
+            journal("SHELL_DETACHED_ANCESTRY_RECHECK_FAILED", {"stage":"SHELL"})
+            return {**denied, "state":"DETACHED_COMBINED_REVIEW_REQUIRED",
+                    "reason":"ANCESTRY_CHANGED_BEFORE_SHELL"}
         shell = shell_worker()
         if (not isinstance(shell, dict)
                 or shell.get("state") != "SHELL_RESTORE_VERIFIED"
@@ -110,6 +127,10 @@ def recover_detached_combined(*, file_worker=None, shell_worker=None,
                 journal("SHELL_DETACHED_FINAL_POSTSTOP_FAILED", {})
                 return {**denied, "state": "DETACHED_COMBINED_REVIEW_REQUIRED",
                         "reason": "POSTSTOP_LOST_BEFORE_POSTVERIFY"}
+        if production is True and not ancestry_still_independent():
+            journal("SHELL_DETACHED_ANCESTRY_RECHECK_FAILED", {"stage":"POSTVERIFY"})
+            return {**denied, "state":"DETACHED_COMBINED_REVIEW_REQUIRED",
+                    "reason":"ANCESTRY_CHANGED_BEFORE_POSTVERIFY"}
         verified = verify_worker()
         if (not isinstance(verified, dict)
                 or verified.get("verified") is not True):

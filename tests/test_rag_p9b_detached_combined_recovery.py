@@ -150,6 +150,30 @@ class DetachedCombinedTests(unittest.TestCase):
         self.assertEqual(verifier_calls,[])
         self.assertIn("SHELL_DETACHED_FINAL_POSTSTOP_FAILED",self.events)
 
+    def test_production_ancestry_change_prevents_shell_worker(self):
+        observed=[]
+        def ancestry(**kw):
+            observed.append("check")
+            return {"state":"EXTERNAL_PROCESS_ANCESTRY_VERIFIED",
+                    "verified":len(observed)<3}
+        called=[]
+        kwargs=self.args|{
+            "production":True,"identity_manifest":"fixture",
+            "identity_sha256":"a"*64,"installed":"C:/CodeBridge",
+            "source_commit":"b"*40,
+            "identity_gate":lambda **kw:{
+                "state":"DETACHED_IDENTITY_OBSERVED_ONLY",
+                "identity_verified":True,"artifacts_checked":4,
+                "cutover_authorized":False},
+            "poststop_probe":lambda *_:{
+                "state":"POSTSTOP_OBSERVED_ONLY","observed_stopped":True},
+            "ancestry_probe":ancestry,
+            "shell_worker":lambda:called.append("shell")}
+        result=recover_detached_combined(**kwargs)
+        self.assertEqual(result["reason"],"ANCESTRY_CHANGED_BEFORE_SHELL")
+        self.assertEqual(called,[])
+        self.assertIn("SHELL_DETACHED_ANCESTRY_RECHECK_FAILED",self.events)
+
     def test_production_gui_parent_process_refused_before_workers(self):
         calls=[]
         r=recover_detached_combined(**(self.args|{
