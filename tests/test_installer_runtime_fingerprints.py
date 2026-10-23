@@ -218,6 +218,25 @@ class RuntimeFingerprintTests(unittest.TestCase):
             result=compare_saved_public_baseline(path,Path(temp),Path(temp))
             self.assertFalse(result["public_index_intact"])
 
+    def test_duplicate_json_keys_are_rejected_before_runtime_access(self):
+        from unittest.mock import patch
+        import installer.runtime_fingerprints as module
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/"saved.json"
+            samples=(
+                '{"schema_version":1,"schema_version":1}',
+                '{"schema_version":1,"purpose":"rag-public-index-read-only-maintenance-baseline","files":{"rag_manifest":{},"rag_manifest":{}}}',
+            )
+            for raw in samples:
+                with self.subTest(raw=raw):
+                    path.write_text(raw,encoding="utf-8")
+                    with patch.object(module,"collect_runtime_fingerprints",
+                                      side_effect=AssertionError("no runtime probing")):
+                        report=compare_saved_public_baseline(
+                            path,Path(temp),Path(temp))
+                    self.assertEqual(report["state"],"PUBLIC_BASELINE_INVALID")
+                    self.assertFalse(report["public_index_intact"])
+
     def test_boolean_schema_version_cannot_claim_public_baseline_v1(self):
         import json
         from unittest.mock import patch

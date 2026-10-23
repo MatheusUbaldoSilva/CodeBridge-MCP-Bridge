@@ -127,11 +127,21 @@ def compare_runtime_fingerprints(before: dict, after: dict) -> dict:
 
 
 
+def _reject_duplicate_json_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("Duplicate key in public baseline JSON")
+        result[key] = value
+    return result
+
+
 def compare_saved_public_baseline(baseline_path: Path, install_root: Path,
                                   rag_state: Path) -> dict:
     """Read a previously captured public SHA baseline and compare it to live files."""
     try:
-        saved = json.loads(Path(baseline_path).read_text(encoding="utf-8"))
+        saved = json.loads(Path(baseline_path).read_text(encoding="utf-8"),
+                           object_pairs_hook=_reject_duplicate_json_keys)
         if (not isinstance(saved, dict) or type(saved.get("schema_version")) is not int
                 or saved["schema_version"] != 1
                 or saved.get("purpose") != "rag-public-index-read-only-maintenance-baseline"):
