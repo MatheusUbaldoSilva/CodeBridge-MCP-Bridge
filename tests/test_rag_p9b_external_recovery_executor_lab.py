@@ -25,6 +25,12 @@ class ExternalTests(unittest.TestCase):
                 self.assertEqual(report["reason"],"LAB_IDENTITY_INVALID")
                 self.assertFalse(report["verified"])
 
+    def test_live_install_cannot_be_beneath_lab_root(self):
+        report=recover_externally(**{**self.kw,
+            "installed":self.lab/"nested"/"live-install"})
+        self.assertEqual(report["reason"],"LAB_PATH_INVALID")
+        self.assertFalse(report["verified"])
+
     def test_real_identity_required(self):
         r=recover_externally(**{**self.kw,"identity_probe":lambda *_:{"verified":False}})
         self.assertEqual(r["reason"],"TRANSACTION_IDENTITY_UNVERIFIED")

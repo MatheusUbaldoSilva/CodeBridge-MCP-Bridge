@@ -19,6 +19,7 @@ def recover_externally(*,lab_root,nsis_snapshot,identity_file,identity_sha,
     root=Path(lab_root).resolve()
     live=Path(installed).resolve()
     if (root==live or root.is_relative_to(live)
+            or live.is_relative_to(root)
             or not root.is_dir() or root.is_symlink()):
         return {**result,"reason":"LAB_PATH_INVALID"}
     try:
