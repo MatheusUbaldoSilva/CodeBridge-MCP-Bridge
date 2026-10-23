@@ -25,6 +25,16 @@ class ExternalTests(unittest.TestCase):
                 self.assertEqual(report["reason"],"LAB_IDENTITY_INVALID")
                 self.assertFalse(report["verified"])
 
+    def test_symlink_lab_root_is_rejected_before_identity(self):
+        link=self.root/"lab_link"
+        try:
+            link.symlink_to(self.lab,target_is_directory=True)
+        except (OSError,NotImplementedError) as exc:
+            self.skipTest(str(exc))
+        report=recover_externally(**{**self.kw,"lab_root":link})
+        self.assertEqual(report["reason"],"LAB_PATH_INVALID")
+        self.assertFalse(report["verified"])
+
     def test_live_install_cannot_be_beneath_lab_root(self):
         report=recover_externally(**{**self.kw,
             "installed":self.lab/"nested"/"live-install"})
