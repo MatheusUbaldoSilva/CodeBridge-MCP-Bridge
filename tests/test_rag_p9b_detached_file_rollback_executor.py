@@ -42,6 +42,41 @@ class FileRollbackTests(unittest.TestCase):
         self.assertEqual((self.installed/"rag"/"old.py").read_bytes(),b"original")
         self.assertFalse((self.installed/"rag"/"new.py").exists())
         self.assertIn("SHELL_PRODUCTION_FILE_RESTORED",self.log)
+    def test_durable_crash_replay_restores_then_blocks_completed_replay(self):
+        from installer.rag_p9b_rollback_journal import RollbackJournal
+        from installer.rag_p9b_production_file_recovery_gate import assess_file_recovery
+        from installer.rag_p9b_file_restore_executor_lab import _replace_old_file_atomically
+        path=self.root/"durable-journal.jsonl"
+        durable=RollbackJournal(path)
+        durable("SHELL_NSIS_FULL_SCOPE_INTERRUPTED",{})
+        def actual_gate(**kwargs):
+            return assess_file_recovery(
+                **kwargs,
+                snapshot_probe=lambda *a:{"state":"INSTALLER_ROLLBACK_SNAPSHOT_VERIFIED","verified":True},
+                preimage_probe=lambda *a:{"state":"CRASH_PREIMAGE_VERIFIED","verified":True},
+                poststop_probe=lambda *a:{"state":"POSTSTOP_OBSERVED_ONLY","observed_stopped":True},
+                new_targets_probe=lambda *a,**kw:{
+                    "state":"NEW_TARGETS_CONTENT_VERIFIED",
+                    "ownership_evidence_verified":True,"delete_authorized":False})
+        calls=[]
+        def crash_after_atomic_replace(target,data):
+            _replace_old_file_atomically(target,data)
+            calls.append(1)
+            raise OSError("injected hard crash after first old-file replace")
+        first=self.run_it(
+            gate=actual_gate,journal=durable,journal_path=path,
+            replace_file=crash_after_atomic_replace)
+        self.assertEqual(first["state"],"DETACHED_FILE_RESTORE_REVIEW_REQUIRED")
+        self.assertEqual(len(calls),1)
+        self.assertEqual((self.installed/"rag"/"old.py").read_bytes(),b"original")
+        self.assertTrue((self.installed/"rag"/"new.py").exists())
+        resumed=RollbackJournal.resume(path)
+        second=self.run_it(gate=actual_gate,journal=resumed,journal_path=path)
+        self.assertEqual(second["state"],"DETACHED_FILES_RESTORED_SHELL_PENDING")
+        self.assertFalse((self.installed/"rag"/"new.py").exists())
+        with self.assertRaises(ValueError):
+            RollbackJournal.resume(path)
+
     def test_no_mutation_without_external_execution(self):
         self.assertEqual(self.run_it(execute=False)["reason"],"EXTERNAL_EXECUTION_AND_JOURNAL_REQUIRED")
         self.assertEqual((self.installed/"rag"/"old.py").read_bytes(),b"updated")
