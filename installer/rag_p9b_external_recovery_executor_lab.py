@@ -33,7 +33,10 @@ def recover_externally(*,lab_root,nsis_snapshot,identity_file,identity_sha,
             or not root.is_dir() or root.is_symlink()):
         return {**result,"reason":"LAB_PATH_INVALID"}
     try:
-        marker=json.loads((root/"identity.json").read_text(encoding="utf-8"),
+        identity_path=root/"identity.json"
+        if not identity_path.is_file() or identity_path.is_symlink():
+            return {**result,"reason":"LAB_IDENTITY_INVALID"}
+        marker=json.loads(identity_path.read_text(encoding="utf-8"),
                           object_pairs_hook=_unique_lab_identity_pairs)
         if (not isinstance(marker,dict)
                 or marker.get("purpose")!="P9B_DISPOSABLE_UNIFIED_LAB"

@@ -47,6 +47,15 @@ class ExternalTests(unittest.TestCase):
     def test_snapshot_mismatch_required(self):
         r=recover_externally(**self.kw)
         self.assertEqual(r["reason"],"LAB_SNAPSHOT_MISMATCH")
+    def test_symlinked_lab_identity_file_refused(self):
+        from unittest.mock import patch
+        real=Path.is_symlink
+        identity=self.lab/"identity.json"
+        with patch.object(Path,"is_symlink",lambda path:True if path==identity else real(path)):
+            report=recover_externally(**self.kw)
+        self.assertEqual(report["reason"],"LAB_IDENTITY_INVALID")
+        self.assertFalse(report["verified"])
+
     def test_duplicate_lab_identity_keys_do_not_authorize_recovery(self):
         (self.lab/"identity.json").write_text(
             '{"schema":1,"schema":1,"purpose":"P9B_DISPOSABLE_UNIFIED_LAB","file_sha":"bad"}',
