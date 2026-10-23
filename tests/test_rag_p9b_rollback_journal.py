@@ -32,5 +32,27 @@ class JournalTests(unittest.TestCase):
         self.assertEqual(read_journal(self.file)["state"],"JOURNAL_UNVERIFIED")
 
 
+class ResumeJournalTests(unittest.TestCase):
+    def test_incomplete_journal_resumes_with_incrementing_sequence(self):
+        import tempfile
+        from pathlib import Path
+        from installer.rag_p9b_rollback_journal import RollbackJournal,read_journal
+        with tempfile.TemporaryDirectory() as root:
+            path=Path(root)/"resume.jsonl"
+            j=RollbackJournal(path)
+            j("SHELL_COMBINED_RECOVERY_ARMED",{})
+            another=RollbackJournal.resume(path)
+            another("SHELL_COMBINED_FILE_CHECKED",{"postverified":True})
+            self.assertEqual(read_journal(path)["count"],2)
+    def test_complete_journal_refused_for_resume(self):
+        import tempfile
+        from pathlib import Path
+        from installer.rag_p9b_rollback_journal import RollbackJournal
+        with tempfile.TemporaryDirectory() as root:
+            path=Path(root)/"complete.jsonl"
+            j=RollbackJournal(path)
+            j("SHELL_COMBINED_RECOVERY_VERIFIED",{})
+            with self.assertRaises(ValueError):RollbackJournal.resume(path)
+
 if __name__=="__main__":
     unittest.main()

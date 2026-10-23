@@ -50,14 +50,15 @@ def execute(cfg):
         registry=ScopedHKCU(Remap())
         journal_path=Path(c['journal']).absolute()
         if (journal_path.parent!=Path(cfg).resolve().parent or
-                journal_path.is_symlink() or journal_path.exists()):
+                journal_path.is_symlink()):
             return {**denied,'reason':'JOURNAL_LOCATION_INVALID'}
         snapshot_proof=verify_installer_rollback_snapshot(paths['snapshot'],installed)
         if (snapshot_proof.get('verified') is not True
                 or snapshot_proof.get('targets')!=258
                 or snapshot_proof.get('existing_files')!=236):
             return {**denied,'reason':'OFFICIAL_SNAPSHOT_SCOPE_INVALID'}
-        journal=RollbackJournal(journal_path)
+        journal=(RollbackJournal.resume(journal_path)
+                 if journal_path.exists() else RollbackJournal(journal_path))
         def file_worker():
             return restore_files_in_lab(snapshot=paths['snapshot'],installed=installed,lab_root=root,
                 expected_sha256=c['snapshot_sha256'],

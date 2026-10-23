@@ -18,6 +18,23 @@ class RollbackJournal:
         with self.path.open("xb") as f:
             os.fsync(f.fileno())
 
+    @classmethod
+    def resume(cls,path):
+        """Resume only an incomplete verified append-only journal."""
+        path=Path(path).absolute()
+        proof=read_journal(path)
+        if (proof.get("state")!="JOURNAL_OBSERVED_ONLY"
+                or proof.get("count",0)<1
+                or proof.get("last_state") in (
+                    "SHELL_COMBINED_RECOVERY_VERIFIED",
+                    "SHELL_NSIS_ISOLATED_RECOVERED",
+                    "SHELL_NSIS_FULL_SCOPE_RECOVERED")):
+            raise ValueError("JOURNAL_NOT_RESUMABLE")
+        obj=cls.__new__(cls)
+        obj.path=path
+        obj._sequence=proof["count"]
+        return obj
+
     def __call__(self,state,detail):
         if not isinstance(state,str) or not state.startswith("SHELL_"):
             raise ValueError("JOURNAL_STATE_REJECTED")
