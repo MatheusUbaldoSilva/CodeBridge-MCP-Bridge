@@ -93,16 +93,20 @@ def recover(root,zip_path):
             target=root/"installed"/Path(*PurePosixPath(rel).parts)
             if not target.is_file() or target.is_symlink() or target.read_bytes()!=MARK:
                 return {**base,"reason":"UNKNOWN_CREATED_FILE"}
+        menu=root/"roaming"/"Microsoft"/"Windows"/"Start Menu"/"Programs"/"CodeBridge"
+        shell_paths=[menu/name for name in MENU_LINKS]+[root/"desktop"/DESKTOP_LINK]
+        # Preflight every writable path before the first restoration write.
+        if any(path.is_symlink() for path in shell_paths):
+            return {**base,"reason":"SHELL_SYMLINK"}
+        if any((root/"installed"/Path(*PurePosixPath(rel).parts)).is_symlink()
+               for rel in m["existing"]):
+            return {**base,"reason":"LINKED_BASELINE"}
         for rel,meta in m["existing"].items():
             target=root/"installed"/Path(*PurePosixPath(rel).parts)
-            if target.is_symlink():return {**base,"reason":"LINKED_BASELINE"}
             target.write_bytes(z.read("old/"+rel))
         for rel in new:
             (root/"installed"/Path(*PurePosixPath(rel).parts)).unlink()
-        menu=root/"roaming"/"Microsoft"/"Windows"/"Start Menu"/"Programs"/"CodeBridge"
-        shell_paths=[menu/name for name in MENU_LINKS]+[root/"desktop"/DESKTOP_LINK]
         for i,item in enumerate(sm["links"]):
-            if shell_paths[i].is_symlink():return {**base,"reason":"SHELL_SYMLINK"}
             if item["exists"]:shell_paths[i].write_bytes(shell.read(f"links/{i}.bin"))
             else:shell_paths[i].unlink(missing_ok=True)
         (root/"fake_registry.json").write_text(json.dumps(sm["registry"],sort_keys=True),encoding="utf-8")

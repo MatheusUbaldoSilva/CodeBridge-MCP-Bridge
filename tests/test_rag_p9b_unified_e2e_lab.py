@@ -53,6 +53,30 @@ class UnifiedTests(unittest.TestCase):
         self.assertEqual(evidence["fake_registry_keys_checked"],2)
         self.assertFalse(evidence["production_modified"])
 
+    def test_shell_symlink_refuses_before_file_writes(self):
+        from unittest.mock import patch
+        from installer.rag_p9b_unified_e2e_lab import prepare,recover
+        from installer.rag_p9b_windows_shell_scope import MENU_LINKS
+        with patch("installer.rag_p9b_unified_e2e_lab.verify_installer_rollback_snapshot",
+                   return_value={"verified":True}):
+            prepare(self.lab,self.snapshot,self.installed)
+        self.assertEqual(self.call("interrupt").returncode,83)
+        old=self.lab/"installed"/"pkg"/"old.py"
+        new=self.lab/"installed"/"pkg"/"new.py"
+        self.assertEqual(old.read_bytes(),b"INTERRUPTED_UPDATE")
+        self.assertTrue(new.exists())
+        suspect=self.lab/"roaming"/"Microsoft"/"Windows"/"Start Menu"/"Programs"/"CodeBridge"/MENU_LINKS[0]
+        original=Path.is_symlink
+        def fake_symlink(path):
+            if path==suspect:
+                return True
+            return original(path)
+        with patch.object(Path,"is_symlink",fake_symlink):
+            result=recover(self.lab,self.snapshot)
+        self.assertEqual(result["reason"],"SHELL_SYMLINK")
+        self.assertEqual(old.read_bytes(),b"INTERRUPTED_UPDATE")
+        self.assertTrue(new.exists())
+
     def test_journal_tamper_after_kill_refused(self):
         from unittest.mock import patch
         from installer.rag_p9b_unified_e2e_lab import prepare
