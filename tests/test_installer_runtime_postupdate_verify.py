@@ -30,6 +30,19 @@ class PostUpdateVerifierTests(unittest.TestCase):
         self.assertFalse(result["writes_performed"])
         self.assertEqual(result["integrity"]["changed_entries"], [])
 
+    def test_invalid_historical_schema_refuses_before_runtime_probe(self):
+        for baseline in (None, [], {}, {"files":None},
+                         {"files":[]}, "bad"):
+            with self.subTest(baseline=baseline):
+                with patch("installer.runtime_postupdate_verify.inspect_embedded_runtime",
+                           side_effect=AssertionError("must not inspect runtime")):
+                    report=verify_installed_update(
+                        Path("C:/install"),Path("C:/rag"),baseline)
+                self.assertEqual(report["state"],"POST_UPDATE_BLOCKED")
+                self.assertFalse(report["public_index_intact"])
+                self.assertFalse(report["deployment_approved"])
+                self.assertFalse(report["writes_performed"])
+
     def test_missing_qdrant_blocks_release(self):
         self.assertEqual(self.check(False,baseline())["state"],"POST_UPDATE_BLOCKED")
 

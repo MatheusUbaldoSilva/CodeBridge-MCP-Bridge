@@ -12,12 +12,27 @@ from installer.runtime_readiness import inspect_embedded_runtime
 
 
 def verify_installed_update(install_root: Path, rag_state: Path, before: dict) -> dict:
+    # An invalid baseline must never be interpreted as a valid empty index.
+    historical_files = before.get("files") if isinstance(before, dict) else None
+    if not isinstance(historical_files, dict):
+        return {"state": "POST_UPDATE_BLOCKED",
+                "installed_runtime_ready": False,
+                "public_index_intact": False,
+                "integrity": {"reason": "PUBLIC_BASELINE_SCHEMA_INVALID"},
+                "does_not_activate_worker": True,
+                "writes_performed": False,
+                "requires_mcp_handshake": True,
+                "requires_isolated_real_jina_worker_test": True,
+                "deployment_approved": False,
+                "phase_closed": False}
     current = inspect_embedded_runtime(install_root)
     after = collect_runtime_fingerprints(install_root, rag_state)
     public_keys = ("rag_manifest", "rag_sqlite", "rag_qdrant")
-    expected = {"files": {key: before.get("files", {}).get(key)
+    expected = {"files": {key: historical_files.get(key)
                           for key in public_keys}}
-    observed = {"files": {key: after.get("files", {}).get(key)
+    observed_files = after.get("files") if isinstance(after,dict) else None
+    observed_files = observed_files if isinstance(observed_files,dict) else {}
+    observed = {"files": {key: observed_files.get(key)
                           for key in public_keys}}
     integrity = compare_runtime_fingerprints(expected, observed)
     ok = bool(current["ready"] and integrity["public_index_intact"])
