@@ -13,13 +13,14 @@ class RollbackJournal:
         if self.path.is_symlink() or not self.path.parent.is_dir():
             raise ValueError("JOURNAL_PATH_INVALID")
         self._sequence=0
+        self.resumed=False
         if self.path.exists():
             raise FileExistsError("JOURNAL_ALREADY_EXISTS")
         with self.path.open("xb") as f:
             os.fsync(f.fileno())
 
     @classmethod
-    def resume(cls,path):
+    def resume(cls,path,*,expected_transaction_sha256=None):
         """Resume only an incomplete verified append-only journal."""
         path=Path(path).absolute()
         proof=read_journal(path)
@@ -36,6 +37,12 @@ class RollbackJournal:
         try:
             history=[json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
             combined = history[0].get("state") == "SHELL_DETACHED_COMBINED_ARMED"
+            if expected_transaction_sha256 is not None:
+                expected=str(expected_transaction_sha256).lower()
+                first=history[0].get("details",{}).get("transaction_sha256")
+                if (len(expected)!=64 or any(c not in "0123456789abcdef" for c in expected)
+                        or first!=expected):
+                    raise ValueError("JOURNAL_TRANSACTION_IDENTITY_MISMATCH")
             completed={"SHELL_COMBINED_RECOVERY_VERIFIED",
                 "SHELL_NSIS_ISOLATED_RECOVERED",
                 "SHELL_NSIS_FULL_SCOPE_RECOVERED",
@@ -62,6 +69,7 @@ class RollbackJournal:
         obj=cls.__new__(cls)
         obj.path=path
         obj._sequence=proof["count"]
+        obj.resumed=True
         return obj
 
     def __call__(self,state,detail):
@@ -74,6 +82,14 @@ class RollbackJournal:
         for key in ("type","files","keys","postverified"):
             if key in detail and isinstance(detail[key],(str,bool,int)):
                 safe[key]=detail[key]
+        if "transaction_sha256" in detail:
+            value=detail["transaction_sha256"]
+            if (not isinstance(value,str) or len(value)!=64
+                    or any(c not in "0123456789abcdef" for c in value.lower())):
+                raise ValueError("INVALID_TRANSACTION_SHA256")
+            if self._sequence!=0 or state!="SHELL_DETACHED_COMBINED_ARMED":
+                raise ValueError("TRANSACTION_SHA256_NOT_FIRST")
+            safe["transaction_sha256"]=value.lower()
         entry={"seq":self._sequence+1,"state":state,
                "utc_epoch":time.time(),"details":safe}
         with self.path.open("ab") as f:

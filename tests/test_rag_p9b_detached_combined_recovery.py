@@ -140,6 +140,34 @@ class DetachedCombinedTests(unittest.TestCase):
         self.assertEqual(verifier_calls,[])
         self.assertIn("SHELL_DETACHED_FINAL_POSTSTOP_FAILED",self.events)
 
+    def test_resumed_production_journal_requires_same_bound_identity(self):
+        import tempfile
+        from pathlib import Path
+        from installer.rag_p9b_rollback_journal import RollbackJournal
+        with tempfile.TemporaryDirectory() as root:
+            path=Path(root)/"bound.jsonl"
+            journal=RollbackJournal(path)
+            journal("SHELL_DETACHED_COMBINED_ARMED",{
+                "transaction_sha256":"a"*64})
+            journal("SHELL_PRODUCTION_FILE_RESTORED",{"postverified":True})
+            with self.assertRaises(ValueError):
+                RollbackJournal.resume(path,expected_transaction_sha256="b"*64)
+            resumed=RollbackJournal.resume(path,expected_transaction_sha256="a"*64)
+            r=recover_detached_combined(**(self.args|{
+                "production":True,"identity_manifest":"fixture",
+                "identity_sha256":"a"*64,"installed":"C:/CodeBridge",
+                "source_commit":"b"*40,"journal":resumed,
+                "identity_gate":lambda **kw:{
+                    "state":"DETACHED_IDENTITY_OBSERVED_ONLY",
+                    "identity_verified":True,"artifacts_checked":4,
+                    "cutover_authorized":False},
+                "poststop_probe":lambda *_:{
+                    "state":"POSTSTOP_OBSERVED_ONLY",
+                    "observed_stopped":True}}))
+            self.assertEqual(r["state"],"DETACHED_COMBINED_RESTORE_VERIFIED")
+            with self.assertRaises(ValueError):
+                RollbackJournal.resume(path,expected_transaction_sha256="a"*64)
+
     def test_execute_off_refuses_without_worker_calls(self):
         self.assertEqual(recover_detached_combined(**(self.args|{
             "execute":False}))["reason"],"INDEPENDENT_WORKERS_REQUIRED")

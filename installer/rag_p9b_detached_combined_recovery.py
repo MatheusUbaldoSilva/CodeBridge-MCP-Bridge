@@ -51,7 +51,10 @@ def recover_detached_combined(*, file_worker=None, shell_worker=None,
             return {**denied, "reason": "INDEPENDENT_POSTSTOP_REQUIRED"}
     current = "FILES"
     try:
-        journal("SHELL_DETACHED_COMBINED_ARMED", {})
+        if getattr(journal,"resumed",False) is not True:
+            journal("SHELL_DETACHED_COMBINED_ARMED",
+                    {"transaction_sha256":str(identity_sha256).lower()}
+                    if production is True else {})
         files = file_worker()
         if (not isinstance(files, dict)
                 or files.get("state") != "DETACHED_FILES_RESTORED_SHELL_PENDING"

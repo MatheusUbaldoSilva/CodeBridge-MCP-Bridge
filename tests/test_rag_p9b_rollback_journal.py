@@ -77,6 +77,25 @@ class ResumeJournalTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 RollbackJournal.resume(path)
 
+    def test_combined_journal_requires_same_transaction_identity(self):
+        with tempfile.TemporaryDirectory() as root:
+            path=Path(root)/"identity-bound.jsonl"
+            j=RollbackJournal(path)
+            j("SHELL_DETACHED_COMBINED_ARMED",{"transaction_sha256":"a"*64})
+            j("SHELL_PRODUCTION_FILE_RESTORED",{"postverified":True})
+            self.assertEqual(
+                RollbackJournal.resume(path,expected_transaction_sha256="a"*64)._sequence,2)
+            with self.assertRaises(ValueError):
+                RollbackJournal.resume(path,expected_transaction_sha256="b"*64)
+
+    def test_combined_journal_rejects_missing_identity(self):
+        with tempfile.TemporaryDirectory() as root:
+            path=Path(root)/"unbound.jsonl"
+            j=RollbackJournal(path)
+            j("SHELL_DETACHED_COMBINED_ARMED",{})
+            with self.assertRaises(ValueError):
+                RollbackJournal.resume(path,expected_transaction_sha256="a"*64)
+
     def test_detached_combined_journal_resumes_after_crash(self):
         with tempfile.TemporaryDirectory() as root:
             path=Path(root)/"combined.jsonl"
