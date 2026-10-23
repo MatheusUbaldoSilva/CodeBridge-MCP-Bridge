@@ -104,6 +104,20 @@ class CodeFallbackWiringTests(unittest.TestCase):
         client.upsert.assert_not_called()
         self.assertLess(events.index(("load","CUDA0")),events.index(("load","none")))
 
+    def test_failed_manager_load_closes_qdrant(self):
+        from rag.models import fallback, code_artifact_install
+        from rag.index import qdrant_local
+        from unittest.mock import patch
+        from rag.models.fallback import ModelFallbackExhaustedError
+        client=Mock()
+        with patch.object(qdrant_local,"open_qdrant_local",return_value=client), patch.object(qdrant_local,"ensure_vector_collections"), patch.object(qdrant_local,"close_qdrant_local") as closing, patch.object(code_artifact_install,"resolve_selected_code_model_path",return_value=Path("C:/fake.gguf")), patch.object(fallback,"TextModelFallbackManager") as maker:
+            maker.return_value.load.side_effect=ModelFallbackExhaustedError("gpu","cpu")
+            row=("chunk","doc","source","CODE","sample.py",1,2,"a"*64,"branch","b"*40)
+            with self.assertRaises(ModelFallbackExhaustedError):
+                _write_vectors(Path("C:/fakeq"),"codebridge",[],[row])
+            client.upsert.assert_not_called()
+            closing.assert_called_once_with(client)
+
     def test_code_embeddings_use_manager_and_cleanup(self):
         from rag.models import fallback
         from rag.models import code_embedding
