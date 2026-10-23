@@ -11,6 +11,7 @@ class IndependentCombinedSchedulerLabTests(unittest.TestCase):
         script=SCRIPT.read_text(encoding="utf-8-sig")
         for item in ("test_rag_p9b_detached_combined_hardcrash_chain_e2e.py",
                      "test_rag_p9b_real_hkcu_scratch_crash.py",
+                     "test_rag_p9b_real_hkcu_file_combined_crash.py",
                      "EXTERNAL_PROCESS_ANCESTRY_VERIFIED",
                      "Get-ScheduledTask","New-ScheduledTaskAction",
                      "Start-ScheduledTask","Unregister-ScheduledTask",
