@@ -11,6 +11,15 @@ from pathlib import Path
 from installer.rag_p9b_unified_e2e_lab import recover as recover_lab
 from installer.rag_p9b_transaction_identity import verify_identity
 
+def _unique_lab_identity_pairs(pairs):
+    result={}
+    for key,value in pairs:
+        if key in result:
+            raise ValueError("DUPLICATE_LAB_IDENTITY_KEY")
+        result[key]=value
+    return result
+
+
 def recover_externally(*,lab_root,nsis_snapshot,identity_file,identity_sha,
                         installed,identity_probe=verify_identity,
                         recoverer=recover_lab):
@@ -24,7 +33,8 @@ def recover_externally(*,lab_root,nsis_snapshot,identity_file,identity_sha,
             or not root.is_dir() or root.is_symlink()):
         return {**result,"reason":"LAB_PATH_INVALID"}
     try:
-        marker=json.loads((root/"identity.json").read_text(encoding="utf-8"))
+        marker=json.loads((root/"identity.json").read_text(encoding="utf-8"),
+                          object_pairs_hook=_unique_lab_identity_pairs)
         if (not isinstance(marker,dict)
                 or marker.get("purpose")!="P9B_DISPOSABLE_UNIFIED_LAB"
                 or type(marker.get("schema")) is not int

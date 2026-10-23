@@ -47,6 +47,14 @@ class ExternalTests(unittest.TestCase):
     def test_snapshot_mismatch_required(self):
         r=recover_externally(**self.kw)
         self.assertEqual(r["reason"],"LAB_SNAPSHOT_MISMATCH")
+    def test_duplicate_lab_identity_keys_do_not_authorize_recovery(self):
+        (self.lab/"identity.json").write_text(
+            '{"schema":1,"schema":1,"purpose":"P9B_DISPOSABLE_UNIFIED_LAB","file_sha":"bad"}',
+            encoding="utf-8")
+        report=recover_externally(**self.kw)
+        self.assertFalse(report["verified"])
+        self.assertEqual(report["reason"],"INDEPENDENT_RECOVERY_EXCEPTION")
+
     def test_unknown_lab_rejected(self):
         (self.lab/"identity.json").write_text("{}")
         self.assertEqual(recover_externally(**self.kw)["reason"],"LAB_IDENTITY_INVALID")
