@@ -17,6 +17,9 @@ class IndependentCombinedSchedulerLabTests(unittest.TestCase):
                      "Start-ScheduledTask","Unregister-ScheduledTask",
                      "Remove-Item -LiteralPath $folder",
                      "production_modified=$false","nsis_executed=$false",
+                     "isolated_nsis_test_executed=$true",
+                     "test_actual_nsis_crash_corrupt_journal_refuses_replay",
+                     "test_actual_nsis_then_file_recoverer_hardcrash_replays",
                      "LAB_FAILED_OR_UNVERIFIED"):
             self.assertIn(item,script)
         for forbidden in ("Stop-Process","Set-ItemProperty",

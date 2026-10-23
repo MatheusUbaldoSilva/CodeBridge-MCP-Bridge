@@ -25,7 +25,7 @@ class DetachedRealRegistryIntegration(unittest.TestCase):
             'preimage':str(f.preimage),'preimage_sha256':f.pre_sha,
             'journal':str(journal)}
         config.write_text(json.dumps(payload),encoding='utf-8')
-        worker=Path.cwd()/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
+        worker=Path(__file__).resolve().parents[1]/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
         r=subprocess.run([sys.executable,str(worker),str(config)],capture_output=True,text=True,timeout=45)
         self.assertEqual(r.returncode,0,r.stderr[-800:]+r.stdout[-800:])
         report=json.loads(r.stdout.strip())
@@ -56,7 +56,7 @@ class DetachedRealRegistryIntegration(unittest.TestCase):
             'preimage':str(f.preimage),'preimage_sha256':f.pre_sha,
             'journal':str(journal)}
         cfg.write_text(json.dumps(info),encoding='utf-8')
-        worker=Path.cwd()/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
+        worker=Path(__file__).resolve().parents[1]/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
         launcher=stage/'temporary-launcher.py'
         result_file=stage/'detached-result.json'
         launcher.write_text("""
@@ -112,7 +112,7 @@ os._exit(83)
         first=RollbackJournal(journal)
         first('SHELL_COMBINED_RECOVERY_ARMED',{})
         first('SHELL_COMBINED_FILE_CHECKED',{'postverified':False})
-        worker=Path.cwd()/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
+        worker=Path(__file__).resolve().parents[1]/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
         child=subprocess.run([sys.executable,str(worker),str(config)],
                               capture_output=True,text=True,timeout=40)
         self.assertEqual(child.returncode,0,child.stdout[-650:]+child.stderr[-650:])
@@ -189,7 +189,7 @@ os._exit(83)
         cfg.write_text(json.dumps(settings),encoding='utf-8')
         start=RollbackJournal(journal)
         start('SHELL_NSIS_LAB_INTERRUPTED',{'files':258})
-        worker=Path.cwd()/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
+        worker=Path(__file__).resolve().parents[1]/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
         if crash_stage is not None:
             env=os.environ.copy()
             env["P9B_LAB_FAULT_AFTER_"+crash_stage.upper()]="1"
@@ -249,7 +249,7 @@ os._exit(83)
             'shell_snapshot':str(f.shell_zip),'shell_snapshot_sha256':f.shell_sha,
             'preimage':str(f.preimage),'preimage_sha256':f.pre_sha,
             'journal':str(journal)}),encoding='utf-8')
-        worker=Path.cwd()/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
+        worker=Path(__file__).resolve().parents[1]/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
         env=os.environ.copy()
         env['P9B_LAB_FAULT_AFTER_FILES']='1'
         crashed=subprocess.run([sys.executable,str(worker),str(config)],
@@ -279,7 +279,7 @@ os._exit(83)
             'preimage':str(f.preimage),'preimage_sha256':f.pre_sha,
             'journal':str(journal)}
         cfg.write_text(json.dumps(payload),encoding='utf-8')
-        worker=Path.cwd()/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
+        worker=Path(__file__).resolve().parents[1]/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
         env=os.environ.copy();env['P9B_LAB_FAULT_AFTER_SHELL']='1'
         interrupted=subprocess.run([sys.executable,str(worker),str(cfg)],
              capture_output=True,text=True,timeout=45,env=env)
@@ -298,7 +298,7 @@ os._exit(83)
         f=self.fixture
         config=f.lab.parent/'invalid.json'
         config.write_text(json.dumps({'lab':str(f.installed)}),encoding='utf-8')
-        worker=Path.cwd()/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
+        worker=Path(__file__).resolve().parents[1]/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
         r=subprocess.run([sys.executable,str(worker),str(config)],capture_output=True,text=True,timeout=30)
         self.assertEqual(r.returncode,2)
 

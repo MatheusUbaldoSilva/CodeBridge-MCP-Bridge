@@ -31,7 +31,7 @@ try {
     'request=json.loads((folder/"request.json").read_text(encoding="utf-8-sig"))'
     'repo=Path(request["repo"]).resolve()'
     'lib=Path(os.environ["LOCALAPPDATA"])/"CodeBridge-MCP-Bridge"/"release_staging"/"P9B_HEAD_CANDIDATE_f45880511c"/"external_supervisor_lib"'
-    'sys.path[:0]=[str(repo),str(lib)]'
+    'sys.path[:0]=[str(repo),str(repo/"tests"),str(lib)]'
     'from installer.rag_p9b_detached_process_ancestry import inspect_detached_process_ancestry'
     'ancestry=inspect_detached_process_ancestry(installed=Path(os.environ["LOCALAPPDATA"])/"Programs"/"CodeBridge")'
     'if ancestry.get("state")!="EXTERNAL_PROCESS_ANCESTRY_VERIFIED":'
@@ -40,6 +40,8 @@ try {
     '    suite=unittest.TestSuite()'
     '    for pattern in ("test_rag_p9b_detached_combined_hardcrash_chain_e2e.py","test_rag_p9b_real_hkcu_scratch_crash.py","test_rag_p9b_real_hkcu_file_combined_crash.py"):'
     '        suite.addTests(unittest.defaultTestLoader.discover(str(repo/"tests"),pattern=pattern))'
+    '    for method in ("test_actual_nsis_interruption_recovers_in_external_child","test_actual_nsis_then_recoverer_hardcrash_replays","test_actual_nsis_then_file_recoverer_hardcrash_replays","test_actual_nsis_crash_corrupt_journal_refuses_replay"):'
+    '        suite.addTests(unittest.defaultTestLoader.loadTestsFromName("test_rag_p9b_detached_combined_recovery_lab.DetachedRealRegistryIntegration."+method))'
     '    with (folder/"test.log").open("w",encoding="utf-8") as stream:'
     '        run=unittest.TextTestRunner(stream=stream,verbosity=1).run(suite)'
     '    result={"state":"SCHEDULER_ISOLATED_COMBINED_ROLLBACK_LAB","verified":run.wasSuccessful(),"passes":run.testsRun,"failures":len(run.failures),"errors":len(run.errors),"ancestry_verified":True,"production_modified":False}'
@@ -51,15 +53,21 @@ try {
   Register-ScheduledTask -TaskName $task -Action $action -Principal $principal -ErrorAction Stop|Out-Null
   $created=$true
   Start-ScheduledTask -TaskName $task -ErrorAction Stop
-  for($i=0;$i -lt 40 -and !(Test-Path -LiteralPath $result);$i++){Start-Sleep -Milliseconds 500}
+  for($i=0;$i -lt 180 -and !(Test-Path -LiteralPath $result);$i++){Start-Sleep -Milliseconds 500}
   if (!(Test-Path -LiteralPath $result -PathType Leaf)){throw 'LAB_RESULT_MISSING'}
   $proof=Get-Content -LiteralPath $result -Raw|ConvertFrom-Json
   if ($proof.state -ne 'SCHEDULER_ISOLATED_COMBINED_ROLLBACK_LAB' -or
       $proof.verified -ne $true -or $proof.ancestry_verified -ne $true -or
       $proof.production_modified -ne $false -or $proof.failures -ne 0 -or
-      $proof.errors -ne 0 -or $proof.passes -lt 3){throw 'LAB_FAILED_OR_UNVERIFIED'}
+            $proof.errors -ne 0 -or $proof.passes -lt 7){
+    $tail=if(Test-Path -LiteralPath (Join-Path $folder 'test.log')) {
+      (Get-Content -LiteralPath (Join-Path $folder 'test.log') -Tail 45) -join ' | '
+    }else{'LAB_LOG_MISSING'}
+    throw ('LAB_FAILED_OR_UNVERIFIED result='+($proof|ConvertTo-Json -Compress)+' test_tail='+$tail)
+  }
   [pscustomobject]@{state='SCHEDULED_COMBINED_LAB_VERIFIED';tests=$proof.passes;
-    ancestry_verified=$true;production_modified=$false;nsis_executed=$false
+    ancestry_verified=$true;production_modified=$false;nsis_executed=$false;
+    isolated_nsis_test_executed=$true;production_nsis_executed=$false
   }|ConvertTo-Json -Compress
 }finally{
   if($created){Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction Stop}
