@@ -29,7 +29,8 @@ class RollbackJournal:
                     "SHELL_COMBINED_RECOVERY_VERIFIED",
                     "SHELL_NSIS_ISOLATED_RECOVERED",
                     "SHELL_NSIS_FULL_SCOPE_RECOVERED",
-                    "SHELL_PRODUCTION_FILE_RESTORED")):
+                    "SHELL_PRODUCTION_FILE_RESTORED",
+                    "SHELL_DETACHED_COMBINED_VERIFIED")):
             raise ValueError("JOURNAL_NOT_RESUMABLE")
         # A terminal success anywhere in history cannot be followed by
         # more recovery events. Reject malformed or unscoped event names.
@@ -38,12 +39,14 @@ class RollbackJournal:
             completed={"SHELL_COMBINED_RECOVERY_VERIFIED",
                 "SHELL_NSIS_ISOLATED_RECOVERED",
                 "SHELL_NSIS_FULL_SCOPE_RECOVERED",
-                "SHELL_PRODUCTION_FILE_RESTORED"}
+                "SHELL_PRODUCTION_FILE_RESTORED",
+                "SHELL_DETACHED_COMBINED_VERIFIED"}
             if (history[0].get("state") not in (
                     "SHELL_COMBINED_RECOVERY_ARMED",
                     "SHELL_NSIS_LAB_INTERRUPTED",
                     "SHELL_NSIS_INTERRUPTED",
-                    "SHELL_NSIS_FULL_SCOPE_INTERRUPTED")):
+                    "SHELL_NSIS_FULL_SCOPE_INTERRUPTED",
+                    "SHELL_DETACHED_COMBINED_ARMED")):
                 raise ValueError("JOURNAL_INITIAL_STATE_INVALID")
             if (any(not isinstance(entry,dict)
                     or not isinstance(entry.get("state"),str)

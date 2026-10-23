@@ -53,6 +53,19 @@ class ResumeJournalTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 RollbackJournal.resume(path)
 
+    def test_detached_combined_journal_resumes_after_crash(self):
+        with tempfile.TemporaryDirectory() as root:
+            path=Path(root)/"combined.jsonl"
+            j=RollbackJournal(path)
+            j("SHELL_DETACHED_COMBINED_ARMED",{})
+            j("SHELL_DETACHED_FILES_VERIFIED",{"postverified":True})
+            again=RollbackJournal.resume(path)
+            again("SHELL_DETACHED_SHELL_VERIFIED",{"postverified":True})
+            again("SHELL_DETACHED_COMBINED_VERIFIED",{"postverified":True})
+            self.assertEqual(read_journal(path)["count"],4)
+            with self.assertRaises(ValueError):
+                RollbackJournal.resume(path)
+
     def test_complete_journal_refused_for_resume(self):
         import tempfile
         from pathlib import Path
