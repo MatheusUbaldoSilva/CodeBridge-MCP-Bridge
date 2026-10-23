@@ -50,6 +50,19 @@ class RuntimeReadinessTests(unittest.TestCase):
         self.assertEqual(result["errors"], [])
         self.assertFalse(result["modifies_runtime"])
 
+    def test_non_object_or_truthy_module_values_fail_closed(self):
+        self.pth.write_text("..\\..\n")
+        cases=["[]","null",'"text"',json.dumps({name:1 for name in MODULES})]
+        for response in cases:
+            with self.subTest(response=response):
+                with patch("installer.runtime_readiness.subprocess.run",
+                           return_value=SimpleNamespace(
+                               returncode=0,stdout=response,stderr="")):
+                    result=inspect_embedded_runtime(self.root)
+                self.assertFalse(result["ready"])
+                self.assertFalse(result["modifies_runtime"])
+                self.assertTrue(result["errors"])
+
     def test_bad_python_probe_does_not_claim_ready(self):
         self.pth.write_text("..\\..\n")
         with patch("installer.runtime_readiness.subprocess.run",

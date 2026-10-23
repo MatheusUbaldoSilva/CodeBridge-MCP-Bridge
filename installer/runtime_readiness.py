@@ -39,7 +39,11 @@ def inspect_embedded_runtime(install_root: Path) -> dict:
             result["errors"].append("PYTHON_PROBE_FAILED")
         else:
             parsed = json.loads(check.stdout.strip())
-            result["modules"] = {key: bool(parsed.get(key)) for key in MODULES}
+            if not isinstance(parsed, dict):
+                result["errors"].append("PYTHON_PROBE_SCHEMA_INVALID")
+            else:
+                result["modules"] = {
+                    key: parsed.get(key) is True for key in MODULES}
     except (OSError, ValueError, subprocess.TimeoutExpired):
         result["errors"].append("PYTHON_PROBE_UNAVAILABLE")
     for module, available in result["modules"].items():
