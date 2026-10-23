@@ -126,6 +126,84 @@ os._exit(83)
         self.assertEqual(refused.returncode,2)
         self.assertEqual(json.loads(refused.stdout.strip())['reason'],'DETACHED_EXCEPTION')
 
+    def test_actual_nsis_interruption_recovers_in_external_child(self):
+        import tempfile,time
+        from zipfile import ZipFile
+        from installer.rag_p9b_rollback_journal import RollbackJournal,read_journal
+        compiler=Path('C:/Program Files (x86)/NSIS/makensis.exe')
+        if not compiler.exists():
+            self.skipTest('Windows NSIS not installed')
+        f=self.fixture
+        with ZipFile(f.files_zip) as archive:
+            manifest=json.loads(archive.read('manifest.json'))
+        approved=manifest['installed_root']
+        old=list(manifest['existing'])
+        new=[n for n in manifest['targets'] if n not in manifest['existing']]
+        self.assertEqual((len(old),len(new)),(236,22))
+        for rel in new:
+            f.lab.joinpath(*rel.split('/')).unlink()
+        prior_file=f.lab.joinpath(*old[0].split('/'))
+        before=prior_file.read_bytes()
+        with tempfile.TemporaryDirectory(prefix='P9B_NSIS_DETACHED_') as folder:
+            stage=Path(folder)
+            exe=stage/'nsis-lab.exe'
+            payload=stage/'test-payload.txt'
+            payload.write_bytes(b'P9B_LAB_INSTALLER_CREATED_V1')
+            script=stage/'nsis-lab.nsi'
+            lines=['Unicode True','Name "P9B Detached Fullscope"',
+                   f'OutFile "{exe}"',f'InstallDir "{f.lab}"',
+                   'RequestExecutionLevel user','SilentInstall silent','Section']
+            for index,rel in enumerate(new+[old[0]]+old[1:]):
+                path=f.lab.joinpath(*rel.split('/'))
+                lines.append(f'SetOutPath "{path.parent}"')
+                lines.append(f'File /oname={path.name} "{payload}"')
+                if index==22:lines.append('Sleep 15000')
+            lines.append('SectionEnd')
+            script.write_text(chr(10).join(lines)+chr(10),encoding='ascii')
+            built=subprocess.run([str(compiler),str(script)],capture_output=True,timeout=45)
+            self.assertEqual(built.returncode,0,built.stderr[-650:])
+            process=subprocess.Popen([str(exe),'/S'])
+            try:
+                deadline=time.monotonic()+12
+                while time.monotonic()<deadline:
+                    if prior_file.read_bytes()==payload.read_bytes():break
+                    if process.poll() is not None:self.fail('NSIS_EXITED_EARLY')
+                    time.sleep(.05)
+                self.assertEqual(prior_file.read_bytes(),payload.read_bytes())
+                self.assertIsNone(process.poll())
+                process.kill();process.wait(timeout=5)
+            finally:
+                if process.poll() is None:
+                    process.kill();process.wait(timeout=5)
+        self.assertNotEqual(prior_file.read_bytes(),before)
+        self.assertTrue(all(f.lab.joinpath(*x.split('/')).is_file() for x in new))
+        folder=f.lab.parent
+        cfg=folder/'actual-nsis-detached.json'
+        journal=folder/'actual-nsis-journal.jsonl'
+        settings={'lab':str(f.lab),'appdata':str(f.appdata),
+          'desktop':str(f.desktop),'token':f.token,'installed':approved,
+          'snapshot':str(f.files_zip),'snapshot_sha256':f.file_sha,
+          'shell_snapshot':str(f.shell_zip),'shell_snapshot_sha256':f.shell_sha,
+          'preimage':str(f.preimage),'preimage_sha256':f.pre_sha,
+          'journal':str(journal)}
+        cfg.write_text(json.dumps(settings),encoding='utf-8')
+        start=RollbackJournal(journal)
+        start('SHELL_NSIS_LAB_INTERRUPTED',{'files':258})
+        worker=Path.cwd()/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
+        recovered=subprocess.run([sys.executable,str(worker),str(cfg)],
+                                 capture_output=True,text=True,timeout=45)
+        self.assertEqual(recovered.returncode,0,recovered.stdout[-700:]+recovered.stderr[-700:])
+        result=json.loads(recovered.stdout.strip())
+        self.assertTrue(result['verified'])
+        self.assertEqual((result['files'],result['new_targets'],
+            result['shortcuts'],result['fake_registry_keys']),(236,22,5,2))
+        observed=read_journal(journal)
+        self.assertEqual(observed['count'],7)
+        self.assertEqual(observed['last_state'],'SHELL_COMBINED_RECOVERY_VERIFIED')
+        with ZipFile(f.files_zip) as archive:
+            expected_original=archive.read('old/'+old[0])
+        self.assertEqual(prior_file.read_bytes(),expected_original)
+
     def test_denies_production_root(self):
         f=self.fixture
         config=f.lab.parent/'invalid.json'
