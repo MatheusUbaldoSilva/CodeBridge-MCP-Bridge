@@ -39,6 +39,13 @@ def recover_externally(*,lab_root,nsis_snapshot,identity_file,identity_sha,
         if restored.get("state")!="UNIFIED_LAB_RECOVERED" or restored.get("recovered") is not True:
             return {**result,"state":"EXTERNAL_RECOVERY_REVIEW_REQUIRED",
                     "reason":"INDEPENDENT_POSTVERIFY_FAILED"}
+        counts=tuple(restored.get(key) for key in (
+            "old_files_checked","new_targets_removed",
+            "shortcuts_checked","fake_registry_keys_checked"))
+        if (any(type(value) is not int for value in counts)
+                or counts[0]<1 or counts[1]<0 or counts[2]!=5 or counts[3]!=2):
+            return {**result,"state":"EXTERNAL_RECOVERY_REVIEW_REQUIRED",
+                    "reason":"POSTVERIFY_COUNTS_INVALID"}
         return {**result,"state":"EXTERNAL_LAB_RECOVERY_VERIFIED",
                 "verified":True,"old_files_checked":restored["old_files_checked"],
                 "new_targets_removed":restored["new_targets_removed"],

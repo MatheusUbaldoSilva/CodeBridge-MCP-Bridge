@@ -51,6 +51,24 @@ class ExternalTests(unittest.TestCase):
             "shortcuts_checked":5,"fake_registry_keys_checked":2}})
         self.assertEqual(r["state"],"EXTERNAL_LAB_RECOVERY_VERIFIED")
         self.assertFalse(r["production_modified"])
+    def test_malformed_recovery_counts_cannot_claim_success(self):
+        import hashlib
+        (self.lab/"identity.json").write_text(json.dumps({
+            "schema":1,"purpose":"P9B_DISPOSABLE_UNIFIED_LAB",
+            "file_sha":hashlib.sha256(self.snapshot.read_bytes()).hexdigest()}))
+        for name,bad in (("old_files_checked",True),
+                         ("new_targets_removed",-1),
+                         ("shortcuts_checked",4),
+                         ("fake_registry_keys_checked",None)):
+            with self.subTest(name=name):
+                proof={"state":"UNIFIED_LAB_RECOVERED","recovered":True,
+                       "old_files_checked":236,"new_targets_removed":22,
+                       "shortcuts_checked":5,"fake_registry_keys_checked":2}
+                proof[name]=bad
+                report=recover_externally(**{**self.kw,"recoverer":lambda *_:proof})
+                self.assertEqual(report["reason"],"POSTVERIFY_COUNTS_INVALID")
+                self.assertFalse(report["verified"])
+
     def test_failed_postverification_stays_blocked(self):
         import hashlib
         (self.lab/"identity.json").write_text(json.dumps({
