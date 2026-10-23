@@ -31,6 +31,23 @@ class DetachedLifecycleTests(unittest.TestCase):
         r=self.check(external=False)
         self.assertEqual(r["reason"],"INDEPENDENT_CONTROLLER_REQUIRED")
         self.assertEqual(self.events,[])
+    def test_malformed_digest_refuses_before_any_probe_or_journal(self):
+        for field, value in (
+            ("expected_process_digest", "z"*64),
+            ("expected_process_digest", "C"*64),
+            ("expected_process_digest", "a"*63),
+            ("identity_sha256", "x"*64),
+            ("identity_sha256", True),
+        ):
+            with self.subTest(field=field,value=value):
+                calls=[]
+                report=self.check(**{field:value},
+                    runtime_probe=lambda **kw:calls.append("runtime"))
+                self.assertEqual(report["reason"],
+                                 "INDEPENDENT_CONTROLLER_REQUIRED")
+                self.assertEqual(calls,[])
+                self.assertEqual(self.events,[])
+
     def test_initial_journal_records_exact_release_identity(self):
         entries=[]
         result=self.check(journal=lambda state,details:

@@ -32,9 +32,13 @@ def run_detached_shutdown_recovery(*, installed, identity_manifest,
     base={"state":"DETACHED_LIFECYCLE_REFUSED","verified":False,
           "installer_executed":False,"installer_authorized":False,
           "installed_modified":False}
+    def valid_sha256(value):
+        return (isinstance(value, str) and len(value) == 64
+                and all(ch in "0123456789abcdef" for ch in value))
+
     if not (external is True and execute is True and callable(journal)
-            and isinstance(expected_process_digest,str)
-            and len(expected_process_digest)==64):
+            and valid_sha256(expected_process_digest)
+            and valid_sha256(identity_sha256)):
         return {**base,"reason":"INDEPENDENT_CONTROLLER_REQUIRED"}
     try:
         runtime=runtime_probe(installed=installed,
