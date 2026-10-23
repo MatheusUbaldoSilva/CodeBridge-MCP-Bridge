@@ -13,6 +13,7 @@ from installer.rag_p9b_shutdown_executor import execute_shutdown
 from installer.rag_p9b_poststop_verification import check_poststop
 from installer.rag_p9b_external_recovery import recover_gui
 from installer.rag_p9b_same_machine_external_probe import inspect_external_runtime
+from installer.rag_p9b_detached_process_ancestry import inspect_detached_process_ancestry
 
 
 def run_detached_shutdown_recovery(*, installed, identity_manifest,
@@ -23,6 +24,7 @@ def run_detached_shutdown_recovery(*, installed, identity_manifest,
                                    external_psutil_origin=None,
                                    external_staged_lib=None,
                                    runtime_probe=inspect_external_runtime,
+                                   ancestry_probe=inspect_detached_process_ancestry,
                                    proof=assess_detached_supervisor,
                                    shutdown=execute_shutdown,
                                    poststop=check_poststop,
@@ -43,6 +45,11 @@ def run_detached_shutdown_recovery(*, installed, identity_manifest,
                 or runtime.get("state")!="EXTERNAL_RUNTIME_PATHS_VERIFIED"
                 or runtime.get("verified") is not True):
             return {**base,"reason":"EXTERNAL_RUNTIME_PATHS_REQUIRED"}
+        ancestry=ancestry_probe(installed=installed)
+        if (not isinstance(ancestry,dict)
+                or ancestry.get("state")!="EXTERNAL_PROCESS_ANCESTRY_VERIFIED"
+                or ancestry.get("verified") is not True):
+            return {**base,"reason":"INDEPENDENT_PROCESS_ANCESTRY_REQUIRED"}
         report=proof(installed=installed,identity_manifest=identity_manifest,
             identity_sha256=identity_sha256,source_commit=source_commit,
             external_runtime=True)
@@ -64,6 +71,12 @@ def run_detached_shutdown_recovery(*, installed, identity_manifest,
                 or fresh.get("authorized") is not False):
             journal("SHELL_DETACHED_PRE_SIGNAL_RECHECK_FAILED",{})
             return {**base,"reason":"PRE_SIGNAL_IDENTITY_CHANGED"}
+        last_ancestry=ancestry_probe(installed=installed)
+        if (not isinstance(last_ancestry,dict)
+                or last_ancestry.get("state")!="EXTERNAL_PROCESS_ANCESTRY_VERIFIED"
+                or last_ancestry.get("verified") is not True):
+            journal("SHELL_DETACHED_ANCESTRY_RECHECK_FAILED",{})
+            return {**base,"reason":"INDEPENDENT_PROCESS_ANCESTRY_CHANGED"}
         stop=shutdown(installed,expected_digest=expected_process_digest,
                       independent=True,execute=True)
         if (not isinstance(stop,dict)

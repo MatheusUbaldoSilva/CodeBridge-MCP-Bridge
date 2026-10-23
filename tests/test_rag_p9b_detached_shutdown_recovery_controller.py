@@ -13,6 +13,8 @@ class DetachedLifecycleTests(unittest.TestCase):
             external_staged_lib="C:/External",
             runtime_probe=lambda **kw:{
                 "state":"EXTERNAL_RUNTIME_PATHS_VERIFIED","verified":True},
+            ancestry_probe=lambda **kw:{
+                "state":"EXTERNAL_PROCESS_ANCESTRY_VERIFIED","verified":True},
             journal=lambda state,details:self.events.append(state),
             proof=lambda **kw:{
                 "state":"DETACHED_SUPERVISOR_SHUTDOWN_PENDING",
@@ -55,6 +57,30 @@ class DetachedLifecycleTests(unittest.TestCase):
         self.assertEqual(r["reason"],"EXTERNAL_RUNTIME_PATHS_REQUIRED")
         self.assertEqual(calls,[])
         self.assertEqual(self.events,[])
+
+    def test_mcp_parent_process_blocks_before_journal(self):
+        touched=[]
+        r=self.check(ancestry_probe=lambda **kw:{
+            "state":"EXTERNAL_ANCESTRY_UNVERIFIED","verified":False,
+            "reason":"PROCESS_INSIDE_INSTALLED_APP"},
+            proof=lambda **kw:touched.append(True))
+        self.assertEqual(r["reason"],"INDEPENDENT_PROCESS_ANCESTRY_REQUIRED")
+        self.assertEqual(touched,[])
+        self.assertEqual(self.events,[])
+
+    def test_parent_changes_after_arm_blocks_shutdown(self):
+        calls=[]
+        def drifting(**kw):
+            calls.append(1)
+            return {"state":"EXTERNAL_PROCESS_ANCESTRY_VERIFIED",
+                    "verified":len(calls)==1}
+        signals=[]
+        r=self.check(ancestry_probe=drifting,
+            shutdown=lambda *a,**kw:signals.append(True))
+        self.assertEqual(r["reason"],"INDEPENDENT_PROCESS_ANCESTRY_CHANGED")
+        self.assertEqual(len(calls),2)
+        self.assertEqual(signals,[])
+        self.assertIn("SHELL_DETACHED_ANCESTRY_RECHECK_FAILED",self.events)
 
     def test_changed_digest_prevents_first_journal_event(self):
         r=self.check(proof=lambda **kw:{"state":"DETACHED_SUPERVISOR_SHUTDOWN_PENDING",
