@@ -134,6 +134,32 @@ class DetachedBackendE2ETests(unittest.TestCase):
         with self.assertRaises(ValueError):
             RollbackJournal.resume(self.journal_path)
 
+    def test_registry_write_failure_then_durable_retry(self):
+        real_replace=self.registry.replace_key
+        attempts=[]
+        def fail_once(key,record):
+            attempts.append(key)
+            self.registry.replace_key=real_replace
+            raise OSError("injected HKCU replace failure")
+        self.registry.replace_key=fail_once
+        first=recover_detached_combined(
+            file_worker=self.files,shell_worker=self.shell,
+            verify_worker=self.verify,journal=self.journal,
+            independent=True,execute=True)
+        self.assertEqual(first["state"],"DETACHED_COMBINED_REVIEW_REQUIRED")
+        self.assertEqual(first["reason"],"SHELL_NOT_VERIFIED")
+        self.assertEqual(len(attempts),1)
+        self.assertEqual(self.shortcut.read_bytes(),b"updated-shortcut")
+        self.journal=RollbackJournal.resume(self.journal_path)
+        second=recover_detached_combined(
+            file_worker=self.files,shell_worker=self.shell,
+            verify_worker=self.verify,journal=self.journal,
+            independent=True,execute=True)
+        self.assertEqual(second["state"],"DETACHED_COMBINED_RESTORE_VERIFIED")
+        self.assertEqual(self.shortcut.read_bytes(),b"original")
+        with self.assertRaises(ValueError):
+            RollbackJournal.resume(self.journal_path)
+
     def test_foreign_new_file_blocks_shell_backend(self):
         self.new.write_bytes(b"foreign")
         result=recover_detached_combined(
