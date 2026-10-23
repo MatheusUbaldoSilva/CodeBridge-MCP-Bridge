@@ -94,11 +94,23 @@ def compare_runtime_fingerprints(before: dict, after: dict) -> dict:
         old, new = before_files.get(name), after_files.get(name)
         old = old if isinstance(old, dict) else {}
         new = new if isinstance(new, dict) else {}
-        matches[name] = bool(
-            old.get("exists") and new.get("exists")
-            and old.get("sha256") and old.get("sha256") == new.get("sha256")
-            and old.get("bytes") == new.get("bytes")
-            and old.get("file_count") == new.get("file_count"))
+        old_bytes, new_bytes = old.get("bytes"), new.get("bytes")
+        old_hash, new_hash = old.get("sha256"), new.get("sha256")
+        old_count, new_count = old.get("file_count"), new.get("file_count")
+        valid_counts = (
+            type(old_count) is int and old_count > 0
+            and type(new_count) is int and new_count == old_count
+            if name == "rag_qdrant"
+            else old_count is None and new_count is None
+        )
+        matches[name] = (
+            old.get("exists") is True and new.get("exists") is True
+            and isinstance(old_hash, str) and bool(old_hash)
+            and isinstance(new_hash, str) and old_hash == new_hash
+            and type(old_bytes) is int and old_bytes >= 0
+            and type(new_bytes) is int and old_bytes == new_bytes
+            and valid_counts
+        )
     changed = sorted(
         name for name in set(before_files) | set(after_files)
         if before_files.get(name) != after_files.get(name)

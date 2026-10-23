@@ -47,6 +47,28 @@ class RuntimeFingerprintTests(unittest.TestCase):
         self.assertEqual(rejected["state"],"PUBLIC_INDEX_INTEGRITY_BLOCKED")
         self.assertFalse(rejected["public_index_intact"])
 
+    def test_truthy_non_boolean_integrity_metadata_is_rejected(self):
+        baseline={"files":{
+            "rag_manifest":{"exists":True,"sha256":"a","bytes":1},
+            "rag_sqlite":{"exists":True,"sha256":"b","bytes":2},
+            "rag_qdrant":{"exists":True,"sha256":"c","bytes":3,"file_count":2},
+        }}
+        for key, field, value in (
+            ("rag_manifest","exists",1),
+            ("rag_sqlite","exists","true"),
+            ("rag_manifest","bytes",True),
+            ("rag_sqlite","bytes",2.0),
+            ("rag_qdrant","file_count",True),
+            ("rag_qdrant","file_count",2.0),
+        ):
+            with self.subTest(key=key,field=field,value=value):
+                forged={"files":{name:dict(data)
+                                 for name,data in baseline["files"].items()}}
+                forged["files"][key][field]=value
+                result=compare_runtime_fingerprints(baseline,forged)
+                self.assertFalse(result["public_index_intact"])
+                self.assertFalse(result["protected_matches"][key])
+
     def test_missing_public_hash_fails_closed(self):
         baseline={"files":{"rag_sqlite":{"exists":True,"sha256":"x","bytes":1}}}
         result=compare_runtime_fingerprints(baseline,baseline)
