@@ -126,7 +126,7 @@ os._exit(83)
         self.assertEqual(refused.returncode,2)
         self.assertEqual(json.loads(refused.stdout.strip())['reason'],'DETACHED_EXCEPTION')
 
-    def _run_real_nsis_interrupted(self, crash_stage=None):
+    def _run_real_nsis_interrupted(self, crash_stage=None, tamper_journal=False):
         import tempfile,time
         from zipfile import ZipFile
         from installer.rag_p9b_rollback_journal import RollbackJournal,read_journal
@@ -199,6 +199,17 @@ os._exit(83)
                              crashed.stderr[-700:])
             self.assertNotEqual(read_journal(journal)["last_state"],
                                 "SHELL_COMBINED_RECOVERY_VERIFIED")
+        if tamper_journal:
+            self.assertIsNotNone(crash_stage)
+            before_rejection=prior_file.read_bytes()
+            with journal.open("a",encoding="utf-8") as stream:
+                stream.write("{malformed_journal_event}\n")
+            refused=subprocess.run([sys.executable,str(worker),str(cfg)],
+                capture_output=True,text=True,timeout=45)
+            self.assertEqual(refused.returncode,2,refused.stderr[-700:])
+            self.assertEqual(json.loads(refused.stdout.strip())["reason"],"DETACHED_EXCEPTION")
+            self.assertEqual(prior_file.read_bytes(),before_rejection)
+            return
         recovered=subprocess.run([sys.executable,str(worker),str(cfg)],
                                  capture_output=True,text=True,timeout=45)
         self.assertEqual(recovered.returncode,0,recovered.stdout[-700:]+recovered.stderr[-700:])
@@ -220,6 +231,8 @@ os._exit(83)
         self._run_real_nsis_interrupted(crash_stage="shell")
     def test_actual_nsis_then_file_recoverer_hardcrash_replays(self):
         self._run_real_nsis_interrupted(crash_stage="files")
+    def test_actual_nsis_crash_corrupt_journal_refuses_replay(self):
+        self._run_real_nsis_interrupted(crash_stage="shell",tamper_journal=True)
     def test_recoverer_crash_after_files_then_replays_full_shell(self):
         from zipfile import ZipFile
         from installer.rag_p9b_rollback_journal import read_journal
