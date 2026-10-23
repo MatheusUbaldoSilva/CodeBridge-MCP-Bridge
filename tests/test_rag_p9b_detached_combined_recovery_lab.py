@@ -1,4 +1,4 @@
-﻿import hashlib,json,os,subprocess,sys,unittest
+import hashlib,json,os,subprocess,sys,unittest
 from pathlib import Path
 from test_rag_p9b_full_scope_actual_hkcu_integration import FullScopeActualHKCUTests
 from installer.rag_p9b_shell_postverify import verify_restored_shell
@@ -126,7 +126,7 @@ os._exit(83)
         self.assertEqual(refused.returncode,2)
         self.assertEqual(json.loads(refused.stdout.strip())['reason'],'DETACHED_EXCEPTION')
 
-    def test_actual_nsis_interruption_recovers_in_external_child(self):
+    def _run_real_nsis_interrupted(self, crash_recoverer=False):
         import tempfile,time
         from zipfile import ZipFile
         from installer.rag_p9b_rollback_journal import RollbackJournal,read_journal
@@ -190,6 +190,14 @@ os._exit(83)
         start=RollbackJournal(journal)
         start('SHELL_NSIS_LAB_INTERRUPTED',{'files':258})
         worker=Path.cwd()/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
+        if crash_recoverer:
+            env=os.environ.copy()
+            env["P9B_LAB_FAULT_AFTER_SHELL"]="1"
+            crashed=subprocess.run([sys.executable,str(worker),str(cfg)],
+                capture_output=True,text=True,timeout=45,env=env)
+            self.assertEqual(crashed.returncode,88,crashed.stderr[-700:])
+            self.assertNotEqual(read_journal(journal)["last_state"],
+                                "SHELL_COMBINED_RECOVERY_VERIFIED")
         recovered=subprocess.run([sys.executable,str(worker),str(cfg)],
                                  capture_output=True,text=True,timeout=45)
         self.assertEqual(recovered.returncode,0,recovered.stdout[-700:]+recovered.stderr[-700:])
@@ -198,12 +206,17 @@ os._exit(83)
         self.assertEqual((result['files'],result['new_targets'],
             result['shortcuts'],result['fake_registry_keys']),(236,22,5,2))
         observed=read_journal(journal)
-        self.assertEqual(observed['count'],7)
+        self.assertGreaterEqual(observed['count'],7)
         self.assertEqual(observed['last_state'],'SHELL_COMBINED_RECOVERY_VERIFIED')
         with ZipFile(f.files_zip) as archive:
             expected_original=archive.read('old/'+old[0])
         self.assertEqual(prior_file.read_bytes(),expected_original)
 
+    def test_actual_nsis_interruption_recovers_in_external_child(self):
+        self._run_real_nsis_interrupted()
+
+    def test_actual_nsis_then_recoverer_hardcrash_replays(self):
+        self._run_real_nsis_interrupted(crash_recoverer=True)
     def test_recoverer_crash_after_files_then_replays_full_shell(self):
         from zipfile import ZipFile
         from installer.rag_p9b_rollback_journal import read_journal
