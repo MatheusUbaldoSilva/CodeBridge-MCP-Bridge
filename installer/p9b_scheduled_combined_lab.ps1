@@ -21,15 +21,37 @@ try {
   New-Item -ItemType Directory $folder -ErrorAction Stop|Out-Null
   $worker=Join-Path $folder 'worker.py'
   $result=Join-Path $folder 'result.json'
+  $sourceFiles=@('installer/rag_p9b_detached_combined_recovery_lab.py',
+    'installer/rag_p9b_rollback_journal.py',
+    'tests/test_rag_p9b_detached_combined_recovery_lab.py',
+    'tests/test_rag_p9b_detached_combined_hardcrash_chain_e2e.py',
+    'tests/test_rag_p9b_real_hkcu_scratch_crash.py',
+    'tests/test_rag_p9b_real_hkcu_file_combined_crash.py')
+  $hashes=@{}
+  foreach($relative in $sourceFiles){
+    $absolute=Join-Path $root ($relative.Replace('/',[IO.Path]::DirectorySeparatorChar))
+    if(!(Test-Path -LiteralPath $absolute -PathType Leaf)){throw 'LAB_SOURCE_MISSING'}
+    $hashes[$relative]=(Get-FileHash -LiteralPath $absolute -Algorithm SHA256).Hash.ToLowerInvariant()
+  }
   @{
+    source_sha256=$hashes
     repo=$root
-  } | ConvertTo-Json -Compress | Set-Content -LiteralPath (Join-Path $folder 'request.json') -Encoding UTF8
+  } | ConvertTo-Json -Depth 4 -Compress | Set-Content -LiteralPath (Join-Path $folder 'request.json') -Encoding UTF8
   $lines=@(
-    'import json,os,sys,unittest'
+    'import hashlib,json,os,sys,unittest'
     'from pathlib import Path'
     'folder=Path(__file__).resolve().parent'
     'request=json.loads((folder/"request.json").read_text(encoding="utf-8-sig"))'
     'repo=Path(request["repo"]).resolve()'
+    'expected=request.get("source_sha256",{})'
+    'if not isinstance(expected,dict) or len(expected)!=6:'
+    '    (folder/"result.json").write_text(json.dumps({"state":"INDEPENDENT_LAB_REFUSED","verified":False,"reason":"SOURCE_IDENTITY_INCOMPLETE"}),encoding="utf-8")'
+    '    sys.exit(3)'
+    'for rel,digest in expected.items():'
+    '    target=(repo/rel).resolve()'
+    '    if not target.is_relative_to(repo) or not target.is_file() or hashlib.sha256(target.read_bytes()).hexdigest()!=digest:'
+    '        (folder/"result.json").write_text(json.dumps({"state":"INDEPENDENT_LAB_REFUSED","verified":False,"reason":"SOURCE_IDENTITY_MISMATCH"}),encoding="utf-8")'
+    '        sys.exit(3)'
     'lib=Path(os.environ["LOCALAPPDATA"])/"CodeBridge-MCP-Bridge"/"release_staging"/"P9B_HEAD_CANDIDATE_f45880511c"/"external_supervisor_lib"'
     'sys.path[:0]=[str(repo),str(repo/"tests"),str(lib)]'
     'from installer.rag_p9b_detached_process_ancestry import inspect_detached_process_ancestry'
