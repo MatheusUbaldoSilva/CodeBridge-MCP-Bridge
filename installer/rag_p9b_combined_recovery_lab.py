@@ -9,21 +9,25 @@ def recover_combined_lab(*, file_worker, shell_worker, verify_worker, journal,
                          lab_attestation, independent=False):
     denied={"state":"COMBINED_LAB_RECOVERY_REFUSED","verified":False,
             "production_modified":False,"nsis_executed":False}
-    if (independent is not True or lab_attestation.get("purpose")!="P9B_DISPOSABLE_UNIFIED_LAB"
+    if (independent is not True or not isinstance(lab_attestation,dict) or lab_attestation.get("purpose")!="P9B_DISPOSABLE_UNIFIED_LAB"
             or not all(callable(x) for x in (file_worker,shell_worker,verify_worker,journal))):
         return {**denied,"reason":"INDEPENDENT_LAB_GATES_REQUIRED"}
     try:
         journal("SHELL_COMBINED_RECOVERY_ARMED",{})
         files=file_worker()
+        if not isinstance(files,dict):
+            return {**denied,"state":"COMBINED_LAB_REVIEW_REQUIRED","reason":"FILE_WORKER_INVALID"}
         journal("SHELL_COMBINED_FILE_CHECKED",{"postverified":files.get("verified") is True})
         if files.get("verified") is not True or files.get("state")!="FILE_RESTORE_LAB_VERIFIED":
             return {**denied,"state":"COMBINED_LAB_REVIEW_REQUIRED","reason":"FILE_RESTORE_NOT_VERIFIED"}
         shell=shell_worker()
+        if not isinstance(shell,dict):
+            return {**denied,"state":"COMBINED_LAB_REVIEW_REQUIRED","reason":"SHELL_WORKER_INVALID"}
         journal("SHELL_COMBINED_SHELL_CHECKED",{"postverified":shell.get("verified") is True})
         if shell.get("verified") is not True or shell.get("state")!="SHELL_LAB_VERIFIED":
             return {**denied,"state":"COMBINED_LAB_REVIEW_REQUIRED","reason":"SHELL_RESTORE_NOT_VERIFIED"}
         post=verify_worker()
-        if post.get("verified") is not True:
+        if not isinstance(post,dict) or post.get("verified") is not True:
             return {**denied,"state":"COMBINED_LAB_REVIEW_REQUIRED","reason":"INDEPENDENT_POSTVERIFY_FAILED"}
         journal("SHELL_COMBINED_RECOVERY_VERIFIED",{"postverified":True})
         return {**denied,"state":"COMBINED_LAB_RECOVERY_VERIFIED","verified":True,
