@@ -4,6 +4,32 @@ from installer.rag_p9b_supervised_transaction import assess_transaction,rehearse
 class SupervisorTransactionTests(unittest.TestCase):
     def evidence(self):
         return {"artifacts_verified":True,"preimage_verified":True}
+    def test_malformed_gate_evidence_refuses_without_exception(self):
+        valid_stop={"state":"POSTSTOP_OBSERVED_ONLY","observed_stopped":True}
+        valid_rollback={"state":"PRODUCTION_ROLLBACK_VERIFIED","verified":True}
+        for name,broken in (
+            ("release_evidence",None),
+            ("poststop_evidence",None),
+            ("rollback_evidence",[]),
+        ):
+            with self.subTest(name=name):
+                arguments=dict(release_evidence=self.evidence(),
+                    poststop_evidence=valid_stop,
+                    rollback_evidence=valid_rollback,independent_channel=True)
+                arguments[name]=broken
+                report=assess_transaction(**arguments)
+                self.assertFalse(report["authorized"])
+                self.assertEqual(report["state"],"P9B_TRANSACTION_REFUSED")
+
+    def test_lab_rehearsal_needs_callable_journal_before_stop(self):
+        calls=[]
+        report=rehearse_transaction(
+            release_evidence=self.evidence(),
+            stop=lambda:calls.append("stop"),rollback=lambda:None,
+            restart=lambda:None,external_ready=True,journal="not callable")
+        self.assertEqual(report["reason"],"PRECONDITIONS_MISSING")
+        self.assertEqual(calls,[])
+
     def test_production_gate_requires_real_rollback(self):
         r=assess_transaction(release_evidence=self.evidence(),
             poststop_evidence={"state":"POSTSTOP_OBSERVED_ONLY","observed_stopped":True},
