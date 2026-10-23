@@ -52,6 +52,12 @@ class JournalTests(unittest.TestCase):
             encoding="utf-8")
         self.assertEqual(read_journal(self.file)["state"],"JOURNAL_UNVERIFIED")
 
+    def test_invalid_utf8_is_refused_fail_closed(self):
+        self.file.write_bytes(b"\xff\xfe\n")
+        self.assertEqual(read_journal(self.file)["state"],"JOURNAL_UNVERIFIED")
+        with self.assertRaises(ValueError):
+            RollbackJournal.resume(self.file)
+
     def test_corrupted_seq_refused(self):
         self.file.write_text('{"seq":9,"state":"SHELL_BAD"}',encoding="utf-8")
         self.assertEqual(read_journal(self.file)["state"],"JOURNAL_UNVERIFIED")

@@ -135,5 +135,5 @@ def read_journal(path):
             return {"state":"JOURNAL_UNVERIFIED"}
         return {"state":"JOURNAL_OBSERVED_ONLY","count":len(entries),
                 "last_state":entries[-1]["state"] if entries else None}
-    except (OSError,ValueError,KeyError,TypeError):
+    except (OSError,ValueError,KeyError,TypeError,UnicodeError):
         return {"state":"JOURNAL_UNVERIFIED"}
