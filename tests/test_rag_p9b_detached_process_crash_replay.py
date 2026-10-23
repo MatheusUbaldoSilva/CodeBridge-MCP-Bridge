@@ -1,0 +1,57 @@
+"""Real subprocess hard-exit test. Never starts the installed CodeBridge."""
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+from installer.rag_p9b_rollback_journal import RollbackJournal, read_journal
+
+
+class DetachedCrashReplayTests(unittest.TestCase):
+    def test_external_python_hard_exit_preserves_fsynced_journal(self):
+        with tempfile.TemporaryDirectory() as d:
+            journal = Path(d) / "crash.jsonl"
+            root = str(Path(__file__).resolve().parents[1])
+            child = (
+                "import os,sys;"
+                "from installer.rag_p9b_rollback_journal import RollbackJournal;"
+                "j=RollbackJournal(sys.argv[1]);"
+                "j('SHELL_DETACHED_LIFECYCLE_ARMED',{});"
+                "j('SHELL_DETACHED_SHUTDOWN_SIGNALED',{});"
+                "os._exit(73)"
+            )
+            env = dict(os.environ)
+            env["PYTHONPATH"] = root + os.pathsep + env.get("PYTHONPATH", "")
+            result = subprocess.run(
+                [sys.executable, "-c", child, str(journal)],
+                cwd=root, env=env, timeout=15, capture_output=True)
+            self.assertEqual(result.returncode, 73, result.stderr)
+            observed = read_journal(journal)
+            self.assertEqual(observed["state"], "JOURNAL_OBSERVED_ONLY")
+            self.assertEqual(observed["count"], 2)
+            self.assertEqual(observed["last_state"],
+                             "SHELL_DETACHED_SHUTDOWN_SIGNALED")
+            resumed = RollbackJournal.resume(journal)
+            self.assertTrue(resumed.resumed)
+            resumed("SHELL_DETACHED_LIFECYCLE_REVIEW_REQUIRED", {})
+            final = read_journal(journal)
+            self.assertEqual(final["count"], 3)
+            self.assertEqual(final["last_state"],
+                             "SHELL_DETACHED_LIFECYCLE_REVIEW_REQUIRED")
+
+    def test_external_crash_does_not_imply_restart_or_nsis(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=Path(d)/"crash.jsonl"
+            j=RollbackJournal(path)
+            j("SHELL_DETACHED_LIFECYCLE_ARMED", {})
+            j("SHELL_DETACHED_SHUTDOWN_SIGNALED", {})
+            states=Path(path).read_text(encoding="utf-8")
+            self.assertNotIn("SHELL_DETACHED_GUI_RESTARTED", states)
+            self.assertNotIn("NSIS_EXECUTED", states)
+            self.assertNotIn("SHELL_DETACHED_COMBINED_VERIFIED", states)
+
+
+if __name__=="__main__":
+    unittest.main()
