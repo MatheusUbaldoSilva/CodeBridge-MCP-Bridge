@@ -28,12 +28,21 @@ class ScheduledAttestationTests(unittest.TestCase):
             identity_sha=digest(self.manifest),expected_commit=self.commit,
             interpreter=self.root/"python.exe",psutil_origin=self.root/"psutil.py",
             runtime_probe=lambda **kw:{"state":"EXTERNAL_RUNTIME_PATHS_VERIFIED","verified":True},
-            ancestry_probe=lambda **kw:{"state":"EXTERNAL_PROCESS_ANCESTRY_VERIFIED","verified":True})
+            ancestry_probe=lambda **kw:{"state":"EXTERNAL_PROCESS_ANCESTRY_VERIFIED","verified":True},
+            shutdown_probe=lambda *a:{"state":"SHUTDOWN_PLAN_ONLY",
+                "identity_digest":"c"*64})
     def test_attested_is_never_authorized(self):
         r=inspect_scheduled_supervisor(**self.kw)
         self.assertEqual(r["state"],"SCHEDULED_SUPERVISOR_READONLY_ATTESTED")
         self.assertFalse(r["authorized"])
         self.assertFalse(r["shutdown_signals_sent"])
+    def test_shutdown_topology_must_be_verified(self):
+        r=inspect_scheduled_supervisor(**(self.kw|{
+            "shutdown_probe":lambda *a:{"state":"SHUTDOWN_PLAN_REFUSED"}}))
+        self.assertEqual(r["reason"],"SHUTDOWN_TOPOLOGY_NOT_VERIFIED")
+        self.assertFalse(r["authorized"])
+        self.assertFalse(r["shutdown_signals_sent"])
+
     def test_no_ancestry_refused(self):
         r=inspect_scheduled_supervisor(**(self.kw|{
             "ancestry_probe":lambda **kw:{"verified":False}}))

@@ -20,6 +20,7 @@ class PowerShellScheduledLauncherContractTests(unittest.TestCase):
             "SCHEDULED_SUPERVISOR_READONLY_ATTESTED",
             "SCHEDULED_READONLY_LAUNCH_VERIFIED",
             "Remove-Item -LiteralPath $folder",
+            "$proof.shutdown_plan_verified -ne $true",
             "$proof.authorized -ne $false",
             "$proof.installer_executed -ne $false",
             "$proof.shutdown_signals_sent -ne $false",

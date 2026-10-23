@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
  [Parameter(Mandatory=$true)][string]$Stage,
  [Parameter(Mandatory=$true)][string]$Repository
@@ -64,6 +64,7 @@ try {
      $proof.external_runtime_verified -ne $true -or
      $proof.ancestry_verified -ne $true -or
      $proof.identity_verified -ne $true -or
+     $proof.shutdown_plan_verified -ne $true -or
      $proof.authorized -ne $false -or
      $proof.installer_executed -ne $false -or
      $proof.shutdown_signals_sent -ne $false -or

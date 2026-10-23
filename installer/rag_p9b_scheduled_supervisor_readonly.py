@@ -13,13 +13,15 @@ import sys
 from installer.rag_p9b_detached_process_ancestry import inspect_detached_process_ancestry
 from installer.rag_p9b_transaction_identity import verify_identity, digest
 from installer.rag_p9b_same_machine_external_probe import inspect_external_runtime
+from installer.rag_p9b_supervised_shutdown_plan import make_shutdown_plan
 
 
 def inspect_scheduled_supervisor(*,installed,stage,identity,identity_sha,
                                  expected_commit,interpreter,psutil_origin,
                                  runtime_probe=inspect_external_runtime,
                                  ancestry_probe=inspect_detached_process_ancestry,
-                                 identity_probe=verify_identity):
+                                 identity_probe=verify_identity,
+                                 shutdown_probe=make_shutdown_plan):
     blocked={"state":"SCHEDULED_SUPERVISOR_REFUSED",
              "read_only":True,"authorized":False,
              "shutdown_signals_sent":False,"installer_executed":False,
@@ -53,9 +55,17 @@ def inspect_scheduled_supervisor(*,installed,stage,identity,identity_sha,
                 or proof.get("verified") is not True
                 or proof.get("source_commit")!=expected_commit):
             return {**blocked,"reason":"TRANSACTION_IDENTITY_INVALID"}
+        shutdown=shutdown_probe(root)
+        if (not isinstance(shutdown,dict)
+                or shutdown.get("state")!="SHUTDOWN_PLAN_ONLY"
+                or not isinstance(shutdown.get("identity_digest"),str)
+                or len(shutdown["identity_digest"])!=64):
+            return {**blocked,"reason":"SHUTDOWN_TOPOLOGY_NOT_VERIFIED"}
         return {**blocked,"state":"SCHEDULED_SUPERVISOR_READONLY_ATTESTED",
                 "external_runtime_verified":True,
                 "ancestry_verified":True,"identity_verified":True,
+                "shutdown_plan_verified":True,
+                "shutdown_identity_digest":shutdown["identity_digest"],
                 "reason":"MUTATING_SUPERVISOR_NOT_CERTIFIED"}
     except Exception:
         return {**blocked,"reason":"SCHEDULED_ATTESTATION_FAILED"}
