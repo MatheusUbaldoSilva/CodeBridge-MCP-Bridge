@@ -106,6 +106,34 @@ class DetachedBackendE2ETests(unittest.TestCase):
         self.assertFalse(result["cutover_authorized"])
         self.assertEqual(self.shortcut.read_bytes(),b"original")
 
+    def test_restore_replay_after_shell_failure_with_actual_fixture_backends(self):
+        calls=[]
+        def fail_before_shell():
+            calls.append("interrupted")
+            raise OSError("simulated shell crash")
+        first=recover_detached_combined(
+            file_worker=self.files,shell_worker=fail_before_shell,
+            verify_worker=self.verify,journal=self.journal,
+            independent=True,execute=True)
+        self.assertEqual(first["state"],"DETACHED_COMBINED_REVIEW_REQUIRED")
+        self.assertEqual(first["failed_stage"],"SHELL")
+        self.assertEqual(calls,["interrupted"])
+        self.assertEqual(self.old.read_bytes(),b"original")
+        self.assertFalse(self.new.exists())
+        self.assertEqual(self.shortcut.read_bytes(),b"updated-shortcut")
+        # Restart from the persisted journal. The file worker is idempotent:
+        # no new installer files remain and old contents already match.
+        self.journal=RollbackJournal.resume(self.journal_path)
+        second=recover_detached_combined(
+            file_worker=self.files,shell_worker=self.shell,
+            verify_worker=self.verify,journal=self.journal,
+            independent=True,execute=True)
+        self.assertEqual(second["state"],"DETACHED_COMBINED_RESTORE_VERIFIED")
+        self.assertTrue(second["verified"])
+        self.assertEqual(self.shortcut.read_bytes(),b"original")
+        with self.assertRaises(ValueError):
+            RollbackJournal.resume(self.journal_path)
+
     def test_foreign_new_file_blocks_shell_backend(self):
         self.new.write_bytes(b"foreign")
         result=recover_detached_combined(

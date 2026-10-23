@@ -53,6 +53,18 @@ class ResumeJournalTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 RollbackJournal.resume(path)
 
+    def test_combined_file_completed_does_not_close_shell_transaction(self):
+        with tempfile.TemporaryDirectory() as root:
+            path=Path(root)/"combined-file.jsonl"
+            journal=RollbackJournal(path)
+            journal("SHELL_DETACHED_COMBINED_ARMED",{})
+            journal("SHELL_PRODUCTION_FILE_RESTORED",{"postverified":True})
+            journal("SHELL_DETACHED_COMBINED_EXCEPTION",{"type":"OSError"})
+            resumed=RollbackJournal.resume(path)
+            resumed("SHELL_DETACHED_COMBINED_VERIFIED",{"postverified":True})
+            with self.assertRaises(ValueError):
+                RollbackJournal.resume(path)
+
     def test_detached_combined_journal_resumes_after_crash(self):
         with tempfile.TemporaryDirectory() as root:
             path=Path(root)/"combined.jsonl"
