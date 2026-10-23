@@ -11,11 +11,16 @@ from pathlib import Path
 from installer.rag_p9b_installer_rollback_scope import verify_installer_rollback_snapshot
 from installer.rag_p9b_crash_preimage import verify_crash_preimage
 from installer.rag_p9b_poststop_verification import check_poststop
-from installer.rag_p9b_rollback_journal import read_journal
+from installer.rag_p9b_rollback_journal import read_journal, RollbackJournal
 from installer.rag_p9b_rollback_new_targets import inspect_new_targets
 
-_INTERRUPTED = frozenset({
+_INCOMPLETE = frozenset({
     "SHELL_NSIS_INTERRUPTED", "SHELL_NSIS_FULL_SCOPE_INTERRUPTED",
+    "SHELL_PRODUCTION_FILE_RESTORE_ARMED",
+    "SHELL_PRODUCTION_FILE_BEFORE_REPLACE",
+    "SHELL_PRODUCTION_FILE_BEFORE_UNLINK",
+    "SHELL_PRODUCTION_FILE_RESTORE_FAILED",
+    "SHELL_PRODUCTION_FILE_POSTVERIFY_FAILED",
 })
 
 
@@ -26,6 +31,7 @@ def assess_file_recovery(*, installed, snapshot, snapshot_sha256, preimage,
                          preimage_probe=verify_crash_preimage,
                          poststop_probe=check_poststop,
                          journal_probe=read_journal,
+                         journal_resume_probe=RollbackJournal.resume,
                          new_targets_probe=inspect_new_targets):
     denied = {"state": "PRODUCTION_FILE_RECOVERY_REFUSED",
               "verified": False, "read_only": True,
@@ -57,9 +63,12 @@ def assess_file_recovery(*, installed, snapshot, snapshot_sha256, preimage,
         journal_state = journal_probe(journal_path)
         if (not isinstance(journal_state, dict)
                 or journal_state.get("state") != "JOURNAL_OBSERVED_ONLY"
-                or journal_state.get("last_state") not in _INTERRUPTED
+                or journal_state.get("last_state") not in _INCOMPLETE
                 or journal_state.get("count", 0) < 1):
             return {**denied, "reason": "INTERRUPTED_JOURNAL_UNVERIFIED"}
+        # Re-read the full journal and validate its starting state, event
+        # names, sequence and absence of a prior terminal success.
+        journal_resume_probe(journal_path)
         stop_state = poststop_probe(root)
         if (not isinstance(stop_state, dict)
                 or stop_state.get("state") != "POSTSTOP_OBSERVED_ONLY"

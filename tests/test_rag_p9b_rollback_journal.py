@@ -44,6 +44,15 @@ class ResumeJournalTests(unittest.TestCase):
             another=RollbackJournal.resume(path)
             another("SHELL_COMBINED_FILE_CHECKED",{"postverified":True})
             self.assertEqual(read_journal(path)["count"],2)
+    def test_file_restore_completed_journal_refused_for_resume(self):
+        with tempfile.TemporaryDirectory() as root:
+            path=Path(root)/"complete-files.jsonl"
+            journal=RollbackJournal(path)
+            journal("SHELL_NSIS_FULL_SCOPE_INTERRUPTED",{})
+            journal("SHELL_PRODUCTION_FILE_RESTORED",{"postverified":True})
+            with self.assertRaises(ValueError):
+                RollbackJournal.resume(path)
+
     def test_complete_journal_refused_for_resume(self):
         import tempfile
         from pathlib import Path

@@ -28,7 +28,8 @@ class RollbackJournal:
                 or proof.get("last_state") in (
                     "SHELL_COMBINED_RECOVERY_VERIFIED",
                     "SHELL_NSIS_ISOLATED_RECOVERED",
-                    "SHELL_NSIS_FULL_SCOPE_RECOVERED")):
+                    "SHELL_NSIS_FULL_SCOPE_RECOVERED",
+                    "SHELL_PRODUCTION_FILE_RESTORED")):
             raise ValueError("JOURNAL_NOT_RESUMABLE")
         # A terminal success anywhere in history cannot be followed by
         # more recovery events. Reject malformed or unscoped event names.
@@ -36,7 +37,8 @@ class RollbackJournal:
             history=[json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
             completed={"SHELL_COMBINED_RECOVERY_VERIFIED",
                 "SHELL_NSIS_ISOLATED_RECOVERED",
-                "SHELL_NSIS_FULL_SCOPE_RECOVERED"}
+                "SHELL_NSIS_FULL_SCOPE_RECOVERED",
+                "SHELL_PRODUCTION_FILE_RESTORED"}
             if (history[0].get("state") not in (
                     "SHELL_COMBINED_RECOVERY_ARMED",
                     "SHELL_NSIS_LAB_INTERRUPTED",

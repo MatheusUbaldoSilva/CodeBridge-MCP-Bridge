@@ -25,6 +25,7 @@ class RecoveryGateTests(unittest.TestCase):
             snapshot_probe=lambda *a: {"verified":True,"state":"INSTALLER_ROLLBACK_SNAPSHOT_VERIFIED"},
             preimage_probe=lambda *a: {"verified":True,"state":"CRASH_PREIMAGE_VERIFIED"},
             journal_probe=lambda *a: {"state":"JOURNAL_OBSERVED_ONLY","last_state":"SHELL_NSIS_FULL_SCOPE_INTERRUPTED","count":2},
+            journal_resume_probe=lambda *a: object(),
             poststop_probe=lambda *a: {"state":"POSTSTOP_OBSERVED_ONLY","observed_stopped":True},
             new_targets_probe=lambda *a,**k: {"state":"NEW_TARGETS_CONTENT_VERIFIED","ownership_evidence_verified":True,"delete_authorized":False})
     def test_all_evidence_is_only_read_only_observation(self):
@@ -45,6 +46,20 @@ class RecoveryGateTests(unittest.TestCase):
     def test_missing_new_content_proof_refused(self):
         r=assess_file_recovery(**(self.kw|{"new_targets_probe":lambda *a,**k:{"state":"NEW_TARGETS_OBSERVED_ONLY"}}))
         self.assertEqual(r["reason"],"NEW_TARGET_OWNERSHIP_UNVERIFIED")
+    def test_incomplete_file_restore_journal_can_be_rechecked(self):
+        r=assess_file_recovery(**(self.kw|{
+            "journal_probe":lambda *a:{
+                "state":"JOURNAL_OBSERVED_ONLY",
+                "last_state":"SHELL_PRODUCTION_FILE_BEFORE_UNLINK",
+                "count":4}}))
+        self.assertEqual(r["state"],"PRODUCTION_FILE_ROLLBACK_GATES_OBSERVED_ONLY")
+
+    def test_invalid_resume_history_refused(self):
+        def invalid(*args):
+            raise ValueError("invalid initial journal state")
+        r=assess_file_recovery(**(self.kw|{"journal_resume_probe":invalid}))
+        self.assertEqual(r["reason"],"FILE_RECOVERY_PREFLIGHT_EXCEPTION")
+
     def test_journal_without_interrupt_refused(self):
         r=assess_file_recovery(**(self.kw|{"journal_probe":lambda *a:{"state":"JOURNAL_OBSERVED_ONLY","last_state":"SHELL_COMBINED_RECOVERY_VERIFIED","count":3}}))
         self.assertEqual(r["reason"],"INTERRUPTED_JOURNAL_UNVERIFIED")
