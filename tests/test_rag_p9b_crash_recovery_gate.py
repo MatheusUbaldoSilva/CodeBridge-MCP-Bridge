@@ -33,6 +33,13 @@ class CrashGateTests(unittest.TestCase):
         self.assertEqual(self.gate(last="INVENTED")["reason"],
                          "UNKNOWN_LAST_JOURNAL_STATE")
 
+    def test_boolean_and_noninteger_counts_are_rejected(self):
+        for value in (True, False, "2", 2.0, None):
+            with self.subTest(value=value):
+                result=self.gate(events=value)
+                self.assertEqual(result["reason"],"JOURNAL_UNVERIFIED")
+                self.assertFalse(result["recovery_authorized"])
+
     def test_empty_journal_blocks(self):
         self.assertEqual(self.gate(events=0)["reason"],"EMPTY_JOURNAL")
 

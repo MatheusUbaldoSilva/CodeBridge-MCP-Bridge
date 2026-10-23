@@ -28,7 +28,8 @@ def inspect_crash_recovery(*, preimage, preimage_sha, journal,
         if snapshot.get("verified") is not True:
             return {**base,"reason":"PREIMAGE_UNVERIFIED"}
         events=journal_reader(journal)
-        if events.get("state")!="JOURNAL_OBSERVED_ONLY" or not isinstance(events.get("count"),int):
+        if (events.get("state")!="JOURNAL_OBSERVED_ONLY"
+                or type(events.get("count")) is not int):
             return {**base,"reason":"JOURNAL_UNVERIFIED"}
         if events["count"]<1:
             return {**base,"reason":"EMPTY_JOURNAL"}
