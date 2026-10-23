@@ -49,6 +49,16 @@ class SupervisorGateTests(unittest.TestCase):
         self.assertFalse(r["authorized"])
         self.assertFalse(r["shutdown_signals_sent"])
         self.assertEqual(self.events,["identity","shutdown"])
+    def test_invalid_shutdown_digest_never_reaches_pending(self):
+        for digest in ("f", "x"*64, "F"*64, None, 123):
+            with self.subTest(digest=digest):
+                report=assess_detached_supervisor(**(self.kw|{
+                    "shutdown_probe":lambda *a:{
+                        "state":"SHUTDOWN_PLAN_ONLY","identity_digest":digest}}))
+                self.assertEqual(report["reason"],"SHUTDOWN_DIGEST_INVALID")
+                self.assertFalse(report["artifacts_verified"] if "artifacts_verified" in report else False)
+                self.assertFalse(report["authorized"])
+
     def test_bad_identity_refused_without_shutdown(self):
         r=assess_detached_supervisor(**(self.kw|{
             "identity_probe":lambda **a:{"verified":False}}))

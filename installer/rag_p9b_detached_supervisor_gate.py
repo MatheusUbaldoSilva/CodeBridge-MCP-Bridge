@@ -45,9 +45,13 @@ def assess_detached_supervisor(*, installed, identity_manifest,
         if not isinstance(shutdown,dict):
             return {**base,"reason":"SHUTDOWN_PLAN_INVALID"}
         if shutdown.get("state")=="SHUTDOWN_PLAN_ONLY":
+            digest=shutdown.get("identity_digest")
+            if (not isinstance(digest,str) or len(digest)!=64
+                    or any(ch not in "0123456789abcdef" for ch in digest)):
+                return {**base,"reason":"SHUTDOWN_DIGEST_INVALID"}
             return {**base,"state":"DETACHED_SUPERVISOR_SHUTDOWN_PENDING",
                     "reason":"INDEPENDENT_SHUTDOWN_NOT_EXECUTED",
-                    "shutdown_identity_digest":shutdown.get("identity_digest"),
+                    "shutdown_identity_digest":digest,
                     "artifacts_verified":True}
         stopped=stopped_probe(Path(installed))
         if (not isinstance(stopped,dict)
