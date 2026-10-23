@@ -112,6 +112,8 @@ class RollbackJournal:
             safe["transaction_sha256"]=value.lower()
         entry={"seq":self._sequence+1,"state":state,
                "utc_epoch":time.time(),"details":safe}
+        if self.path.is_symlink() or not self.path.is_file():
+            raise ValueError("JOURNAL_PATH_INVALID")
         with self.path.open("ab") as f:
             f.write((json.dumps(entry,sort_keys=True)+chr(10)).encode("utf-8"))
             f.flush()

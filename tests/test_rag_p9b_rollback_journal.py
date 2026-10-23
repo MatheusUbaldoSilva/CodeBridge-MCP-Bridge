@@ -22,6 +22,16 @@ class JournalTests(unittest.TestCase):
         RollbackJournal(self.file)
         with self.assertRaises(FileExistsError):RollbackJournal(self.file)
 
+    def test_journal_replacement_with_link_is_refused_before_append(self):
+        from unittest.mock import patch
+        journal=RollbackJournal(self.file)
+        original=Path.is_symlink
+        with patch.object(Path,"is_symlink",
+                          lambda item:True if item==self.file else original(item)):
+            with self.assertRaisesRegex(ValueError,"JOURNAL_PATH_INVALID"):
+                journal("SHELL_RESTORE_ARMED",{})
+        self.assertEqual(read_journal(self.file)["count"],0)
+
     def test_non_shell_state_refused(self):
         w=RollbackJournal(self.file)
         with self.assertRaises(ValueError):w("EXTERNAL",{})
