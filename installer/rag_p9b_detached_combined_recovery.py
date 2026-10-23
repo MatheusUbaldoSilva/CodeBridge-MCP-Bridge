@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from installer.rag_p9b_detached_combined_identity_gate import assess_detached_identity
 from installer.rag_p9b_poststop_verification import check_poststop
+from installer.rag_p9b_detached_process_ancestry import inspect_detached_process_ancestry
 
 
 def recover_detached_combined(*, file_worker=None, shell_worker=None,
@@ -17,7 +18,8 @@ def recover_detached_combined(*, file_worker=None, shell_worker=None,
                               identity_sha256=None, installed=None,
                               source_commit=None,
                               identity_gate=assess_detached_identity,
-                              poststop_probe=check_poststop):
+                              poststop_probe=check_poststop,
+                              ancestry_probe=inspect_detached_process_ancestry):
     denied = {"state": "DETACHED_COMBINED_RECOVERY_REFUSED",
               "verified": False, "nsis_executed": False,
               "cutover_authorized": False}
@@ -28,6 +30,14 @@ def recover_detached_combined(*, file_worker=None, shell_worker=None,
     if production is True:
         if not all((identity_manifest, identity_sha256, installed, source_commit)):
             return {**denied, "reason": "BOUND_TRANSACTION_IDENTITY_REQUIRED"}
+        try:
+            ancestry = ancestry_probe(installed=installed)
+        except Exception:
+            return {**denied, "reason": "INDEPENDENT_PROCESS_ANCESTRY_REQUIRED"}
+        if (not isinstance(ancestry, dict)
+                or ancestry.get("state") != "EXTERNAL_PROCESS_ANCESTRY_VERIFIED"
+                or ancestry.get("verified") is not True):
+            return {**denied, "reason": "INDEPENDENT_PROCESS_ANCESTRY_REQUIRED"}
         try:
             bound = identity_gate(manifest=identity_manifest,
                                   manifest_sha256=identity_sha256,

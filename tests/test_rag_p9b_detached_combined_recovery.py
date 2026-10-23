@@ -58,7 +58,9 @@ class DetachedCombinedTests(unittest.TestCase):
 
     def test_production_refuses_invalid_identity(self):
         r=recover_detached_combined(**(self.args|{
-            "production":True,"identity_manifest":"dummy",
+             "production":True,
+                "ancestry_probe":lambda **kw:{
+                    "state":"EXTERNAL_PROCESS_ANCESTRY_VERIFIED","verified":True},"identity_manifest":"dummy",
             "identity_sha256":"bad","installed":"C:/CodeBridge",
             "source_commit":"a"*40,
             "identity_gate":lambda **kw:{"state":"DETACHED_COMBINED_IDENTITY_REFUSED"}}))
@@ -73,7 +75,9 @@ class DetachedCombinedTests(unittest.TestCase):
                     "identity_verified":True,"artifacts_checked":4,
                     "cutover_authorized":False}
         r=recover_detached_combined(**(self.args|{
-            "production":True,"identity_manifest":"fixture",
+             "production":True,
+                "ancestry_probe":lambda **kw:{
+                    "state":"EXTERNAL_PROCESS_ANCESTRY_VERIFIED","verified":True},"identity_manifest":"fixture",
             "identity_sha256":"a"*64,"installed":"C:/CodeBridge",
             "source_commit":"b"*40,"identity_gate":gate,
             "poststop_probe":lambda *_:{
@@ -84,7 +88,9 @@ class DetachedCombinedTests(unittest.TestCase):
 
     def test_production_refuses_running_codebridge_even_with_valid_identity(self):
         r=recover_detached_combined(**(self.args|{
-            "production":True,"identity_manifest":"fixture",
+             "production":True,
+                "ancestry_probe":lambda **kw:{
+                    "state":"EXTERNAL_PROCESS_ANCESTRY_VERIFIED","verified":True},"identity_manifest":"fixture",
             "identity_sha256":"a"*64,"installed":"C:/CodeBridge",
             "source_commit":"b"*40,
             "identity_gate":lambda **kw:{
@@ -104,7 +110,9 @@ class DetachedCombinedTests(unittest.TestCase):
             return {"state":"POSTSTOP_OBSERVED_ONLY",
                     "observed_stopped":len(snapshots)==1}
         r=recover_detached_combined(**(self.args|{
-            "production":True,"identity_manifest":"fixture",
+             "production":True,
+                "ancestry_probe":lambda **kw:{
+                    "state":"EXTERNAL_PROCESS_ANCESTRY_VERIFIED","verified":True},"identity_manifest":"fixture",
             "identity_sha256":"a"*64,"installed":"C:/CodeBridge",
             "source_commit":"b"*40,
             "identity_gate":lambda **kw:{
@@ -126,7 +134,9 @@ class DetachedCombinedTests(unittest.TestCase):
             return {"state":"POSTSTOP_OBSERVED_ONLY",
                     "observed_stopped":len(snapshots)<3}
         r=recover_detached_combined(**(self.args|{
-            "production":True,"identity_manifest":"fixture",
+             "production":True,
+                "ancestry_probe":lambda **kw:{
+                    "state":"EXTERNAL_PROCESS_ANCESTRY_VERIFIED","verified":True},"identity_manifest":"fixture",
             "identity_sha256":"a"*64,"installed":"C:/CodeBridge",
             "source_commit":"b"*40,
             "identity_gate":lambda **kw:{
@@ -139,6 +149,23 @@ class DetachedCombinedTests(unittest.TestCase):
         self.assertEqual(len(snapshots),3)
         self.assertEqual(verifier_calls,[])
         self.assertIn("SHELL_DETACHED_FINAL_POSTSTOP_FAILED",self.events)
+
+    def test_production_gui_parent_process_refused_before_workers(self):
+        calls=[]
+        r=recover_detached_combined(**(self.args|{
+            "production":True,
+            "identity_manifest":"fixture",
+            "identity_sha256":"a"*64,
+            "installed":"C:/CodeBridge",
+            "source_commit":"b"*40,
+            "ancestry_probe":lambda **kw:{
+                "state":"EXTERNAL_ANCESTRY_UNVERIFIED","verified":False},
+            "file_worker":lambda:calls.append("files"),
+            "shell_worker":lambda:calls.append("shell"),
+            "verify_worker":lambda:calls.append("verify")}))
+        self.assertEqual(r["reason"],"INDEPENDENT_PROCESS_ANCESTRY_REQUIRED")
+        self.assertEqual(calls,[])
+        self.assertEqual(self.events,[])
 
     def test_resumed_production_journal_requires_same_bound_identity(self):
         import tempfile
@@ -154,7 +181,9 @@ class DetachedCombinedTests(unittest.TestCase):
                 RollbackJournal.resume(path,expected_transaction_sha256="b"*64)
             resumed=RollbackJournal.resume(path,expected_transaction_sha256="a"*64)
             r=recover_detached_combined(**(self.args|{
-                "production":True,"identity_manifest":"fixture",
+                 "production":True,
+                "ancestry_probe":lambda **kw:{
+                    "state":"EXTERNAL_PROCESS_ANCESTRY_VERIFIED","verified":True},"identity_manifest":"fixture",
                 "identity_sha256":"a"*64,"installed":"C:/CodeBridge",
                 "source_commit":"b"*40,"journal":resumed,
                 "identity_gate":lambda **kw:{
@@ -179,7 +208,9 @@ class DetachedCombinedTests(unittest.TestCase):
                 "transaction_sha256":"a"*64})
             resumed=RollbackJournal.resume(path)
             r=recover_detached_combined(**(self.args|{
-                "production":True,"identity_manifest":"fixture",
+                 "production":True,
+                "ancestry_probe":lambda **kw:{
+                    "state":"EXTERNAL_PROCESS_ANCESTRY_VERIFIED","verified":True},"identity_manifest":"fixture",
                 "identity_sha256":"a"*64,"installed":"C:/CodeBridge",
                 "source_commit":"b"*40,"journal":resumed,
                 "identity_gate":lambda **kw:{
