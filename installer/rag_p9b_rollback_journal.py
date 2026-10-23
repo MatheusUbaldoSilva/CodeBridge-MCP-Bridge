@@ -113,7 +113,7 @@ def read_journal(path):
         return {"state":"JOURNAL_UNVERIFIED"}
     try:
         entries=[json.loads(line) for line in p.read_text(encoding="utf-8").splitlines()]
-        if any(item.get("seq")!=i+1 for i,item in enumerate(entries)):
+        if any(not isinstance(item,dict) or type(item.get("seq")) is not int or item["seq"]!=i+1 or not isinstance(item.get("state"),str) or not item["state"].startswith("SHELL_") or not isinstance(item.get("details"),dict) for i,item in enumerate(entries)):
             return {"state":"JOURNAL_UNVERIFIED"}
         return {"state":"JOURNAL_OBSERVED_ONLY","count":len(entries),
                 "last_state":entries[-1]["state"] if entries else None}

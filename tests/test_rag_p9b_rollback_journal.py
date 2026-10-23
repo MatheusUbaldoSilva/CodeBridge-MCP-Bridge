@@ -27,6 +27,15 @@ class JournalTests(unittest.TestCase):
         with self.assertRaises(ValueError):w("EXTERNAL",{})
         self.assertEqual(read_journal(self.file)["count"],0)
 
+    def test_boolean_sequence_and_invalid_state_refused(self):
+        for raw in ('{"seq":true,"state":"SHELL_ARMED","details":{}}',
+                    '{"seq":1,"state":"READY","details":{}}',
+                    '{"seq":1,"state":"SHELL_ARMED","details":null}',
+                    '[]'):
+            with self.subTest(raw=raw):
+                self.file.write_text(raw,encoding="utf-8")
+                self.assertEqual(read_journal(self.file)["state"],"JOURNAL_UNVERIFIED")
+
     def test_corrupted_seq_refused(self):
         self.file.write_text('{"seq":9,"state":"SHELL_BAD"}',encoding="utf-8")
         self.assertEqual(read_journal(self.file)["state"],"JOURNAL_UNVERIFIED")
