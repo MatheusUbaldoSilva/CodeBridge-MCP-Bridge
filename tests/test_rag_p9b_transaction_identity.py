@@ -43,6 +43,26 @@ class IdentityTests(unittest.TestCase):
         self.assertFalse(result["written"])
         self.assertFalse(self.output.exists())
 
+    def test_duplicate_keys_and_boolean_schema_are_not_trusted(self):
+        import hashlib,json
+        for raw in (
+            '{"schema":1,"schema":1}',
+            '{"schema":true,"purpose":"P9B_RELEASE_TRANSACTION_IDENTITY_V1"}',
+        ):
+            with self.subTest(raw=raw):
+                self.output.write_text(raw,encoding="utf-8")
+                sha=hashlib.sha256(self.output.read_bytes()).hexdigest()
+                result=verify_identity(self.output,sha)
+                self.assertFalse(result["verified"])
+                self.output.unlink()
+
+    def test_non_object_manifest_is_rejected_cleanly(self):
+        import hashlib
+        self.output.write_text("[]",encoding="utf-8")
+        sha=hashlib.sha256(self.output.read_bytes()).hexdigest()
+        result=verify_identity(self.output,sha)
+        self.assertEqual(result["reason"],"MANIFEST_SCHEMA_INVALID")
+
     def test_missing_artifact_refused(self):
         self.artifacts.pop("shell_snapshot")
         self.assertEqual(self.create()["reason"],"ARTIFACT_SET_INVALID")

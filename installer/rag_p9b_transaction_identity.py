@@ -47,6 +47,14 @@ def write_identity(output,*,artifacts,installed,source_commit):
     except (OSError,ValueError,TypeError):
         return {**rejected,"reason":"IDENTITY_PERSISTENCE_FAILED"}
 
+def _strict_json_pairs(pairs):
+    obj = {}
+    for key, value in pairs:
+        if key in obj:
+            raise ValueError("Duplicate transaction identity key")
+        obj[key] = value
+    return obj
+
 def verify_identity(path,expected_sha):
     rejected={"state":"TRANSACTION_IDENTITY_UNVERIFIED","verified":False,
               "inspection_only":True}
@@ -58,7 +66,10 @@ def verify_identity(path,expected_sha):
     try:
         if src.stat().st_size>8192 or digest(src)!=expected:
             return {**rejected,"reason":"MANIFEST_HASH_MISMATCH"}
-        body=json.loads(src.read_text(encoding="utf-8"))
+        body=json.loads(src.read_text(encoding="utf-8"),
+                        object_pairs_hook=_strict_json_pairs)
+        if not isinstance(body,dict):
+            return {**rejected,"reason":"MANIFEST_SCHEMA_INVALID"}
         source=body.get("source_commit")
         artifact_specs=body.get("artifacts")
         if (type(body.get("schema")) is not int or body["schema"]!=1
@@ -73,8 +84,12 @@ def verify_identity(path,expected_sha):
             if not isinstance(spec,dict) or set(spec)!={"path","sha256"}:
                 return {**rejected,"reason":"ARTIFACT_ENTRY_INVALID","artifact":name}
             p=Path(spec["path"])
-            if (not p.is_absolute() or not p.is_file() or p.is_symlink()
-                    or len(spec["sha256"])!=64 or digest(p)!=spec["sha256"]):
+            sha=spec["sha256"]
+            if (not isinstance(spec["path"],str)
+                    or not isinstance(sha,str) or len(sha)!=64
+                    or any(c not in "0123456789abcdef" for c in sha)
+                    or not p.is_absolute() or not p.is_file() or p.is_symlink()
+                    or digest(p)!=sha):
                 return {**rejected,"reason":"BOUND_ARTIFACT_CHANGED","artifact":name}
         return {**rejected,"state":"TRANSACTION_IDENTITY_VERIFIED","verified":True,
                 "artifact_count":len(NAMES),"source_commit":body["source_commit"]}
