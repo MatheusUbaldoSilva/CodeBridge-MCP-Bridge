@@ -126,7 +126,7 @@ os._exit(83)
         self.assertEqual(refused.returncode,2)
         self.assertEqual(json.loads(refused.stdout.strip())['reason'],'DETACHED_EXCEPTION')
 
-    def _run_real_nsis_interrupted(self, crash_recoverer=False):
+    def _run_real_nsis_interrupted(self, crash_stage=None):
         import tempfile,time
         from zipfile import ZipFile
         from installer.rag_p9b_rollback_journal import RollbackJournal,read_journal
@@ -190,12 +190,13 @@ os._exit(83)
         start=RollbackJournal(journal)
         start('SHELL_NSIS_LAB_INTERRUPTED',{'files':258})
         worker=Path.cwd()/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
-        if crash_recoverer:
+        if crash_stage is not None:
             env=os.environ.copy()
-            env["P9B_LAB_FAULT_AFTER_SHELL"]="1"
+            env["P9B_LAB_FAULT_AFTER_"+crash_stage.upper()]="1"
             crashed=subprocess.run([sys.executable,str(worker),str(cfg)],
                 capture_output=True,text=True,timeout=45,env=env)
-            self.assertEqual(crashed.returncode,88,crashed.stderr[-700:])
+            self.assertEqual(crashed.returncode,87 if crash_stage=="files" else 88,
+                             crashed.stderr[-700:])
             self.assertNotEqual(read_journal(journal)["last_state"],
                                 "SHELL_COMBINED_RECOVERY_VERIFIED")
         recovered=subprocess.run([sys.executable,str(worker),str(cfg)],
@@ -216,7 +217,9 @@ os._exit(83)
         self._run_real_nsis_interrupted()
 
     def test_actual_nsis_then_recoverer_hardcrash_replays(self):
-        self._run_real_nsis_interrupted(crash_recoverer=True)
+        self._run_real_nsis_interrupted(crash_stage="shell")
+    def test_actual_nsis_then_file_recoverer_hardcrash_replays(self):
+        self._run_real_nsis_interrupted(crash_stage="files")
     def test_recoverer_crash_after_files_then_replays_full_shell(self):
         from zipfile import ZipFile
         from installer.rag_p9b_rollback_journal import read_journal
