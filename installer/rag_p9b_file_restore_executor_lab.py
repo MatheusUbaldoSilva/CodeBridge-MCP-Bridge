@@ -41,8 +41,10 @@ def restore_files_in_lab(*, snapshot, installed, lab_root, expected_sha256,
             "production_modified":False,"nsis_executed":False}
     root=Path(lab_root).absolute()
     actual=Path(installed).resolve()
-    if (not root.is_dir() or root.is_symlink() or
-            root==actual or root.is_relative_to(actual)):
+    if (not root.is_dir() or
+            any(parent.is_symlink() for parent in (root, *root.parents)) or
+            root==actual or root.is_relative_to(actual) or
+            actual.is_relative_to(root.resolve())):
         return {**result,"reason":"LAB_SCOPE_INVALID"}
     if hashlib.sha256(Path(snapshot).read_bytes()).hexdigest()!=str(expected_sha256).lower():
         return {**result,"reason":"SNAPSHOT_DIGEST_INVALID"}

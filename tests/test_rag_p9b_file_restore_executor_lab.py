@@ -58,6 +58,19 @@ class FileRestoreTests(unittest.TestCase):
                          b"P9B_LAB_INSTALLER_CREATED_V1")
         self.assertEqual(list((self.lab/"pkg").glob(".p9b-restore-*")),[])
 
+    def test_refuses_lab_root_containing_installed_tree(self):
+        self.assertEqual(self.go(lab_root=self.root)["reason"],"LAB_SCOPE_INVALID")
+        self.assertEqual((self.lab/"pkg"/"old.py").read_bytes(),b"changed")
+
+    def test_refuses_symlinked_lab_ancestor(self):
+        redirected=self.root/"alias"
+        try:
+            redirected.symlink_to(self.lab, target_is_directory=True)
+        except OSError:
+            self.skipTest("directory symlinks disabled")
+        self.assertEqual(self.go(lab_root=redirected)["reason"],"LAB_SCOPE_INVALID")
+        self.assertEqual((self.lab/"pkg"/"old.py").read_bytes(),b"changed")
+
     def test_refuses_production_root(self):
         self.assertEqual(self.go(lab_root=self.installed)["reason"],"LAB_SCOPE_INVALID")
 if __name__=="__main__":unittest.main()
