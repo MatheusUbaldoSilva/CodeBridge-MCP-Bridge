@@ -69,6 +69,21 @@ class DetachedLifecycleTests(unittest.TestCase):
     def test_restart_failure_requires_review(self):
         r=self.check(restart=lambda *a:{"state":"RECOVERY_PENDING","launched":True})
         self.assertEqual(r["reason"],"RESTART_NOT_CONFIRMED")
+    def test_identity_changes_after_journal_arm_never_sends_signal(self):
+        evidence=[]
+        signals=[]
+        def drifting(**kw):
+            evidence.append(1)
+            return {"state":"DETACHED_SUPERVISOR_SHUTDOWN_PENDING",
+                "artifacts_verified":True,"authorized":False,
+                "shutdown_identity_digest":("c" if len(evidence)==1 else "d")*64}
+        r=self.check(proof=drifting,
+            shutdown=lambda *a,**k:signals.append(True))
+        self.assertEqual(r["reason"],"PRE_SIGNAL_IDENTITY_CHANGED")
+        self.assertEqual(len(evidence),2)
+        self.assertEqual(signals,[])
+        self.assertIn("SHELL_DETACHED_PRE_SIGNAL_RECHECK_FAILED",self.events)
+
     def test_journal_failure_before_shutdown_prevents_any_signal(self):
         calls=[]
         def fail(state,details):

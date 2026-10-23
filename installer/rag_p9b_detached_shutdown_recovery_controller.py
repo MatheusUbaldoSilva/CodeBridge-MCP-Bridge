@@ -53,6 +53,16 @@ def run_detached_shutdown_recovery(*, installed, identity_manifest,
                 or report.get("authorized") is not False):
             return {**base,"reason":"SHUTDOWN_PLAN_OR_IDENTITY_CHANGED"}
         journal("SHELL_DETACHED_LIFECYCLE_ARMED",{})
+        fresh=proof(installed=installed,identity_manifest=identity_manifest,
+            identity_sha256=identity_sha256,source_commit=source_commit,
+            external_runtime=True)
+        if (not isinstance(fresh,dict)
+                or fresh.get("state")!="DETACHED_SUPERVISOR_SHUTDOWN_PENDING"
+                or fresh.get("artifacts_verified") is not True
+                or fresh.get("shutdown_identity_digest")!=expected_process_digest
+                or fresh.get("authorized") is not False):
+            journal("SHELL_DETACHED_PRE_SIGNAL_RECHECK_FAILED",{})
+            return {**base,"reason":"PRE_SIGNAL_IDENTITY_CHANGED"}
         stop=shutdown(installed,expected_digest=expected_process_digest,
                       independent=True,execute=True)
         if (not isinstance(stop,dict)
