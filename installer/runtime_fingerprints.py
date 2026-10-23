@@ -131,7 +131,8 @@ def compare_saved_public_baseline(baseline_path: Path, install_root: Path,
     """Read a previously captured public SHA baseline and compare it to live files."""
     try:
         saved = json.loads(Path(baseline_path).read_text(encoding="utf-8"))
-        if (not isinstance(saved, dict) or saved.get("schema_version") != 1
+        if (not isinstance(saved, dict) or type(saved.get("schema_version")) is not int
+                or saved["schema_version"] != 1
                 or saved.get("purpose") != "rag-public-index-read-only-maintenance-baseline"):
             raise ValueError("Invalid public baseline schema")
         required = ("rag_manifest", "rag_sqlite", "rag_qdrant")

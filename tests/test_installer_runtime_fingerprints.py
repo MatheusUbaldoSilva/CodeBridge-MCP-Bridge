@@ -205,6 +205,27 @@ class RuntimeFingerprintTests(unittest.TestCase):
             result=compare_saved_public_baseline(path,Path(temp),Path(temp))
             self.assertFalse(result["public_index_intact"])
 
+    def test_boolean_schema_version_cannot_claim_public_baseline_v1(self):
+        import json
+        from unittest.mock import patch
+        import installer.runtime_fingerprints as module
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/"saved.json"
+            valid={"schema_version":True,
+                   "purpose":"rag-public-index-read-only-maintenance-baseline",
+                   "files":{
+                       "rag_manifest":{"exists":True,"sha256":"a"*64,"bytes":1},
+                       "rag_sqlite":{"exists":True,"sha256":"b"*64,"bytes":2},
+                       "rag_qdrant":{"exists":True,"sha256":"c"*64,"bytes":3,
+                                     "file_count":1},
+                   }}
+            path.write_text(json.dumps(valid),encoding="utf-8")
+            with patch.object(module,"collect_runtime_fingerprints",
+                              side_effect=AssertionError("no runtime probing")):
+                result=compare_saved_public_baseline(path,Path(temp),Path(temp))
+            self.assertEqual(result["state"],"PUBLIC_BASELINE_INVALID")
+            self.assertFalse(result["public_index_intact"])
+
     def test_cli_missing_saved_baseline_returns_error(self):
         import subprocess
         import sys
