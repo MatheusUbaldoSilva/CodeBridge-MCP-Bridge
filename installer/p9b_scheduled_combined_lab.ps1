@@ -1,4 +1,4 @@
-﻿# P9-B: execute disposable combined rollback lab from an independent task.
+# P9-B: execute disposable combined rollback lab from an independent task.
 # Only runs a fixed test suite against TemporaryDirectory and simulated HKCU.
 [CmdletBinding()]
 param([Parameter(Mandatory=$true)][string]$Repository)
@@ -37,7 +37,9 @@ try {
     'if ancestry.get("state")!="EXTERNAL_PROCESS_ANCESTRY_VERIFIED":'
     '    result={"state":"INDEPENDENT_LAB_REFUSED","verified":False,"reason":"ANCESTRY"}'
     'else:'
-    '    suite=unittest.defaultTestLoader.discover(str(repo/"tests"),pattern="test_rag_p9b_detached_combined_hardcrash_chain_e2e.py")'
+    '    suite=unittest.TestSuite()'
+    '    for pattern in ("test_rag_p9b_detached_combined_hardcrash_chain_e2e.py","test_rag_p9b_real_hkcu_scratch_crash.py"):'
+    '        suite.addTests(unittest.defaultTestLoader.discover(str(repo/"tests"),pattern=pattern))'
     '    with (folder/"test.log").open("w",encoding="utf-8") as stream:'
     '        run=unittest.TextTestRunner(stream=stream,verbosity=1).run(suite)'
     '    result={"state":"SCHEDULER_ISOLATED_COMBINED_ROLLBACK_LAB","verified":run.wasSuccessful(),"passes":run.testsRun,"failures":len(run.failures),"errors":len(run.errors),"ancestry_verified":True,"production_modified":False}'
@@ -55,7 +57,7 @@ try {
   if ($proof.state -ne 'SCHEDULER_ISOLATED_COMBINED_ROLLBACK_LAB' -or
       $proof.verified -ne $true -or $proof.ancestry_verified -ne $true -or
       $proof.production_modified -ne $false -or $proof.failures -ne 0 -or
-      $proof.errors -ne 0 -or $proof.passes -lt 1){throw 'LAB_FAILED_OR_UNVERIFIED'}
+      $proof.errors -ne 0 -or $proof.passes -lt 2){throw 'LAB_FAILED_OR_UNVERIFIED'}
   [pscustomobject]@{state='SCHEDULED_COMBINED_LAB_VERIFIED';tests=$proof.passes;
     ancestry_verified=$true;production_modified=$false;nsis_executed=$false
   }|ConvertTo-Json -Compress
