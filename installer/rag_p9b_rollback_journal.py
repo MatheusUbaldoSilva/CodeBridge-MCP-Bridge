@@ -7,6 +7,15 @@ import time
 from pathlib import Path
 
 
+def _strict_journal_pairs(pairs):
+    result={}
+    for key,value in pairs:
+        if key in result:
+            raise ValueError("DUPLICATE_JOURNAL_KEY")
+        result[key]=value
+    return result
+
+
 class RollbackJournal:
     def __init__(self,path):
         self.path=Path(path).absolute()
@@ -36,7 +45,7 @@ class RollbackJournal:
         # A terminal success anywhere in history cannot be followed by
         # more recovery events. Reject malformed or unscoped event names.
         try:
-            history=[json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+            history=[json.loads(line,object_pairs_hook=_strict_journal_pairs) for line in path.read_text(encoding="utf-8").splitlines()]
             combined = history[0].get("state") == "SHELL_DETACHED_COMBINED_ARMED"
             if expected_transaction_sha256 is not None:
                 expected=str(expected_transaction_sha256).lower()
@@ -112,7 +121,7 @@ def read_journal(path):
     if not p.is_file() or p.is_symlink() or p.stat().st_size>1024*1024:
         return {"state":"JOURNAL_UNVERIFIED"}
     try:
-        entries=[json.loads(line) for line in p.read_text(encoding="utf-8").splitlines()]
+        entries=[json.loads(line,object_pairs_hook=_strict_journal_pairs) for line in p.read_text(encoding="utf-8").splitlines()]
         if any(not isinstance(item,dict) or type(item.get("seq")) is not int or item["seq"]!=i+1 or not isinstance(item.get("state"),str) or not item["state"].startswith("SHELL_") or not isinstance(item.get("details"),dict) for i,item in enumerate(entries)):
             return {"state":"JOURNAL_UNVERIFIED"}
         return {"state":"JOURNAL_OBSERVED_ONLY","count":len(entries),
