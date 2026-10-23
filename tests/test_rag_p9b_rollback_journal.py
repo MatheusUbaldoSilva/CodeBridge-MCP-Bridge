@@ -65,6 +65,18 @@ class ResumeJournalTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 RollbackJournal.resume(path)
 
+    def test_combined_file_only_terminal_event_is_not_combined_completion(self):
+        with tempfile.TemporaryDirectory() as root:
+            path=Path(root)/"interrupted-between-files-and-shell.jsonl"
+            j=RollbackJournal(path)
+            j("SHELL_DETACHED_COMBINED_ARMED",{})
+            j("SHELL_PRODUCTION_FILE_RESTORED",{"postverified":True})
+            resumed=RollbackJournal.resume(path)
+            resumed("SHELL_DETACHED_SHELL_VERIFIED",{"postverified":True})
+            resumed("SHELL_DETACHED_COMBINED_VERIFIED",{"postverified":True})
+            with self.assertRaises(ValueError):
+                RollbackJournal.resume(path)
+
     def test_detached_combined_journal_resumes_after_crash(self):
         with tempfile.TemporaryDirectory() as root:
             path=Path(root)/"combined.jsonl"

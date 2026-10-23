@@ -29,7 +29,6 @@ class RollbackJournal:
                     "SHELL_COMBINED_RECOVERY_VERIFIED",
                     "SHELL_NSIS_ISOLATED_RECOVERED",
                     "SHELL_NSIS_FULL_SCOPE_RECOVERED",
-                    "SHELL_PRODUCTION_FILE_RESTORED",
                     "SHELL_DETACHED_COMBINED_VERIFIED")):
             raise ValueError("JOURNAL_NOT_RESUMABLE")
         # A terminal success anywhere in history cannot be followed by
@@ -43,6 +42,8 @@ class RollbackJournal:
                 "SHELL_DETACHED_COMBINED_VERIFIED"}
             if not combined:
                 completed.add("SHELL_PRODUCTION_FILE_RESTORED")
+                if proof.get("last_state")=="SHELL_PRODUCTION_FILE_RESTORED":
+                    raise ValueError("JOURNAL_NOT_RESUMABLE")
             if (history[0].get("state") not in (
                     "SHELL_COMBINED_RECOVERY_ARMED",
                     "SHELL_NSIS_LAB_INTERRUPTED",
