@@ -52,3 +52,25 @@ def assess_detached_supervisor(*, installed, identity_manifest,
                 "reason":"MUTATING_RECOVERY_EXECUTOR_NOT_YET_CERTIFIED"}
     except (OSError,ValueError,TypeError,KeyError):
         return {**base,"reason":"DETACHED_SUPERVISOR_PROBE_ERROR"}
+
+
+def main(argv=None):
+    """External, inspection-only command. Exit 2 always denies cutover."""
+    import argparse
+    import json
+    parser=argparse.ArgumentParser()
+    parser.add_argument("--installed",required=True)
+    parser.add_argument("--identity",required=True)
+    parser.add_argument("--identity-sha",required=True)
+    parser.add_argument("--source-commit",required=True)
+    args=parser.parse_args(argv)
+    report=assess_detached_supervisor(
+        installed=args.installed,identity_manifest=args.identity,
+        identity_sha256=args.identity_sha,source_commit=args.source_commit,
+        external_runtime=True)
+    print(json.dumps(report,sort_keys=True))
+    return 2
+
+
+if __name__=="__main__":
+    raise SystemExit(main())

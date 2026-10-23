@@ -13,6 +13,21 @@ class SupervisorGateTests(unittest.TestCase):
                 "state":"SHUTDOWN_PLAN_ONLY","identity_digest":"f"*64},
             stopped_probe=lambda *a:self.events.append("poststop") or {
                 "state":"POSTSTOP_OBSERVED_ONLY","observed_stopped":True})
+    def test_cli_never_returns_authorized_exit_code(self):
+        from unittest.mock import patch
+        from installer.rag_p9b_detached_supervisor_gate import main
+        import io
+        from contextlib import redirect_stdout
+        capture=io.StringIO()
+        with patch("installer.rag_p9b_detached_supervisor_gate.assess_detached_supervisor",
+                   return_value={"state":"DETACHED_SUPERVISOR_POSTSTOP_OBSERVED",
+                                 "authorized":False}):
+            with redirect_stdout(capture):
+                code=main(["--installed","C:/CodeBridge","--identity","x",
+                           "--identity-sha","a"*64,"--source-commit","b"*40])
+        self.assertEqual(code,2)
+        self.assertIn('"authorized": false',capture.getvalue())
+
     def test_no_external_runtime_does_not_start(self):
         r=assess_detached_supervisor(**(self.kw|{"external_runtime":False}))
         self.assertEqual(r["reason"],"EXTERNAL_RUNTIME_REQUIRED")
