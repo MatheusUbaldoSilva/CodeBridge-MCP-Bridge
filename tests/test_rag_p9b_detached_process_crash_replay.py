@@ -41,6 +41,37 @@ class DetachedCrashReplayTests(unittest.TestCase):
             self.assertEqual(final["last_state"],
                              "SHELL_DETACHED_LIFECYCLE_REVIEW_REQUIRED")
 
+    def test_external_combined_rollback_hard_exit_is_not_completion(self):
+        with tempfile.TemporaryDirectory() as d:
+            journal = Path(d) / "partial-combined.jsonl"
+            root = str(Path(__file__).resolve().parents[1])
+            child = (
+                "import os,sys;"
+                "from installer.rag_p9b_rollback_journal import RollbackJournal;"
+                "j=RollbackJournal(sys.argv[1]);"
+                "j('SHELL_DETACHED_COMBINED_ARMED',"
+                "{'transaction_sha256':'a'*64});"
+                "j('SHELL_PRODUCTION_FILE_RESTORED',{'postverified':True});"
+                "os._exit(74)"
+            )
+            env = dict(os.environ)
+            env["PYTHONPATH"] = root + os.pathsep + env.get("PYTHONPATH", "")
+            result = subprocess.run(
+                [sys.executable, "-c", child, str(journal)],
+                cwd=root, env=env, timeout=15, capture_output=True)
+            self.assertEqual(result.returncode,74,result.stderr)
+            observed = read_journal(journal)
+            self.assertEqual(observed["count"],2)
+            self.assertEqual(observed["last_state"],"SHELL_PRODUCTION_FILE_RESTORED")
+            with self.assertRaises(ValueError):
+                RollbackJournal.resume(journal,expected_transaction_sha256="b"*64)
+            resumed = RollbackJournal.resume(
+                journal,expected_transaction_sha256="a"*64)
+            self.assertTrue(resumed.resumed)
+            self.assertEqual(resumed.bound_transaction_sha256,"a"*64)
+            self.assertNotIn("SHELL_DETACHED_COMBINED_VERIFIED",
+                             journal.read_text(encoding="utf-8"))
+
     def test_external_crash_does_not_imply_restart_or_nsis(self):
         with tempfile.TemporaryDirectory() as d:
             path=Path(d)/"crash.jsonl"
