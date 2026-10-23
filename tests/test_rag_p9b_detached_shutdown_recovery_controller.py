@@ -69,6 +69,26 @@ class DetachedLifecycleTests(unittest.TestCase):
     def test_restart_failure_requires_review(self):
         r=self.check(restart=lambda *a:{"state":"RECOVERY_PENDING","launched":True})
         self.assertEqual(r["reason"],"RESTART_NOT_CONFIRMED")
+    def test_journal_failure_before_shutdown_prevents_any_signal(self):
+        calls=[]
+        def fail(state,details):
+            raise OSError("journal disk unavailable")
+        result=self.check(journal=fail,
+            shutdown=lambda *args,**kw:calls.append("shutdown"))
+        self.assertEqual(result["reason"],"LIFECYCLE_WORKER_EXCEPTION")
+        self.assertEqual(calls,[])
+        self.assertFalse(result["verified"])
+
+    def test_journal_failure_after_shutdown_requires_review(self):
+        calls=[]
+        def fail_second(state,details):
+            calls.append(state)
+            if len(calls)==2:raise OSError("disk error after stop")
+        result=self.check(journal=fail_second)
+        self.assertEqual(result["state"],"DETACHED_LIFECYCLE_REVIEW_REQUIRED")
+        self.assertFalse(result["verified"])
+        self.assertEqual(calls[0],"SHELL_DETACHED_LIFECYCLE_ARMED")
+
     def test_worker_exception_is_journaled(self):
         def fail(*args,**kwargs): raise OSError("synthetic")
         r=self.check(shutdown=fail)
