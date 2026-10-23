@@ -37,9 +37,16 @@ def make_shutdown_plan(installed: Path, *, records=None) -> dict:
                 "observed_roles": sorted(roles)}
     if review.get("parent_age_conflicts"):
         return {**base, "reason": "PROCESS_AGE_CONFLICT"}
-    if review.get("mcp_parent_absent") != [
-        next(x["pid"] for x in processes if x["component"] == "MCP")
-    ]:
+    mcp=next(x for x in processes if x["component"]=="MCP")
+    gui=next(x for x in processes if x["component"]=="GUI")
+    # On current Windows versions MCP may be a direct child of the GUI,
+    # rather than an adopted/orphan process. Both are valid only if the
+    # process is otherwise uniquely identified and birth ordering agrees.
+    mcp_parent=next(x["parent_pid"] for x in review["processes"]
+                    if x["component"]=="MCP")
+    adopted=review.get("mcp_parent_absent")==[mcp["pid"]]
+    gui_child=mcp_parent==gui["pid"] and mcp["create_time"]>=gui["create_time"]
+    if not (adopted or gui_child):
         return {**base, "reason": "UNEXPECTED_MCP_ANCESTRY"}
     scope = sorted(
         ({"component": x["component"],

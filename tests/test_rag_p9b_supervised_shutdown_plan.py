@@ -55,9 +55,16 @@ class ShutdownPlanTests(unittest.TestCase):
             self.item("MCP",55,800,220)])
         self.assertEqual(r["reason"],"UNEXPECTED_PROCESS_MULTIPLICITY")
 
-    def test_unexpected_attached_mcp_blocks(self):
+    def test_gui_owned_mcp_accepted_for_shutdown_plan_only(self):
         r=self.valid()
         r[1]["ppid"]=10
+        result=make_shutdown_plan(self.root,records=r)
+        self.assertEqual(result["state"],"SHUTDOWN_PLAN_ONLY")
+        self.assertFalse(result["safe_to_apply_installer"])
+
+    def test_unexpected_attached_mcp_blocks(self):
+        r=self.valid()
+        r[1]["ppid"]=30
         result=make_shutdown_plan(self.root,records=r)
         self.assertEqual(result["reason"],"UNEXPECTED_MCP_ANCESTRY")
 
