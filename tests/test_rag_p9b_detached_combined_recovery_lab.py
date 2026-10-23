@@ -204,6 +204,67 @@ os._exit(83)
             expected_original=archive.read('old/'+old[0])
         self.assertEqual(prior_file.read_bytes(),expected_original)
 
+    def test_recoverer_crash_after_files_then_replays_full_shell(self):
+        from zipfile import ZipFile
+        from installer.rag_p9b_rollback_journal import read_journal
+        f=self.fixture
+        with ZipFile(f.files_zip) as archive:
+            installed_from_manifest=json.loads(archive.read('manifest.json'))['installed_root']
+        base=f.lab.parent
+        config=base/'worker-crash.json'
+        journal=base/'worker-crash-journal.jsonl'
+        config.write_text(json.dumps({
+            'lab':str(f.lab),'appdata':str(f.appdata),'desktop':str(f.desktop),
+            'token':f.token,'installed':installed_from_manifest,
+            'snapshot':str(f.files_zip),'snapshot_sha256':f.file_sha,
+            'shell_snapshot':str(f.shell_zip),'shell_snapshot_sha256':f.shell_sha,
+            'preimage':str(f.preimage),'preimage_sha256':f.pre_sha,
+            'journal':str(journal)}),encoding='utf-8')
+        worker=Path.cwd()/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
+        env=os.environ.copy()
+        env['P9B_LAB_FAULT_AFTER_FILES']='1'
+        crashed=subprocess.run([sys.executable,str(worker),str(config)],
+           capture_output=True,text=True,timeout=45,env=env)
+        self.assertEqual(crashed.returncode,87)
+        self.assertEqual(read_journal(journal)['count'],1)
+        resumed=subprocess.run([sys.executable,str(worker),str(config)],
+           capture_output=True,text=True,timeout=45)
+        self.assertEqual(resumed.returncode,0,resumed.stdout[-600:]+resumed.stderr[-600:])
+        result=json.loads(resumed.stdout.strip())
+        self.assertTrue(result['verified'])
+        self.assertEqual((result['files'],result['new_targets'],
+            result['shortcuts'],result['fake_registry_keys']),(236,22,5,2))
+        self.assertEqual(read_journal(journal)['last_state'],'SHELL_COMBINED_RECOVERY_VERIFIED')
+
+    def test_recoverer_crash_after_shell_then_replays(self):
+        from zipfile import ZipFile
+        from installer.rag_p9b_rollback_journal import read_journal
+        f=self.fixture
+        with ZipFile(f.files_zip) as archive:
+            approved=json.loads(archive.read('manifest.json'))['installed_root']
+        base=f.lab.parent;cfg=base/'shell-crash-config.json';journal=base/'shell-crash-log.jsonl'
+        payload={'lab':str(f.lab),'appdata':str(f.appdata),'desktop':str(f.desktop),
+            'token':f.token,'installed':approved,
+            'snapshot':str(f.files_zip),'snapshot_sha256':f.file_sha,
+            'shell_snapshot':str(f.shell_zip),'shell_snapshot_sha256':f.shell_sha,
+            'preimage':str(f.preimage),'preimage_sha256':f.pre_sha,
+            'journal':str(journal)}
+        cfg.write_text(json.dumps(payload),encoding='utf-8')
+        worker=Path.cwd()/'installer'/'rag_p9b_detached_combined_recovery_lab.py'
+        env=os.environ.copy();env['P9B_LAB_FAULT_AFTER_SHELL']='1'
+        interrupted=subprocess.run([sys.executable,str(worker),str(cfg)],
+             capture_output=True,text=True,timeout=45,env=env)
+        self.assertEqual(interrupted.returncode,88)
+        self.assertEqual(read_journal(journal)['last_state'],'SHELL_BACKEND_WRITTEN')
+        resumed=subprocess.run([sys.executable,str(worker),str(cfg)],
+             capture_output=True,text=True,timeout=45)
+        self.assertEqual(resumed.returncode,0,resumed.stdout[-400:]+resumed.stderr[-400:])
+        report=json.loads(resumed.stdout.strip())
+        self.assertTrue(report['verified'])
+        self.assertEqual((report['files'],report['new_targets'],
+           report['shortcuts'],report['fake_registry_keys']),(236,22,5,2))
+        self.assertEqual(read_journal(journal)['last_state'],'SHELL_COMBINED_RECOVERY_VERIFIED')
+
     def test_denies_production_root(self):
         f=self.fixture
         config=f.lab.parent/'invalid.json'

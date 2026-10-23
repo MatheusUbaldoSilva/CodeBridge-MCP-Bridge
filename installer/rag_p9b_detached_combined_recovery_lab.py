@@ -60,9 +60,15 @@ def execute(cfg):
         journal=(RollbackJournal.resume(journal_path)
                  if journal_path.exists() else RollbackJournal(journal_path))
         def file_worker():
-            return restore_files_in_lab(snapshot=paths['snapshot'],installed=installed,lab_root=root,
+            result=restore_files_in_lab(snapshot=paths['snapshot'],installed=installed,lab_root=root,
                 expected_sha256=c['snapshot_sha256'],
                 snapshot_probe=verify_installer_rollback_snapshot)
+            # Explicit lab-only fault injection: a real hard exit after all
+            # files restore, before the coordinator can journal completion.
+            if (result.get('verified') is True and
+                    os.environ.get('P9B_LAB_FAULT_AFTER_FILES')=='1'):
+                os._exit(87)
+            return result
         def shell_worker():
             applied=restore_shell(snapshot=paths['shell_snapshot'],
                 expected_sha256=c['shell_snapshot_sha256'],appdata=appdata,
@@ -70,6 +76,9 @@ def execute(cfg):
                 stopped=True,external=True,execute=True,journal=journal,
                 process_guard=lambda _: {'state':'NO_RUNNING_CODEBRIDGE'},
                 preimage=paths['preimage'],preimage_sha256=c['preimage_sha256'])
+            if (applied.get('state')=='SHELL_BACKEND_APPLIED_POSTVERIFY_REQUIRED'
+                    and os.environ.get('P9B_LAB_FAULT_AFTER_SHELL')=='1'):
+                os._exit(88)
             post=verify_restored_shell(paths['shell_snapshot'],appdata=appdata,desktop=desktop,
                 registry_values=lambda k,n:registry.read_key(k))
             ok=applied.get('state')=='SHELL_BACKEND_APPLIED_POSTVERIFY_REQUIRED' and post.get('verified') is True
