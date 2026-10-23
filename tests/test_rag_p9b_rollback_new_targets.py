@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 from zipfile import ZipFile
 import json
+import hashlib
 
 from installer.rag_p9b_rollback_new_targets import inspect_new_targets
 
@@ -27,6 +28,36 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(r["state"],"NEW_TARGETS_OBSERVED_ONLY")
         self.assertEqual(r["count"],1)
         self.assertFalse(r["delete_authorized"])
+
+    @patch("installer.rag_p9b_rollback_new_targets.verify_installer_rollback_snapshot",
+           return_value={"verified":True})
+    def test_new_target_digest_match_is_observation_not_delete_approval(self,_):
+        target=self.installed/"rag"/"b.py"
+        target.parent.mkdir()
+        target.write_bytes(b"expected")
+        digest=hashlib.sha256(b"expected").hexdigest()
+        r=inspect_new_targets(self.zip,self.installed,expected_new_hashes={"rag/b.py":digest})
+        self.assertEqual(r["state"],"NEW_TARGETS_CONTENT_VERIFIED")
+        self.assertTrue(r["ownership_evidence_verified"])
+        self.assertFalse(r["delete_authorized"])
+        self.assertEqual(target.read_bytes(),b"expected")
+
+    @patch("installer.rag_p9b_rollback_new_targets.verify_installer_rollback_snapshot",
+           return_value={"verified":True})
+    def test_foreign_new_target_bytes_refused(self,_):
+        target=self.installed/"rag"/"b.py"
+        target.parent.mkdir()
+        target.write_bytes(b"foreign")
+        digest=hashlib.sha256(b"expected").hexdigest()
+        r=inspect_new_targets(self.zip,self.installed,expected_new_hashes={"rag/b.py":digest})
+        self.assertEqual(r["reason"],"UNRECOGNIZED_NEW_TARGET_CONTENT")
+        self.assertEqual(target.read_bytes(),b"foreign")
+
+    @patch("installer.rag_p9b_rollback_new_targets.verify_installer_rollback_snapshot",
+           return_value={"verified":True})
+    def test_incomplete_expected_digests_refused(self,_):
+        r=inspect_new_targets(self.zip,self.installed,expected_new_hashes={})
+        self.assertEqual(r["reason"],"NEW_TARGET_DIGEST_SCOPE_INVALID")
 
     @patch("installer.rag_p9b_rollback_new_targets.verify_installer_rollback_snapshot",
            return_value={"verified":False})
