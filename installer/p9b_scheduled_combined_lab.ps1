@@ -1,7 +1,8 @@
 # P9-B: execute disposable combined rollback lab from an independent task.
 # Only runs a fixed test suite against TemporaryDirectory and simulated HKCU.
 [CmdletBinding()]
-param([Parameter(Mandatory=$true)][string]$Repository)
+param([Parameter(Mandatory=$true)][string]$Repository,
+      [switch]$InjectHashMismatchForLab)
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $task='CodeBridge_P9B_Independent_Recovery_Lab'
@@ -33,6 +34,7 @@ try {
     if(!(Test-Path -LiteralPath $absolute -PathType Leaf)){throw 'LAB_SOURCE_MISSING'}
     $hashes[$relative]=(Get-FileHash -LiteralPath $absolute -Algorithm SHA256).Hash.ToLowerInvariant()
   }
+  if($InjectHashMismatchForLab){$hashes[$sourceFiles[0]]=('0'*64)}
   @{
     source_sha256=$hashes
     repo=$root

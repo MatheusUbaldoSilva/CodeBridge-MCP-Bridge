@@ -22,7 +22,7 @@ class IndependentCombinedSchedulerLabTests(unittest.TestCase):
                      "test_actual_nsis_then_file_recoverer_hardcrash_replays",
                      "LAB_FAILED_OR_UNVERIFIED",
                      "SOURCE_IDENTITY_MISMATCH","source_sha256",
-                     "Get-FileHash","Stop-ScheduledTask",
+                     "Get-FileHash","InjectHashMismatchForLab","Stop-ScheduledTask",
                      "LAB_TASK_STILL_RUNNING_CLEANUP_REFUSED"):
             self.assertIn(item,script)
         for forbidden in ("Stop-Process","Set-ItemProperty",
