@@ -70,9 +70,14 @@ def inspect_postupdate_mcp_tool(installed_root: Path, *,
         root / "author_mcp" / "mcp_server.py",
         root / "rag" / "runtime" / "incremental_authorized_queue_bootstrap.py",
     )
-    if (not root.is_dir() or not isinstance(expected_generation, str)
+    if (not root.is_dir()
             or any(not p.is_file() or p.is_symlink() for p in required)):
         return {**blocked, "reason": "MCP_TOOL_SOURCE_NOT_INSTALLED"}
+    if (not isinstance(expected_generation,str)
+            or not expected_generation.strip()
+            or expected_generation != expected_generation.strip()
+            or len(expected_generation)>128):
+        return {**blocked, "reason": "INVALID_EXPECTED_GENERATION"}
     if type(timeout_seconds) is not int or not 1 <= timeout_seconds <= 60:
         return {**blocked, "reason": "INVALID_PROBE_TIMEOUT"}
     try:

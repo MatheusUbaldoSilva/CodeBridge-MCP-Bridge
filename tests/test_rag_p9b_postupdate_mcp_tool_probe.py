@@ -55,6 +55,16 @@ class PostUpdateToolProbeTests(unittest.TestCase):
         self.assertIn("-B",args.args[0])
         self.assertEqual(args.kwargs["env"]["PYTHONDONTWRITEBYTECODE"],"1")
 
+    def test_empty_or_malformed_expected_generation_blocks_subprocess(self):
+        for generation in ("", " ", "\n", " v1 ", None, 13, "x"*129):
+            with self.subTest(generation=generation):
+                with patch("installer.rag_p9b_postupdate_mcp_tool_probe.subprocess.run",
+                           side_effect=AssertionError("should not spawn subprocess")):
+                    result=inspect_postupdate_mcp_tool(
+                        self.root,expected_generation=generation)
+                self.assertEqual(result["reason"],"INVALID_EXPECTED_GENERATION")
+                self.assertFalse(result["verified"])
+
     def test_source_absent_refuses_execution(self):
         (self.root/"rag/runtime/incremental_authorized_queue_bootstrap.py").unlink()
         with patch(
