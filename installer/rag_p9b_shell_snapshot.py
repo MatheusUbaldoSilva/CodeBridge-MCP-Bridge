@@ -94,6 +94,15 @@ def snapshot_shell_state(*, appdata, desktop, snapshot, registry_values=None):
                 "partial_file_present":path.exists()}
 
 
+def _reject_duplicate_shell_keys(pairs):
+    result={}
+    for key,value in pairs:
+        if key in result:
+            raise ValueError("ambiguous shell backup JSON")
+        result[key]=value
+    return result
+
+
 def verify_shell_snapshot(snapshot):
     result={"state":"SHELL_BACKUP_UNVERIFIED","verified":False,
             "read_only":True,"restore_performed":False}
@@ -102,8 +111,10 @@ def verify_shell_snapshot(snapshot):
             names=z.namelist()
             if len(names)!=len(set(names)) or "manifest.json" not in names:
                 return result
-            meta=json.loads(z.read("manifest.json"))
-            if (meta.get("schema")!=1 or meta.get("state")!="P9B_SHELL_BACKUP"
+            meta=json.loads(z.read("manifest.json"),
+                            object_pairs_hook=_reject_duplicate_shell_keys)
+            if (not isinstance(meta,dict) or type(meta.get("schema")) is not int
+                    or meta["schema"]!=1 or meta.get("state")!="P9B_SHELL_BACKUP"
                     or not isinstance(meta.get("registry"),dict)
                     or set(meta["registry"])!=set(APP_KEYS)
                     or not isinstance(meta.get("shortcuts"),list)

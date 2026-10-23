@@ -81,6 +81,26 @@ class ShellSnapshotTests(unittest.TestCase):
             z.writestr("links/0.bin",b"x"*65537)
         self.assertFalse(verify_shell_snapshot(self.output)["verified"])
 
+    def test_duplicate_manifest_keys_refused(self):
+        self.make()
+        with ZipFile(self.output,"r") as z:
+            raw=z.read("manifest.json").decode("utf-8")
+        raw=raw.replace('"schema": 1', '"schema": 1, "schema": 1',1)
+        self.output.unlink()
+        with ZipFile(self.output,"w") as z:
+            z.writestr("manifest.json",raw)
+        self.assertFalse(verify_shell_snapshot(self.output)["verified"])
+
+    def test_boolean_schema_not_equal_to_version_one(self):
+        self.make()
+        with ZipFile(self.output,"r") as z:
+            body=json.loads(z.read("manifest.json"))
+        body["schema"]=True
+        self.output.unlink()
+        with ZipFile(self.output,"w") as z:
+            z.writestr("manifest.json",json.dumps(body))
+        self.assertFalse(verify_shell_snapshot(self.output)["verified"])
+
     def test_corrupt_snapshot_refused(self):
         self.output.write_bytes(b"corrupt")
         self.assertFalse(verify_shell_snapshot(self.output)["verified"])
