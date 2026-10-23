@@ -7,6 +7,7 @@ required after both workers report their own successful completion.
 from __future__ import annotations
 
 from installer.rag_p9b_detached_combined_identity_gate import assess_detached_identity
+from installer.rag_p9b_poststop_verification import check_poststop
 
 
 def recover_detached_combined(*, file_worker=None, shell_worker=None,
@@ -15,7 +16,8 @@ def recover_detached_combined(*, file_worker=None, shell_worker=None,
                               production=False, identity_manifest=None,
                               identity_sha256=None, installed=None,
                               source_commit=None,
-                              identity_gate=assess_detached_identity):
+                              identity_gate=assess_detached_identity,
+                              poststop_probe=check_poststop):
     denied = {"state": "DETACHED_COMBINED_RECOVERY_REFUSED",
               "verified": False, "nsis_executed": False,
               "cutover_authorized": False}
@@ -39,6 +41,14 @@ def recover_detached_combined(*, file_worker=None, shell_worker=None,
                 or bound.get("artifacts_checked") != 4
                 or bound.get("cutover_authorized") is not False):
             return {**denied, "reason": "BOUND_TRANSACTION_IDENTITY_REQUIRED"}
+        try:
+            stopped = poststop_probe(installed)
+        except Exception:
+            return {**denied, "reason": "INDEPENDENT_POSTSTOP_UNAVAILABLE"}
+        if (not isinstance(stopped, dict)
+                or stopped.get("state") != "POSTSTOP_OBSERVED_ONLY"
+                or stopped.get("observed_stopped") is not True):
+            return {**denied, "reason": "INDEPENDENT_POSTSTOP_REQUIRED"}
     current = "FILES"
     try:
         journal("SHELL_DETACHED_COMBINED_ARMED", {})

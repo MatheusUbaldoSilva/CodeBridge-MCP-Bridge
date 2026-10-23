@@ -75,10 +75,26 @@ class DetachedCombinedTests(unittest.TestCase):
         r=recover_detached_combined(**(self.args|{
             "production":True,"identity_manifest":"fixture",
             "identity_sha256":"a"*64,"installed":"C:/CodeBridge",
-            "source_commit":"b"*40,"identity_gate":gate}))
+            "source_commit":"b"*40,"identity_gate":gate,
+            "poststop_probe":lambda *_:{
+                "state":"POSTSTOP_OBSERVED_ONLY","observed_stopped":True}}))
         self.assertEqual(r["state"],"DETACHED_COMBINED_RESTORE_VERIFIED")
         self.assertFalse(r["cutover_authorized"])
         self.assertEqual(observed[0]["expected_source_commit"],"b"*40)
+
+    def test_production_refuses_running_codebridge_even_with_valid_identity(self):
+        r=recover_detached_combined(**(self.args|{
+            "production":True,"identity_manifest":"fixture",
+            "identity_sha256":"a"*64,"installed":"C:/CodeBridge",
+            "source_commit":"b"*40,
+            "identity_gate":lambda **kw:{
+                "state":"DETACHED_IDENTITY_OBSERVED_ONLY",
+                "identity_verified":True,"artifacts_checked":4,
+                "cutover_authorized":False},
+            "poststop_probe":lambda *_:{
+                "state":"POSTSTOP_UNVERIFIED","observed_stopped":False}}))
+        self.assertEqual(r["reason"],"INDEPENDENT_POSTSTOP_REQUIRED")
+        self.assertEqual(self.events,[])
 
     def test_execute_off_refuses_without_worker_calls(self):
         self.assertEqual(recover_detached_combined(**(self.args|{
