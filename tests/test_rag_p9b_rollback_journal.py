@@ -40,6 +40,12 @@ class JournalTests(unittest.TestCase):
         self.file.write_text('{"seq":1,"seq":1,"state":"SHELL_ARMED","details":{}}',encoding="utf-8")
         self.assertEqual(read_journal(self.file)["state"],"JOURNAL_UNVERIFIED")
 
+    def test_nonfinite_json_number_refused(self):
+        for value in ("NaN","Infinity","-Infinity"):
+            with self.subTest(value=value):
+                self.file.write_text('{"seq":1,"state":"SHELL_ARMED","details":{"files":'+value+'}}',encoding="utf-8")
+                self.assertEqual(read_journal(self.file)["state"],"JOURNAL_UNVERIFIED")
+
     def test_corrupted_seq_refused(self):
         self.file.write_text('{"seq":9,"state":"SHELL_BAD"}',encoding="utf-8")
         self.assertEqual(read_journal(self.file)["state"],"JOURNAL_UNVERIFIED")
