@@ -17,6 +17,29 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(r["state"],"P9B_TRANSACTION_STEPS_OBSERVED_ONLY")
         self.assertFalse(r["authorized"])
 
+    def test_malformed_artifact_and_boolean_pair_are_blocked(self):
+        for bad in (None, [], {"state":"ARTIFACT_PAIR_VERIFIED_ONLY","paired":1}):
+            with self.subTest(bad=bad):
+                args=self.args()
+                args["artifact"]=bad
+                self.assertEqual(plan_transaction(**args)["reason"],
+                                 "ARTIFACT_PAIR_UNVERIFIED")
+
+    def test_malformed_shutdown_and_poststop_are_blocked(self):
+        for key in ("shutdown","poststop"):
+            args=self.args()
+            args[key]=None
+            result=plan_transaction(**args)
+            self.assertFalse(result["authorized"])
+            self.assertEqual(result["state"],"P9B_TRANSACTION_REFUSED")
+
+    def test_invalid_commit_digest_is_blocked(self):
+        for bad in ("z"*40, "A"*40, "a"*39, True):
+            args=self.args()
+            args["paired_commit"]=bad
+            result=plan_transaction(**args)
+            self.assertEqual(result["reason"],"SOURCE_COMMIT_MISMATCH")
+
     def test_wrong_commit_denied(self):
         a=self.args()
         a["paired_commit"]="b"*40

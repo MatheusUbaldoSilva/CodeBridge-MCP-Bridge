@@ -13,13 +13,21 @@ def plan_transaction(*, artifact, shutdown, poststop, independent_online,
             "installed_modified":False,
             "rollback_performed":False,
             "authorized":False}
-    if artifact.get("state")!="ARTIFACT_PAIR_VERIFIED_ONLY" or not artifact.get("paired"):
+    if (not isinstance(artifact,dict)
+            or artifact.get("state")!="ARTIFACT_PAIR_VERIFIED_ONLY"
+            or artifact.get("paired") is not True):
         return {**denied,"reason":"ARTIFACT_PAIR_UNVERIFIED"}
-    if paired_commit != artifact.get("source_commit"):
+    if (not isinstance(paired_commit,str) or len(paired_commit)!=40
+            or any(ch not in "0123456789abcdef" for ch in paired_commit)
+            or paired_commit != artifact.get("source_commit")):
         return {**denied,"reason":"SOURCE_COMMIT_MISMATCH"}
-    if shutdown.get("state")!="SHUTDOWN_SIGNALS_COMPLETED" or shutdown.get("processes_stopped") is not True:
+    if (not isinstance(shutdown,dict)
+            or shutdown.get("state")!="SHUTDOWN_SIGNALS_COMPLETED"
+            or shutdown.get("processes_stopped") is not True):
         return {**denied,"reason":"SHUTDOWN_UNVERIFIED"}
-    if poststop.get("state")!="POSTSTOP_OBSERVED_ONLY" or poststop.get("observed_stopped") is not True:
+    if (not isinstance(poststop,dict)
+            or poststop.get("state")!="POSTSTOP_OBSERVED_ONLY"
+            or poststop.get("observed_stopped") is not True):
         return {**denied,"reason":"POSTSTOP_UNVERIFIED"}
     if independent_online is not True:
         return {**denied,"reason":"EXTERNAL_RECOVERY_CHANNEL_UNAVAILABLE"}
