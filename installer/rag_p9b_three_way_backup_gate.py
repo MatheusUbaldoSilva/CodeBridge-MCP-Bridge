@@ -20,7 +20,8 @@ def verify_three_way(installer, file_snapshot, shell_snapshot, installed, *,
                     expected_installer_sha256=installer_hash,
                     expected_snapshot_sha256=file_snapshot_hash,
                     expected_source_commit=source_commit)
-    if pair.get("paired") is not True:
+    if (not isinstance(pair,dict) or pair.get("paired") is not True
+            or pair.get("state")!="ARTIFACT_PAIR_VERIFIED_ONLY"):
         return {**result,"reason":"FILE_ROLLBACK_PAIR_INVALID"}
     digest=str(shell_snapshot_hash).lower()
     file=Path(shell_snapshot)
@@ -29,7 +30,8 @@ def verify_three_way(installer, file_snapshot, shell_snapshot, installed, *,
             or hashlib.sha256(file.read_bytes()).hexdigest()!=digest):
         return {**result,"reason":"SHELL_SNAPSHOT_DIGEST_INVALID"}
     shell=shell_probe(file,appdata=appdata,desktop=desktop)
-    if shell.get("verified") is not True:
+    if (not isinstance(shell,dict) or shell.get("verified") is not True
+            or shell.get("state")!="SHELL_POSTRESTORE_MATCHED"):
         return {**result,"reason":"SHELL_BASELINE_CHANGED",
                 "shell_reason":shell.get("reason")}
     return {**result,"state":"THREE_WAY_BACKUP_OBSERVED_ONLY",
