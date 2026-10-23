@@ -30,6 +30,21 @@ class RollbackJournal:
                     "SHELL_NSIS_ISOLATED_RECOVERED",
                     "SHELL_NSIS_FULL_SCOPE_RECOVERED")):
             raise ValueError("JOURNAL_NOT_RESUMABLE")
+        # A terminal success anywhere in history cannot be followed by
+        # more recovery events. Reject malformed or unscoped event names.
+        try:
+            history=[json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+            completed={"SHELL_COMBINED_RECOVERY_VERIFIED",
+                "SHELL_NSIS_ISOLATED_RECOVERED",
+                "SHELL_NSIS_FULL_SCOPE_RECOVERED"}
+            if (any(not isinstance(entry,dict)
+                    or not isinstance(entry.get("state"),str)
+                    or not entry["state"].startswith("SHELL_")
+                    or entry["state"] in completed for entry in history)
+                    or not all(isinstance(e.get("details"),dict) for e in history)):
+                raise ValueError("JOURNAL_HISTORY_INVALID")
+        except (OSError,ValueError,TypeError):
+            raise ValueError("JOURNAL_HISTORY_INVALID") from None
         obj=cls.__new__(cls)
         obj.path=path
         obj._sequence=proof["count"]

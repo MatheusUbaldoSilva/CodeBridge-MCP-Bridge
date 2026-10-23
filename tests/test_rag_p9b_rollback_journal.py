@@ -54,5 +54,25 @@ class ResumeJournalTests(unittest.TestCase):
             j("SHELL_COMBINED_RECOVERY_VERIFIED",{})
             with self.assertRaises(ValueError):RollbackJournal.resume(path)
 
+class JournalTamperResumeTests(unittest.TestCase):
+    def test_rejects_completed_history_with_appended_event(self):
+        import json,tempfile
+        from pathlib import Path
+        from installer.rag_p9b_rollback_journal import RollbackJournal
+        with tempfile.TemporaryDirectory() as directory:
+            target=Path(directory)/"tampered.jsonl"
+            journal=RollbackJournal(target)
+            journal("SHELL_COMBINED_RECOVERY_VERIFIED",{})
+            journal("SHELL_BACKEND_ARMED",{})
+            with self.assertRaises(ValueError):RollbackJournal.resume(target)
+    def test_refuses_unscoped_incomplete_state(self):
+        import json,tempfile
+        from pathlib import Path
+        from installer.rag_p9b_rollback_journal import RollbackJournal
+        with tempfile.TemporaryDirectory() as directory:
+            target=Path(directory)/"wrong-state.jsonl"
+            target.write_text(json.dumps({"seq":1,"state":"OTHER_EVENT","details":{}})+"\n")
+            with self.assertRaises(ValueError):RollbackJournal.resume(target)
+
 if __name__=="__main__":
     unittest.main()
