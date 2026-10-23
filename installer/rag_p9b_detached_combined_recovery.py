@@ -82,6 +82,17 @@ def recover_detached_combined(*, file_worker=None, shell_worker=None,
                     "reason": "SHELL_NOT_VERIFIED"}
         journal("SHELL_DETACHED_SHELL_VERIFIED", {"postverified": True})
         current = "POSTVERIFY"
+        if production is True:
+            try:
+                final_stop = poststop_probe(installed)
+            except Exception:
+                final_stop = None
+            if (not isinstance(final_stop, dict)
+                    or final_stop.get("state") != "POSTSTOP_OBSERVED_ONLY"
+                    or final_stop.get("observed_stopped") is not True):
+                journal("SHELL_DETACHED_FINAL_POSTSTOP_FAILED", {})
+                return {**denied, "state": "DETACHED_COMBINED_REVIEW_REQUIRED",
+                        "reason": "POSTSTOP_LOST_BEFORE_POSTVERIFY"}
         verified = verify_worker()
         if (not isinstance(verified, dict)
                 or verified.get("verified") is not True):

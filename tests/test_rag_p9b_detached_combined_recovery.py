@@ -118,6 +118,28 @@ class DetachedCombinedTests(unittest.TestCase):
         self.assertEqual(shell_calls,[])
         self.assertIn("SHELL_DETACHED_POSTSTOP_RECHECK_FAILED",self.events)
 
+    def test_production_rechecks_processes_before_final_postverify(self):
+        snapshots=[]
+        verifier_calls=[]
+        def probe(*args):
+            snapshots.append(1)
+            return {"state":"POSTSTOP_OBSERVED_ONLY",
+                    "observed_stopped":len(snapshots)<3}
+        r=recover_detached_combined(**(self.args|{
+            "production":True,"identity_manifest":"fixture",
+            "identity_sha256":"a"*64,"installed":"C:/CodeBridge",
+            "source_commit":"b"*40,
+            "identity_gate":lambda **kw:{
+                "state":"DETACHED_IDENTITY_OBSERVED_ONLY",
+                "identity_verified":True,"artifacts_checked":4,
+                "cutover_authorized":False},
+            "poststop_probe":probe,
+            "verify_worker":lambda:verifier_calls.append(1)}))
+        self.assertEqual(r["reason"],"POSTSTOP_LOST_BEFORE_POSTVERIFY")
+        self.assertEqual(len(snapshots),3)
+        self.assertEqual(verifier_calls,[])
+        self.assertIn("SHELL_DETACHED_FINAL_POSTSTOP_FAILED",self.events)
+
     def test_execute_off_refuses_without_worker_calls(self):
         self.assertEqual(recover_detached_combined(**(self.args|{
             "execute":False}))["reason"],"INDEPENDENT_WORKERS_REQUIRED")
