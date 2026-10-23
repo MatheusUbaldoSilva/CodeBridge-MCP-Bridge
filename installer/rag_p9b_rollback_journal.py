@@ -122,9 +122,9 @@ class RollbackJournal:
 
 def read_journal(path):
     p=Path(path)
-    if not p.is_file() or p.is_symlink() or p.stat().st_size>1024*1024:
-        return {"state":"JOURNAL_UNVERIFIED"}
     try:
+        if not p.is_file() or p.is_symlink() or p.stat().st_size>1024*1024:
+            return {"state":"JOURNAL_UNVERIFIED"}
         raw=p.read_bytes()
         # A valid JSON object without the terminating newline is not a
         # committed fsync journal record after a possible power loss.

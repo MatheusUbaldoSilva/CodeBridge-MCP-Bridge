@@ -52,6 +52,11 @@ class JournalTests(unittest.TestCase):
             encoding="utf-8")
         self.assertEqual(read_journal(self.file)["state"],"JOURNAL_UNVERIFIED")
 
+    def test_journal_metadata_access_error_is_refused(self):
+        from unittest.mock import patch
+        with patch.object(Path,"stat",side_effect=PermissionError("access denied")):
+            self.assertEqual(read_journal(self.file)["state"],"JOURNAL_UNVERIFIED")
+
     def test_invalid_utf8_is_refused_fail_closed(self):
         self.file.write_bytes(b"\xff\xfe\n")
         self.assertEqual(read_journal(self.file)["state"],"JOURNAL_UNVERIFIED")
