@@ -168,6 +168,29 @@ class DetachedCombinedTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 RollbackJournal.resume(path,expected_transaction_sha256="a"*64)
 
+    def test_unbound_resumed_production_journal_refused(self):
+        import tempfile
+        from pathlib import Path
+        from installer.rag_p9b_rollback_journal import RollbackJournal
+        with tempfile.TemporaryDirectory() as root:
+            path=Path(root)/"unbound-resume.jsonl"
+            journal=RollbackJournal(path)
+            journal("SHELL_DETACHED_COMBINED_ARMED",{
+                "transaction_sha256":"a"*64})
+            resumed=RollbackJournal.resume(path)
+            r=recover_detached_combined(**(self.args|{
+                "production":True,"identity_manifest":"fixture",
+                "identity_sha256":"a"*64,"installed":"C:/CodeBridge",
+                "source_commit":"b"*40,"journal":resumed,
+                "identity_gate":lambda **kw:{
+                    "state":"DETACHED_IDENTITY_OBSERVED_ONLY",
+                    "identity_verified":True,"artifacts_checked":4,
+                    "cutover_authorized":False},
+                "poststop_probe":lambda *_:{
+                    "state":"POSTSTOP_OBSERVED_ONLY",
+                    "observed_stopped":True}}))
+            self.assertEqual(r["reason"],"RESUMED_JOURNAL_IDENTITY_UNVERIFIED")
+
     def test_execute_off_refuses_without_worker_calls(self):
         self.assertEqual(recover_detached_combined(**(self.args|{
             "execute":False}))["reason"],"INDEPENDENT_WORKERS_REQUIRED")

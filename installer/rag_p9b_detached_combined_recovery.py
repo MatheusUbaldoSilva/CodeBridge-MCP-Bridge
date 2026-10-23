@@ -49,6 +49,10 @@ def recover_detached_combined(*, file_worker=None, shell_worker=None,
                 or stopped.get("state") != "POSTSTOP_OBSERVED_ONLY"
                 or stopped.get("observed_stopped") is not True):
             return {**denied, "reason": "INDEPENDENT_POSTSTOP_REQUIRED"}
+    if (production is True and getattr(journal,"resumed",False) is True
+            and getattr(journal,"bound_transaction_sha256",None)
+                != str(identity_sha256).lower()):
+        return {**denied, "reason":"RESUMED_JOURNAL_IDENTITY_UNVERIFIED"}
     current = "FILES"
     try:
         if getattr(journal,"resumed",False) is not True:

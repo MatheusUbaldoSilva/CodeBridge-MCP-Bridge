@@ -14,6 +14,7 @@ class RollbackJournal:
             raise ValueError("JOURNAL_PATH_INVALID")
         self._sequence=0
         self.resumed=False
+        self.bound_transaction_sha256=None
         if self.path.exists():
             raise FileExistsError("JOURNAL_ALREADY_EXISTS")
         with self.path.open("xb") as f:
@@ -70,6 +71,9 @@ class RollbackJournal:
         obj.path=path
         obj._sequence=proof["count"]
         obj.resumed=True
+        obj.bound_transaction_sha256=(
+            str(expected_transaction_sha256).lower()
+            if expected_transaction_sha256 is not None else None)
         return obj
 
     def __call__(self,state,detail):
