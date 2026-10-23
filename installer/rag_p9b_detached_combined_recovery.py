@@ -99,6 +99,17 @@ def recover_detached_combined(*, file_worker=None, shell_worker=None,
             journal("SHELL_DETACHED_IDENTITY_RECHECK_FAILED", {"stage":"FILES"})
             return {**denied, "state":"DETACHED_COMBINED_REVIEW_REQUIRED",
                     "reason":"IDENTITY_CHANGED_BEFORE_FILES"}
+        if production is True:
+            try:
+                file_stop = poststop_probe(installed)
+            except Exception:
+                file_stop = None
+            if (not isinstance(file_stop, dict)
+                    or file_stop.get("state") != "POSTSTOP_OBSERVED_ONLY"
+                    or file_stop.get("observed_stopped") is not True):
+                journal("SHELL_DETACHED_PRE_FILES_POSTSTOP_FAILED", {})
+                return {**denied, "state": "DETACHED_COMBINED_REVIEW_REQUIRED",
+                        "reason": "POSTSTOP_LOST_BEFORE_FILES"}
         files = file_worker()
         if (not isinstance(files, dict)
                 or files.get("state") != "DETACHED_FILES_RESTORED_SHELL_PENDING"

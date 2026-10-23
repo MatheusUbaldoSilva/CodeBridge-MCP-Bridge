@@ -108,7 +108,7 @@ class DetachedCombinedTests(unittest.TestCase):
         def poststop(*args):
             snapshots.append(len(snapshots))
             return {"state":"POSTSTOP_OBSERVED_ONLY",
-                    "observed_stopped":len(snapshots)==1}
+                    "observed_stopped":len(snapshots)<=2}
         r=recover_detached_combined(**(self.args|{
              "production":True,
                 "ancestry_probe":lambda **kw:{
@@ -122,7 +122,7 @@ class DetachedCombinedTests(unittest.TestCase):
             "poststop_probe":poststop,
             "shell_worker":lambda:shell_calls.append(1)}))
         self.assertEqual(r["reason"],"POSTSTOP_LOST_BEFORE_SHELL")
-        self.assertEqual(len(snapshots),2)
+        self.assertEqual(len(snapshots),3)
         self.assertEqual(shell_calls,[])
         self.assertIn("SHELL_DETACHED_POSTSTOP_RECHECK_FAILED",self.events)
 
@@ -132,7 +132,7 @@ class DetachedCombinedTests(unittest.TestCase):
         def probe(*args):
             snapshots.append(1)
             return {"state":"POSTSTOP_OBSERVED_ONLY",
-                    "observed_stopped":len(snapshots)<3}
+                    "observed_stopped":len(snapshots)<4}
         r=recover_detached_combined(**(self.args|{
              "production":True,
                 "ancestry_probe":lambda **kw:{
@@ -146,9 +146,33 @@ class DetachedCombinedTests(unittest.TestCase):
             "poststop_probe":probe,
             "verify_worker":lambda:verifier_calls.append(1)}))
         self.assertEqual(r["reason"],"POSTSTOP_LOST_BEFORE_POSTVERIFY")
-        self.assertEqual(len(snapshots),3)
+        self.assertEqual(len(snapshots),4)
         self.assertEqual(verifier_calls,[])
         self.assertIn("SHELL_DETACHED_FINAL_POSTSTOP_FAILED",self.events)
+
+    def test_production_poststop_lost_before_files_never_runs_worker(self):
+        observations=[]
+        executed=[]
+        def poststop(*_):
+            observations.append(1)
+            return {"state":"POSTSTOP_OBSERVED_ONLY",
+                    "observed_stopped":len(observations)==1}
+        r=recover_detached_combined(**(self.args|{
+            "production":True,"identity_manifest":"fixture",
+            "identity_sha256":"a"*64,"installed":"C:/CodeBridge",
+            "source_commit":"b"*40,
+            "identity_gate":lambda **kw:{
+                "state":"DETACHED_IDENTITY_OBSERVED_ONLY",
+                "identity_verified":True,"artifacts_checked":4,
+                "cutover_authorized":False},
+            "ancestry_probe":lambda **kw:{
+                "state":"EXTERNAL_PROCESS_ANCESTRY_VERIFIED","verified":True},
+            "poststop_probe":poststop,
+            "file_worker":lambda:executed.append("files")}))
+        self.assertEqual(r["reason"],"POSTSTOP_LOST_BEFORE_FILES")
+        self.assertEqual(executed,[])
+        self.assertEqual(len(observations),2)
+        self.assertIn("SHELL_DETACHED_PRE_FILES_POSTSTOP_FAILED",self.events)
 
     def test_production_identity_change_before_files_never_runs_worker(self):
         calls=[]
