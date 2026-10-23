@@ -72,6 +72,33 @@ class DetachedCrashReplayTests(unittest.TestCase):
             self.assertNotIn("SHELL_DETACHED_COMBINED_VERIFIED",
                              journal.read_text(encoding="utf-8"))
 
+    def test_hard_exit_bound_lifecycle_replay_wrong_identity_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            journal=Path(d)/"bound-crash.jsonl"
+            repo=str(Path(__file__).resolve().parents[1])
+            child=(
+                "import os,sys;"
+                "from installer.rag_p9b_rollback_journal import RollbackJournal;"
+                "j=RollbackJournal(sys.argv[1]);"
+                "j('SHELL_DETACHED_LIFECYCLE_ARMED',"
+                "{'transaction_sha256':'a'*64});"
+                "j('SHELL_DETACHED_SHUTDOWN_SIGNALED',{});"
+                "os._exit(76)")
+            env=dict(os.environ)
+            env["PYTHONPATH"]=repo+os.pathsep+env.get("PYTHONPATH","")
+            process=subprocess.run([sys.executable,"-c",child,str(journal)],
+                cwd=repo,env=env,capture_output=True,timeout=15)
+            self.assertEqual(process.returncode,76,process.stderr)
+            self.assertEqual(read_journal(journal)["count"],2)
+            with self.assertRaises(ValueError):
+                RollbackJournal.resume(journal,expected_transaction_sha256="b"*64)
+            resumed=RollbackJournal.resume(
+                journal,expected_transaction_sha256="a"*64)
+            self.assertEqual(resumed.bound_transaction_sha256,"a"*64)
+            self.assertEqual(resumed._sequence,2)
+            self.assertNotIn("SHELL_DETACHED_GUI_RESTARTED",
+                             journal.read_text(encoding="utf-8"))
+
     def test_external_crash_does_not_imply_restart_or_nsis(self):
         with tempfile.TemporaryDirectory() as d:
             path=Path(d)/"crash.jsonl"
