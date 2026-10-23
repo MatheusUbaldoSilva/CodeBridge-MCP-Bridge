@@ -26,7 +26,9 @@ def write_identity(output,*,artifacts,installed,source_commit):
     if (destination.exists() or destination.is_symlink()
             or not destination.parent.is_dir() or destination.parent.is_symlink()):
         return {**rejected,"reason":"IDENTITY_OUTPUT_NOT_NEW"}
-    if set(artifacts)!=set(NAMES) or not isinstance(source_commit,str) or len(source_commit)!=40:
+    if (not isinstance(artifacts, dict) or set(artifacts)!=set(NAMES)
+            or not isinstance(source_commit,str) or len(source_commit)!=40
+            or any(c not in "0123456789abcdef" for c in source_commit)):
         return {**rejected,"reason":"ARTIFACT_SET_INVALID"}
     try:
         values={}
@@ -57,9 +59,14 @@ def verify_identity(path,expected_sha):
         if src.stat().st_size>8192 or digest(src)!=expected:
             return {**rejected,"reason":"MANIFEST_HASH_MISMATCH"}
         body=json.loads(src.read_text(encoding="utf-8"))
-        if (body.get("schema")!=1 or body.get("purpose")!=PURPOSE
-                or set(body.get("artifacts",{}))!=set(NAMES)
-                or len(body.get("source_commit",""))!=40):
+        source=body.get("source_commit")
+        artifact_specs=body.get("artifacts")
+        if (type(body.get("schema")) is not int or body["schema"]!=1
+                or body.get("purpose")!=PURPOSE
+                or not isinstance(artifact_specs,dict)
+                or set(artifact_specs)!=set(NAMES)
+                or not isinstance(source,str) or len(source)!=40
+                or any(c not in "0123456789abcdef" for c in source)):
             return {**rejected,"reason":"MANIFEST_SCHEMA_INVALID"}
         for name in NAMES:
             spec=body["artifacts"][name]
