@@ -65,7 +65,15 @@ def run_lab_retry(*, config, retry_ledger, transaction_sha256, worker=None,
             return {**blocked, "reason": attempt.get("reason", "RESERVATION_REFUSED"),
                     "retry_state": attempt.get("state"),
                     "attempts": attempt.get("attempts")}
+        # Revalidate immediate pre-worker and post-worker identity. This is a
+        # detection gate, not an immutable file handle or publisher authority.
+        if hashlib.sha256(cfg.read_bytes()).hexdigest() != transaction_sha256:
+            return {**blocked, "reason": "CONFIG_CHANGED_BEFORE_WORKER",
+                    "attempt": attempt["attempt"]}
         outcome = worker(str(cfg))
+        if hashlib.sha256(cfg.read_bytes()).hexdigest() != transaction_sha256:
+            return {**blocked, "reason": "CONFIG_CHANGED_DURING_WORKER",
+                    "attempt": attempt["attempt"]}
         if not isinstance(outcome, dict) or outcome.get("verified") is not True:
             return {**blocked, "state": "P9B_RETRY_RECOVERY_REVIEW_REQUIRED",
                     "reason": "COMBINED_RECOVERY_UNVERIFIED",

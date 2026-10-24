@@ -133,6 +133,25 @@ class ScheduledCombinedRetryAdapterTests(unittest.TestCase):
         self.sha=hashlib.sha256(self.config.read_bytes()).hexdigest()
         self.assertEqual(self.invoke()["reason"],"SHELL_OUTSIDE_SCRATCH")
         self.assertFalse(self.ledger.exists())
+    def test_config_mutation_during_worker_prevents_terminal(self):
+        def mutating_worker(_):
+            self.calls += 1
+            self.config.write_bytes(self.config.read_bytes()+b" ")
+            return {"verified":True,"production_modified":False}
+        result=self.invoke(worker=mutating_worker)
+        self.assertEqual(result["reason"],"CONFIG_CHANGED_DURING_WORKER")
+        self.assertFalse(result["verified"])
+        self.assertEqual(self.calls,1)
+        self.assertEqual(json.loads(self.ledger.read_text())["attempts"],1)
+        self.assertNotEqual(json.loads(self.ledger.read_text())["state"],"TERMINAL")
+
+    def test_config_deleted_by_worker_refuses_terminal(self):
+        def deleting_worker(_):
+            self.config.unlink()
+            return {"verified":True,"production_modified":False}
+        result=self.invoke(worker=deleting_worker)
+        self.assertEqual(result["reason"],"LAB_RETRY_EXECUTION_FAILED")
+        self.assertNotEqual(json.loads(self.ledger.read_text())["state"],"TERMINAL")
     def test_config_mutation_after_binding_denied_without_reserve(self):
         raw=json.loads(self.config.read_text())
         raw["extra_untrusted_field"]="changed"
