@@ -6,10 +6,10 @@ out-of-band trust root must be attested by a distinct authorized component.
 from __future__ import annotations
 
 import hashlib
-import json
+import tempfile
 from pathlib import Path
 
-from installer.rag_p9b_frozen_disposable_bundle import verify_disposable_bundle
+from installer.rag_p9b_frozen_disposable_bundle import verify_disposable_bundle, _contained
 
 
 def verify_signed_frozen_bundle(*, manifest, signature, public_key,
@@ -24,6 +24,13 @@ def verify_signed_frozen_bundle(*, manifest, signature, public_key,
         return {**refused, "reason": "BUNDLE_INCONSISTENT",
                 "bundle_reason": consistency.get("reason")}
     try:
+        temp = Path(temp_root or tempfile.gettempdir()).resolve(strict=True)
+        detached_signature = Path(signature)
+        if (not _contained(detached_signature, temp)
+                or detached_signature.is_symlink()
+                or not detached_signature.is_file()
+                or detached_signature.stat().st_size != 64):
+            return {**refused, "reason": "SIGNATURE_PATH_NOT_DISPOSABLE"}
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
         manifest_bytes = Path(manifest).read_bytes()
         signature_bytes = Path(signature).read_bytes()

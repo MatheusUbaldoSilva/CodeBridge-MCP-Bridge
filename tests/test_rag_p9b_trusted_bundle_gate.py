@@ -71,6 +71,19 @@ class TrustedRootGateTests(unittest.TestCase):
             serialization.Encoding.Raw, serialization.PublicFormat.Raw)
         self.assertEqual(self.check(public_key=other)["reason"], "SIGNATURE_NOT_VERIFIED")
 
+    def test_signature_outside_disposable_root_refused(self):
+        external = Path(self.root.anchor)/"unlikely-signature-p9b.bin"
+        self.assertEqual(self.check(signature=external)["reason"],
+                         "SIGNATURE_PATH_NOT_DISPOSABLE")
+
+    def test_symlinked_signature_refused(self):
+        link = self.root/"signature-link.bin"
+        try:
+            link.symlink_to(self.signature)
+        except (OSError,NotImplementedError):
+            self.skipTest("symlink unavailable")
+        self.assertEqual(self.check(signature=link)["reason"],
+                         "SIGNATURE_PATH_NOT_DISPOSABLE")
     def test_modified_frozen_artifact_refused_before_signature(self):
         (self.root / "frozen" / "installer.bin").write_bytes(b"changed")
         proof = self.check()
