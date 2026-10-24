@@ -10,7 +10,7 @@
 
 ## Documentação técnica oficial
 
-O conjunto de referências **do sistema que existe nesta branch** está em [docs/INDEX.md](docs/INDEX.md). Inclui arquitetura, executor e ledger, 16 ferramentas MCP declaradas, segurança (DPAPI, Named Pipes), RAG interno e ranking, interface Windows, implantação NSIS e recuperação, sempre distinguindo código implementado de disponibilidade operacional.
+O conjunto de referências **do sistema que existe nesta branch** está em [docs/INDEX.md](docs/INDEX.md). Inclui arquitetura, executor e ledger, 16 ferramentas MCP principais e 2 ferramentas de checkpoint de desenvolvimento, segurança (DPAPI, Named Pipes), RAG interno e ranking, interface Windows, implantação NSIS e recuperação, sempre distinguindo código implementado de disponibilidade operacional.
 
 ## Arquitetura e responsabilidades
 
