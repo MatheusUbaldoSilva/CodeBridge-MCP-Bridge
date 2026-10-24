@@ -1,7 +1,7 @@
-"""OS-backed exclusive lock for one disposable P9-B rollback journal.
+"""OS-backed exclusive lock for disposable P9-B rollback journals.
 
-The lock sidecar persists across process crashes to keep the lock inode stable.
-A host-local advisory lock does not authenticate an untrusted filesystem.
+The persistent sidecar is initialized while holding the same OS lock used by
+all subsequent readers. Never delete it; local advisory locking is not trust.
 """
 from __future__ import annotations
 
@@ -17,29 +17,37 @@ def exclusive_journal_lock(path):
     if (not journal.parent.is_dir() or journal.parent.is_symlink()
             or lock.is_symlink() or (lock.exists() and not lock.is_file())):
         raise ValueError("JOURNAL_LOCK_PATH_INVALID")
+    created = False
     try:
-        with lock.open("xb") as initializer:
-            initializer.write(b"1")
-            initializer.flush()
-            os.fsync(initializer.fileno())
+        stream = lock.open("x+b")
+        created = True
     except FileExistsError:
-        pass
-    if lock.is_symlink() or not lock.is_file() or lock.stat().st_size!=1:
-        raise ValueError("JOURNAL_LOCK_PATH_INVALID")
-    with lock.open("r+b") as stream:
+        stream = lock.open("r+b")
+    with stream:
         stream.seek(0)
         if os.name == "nt":
             import msvcrt
             msvcrt.locking(stream.fileno(), msvcrt.LK_LOCK, 1)
-            try:
-                yield
-            finally:
-                stream.seek(0)
-                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
         else:
             import fcntl
             fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
+        try:
+            if lock.is_symlink() or not lock.is_file():
+                raise ValueError("JOURNAL_LOCK_PATH_INVALID")
+            if created:
+                if lock.stat().st_size != 0:
+                    raise ValueError("JOURNAL_LOCK_PATH_INVALID")
+                stream.write(b"1")
+                stream.flush()
+                os.fsync(stream.fileno())
+            else:
+                stream.seek(0)
+                if lock.stat().st_size != 1 or stream.read(1) != b"1":
+                    raise ValueError("JOURNAL_LOCK_PATH_INVALID")
+            yield
+        finally:
+            stream.seek(0)
+            if os.name == "nt":
+                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
                 fcntl.flock(stream.fileno(), fcntl.LOCK_UN)

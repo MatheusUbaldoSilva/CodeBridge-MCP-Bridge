@@ -86,6 +86,17 @@ class RetryLedgerTests(unittest.TestCase):
                          "LEDGER_IDENTITY_OR_SCHEMA_MISMATCH")
         self.assertEqual(self.ledger.read_bytes(), before)
 
+    def test_preexisting_empty_lock_fails_closed(self):
+        lock=self.ledger.with_name(self.ledger.name+".lock")
+        lock.write_bytes(b"")
+        self.assertEqual(self.reserve()["reason"],"LEDGER_UNVERIFIED")
+        self.assertFalse(self.ledger.exists())
+
+    def test_preexisting_tampered_lock_fails_closed(self):
+        lock=self.ledger.with_name(self.ledger.name+".lock")
+        lock.write_bytes(b"X")
+        self.assertEqual(self.reserve()["reason"],"LEDGER_UNVERIFIED")
+        self.assertFalse(self.ledger.exists())
     def test_corrupt_json_refused(self):
         self.ledger.write_bytes(b"{bad json")
         before=self.ledger.read_bytes()
