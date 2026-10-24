@@ -1,60 +1,43 @@
-# Arquitetura — CodeBridge 2.0 MCP Bridge
+# Arquitetura do CodeBridge
 
-## Princípio central
+## Visão de componentes
 
-O MCP autoral é o único transporte oficial entre ChatGPT e o CodeBridge 2.0. A autoridade de execução permanece dentro do runtime local.
+```text
+Cliente MCP autorizado (por exemplo, ChatGPT)
+           | MCP HTTP via túnel seguro
+           v
+author_mcp/mcp_server.py (API de ferramentas MCP)
+           | protocolo CBMCP/1
+           v
+author_mcp/adapter_server.py -> app_rewrite/api_server.py
+           | localhost, token e runtime
+           v
+app_rewrite/runtime.py (BridgeRuntime)
+     |                 |                  |
+ TerminalManager  ExecutionLedger   RAG local
+     |                                   |
+ PowerShell / CMD / SSH             SQLite + Qdrant + Jina
+```
 
-## Fluxo
+## Limites de responsabilidade
 
-1. ChatGPT chama uma ferramenta do MCP autoral.
-2. O MCP cria um `REQUEST_SYN` CBMCP/1.
-3. O adapter persiste e confirma o pedido com `REQUEST_ACK`.
-4. O adapter chama a API local autenticada do CodeBridge.
-5. O runtime valida alvo, identidade e disponibilidade do terminal.
-6. O comando é preparado no terminal real.
-7. O executor V2 registra `execution_id`, estado e saída incremental.
-8. PowerShell 5.1, CMD ou SSH executa o comando.
-9. O resultado é persistido localmente.
-10. O adapter cria `RESPONSE_SYN` e o MCP confirma com `RESPONSE_ACK`.
+- **Servidor MCP:** expõe ferramentas, valida parâmetros, encapsula erros e formata respostas. Implementação em `author_mcp/mcp_server.py`.
+- **Adapter e API local:** encaminham pedidos para o runtime sob controle de acesso. A API do aplicativo usa endereço de loopback por padrão.
+- **Runtime:** gerencia a execução, estados, preparação, espera, cancelamento, identificação dos pedidos e snapshots em `app_rewrite/runtime.py`.
+- **Terminais:** `TerminalManager` coordena sessões reais Windows e SSH; a interface Qt apenas mostra eventos e interage com elas.
+- **RAG:** serviço separado de descoberta de informação. Respostas do RAG não substituem o sistema de arquivos nem a versão Git atual.
+- **Desktop:** interface PySide6, gerenciador MCP, túnel e telemetria em `app_rewrite/`.
 
-## Autoridade de terminal
+## Transporte e estados
 
-`TerminalManager.prepare()` possui a trava lógica comum para impedir que dois caminhos de automação preparem comandos simultaneamente.
+O protocolo `CBMCP/1` identifica requisições e respostas e possui confirmações de recebimento. A instância observada utiliza servidor MCP em `127.0.0.1:8765/mcp` e adapter local em `127.0.0.1:8766`, porém configurações e portas podem variar. Essas portas não devem ser expostas diretamente na rede.
 
-Os destinos canônicos são `POWERSHELL5.1`, `CMD` e `SSH`.
-## Persistência
+Há processos locais supervisionados pelo desktop em `author_mcp_manager.py` e `secure_tunnel_manager.py`. O código usa controle de instância única em Windows e canais IPC internos. A disponibilidade de um terminal deve ser consultada, não presumida.
 
-- `author_mcp_protocol.db`: handshake CBMCP/1 e deduplicação;
-- `executions_v2.db`: identidade, estado e resultado das execuções;
-- `execution_output_chunks`: saída incremental append-only por cursor;
-- `jobs.db`: fila local tradicional da interface.
+## Interfaces principais
 
-## Invariantes
-
-- o MCP não executa shell diretamente;
-- nenhum retry pode executar novamente uma mutação já associada ao mesmo `request_id`;
-- o comando aparece no terminal real antes do Enter;
-- resultados só concluem o handshake após `RESPONSE_ACK`;
-- restart transforma execução V2 incompleta de runtime anterior em `INTERRUPTED`;
-- stop por `execution_id` só atua sobre a execução correspondente;
-- PowerShell 5.1, CMD e SSH usam o mesmo contrato V2 de start/status/result/output/stop.
-
-## Ciclo de vida do MCP autoral
-
-`BridgeRuntime.start()` sobe a stack local do MCP autoral depois que a API local e o `runtime.json` já estão disponíveis.
-
-O `AuthorMCPManager` inicia somente:
-- adapter local em `127.0.0.1:8766`;
-- servidor MCP local em `127.0.0.1:8765/mcp`.
-
-Se uma stack completa já estiver online, o runtime apenas a detecta e não assume propriedade. Se apenas uma das portas estiver ocupada, o início automático é bloqueado como estado degradado para evitar colisão.
-
-`BridgeRuntime.stop()` encerra somente os processos que o runtime reconhece como pertencentes à instância atual. O `AuthorMCPManager` gerencia o adapter e o MCP local; o `SecureTunnelManager` gerencia o túnel remoto.
-
-## Acesso remoto
-
-O acesso remoto usa o Secure Tunnel do CodeBridge e o mesmo MCP autoral local em `127.0.0.1:8765/mcp`. O perfil do túnel encaminha o canal `main` para esse endpoint, sem duplicar a stack MCP.
-
-## Interface
-
-A interface usa PySide6 + QWebEngineView + xterm.js para exibir os terminais persistentes. O estado do MCP autoral é obtido pelo health do adapter e pela porta do servidor MCP.
+- [MCP_TOOLS.md](MCP_TOOLS.md): entradas externas.
+- [EXECUTOR.md](EXECUTOR.md): ciclo de execução e estados.
+- [RAG_INTERNALS.md](RAG_INTERNALS.md): organização de armazenamento e consulta.
+- [SECURITY.md](SECURITY.md): fronteiras de confiança.
+- [STORAGE.md](STORAGE.md): dados persistidos.

@@ -1,9 +1,0 @@
-# P9-B.02-D / 03-C — Actual isolated HKCU crash-and-resume via durable retries
-Date: 2026-10-24
-State: independent process crash and fresh process recovery PROVEN in disposable Windows lab; not yet Windows Scheduled Task automatically starting the second process; P9-B OPEN.
-
-test_rag_p9b_adapter_actual_hkcu_hardcrash_resume.py reuses the existing scoped Windows real HKCU fixture and existing combined rollback worker through run_lab_retry, without a parallel restore engine. A genuine release staging file snapshot is copied to TEMP and its SHA-256 compared before use. Initial separate Python process reserves retry #1 and performs file restoration, then os._exit(87) injected by existing P9B_LAB_FAULT_AFTER_FILES setting before coordinator completion. Parent observes exact return code 87 and ledger attempt 1. A second independent subprocess (not a scheduled invocation yet) resumes the same persistent journal and performs complete real remapped HKCU/shortcuts/files rollback, reaches state P9B_LAB_COMBINED_TERMINAL_PERSISTED and fsyncs retry TERMINAL at attempt #2. Third independent process returns DURABLE_TERMINAL_STATE and leaves attempts 2. Final shell comparison PASS.
-
-4 Windows tests PASS in 9.326s (fixture base tests included). Full P9B regression 599 PASS in 75.314s. Prior OS lock initialization race fix commit 6af7e25 keeps concurrent readers serialized and correctly rejects preexisting zero-length/tampered locks.
-
-Incomplete for P9-B.02-C/E: no single manifest signed by protected independent root; no one durable journal containing actual NSIS mutation and complete shell rollback; injection AFTER_FILES does not certify crash during NSIS. Incomplete for P9-B.03-B/C: second subprocess explicitly launched by test, not automatically scheduled supervisor. Official installation/HKCU and active RAG remain untouched.

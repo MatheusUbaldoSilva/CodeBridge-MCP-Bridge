@@ -1,4 +1,4 @@
-﻿"""Read-only installer payload inventory and reversible installed-file snapshot.
+"""Read-only installer payload inventory and reversible installed-file snapshot.
 
 No installer execution, service stop, restored files, secrets or RAG data.
 Only the files explicitly present in the audited NSIS payload are in scope.
@@ -19,7 +19,7 @@ _ALLOWED_ROOTS = {
     "installer", "browser_extension", "tools",
 }
 _ALLOWED_FILES = {"requirements.txt", "README.md", "version.json",
-                  "docs/DESKTOP_DEPLOYMENT_CURRENT.md"}
+                  "docs/INSTALLATION.md"}
 _DENIED_PARTS = {".env", ".ssh", "secrets", "private", "credentials"}
 _DENIED_SUFFIXES = {".key", ".pem", ".p12", ".pfx", ".sqlite", ".db"}
 

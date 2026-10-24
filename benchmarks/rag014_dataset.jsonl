@@ -23,31 +23,31 @@
 {"id":"rag014-023","category":"code","query":"Where does get_context enforce project scoped authorized chunk retrieval","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-024","category":"code","query":"How are public RAG exceptions classified into stable structured error contracts","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-025","category":"code","query":"Where is Git HEAD and branch metadata attached to an immutable Chunk","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-026","category":"docs","query":"What backend was selected for persistent vector storage and why","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-027","category":"docs","query":"What are the frozen dimensions of the text and code embedding collections","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-028","category":"docs","query":"Why was sqlite vec rejected as the initial vector backend","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-029","category":"docs","query":"Why was LanceDB not selected for the first CodeBridge desktop vector index","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-030","category":"docs","query":"What does the RAG 009 closeout prove about idempotent reindexing","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-031","category":"docs","query":"What are the canonical project namespace examples defined for the vector index","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-032","category":"docs","query":"What rules define a valid project namespace","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-033","category":"docs","query":"What does RAG 010 A combine before ranking fusion","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-034","category":"docs","query":"What does RAG 010 B add for code retrieval","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-035","category":"docs","query":"What is the role of RAG 010 C HYBRID queries","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-036","category":"docs","query":"Why does RAG 010 D use Reciprocal Rank Fusion instead of raw score addition","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-037","category":"docs","query":"What near duplicate policy and threshold were frozen in RAG 010 E","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-038","category":"docs","query":"What metrics were observed in the RAG 010 retrieval benchmark","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-039","category":"docs","query":"What does the RAG 011 closeout say about Git provenance and staleness","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-040","category":"docs","query":"What does the RAG 012 manifest persist for incremental indexing","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-041","category":"docs","query":"When should an unchanged file be skipped according to RAG 012","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-042","category":"docs","query":"What happens to chunks when a source file is removed","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-043","category":"docs","query":"How does RAG 012 handle embedding model version changes","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-044","category":"docs","query":"Which four MCP tools are proposed and implemented in RAG 013","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-045","category":"docs","query":"Why is codebridge_rag_index safe by default","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-046","category":"docs","query":"What inputs are accepted by codebridge_search_context","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-047","category":"docs","query":"What authorization boundary is documented for codebridge_get_context","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-048","category":"docs","query":"Which RAG error categories were frozen in RAG 013 E","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-049","category":"docs","query":"How was real MCP integration proven for RAG 013","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-050","category":"docs","query":"What query distribution is required by the RAG 014 benchmark handoff","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-026","category":"docs","query":"How is Qdrant used as the local vector store?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-027","category":"docs","query":"Which stores back lexical and semantic searches in CodeBridge?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-028","category":"docs","query":"How does the RAG distinguish lexical retrieval from vector retrieval?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-029","category":"docs","query":"Which persistent vector backend is described for the local RAG?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-030","category":"docs","query":"How do chunk identifiers and source provenance aid consistent indexing?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-031","category":"docs","query":"Which RAG modules are responsible for vector namespaces and project isolation?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-032","category":"docs","query":"Which metadata is used to constrain RAG searches to a project?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-033","category":"docs","query":"How is lexical and vector evidence combined for text queries?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-034","category":"docs","query":"Which retrieval pipeline handles code queries?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-035","category":"docs","query":"What is the role of hybrid retrieval in the RAG?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-036","category":"docs","query":"Which ranking function fuses results across retrieval modes?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-037","category":"docs","query":"Which module deduplicates exact and near-duplicate passages?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-038","category":"docs","query":"Which CodeBridge subsystems implement ranking and document retrieval?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-039","category":"docs","query":"What metadata helps trace source provenance and freshness?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-040","category":"docs","query":"What data stores and generation metadata must be preserved together?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-041","category":"docs","query":"How are sources identified for incremental indexing?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-042","category":"docs","query":"What gates control changes to an already published RAG generation?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-043","category":"docs","query":"How is model inference managed when resources are limited?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-044","category":"docs","query":"Which MCP tools support RAG status, search, context and index planning?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-045","category":"docs","query":"Why is the RAG index tool non-mutating with its default arguments?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-046","category":"docs","query":"Which filters and parameters does codebridge_search_context accept?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-047","category":"docs","query":"Which authorization and freshness arguments does codebridge_get_context accept?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-048","category":"docs","query":"Which MCP result fields distinguish an operation failure from success?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-049","category":"docs","query":"How can a client verify the CodeBridge MCP tools and runtime status?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-050","category":"docs","query":"What is the purpose and source-of-truth boundary of the CodeBridge RAG?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-051","category":"errors_audits","query":"What structured error should be returned when a local embedding model cannot load","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-052","category":"errors_audits","query":"How is an unavailable RAG index represented at the public MCP boundary","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-053","category":"errors_audits","query":"What happens when get_context requests a chunk that does not exist","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
@@ -61,9 +61,9 @@
 {"id":"rag014-061","category":"errors_audits","query":"How does the Git state reader report a directory that is not a repository","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-062","category":"errors_audits","query":"What is the behavior when Git HEAD does not resolve to a canonical 40 character SHA","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-063","category":"errors_audits","query":"How does staleness distinguish a changed file from the SHA stored at index time","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-064","category":"errors_audits","query":"What audit proves RAG 010 was closed with a clean synchronized Git branch","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-065","category":"errors_audits","query":"What audit proves RAG 013 real MCP calls returned structured output rather than protocol errors","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
-{"id":"rag014-066","category":"errors_audits","query":"How was the Python 3.13 sqlite ResourceWarning around Qdrant local persistence handled","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-064","category":"errors_audits","query":"How are MCP execution results associated with an execution ID?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-065","category":"errors_audits","query":"Which CodeBridge MCP calls expose RAG status and search functionality?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
+{"id":"rag014-066","category":"errors_audits","query":"What persistent storage components compose an active RAG generation?","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-067","category":"errors_audits","query":"What validation rejects a text query vector with the wrong embedding dimension","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-068","category":"errors_audits","query":"What validation rejects a code query vector with the wrong embedding dimension","language":"en","ground_truth_status":"PENDING_RAG_014_B"}
 {"id":"rag014-069","category":"errors_audits","query":"How is an invalid idle timeout value rejected in the model manager","language":"en","ground_truth_status":"PENDING_RAG_014_B"}

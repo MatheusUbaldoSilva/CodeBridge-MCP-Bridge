@@ -1,6 +1,0 @@
-# P9-B — Bounded lock sidecar creation micro-race handling
-Date 2026-10-24. Status: test passed, P9-B open.
-
-Previous commit 6af7e25 made initialization occur under the OS lock. New audit found another narrow interval: a second opener can acquire that lock between the creator opening a new zero-byte sidecar and the creator acquiring the byte-range lock. Bounded retry now releases the lock and waits 15ms (max 24 acquisitions) only for a zero-byte marker, allowing a legitimate creator to finish initializing; if marker stays zero, refuse. Noncanonical marker content, replaced symlinks and paths remain fail-closed. No sidecar deletion, no production auth.
-
-Tests: 21 focused OS journal lock and retry tests PASS; full P9B 599 tests PASS in 74.194 seconds after change. This is host-local advisory lock, NOT an authentication guarantee or proof of power-loss durability. P9-B.01-C protected trust root and P9-B.02-C unified actual NSIS identity and P9-B.03 scheduler autonomous full recovery remain unfinished.

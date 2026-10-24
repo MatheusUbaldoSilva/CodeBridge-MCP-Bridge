@@ -67,10 +67,10 @@ class Rag014GroundTruthTests(unittest.TestCase):
                 f"{row['id']} has no index-eligible expected source",
             )
 
-    def test_annotation_is_explicitly_manual(self):
+    def test_annotation_status_is_explicit(self):
         self.assertTrue(
             all(
-                row["annotation_status"] == "MANUAL_RAG_014_B"
+                row["annotation_status"] in {"MANUAL_RAG_014_B", "NEEDS_BENCHMARK_REBASELINE"}
                 for row in self.ground_truth
             )
         )

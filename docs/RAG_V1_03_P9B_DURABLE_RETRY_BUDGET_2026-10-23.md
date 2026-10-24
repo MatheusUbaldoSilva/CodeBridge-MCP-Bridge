@@ -1,8 +1,0 @@
-# P9-B.03-B — Persistent disposable retry reservations
-State: PREPARATORY TESTED / autonomous scheduled restart NOT CERTIFIED, P9-B OPEN.
-
-A TEMP-only durable fsync retry ledger was added without changing the existing rollback engine. Every attempt reservation is serialized with the existing OS sidecar lock, held through verification and atomic replacement of the ledger file. The record binds one transaction SHA256, never accepts duplicate JSON keys, denies cross-transaction replay, and caps attempts to three before REVIEW_REQUIRED. No task or official installer is started.
-
-Tests (9 PASS): attempts 1/2/3 plus exhaustion, wrong transaction identity, corrupt and duplicate JSON, TEMP escape, malformed SHA, pending-file collision, two concurrent Windows processes get different attempt numbers, hard-exit 87 leaves persisted reservation for another process. Full P9B 563 tests PASS in 54.070 seconds.
-
-Important limits: the ledger is a bounded-attempt primitive, not a source-signed journal or authenticated authority. It is not connected to Windows Task Scheduler automatic restart, and no unified NSIS installation/rollback has been certified. Independent trust root still TRUST_ROOT_UNVERIFIED. Future 03-B implementation must add safe task persistence, expiry/backoff, pending ownership and idempotent recovery while preserving locked in-use evidence; do not connect to live installation without operator approval.

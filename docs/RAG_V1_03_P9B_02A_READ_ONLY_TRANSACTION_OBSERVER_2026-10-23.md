@@ -1,6 +1,0 @@
-# P9-B.02-A - Read-only unified recovery journal observer
-Status: preparatory read-only observer tested, P9-B.02-A is NOT a unified NSIS execution proof. P9-B.01-C trust root still blocked.
-
-New module installer/rag_p9b_unified_journal_observer.py reuses existing RollbackJournal events without changing historical writers or resume readers. Requires exact first ARM event bound to expected SHA256, subsequent verified file, verified shell, verified terminal combined event, ordered and each unique. Rejects incomplete, reordered, duplicate, post-terminal, FAILED/UNVERIFIED/EXCEPTION/REFUSED, corrupt and mismatched identity. Never mutates a file and never grants installer permission.
-
-New nine negative/positive focused tests PASS. Full P9B 543 PASS in 51.208 seconds. This does not certify one actual NSIS transaction or independent supervisor auto-restart. Do not start production NSIS. Next 02-B must remain disposable isolated until independently protected trust root and transaction identity are proven.
