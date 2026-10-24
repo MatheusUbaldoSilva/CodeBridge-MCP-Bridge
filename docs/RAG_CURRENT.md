@@ -64,3 +64,7 @@ Não há canal automático implícito de arquivo anexado ao ChatGPT para o files
 O inventário aplica regras de rejeição a exemplos como ambientes virtuais, dependências, caches, binários, backups e nomes de arquivos de credenciais/chaves. A aprovação de uma pasta não equivale à aprovação irrestrita de todos os seus arquivos.
 
 A documentação histórica não é a fonte de verdade para código executável. Utilizar estado real do servidor e arquivos atuais quando houver divergência.
+
+## Detalhes internos da implementação
+
+Para ranking, recuperação híbrida, inventário, manifestos, geração, locks e gates de publicação, veja [RAG_INTERNALS_CURRENT.md](RAG_INTERNALS_CURRENT.md). Os mecanismos no código não estão necessariamente habilitados na busca pública.
