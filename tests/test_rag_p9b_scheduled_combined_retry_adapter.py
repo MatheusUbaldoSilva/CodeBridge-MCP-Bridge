@@ -1,3 +1,4 @@
+import hashlib
 import json
 import tempfile
 import unittest
@@ -29,7 +30,7 @@ class ScheduledCombinedRetryAdapterTests(unittest.TestCase):
             "journal":str(self.root/"combined.jsonl"),
             "token":"b"*32, **self.backups}),encoding="utf-8")
         self.ledger=self.root/"retry.json"
-        self.sha="a"*64
+        self.sha=hashlib.sha256(self.config.read_bytes()).hexdigest()
         self.calls=0
 
     def invoke(self, worker=None, **changes):
@@ -94,11 +95,13 @@ class ScheduledCombinedRetryAdapterTests(unittest.TestCase):
 
     def test_untrusted_lab_path_no_reservation(self):
         self.config.write_text(json.dumps({"lab":str(self.root)}),encoding="utf-8")
+        self.sha=hashlib.sha256(self.config.read_bytes()).hexdigest()
         self.assertEqual(self.invoke()["reason"],"DISPOSABLE_ROOT_REQUIRED")
         self.assertFalse(self.ledger.exists())
 
     def test_incomplete_config_does_not_reserve(self):
         self.config.write_text(json.dumps({"lab":str(self.lab)}),encoding="utf-8")
+        self.sha=hashlib.sha256(self.config.read_bytes()).hexdigest()
         self.assertEqual(self.invoke()["reason"],"RECOVERY_CONFIGURATION_INCOMPLETE")
         self.assertFalse(self.ledger.exists())
 
@@ -106,6 +109,7 @@ class ScheduledCombinedRetryAdapterTests(unittest.TestCase):
         config=json.loads(self.config.read_text())
         config["snapshot"]=str(Path(self.root.anchor)/"outside.zip")
         self.config.write_text(json.dumps(config),encoding="utf-8")
+        self.sha=hashlib.sha256(self.config.read_bytes()).hexdigest()
         self.assertEqual(self.invoke()["reason"],"BACKUP_OUTSIDE_SCRATCH")
         self.assertFalse(self.ledger.exists())
 
@@ -118,6 +122,7 @@ class ScheduledCombinedRetryAdapterTests(unittest.TestCase):
         config=json.loads(self.config.read_text())
         config["lab"]=str(alias)
         self.config.write_text(json.dumps(config),encoding="utf-8")
+        self.sha=hashlib.sha256(self.config.read_bytes()).hexdigest()
         self.assertEqual(self.invoke()["reason"],"DISPOSABLE_ROOT_REQUIRED")
         self.assertFalse(self.ledger.exists())
 
@@ -125,12 +130,19 @@ class ScheduledCombinedRetryAdapterTests(unittest.TestCase):
         config=json.loads(self.config.read_text())
         config["desktop"]=str(self.root)
         self.config.write_text(json.dumps(config),encoding="utf-8")
+        self.sha=hashlib.sha256(self.config.read_bytes()).hexdigest()
         self.assertEqual(self.invoke()["reason"],"SHELL_OUTSIDE_SCRATCH")
+        self.assertFalse(self.ledger.exists())
+    def test_config_mutation_after_binding_denied_without_reserve(self):
+        raw=json.loads(self.config.read_text())
+        raw["extra_untrusted_field"]="changed"
+        self.config.write_text(json.dumps(raw),encoding="utf-8")
+        self.assertEqual(self.invoke()["reason"],"TRANSACTION_CONFIG_SHA_MISMATCH")
         self.assertFalse(self.ledger.exists())
     def test_digest_substitution_rejected(self):
         self.assertTrue(self.invoke()["verified"])
         self.assertEqual(self.invoke(transaction_sha256="b"*64)["reason"],
-                         "LEDGER_IDENTITY_OR_SCHEMA_MISMATCH")
+                         "TRANSACTION_CONFIG_SHA_MISMATCH")
         self.assertEqual(self.calls,1)
 
 

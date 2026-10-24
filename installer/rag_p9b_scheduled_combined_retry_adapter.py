@@ -4,6 +4,7 @@ No scheduler registration, no production deployment, no installer execution.
 The existing detached combined lab owns all restore operations and scope guards.
 """
 from __future__ import annotations
+import hashlib
 import json
 import tempfile
 from pathlib import Path
@@ -27,7 +28,10 @@ def run_lab_retry(*, config, retry_ledger, transaction_sha256, worker=None,
             or ledger.parent != cfg.parent):
         return {**blocked, "reason": "LAB_CONFIG_OR_LEDGER_SCOPE_INVALID"}
     try:
-        data = json.loads(cfg.read_text(encoding="utf-8"))
+        config_bytes = cfg.read_bytes()
+        if hashlib.sha256(config_bytes).hexdigest() != transaction_sha256:
+            return {**blocked, "reason": "TRANSACTION_CONFIG_SHA_MISMATCH"}
+        data = json.loads(config_bytes.decode("utf-8"))
         raw_lab = Path(data["lab"]).absolute()
         if not _contained(raw_lab, root):
             return {**blocked, "reason": "DISPOSABLE_ROOT_REQUIRED"}
