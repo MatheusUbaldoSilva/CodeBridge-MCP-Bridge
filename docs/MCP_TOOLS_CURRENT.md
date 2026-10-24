@@ -1,64 +1,101 @@
-# CodeBridge — Catálogo de ferramentas MCP
+# Ferramentas MCP — contratos da branch atual
 
-Referência dos nomes declarados no servidor `author_mcp/mcp_server.py` e dos contratos expostos na conexão em uso. **Declarada no código** não significa necessariamente **publicada na conexão atual**.
+Catálogo declarado em `author_mcp/mcp_server.py`. A assinatura do servidor é a fonte de verdade; uma ferramenta declarada pode não estar exposta pela conexão ChatGPT da instalação corrente. As ferramentas de terminal operam com as permissões da sessão real do computador.
 
 ## Estado e descoberta
 
-| Nome | Chamada / argumentos | O que retorna |
+| Ferramenta | Parâmetros | Resultado |
 |---|---|---|
-| `codebridge_status` | `{}` | Handshake, status READY, app, versão, filas, executor, disponibilidade dos terminais |
-| `codebridge_capabilities` | `{}` | Alvos aceitos, recursos, limites e ferramentas preferidas |
-| `codebridge_read_batch` | `{requests:[...]}` (conferir schema do servidor) | Lote validado de operações estritamente somente leitura |
+| `codebridge_status` | Nenhum | Protocolo, handshake, versão, disponibilidade de terminais, estado do executor |
+| `codebridge_capabilities` | Nenhum | `targets`, `features`, `limits`, ferramentas preferidas e migração |
+| `codebridge_read_batch` | **`operations: list[dict]`** | Executa lote restrito de consultas de leitura |
 
-## Execução e terminal
+### `codebridge_read_batch` — contrato exato
 
-| Nome | Parâmetros importantes | Efeito |
-|---|---|---|
-| `codebridge_prepare` | `target, command` | Prepara comando, sem Enter |
-| `codebridge_execute_prepared` | `prepared_request_id` | Envia Enter do comando preparado uma vez |
-| `codebridge_discard` | `request_id` opcional | Descarta comando preparado |
-| `codebridge_exec` | `target, command, wait_timeout_ms, output_mode` | Inicia/acompanha execução no terminal |
-| `codebridge_wait` | `execution_id, cursor, wait_timeout_ms, max_chars, output_mode` | Lê saída e estado do ID sem novo Enter |
-| `codebridge_stop` | `execution_id` opcional | Interrompe execução indicada ou fluxo ativo/preparado |
+Cada elemento de `operations` aceita somente as chaves `id` (opcional), `kind` e `path`. Tipos permitidos: `GIT_STATUS`, `GIT_HEAD`, `GIT_BRANCH`, `VERSION`, `FILE_STAT` e `SHA256`. `VERSION` **não aceita `path`**; todos os outros tipos exigem `path`.
 
 ```json
-{"target":"CMD","command":"ver","wait_timeout_ms":1500,"output_mode":"NORMAL"}
+{
+  "operations": [
+    {"id": "git", "kind": "GIT_STATUS", "path": "C:\\Users\\Matheus\\CodeBridge-MCP-Bridge"},
+    {"id": "app", "kind": "VERSION"}
+  ]
+}
 ```
 
-Exemplo para `codebridge_exec`. Em caso de retorno `RUNNING`, continuar por `codebridge_wait`, não repetir a chamada acima.
+Máximo observado na versão auditada: 32 operações e 8 workers. Campos desconhecidos rejeitam a validação. O nome `requests` **não é** o parâmetro desta ferramenta.
 
-## Conhecimento/RAG
+## Executor e controle
 
-| Nome | Parâmetros importantes | Comportamento |
+| Ferramenta | Assinatura essencial | Função |
 |---|---|---|
-| `codebridge_rag_status` | `{}` | Geração, índice, backend, modelos e projetos |
-| `codebridge_rag_index` | `project_id, project_root, scope, paths, execute` | Prévia da elegibilidade; execução condicionada a gates |
-| `codebridge_search_context` | `query, project, top_k, source_types, path_filter, branch` | Pesquisa indexada com proveniência |
-| `codebridge_get_context` | Identificadores de chunks autorizados e projeto | Recupera contexto indexado, não lê paths arbitrários |
-| `codebridge_rag_generation_probe` | Sem argumentos | Diagnóstico de geração, declarado no servidor |
-| `codebridge_rag_integrity` | Sem argumentos | Diagnóstico de integridade, declarado no servidor |
-| `codebridge_rag_queue_bootstrap` | Conferir assinatura do código | Bootstrap da fila incremental; não equivale à publicação |
+| `codebridge_prepare` | `(target: str, command: str)` | Prepara o comando no terminal sem enviar Enter |
+| `codebridge_execute_prepared` | `(prepared_request_id: str)` | Envia Enter do comando preparado |
+| `codebridge_discard` | `(request_id: str | None = None)` | Descarta preparação sem executar |
+| `codebridge_exec` | `(target, command, wait_timeout_ms=1500, output_mode="NORMAL")` | Inicia execução pelo executor V2 |
+| `codebridge_wait` | `(execution_id, cursor=0, wait_timeout_ms=15000, max_chars=32768, output_mode="NORMAL")` | Consulta estado e saída incremental sem reenviar Enter |
+| `codebridge_stop` | `(execution_id: str | None = None)` | Interrompe execução especificada ou fluxo ativo/preparado |
 
-Os três últimos métodos podem não estar expostos à conexão corrente. Consultas que exigem ferramenta não oferecida pelo cliente não devem ser descritas como executadas.
+Alvos suportados pela instalação observada: `POWERSHELL5.1`, `CMD` e `SSH`. `SSH` depende de a sessão estar online. `codebridge_capabilities` informa limites reais.
 
-### Exemplos
+Exemplo de `codebridge_exec`:
 
 ```json
-{"project":"codebridge","query":"Em qual arquivo o runtime trata o cancelamento?","top_k":5}
+{"target":"POWERSHELL5.1","command":"Get-Date","wait_timeout_ms":1500,"output_mode":"NORMAL"}
 ```
 
-Chamada: `codebridge_search_context`.
+Para resposta `RUNNING`, continue por `codebridge_wait` com o **mesmo `execution_id`**:
+
+```json
+{"execution_id":"<execution_id retornado>","cursor":0,"wait_timeout_ms":15000,"output_mode":"RAW"}
+```
+
+`NORMAL` pode compactar saídas extensas automaticamente; `COMPACT` solicita resumo, `RAW` preserva a recuperação. Os campos `stdout`/`stderr` expostos devem ser interpretados conforme o contrato de `stream_mode` e `streams_separated` do retorno: não presumir streams independentes em toda sessão.
+
+## Conhecimento e RAG
+
+| Ferramenta | Assinatura/parâmetros | Função |
+|---|---|---|
+| `codebridge_rag_status` | `()` | Estado da geração pública, manifesto, SQLite, Qdrant, projetos e modelos |
+| `codebridge_rag_index` | `(project_id, project_root, scope="BOTH", paths=None, execute=False)` | Planejamento das fontes e execução condicionada a gates |
+| `codebridge_search_context` | `(query, project, source_types=None, top_k=10, path_filter=None, branch=None)` | Pesquisa restrita ao projeto com filtros e proveniência |
+| `codebridge_get_context` | `(project, chunk_ids, include_document_content=False, project_root=None, allow_stale=False)` | Recupera chunks identificados e autorizados |
+| `codebridge_rag_generation_probe` | `()` | Sonda a geração; método declarado, não necessariamente exposto |
+| `codebridge_rag_integrity` | `()` | Verificações diagnósticas de integridade; pode não estar exposto |
+| `codebridge_rag_queue_bootstrap` | `(execute=False, operator_approved=False, confirmation=None, expected_generation=None)` | Verifica/inicia mecanismo restrito de bootstrap da fila; não equivale a publicação |
+
+### Exemplos seguros
+
+`codebridge_search_context`:
+
+```json
+{"project":"codebridge","query":"Onde fica o ledger de execução?","top_k":5}
+```
+
+`codebridge_get_context` (utilize IDs **retornados pela busca**, não paths arbitrários):
+
+```json
+{"project":"codebridge","chunk_ids":["<id de chunk válido>"],"include_document_content":false,"allow_stale":false}
+```
+
+`codebridge_rag_index` (somente prévia):
 
 ```json
 {"project_id":"codebridge","project_root":"C:\\Users\\Matheus\\CodeBridge-MCP-Bridge","scope":"BOTH","paths":["README.md"],"execute":false}
 ```
 
-Chamada: `codebridge_rag_index`. **Não publica nada**; é um planejamento de elegibilidade de fonte.
+A publicação incremental no índice público está **bloqueada ou não certificada**. `execute=true` não é um atalho de autorização. A ferramenta de bootstrap possui um contrato próprio de aprovação e gates; sua presença no servidor não prova que foi habilitada na conexão atual.
 
-## Ferramentas de compatibilidade
+## Nomes legados
 
-Nomes históricos `codebridge_v2_start`, `codebridge_v2_status`, `codebridge_v2_result`, `codebridge_v2_output`, `codebridge_v2_stop`, `codebridge_start` e `codebridge_execution_status` não são o caminho preferido de novas integrações. Utilize `codebridge_exec`, `codebridge_wait` e `codebridge_stop`.
+A família `codebridge_v2_start/status/output/result/stop` e nomes `codebridge_start`, `codebridge_execution_status` e `codebridge_terminal` aparecem em políticas de compatibilidade. Novos clientes devem preferir `codebridge_exec`, `codebridge_wait`, `codebridge_stop`, `codebridge_prepare` e `codebridge_execute_prepared`.
 
-## Como confirmar um contrato
+## Fonte e observabilidade
 
-A assinatura real de cada ferramenta está em `author_mcp/mcp_server.py` e na descrição MCP descoberta pelo cliente. Os campos desta referência são um guia funcional, não uma substituição ao schema dinâmico e à política de autorização. Para limites, consulte `codebridge_capabilities`. Para disponibilidade, `codebridge_status`.
+- Assinaturas: `author_mcp/mcp_server.py`.
+- Esquema do lote: `app_rewrite/read_only_batch.py::_validate_operations`.
+- Estados persistentes: `app_rewrite/execution_ledger.py`.
+- Busca e contexto: `author_mcp/rag_bridge.py`.
+- Disponibilidade efetiva: chamada real `codebridge_status` e ferramentas anunciadas pela conexão.
+
+Leia também [EXECUTION_RUNTIME_CURRENT.md](EXECUTION_RUNTIME_CURRENT.md), [SECURITY_AND_PERSISTENCE_CURRENT.md](SECURITY_AND_PERSISTENCE_CURRENT.md) e [RAG_INTERNALS_CURRENT.md](RAG_INTERNALS_CURRENT.md).
