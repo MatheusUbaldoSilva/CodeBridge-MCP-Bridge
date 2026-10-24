@@ -114,6 +114,12 @@ class RollbackJournal:
                "utc_epoch":time.time(),"details":safe}
         if self.path.is_symlink() or not self.path.is_file():
             raise ValueError("JOURNAL_PATH_INVALID")
+        # A resumed writer must never append on a journal changed by another
+        # process (or replaced) since its last observed sequence.
+        current=read_journal(self.path)
+        if (current.get("state")!="JOURNAL_OBSERVED_ONLY"
+                or current.get("count")!=self._sequence):
+            raise ValueError("JOURNAL_SEQUENCE_CHANGED")
         with self.path.open("ab") as f:
             f.write((json.dumps(entry,sort_keys=True)+chr(10)).encode("utf-8"))
             f.flush()

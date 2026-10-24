@@ -32,6 +32,24 @@ class JournalTests(unittest.TestCase):
                 journal("SHELL_RESTORE_ARMED",{})
         self.assertEqual(read_journal(self.file)["count"],0)
 
+    def test_stale_resumed_writer_rejects_second_writer_event(self):
+        w=RollbackJournal(self.file)
+        w("SHELL_COMBINED_RECOVERY_ARMED",{})
+        resumed=RollbackJournal.resume(self.file)
+        w("SHELL_COMBINED_FILE_CHECKED",{"postverified":True})
+        with self.assertRaisesRegex(ValueError,"JOURNAL_SEQUENCE_CHANGED"):
+            resumed("SHELL_DETACHED_SHELL_VERIFIED",{})
+        self.assertEqual(read_journal(self.file)["count"],2)
+
+    def test_writer_refuses_tampered_journal_before_append(self):
+        w=RollbackJournal(self.file)
+        w("SHELL_COMBINED_RECOVERY_ARMED",{})
+        with self.file.open("ab") as stream:
+            stream.write(b"{corrupted}\n")
+        before=self.file.read_bytes()
+        with self.assertRaisesRegex(ValueError,"JOURNAL_SEQUENCE_CHANGED"):
+            w("SHELL_COMBINED_FILE_CHECKED",{})
+        self.assertEqual(self.file.read_bytes(),before)
     def test_non_shell_state_refused(self):
         w=RollbackJournal(self.file)
         with self.assertRaises(ValueError):w("EXTERNAL",{})
