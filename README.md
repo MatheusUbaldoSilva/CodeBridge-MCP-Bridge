@@ -8,6 +8,10 @@
 
 > **Situação atual:** o executor MCP e a consulta ao índice RAG existente funcionam. A entrada de fontes possui inventário e prévia, mas a **publicação incremental no índice ativo ainda está bloqueada**. A fase de atualização/rollback NSIS P9-B está congelada para priorizar leitura, escrita e gerenciamento do RAG. Não interpretar testes isolados como autorização de instalação em produção.
 
+## Documentação técnica oficial
+
+O conjunto de referências **do sistema que existe nesta branch** está em [docs/INDEX.md](docs/INDEX.md). Inclui arquitetura, executor e ledger, 16 ferramentas MCP declaradas, segurança (DPAPI, Named Pipes), RAG interno e ranking, interface Windows, implantação NSIS e recuperação, sempre distinguindo código implementado de disponibilidade operacional.
+
 ## Arquitetura e responsabilidades
 
 ```text
@@ -152,7 +156,7 @@ Os nomes `codebridge_ping`, `codebridge_terminal`, `codebridge_start`, `codebrid
 Há instalador e atualizador em `installer/`; consulte [docs/INSTALLER.md](docs/INSTALLER.md) e [installer/build_installer.ps1](installer/build_installer.ps1). As rotinas incluem instalação de runtime isolado, componentes do túnel e configuração da conexão. A documentação/artefatos de instalador não substituem os gates de release ainda pendentes.
 
 ```powershell
-.\installer\build_installer.ps1 -InstallInno
+.\installer\build_installer.ps1 -InstallNSIS
 ```
 
 **Atenção:** esse é o comando documentado do build histórico; confirme os parâmetros suportados pela revisão atual do script e o resultado das validações antes de distribuir o instalador. Não executar cutover P9-B até certificação e aprovação.
