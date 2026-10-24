@@ -1,8 +1,22 @@
+import multiprocessing
 import tempfile
 import unittest
 from pathlib import Path
 from installer.rag_p9b_rollback_journal import RollbackJournal,read_journal
 
+
+def simultaneous_append_worker(path, ready, go, results):
+    from installer.rag_p9b_rollback_journal import RollbackJournal
+    try:
+        resumed=RollbackJournal.resume(path)
+        ready.put("ready")
+        if not go.wait(10):
+            results.put("timeout")
+            return
+        resumed("SHELL_COMBINED_FILE_CHECKED",{"postverified":True})
+        results.put("written")
+    except ValueError as error:
+        results.put(str(error))
 
 class JournalTests(unittest.TestCase):
     def setUp(self):
@@ -18,6 +32,33 @@ class JournalTests(unittest.TestCase):
         self.assertEqual(read_journal(self.file)["last_state"],"SHELL_BACKEND_WRITTEN")
         self.assertNotIn("DO_NOT_PERSIST",self.file.read_text(encoding="utf-8"))
 
+    def test_two_resumed_processes_only_one_append_succeeds(self):
+        ctx=multiprocessing.get_context("spawn")
+        journal=RollbackJournal(self.file)
+        journal("SHELL_COMBINED_RECOVERY_ARMED",{})
+        ready=ctx.Queue()
+        go=ctx.Event()
+        results=ctx.Queue()
+        workers=[ctx.Process(target=simultaneous_append_worker,
+            args=(str(self.file),ready,go,results)) for _ in range(2)]
+        try:
+            for worker in workers:
+                worker.start()
+            self.assertEqual(ready.get(timeout=10),"ready")
+            self.assertEqual(ready.get(timeout=10),"ready")
+            go.set()
+            observed=[results.get(timeout=10) for _ in workers]
+            self.assertEqual(sorted(observed),["JOURNAL_SEQUENCE_CHANGED","written"])
+            for worker in workers:
+                worker.join(timeout=10)
+                self.assertEqual(worker.exitcode,0)
+            self.assertEqual(read_journal(self.file)["count"],2)
+        finally:
+            go.set()
+            for worker in workers:
+                if worker.is_alive():
+                    worker.terminate()
+                worker.join(timeout=5)
     def test_preexisting_file_refused(self):
         RollbackJournal(self.file)
         with self.assertRaises(FileExistsError):RollbackJournal(self.file)
