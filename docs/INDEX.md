@@ -1,23 +1,27 @@
-# Documentacao principal do CodeBridge
+# Documentação principal — CodeBridge
 
-Atualizado em 2026-10-24. Este indice separa material operacional de evidencias historicas.
+Este diretório contém os **documentos de referência do estado atual** da branch `rag-017-optimized-inference-after-candidate`. Descrevem o que o sistema possui, suas interfaces, contratos e limites, **não a sequência de desenvolvimento**.
 
-## Comece por aqui
-- `../README.md`: recursos atuais, MCP, exemplos e situacao do RAG.
-- `ARCHITECTURE.md`: arquitetura, fluxo de execucao e contratos do runtime.
-- `ROADMAP.md`: marcos historicos da base MCP (nao confundir com prioridades mais recentes).
-- `INSTALLER.md`: configuracao Windows e instalacao; release P9-B ainda nao certificado.
-- `RAG_RW_PRIORITY_2026-10-24.md`: prioridade atual de leitura, escrita e anexacao do RAG.
+## Leitura recomendada
 
-## Contratos e evidencias tecnicas
-- `RAG_001*` a `RAG_017*`: fundamentos, contratos, benchmarks e closeouts do RAG.
-- `RAG_V1*`: integridade, geracoes, supervisao, rollback e gates de producao.
-- `HANDOFF*`: continuidade e decisoes de fases.
-- Arquivos de teste e codigo-fonte permanecem a referencia final para comportamento executavel.
+1. **[CURRENT_SYSTEM.md](CURRENT_SYSTEM.md)** — visão do produto, componentes e arquitetura em operação.
+2. **[EXECUTION_RUNTIME_CURRENT.md](EXECUTION_RUNTIME_CURRENT.md)** — executor CBMCP/1, terminais, preparação, execução, espera, cancelamento e limites.
+3. **[MCP_TOOLS_CURRENT.md](MCP_TOOLS_CURRENT.md)** — catálogo das ferramentas MCP, argumentos, efeitos e exemplos.
+4. **[RAG_CURRENT.md](RAG_CURRENT.md)** — fontes, embeddings, SQLite, Qdrant, pesquisa, integridade e status de escrita.
+5. **[DESKTOP_DEPLOYMENT_CURRENT.md](DESKTOP_DEPLOYMENT_CURRENT.md)** — interface Windows, serviços, instalação, atualizador e segurança operacional.
 
-## Historico e limpeza controlada
-- Arquivo ZIP dos 396 documentos anteriores: `C:\Users\Matheus\CodeBridge_Branch_Archive\CodeBridge_docs_before_cleanup_2026-10-24.zip`.
-- Primeira retirada: 12 evidencias intermediarias P9-B de 2026-10-22, sem referencias textuais no HEAD auditado.
-- O repositorio Git preserva historico de documentos excluidos; nao remover contratos, blockers atuais ou evidencias de rollback ativo sem revisao individual.
-- Os tres arquivos locais pendentes preexistentes nao fazem parte desta limpeza.
-- O indice RAG ativo e a instalacao Windows nao foram alterados por essa limpeza.
+**[README.md](../README.md)** é a apresentação do repositório. Para detalhe técnico, priorizar os cinco documentos acima.
+
+## Interpretação dos estados
+
+- **Implementado:** existe no código da branch.
+- **Operacional/observado:** foi verificado na instalação MCP conectada.
+- **Condicional:** depende de configuração, conexão ou seleção de projeto.
+- **Não liberado:** componentes podem existir, mas o caminho real de produção permanece bloqueado.
+- **Não certificado:** o recurso não passou por toda a validação necessária à alegação de prontidão.
+
+Arquivos de `docs/` fora deste conjunto continuam sendo material de apoio para auditoria enquanto permanecerem no repositório; **não alteram automaticamente a descrição do estado atual**. O código da revisão Git ativa e o status de execução são as fontes finais para comportamento e disponibilidade.
+
+## Segurança para futura consolidação
+
+Não excluir indiscriminadamente contratos consumidos por testes/código, esquemas, políticas, registros de integridade/rollback e evidências exigidas para certificação. A eliminação das documentações antigas é uma operação separada e requer análise de dependências, backup recuperável e validação pós-exclusão. Um índice RAG ativo pode manter referências históricas até nova indexação autorizada.
