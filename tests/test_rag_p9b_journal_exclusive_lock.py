@@ -1,4 +1,5 @@
 import multiprocessing
+import os
 import queue
 import tempfile
 import unittest
@@ -12,6 +13,13 @@ def lock_worker(path, gate, result):
         result.put("entered")
         gate.wait(8)
 
+
+def hard_crash_lock_worker(path, result):
+    with exclusive_journal_lock(path):
+        result.put("acquired")
+        result.close()
+        result.join_thread()
+        os._exit(91)
 
 class ExclusiveLockTests(unittest.TestCase):
     def test_lock_sidecar_survives_reentry(self):
@@ -62,6 +70,23 @@ class ExclusiveLockTests(unittest.TestCase):
             process.join(timeout=10)
             self.assertEqual(process.exitcode,0)
             self.assertEqual(result.get(timeout=5),"entered")
+    def test_hard_crash_releases_os_lock(self):
+        with tempfile.TemporaryDirectory() as root:
+            ctx=multiprocessing.get_context("spawn")
+            path=str(Path(root)/"recovery.jsonl")
+            result=ctx.Queue()
+            process=ctx.Process(target=hard_crash_lock_worker,args=(path,result))
+            process.start()
+            try:
+                self.assertEqual(result.get(timeout=10),"acquired")
+                process.join(timeout=10)
+                self.assertEqual(process.exitcode,91)
+                with exclusive_journal_lock(path):
+                    self.assertTrue(Path(path+".lock").is_file())
+            finally:
+                if process.is_alive():
+                    process.terminate()
+                    process.join(timeout=5)
     def test_symlink_sidecar_refused(self):
         with tempfile.TemporaryDirectory() as root:
             a=Path(root)/"journal.jsonl"
