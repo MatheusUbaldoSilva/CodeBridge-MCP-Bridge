@@ -64,6 +64,7 @@ try {
     '    suite=unittest.TestSuite()'
     '    for pattern in ("test_rag_p9b_detached_combined_hardcrash_chain_e2e.py","test_rag_p9b_real_hkcu_scratch_crash.py","test_rag_p9b_real_hkcu_file_combined_crash.py"):'
     '        suite.addTests(unittest.defaultTestLoader.discover(str(repo/"tests"),pattern=pattern))'
+    '    suite.addTests(unittest.defaultTestLoader.loadTestsFromName("test_rag_p9b_detached_combined_recovery_lab.DetachedRealRegistryIntegration.test_recovery_survives_launcher_hard_exit"))'
     '    for method in ("test_actual_nsis_interruption_recovers_in_external_child","test_actual_nsis_then_recoverer_hardcrash_replays","test_actual_nsis_then_file_recoverer_hardcrash_replays","test_actual_nsis_crash_corrupt_journal_refuses_replay"):'
     '        suite.addTests(unittest.defaultTestLoader.loadTestsFromName("test_rag_p9b_detached_combined_recovery_lab.DetachedRealRegistryIntegration."+method))'
     '    with (folder/"test.log").open("w",encoding="utf-8") as stream:'
@@ -84,7 +85,7 @@ try {
       $proof.verified -ne $true -or $proof.ancestry_verified -ne $true -or
       $proof.production_modified -ne $false -or $proof.failures -ne 0 -or
             $proof.errors -ne 0 -or $proof.skipped -ne 0 -or
-      $proof.unexpected_successes -ne 0 -or $proof.passes -ne 7){
+      $proof.unexpected_successes -ne 0 -or $proof.passes -ne 8){
     $tail=if(Test-Path -LiteralPath (Join-Path $folder 'test.log')) {
       (Get-Content -LiteralPath (Join-Path $folder 'test.log') -Tail 45) -join ' | '
     }else{'LAB_LOG_MISSING'}

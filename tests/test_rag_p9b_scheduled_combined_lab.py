@@ -20,12 +20,13 @@ class IndependentCombinedSchedulerLabTests(unittest.TestCase):
                      "isolated_nsis_test_executed=$true",
                      "test_actual_nsis_crash_corrupt_journal_refuses_replay",
                      "test_actual_nsis_then_file_recoverer_hardcrash_replays",
+                     "test_recovery_survives_launcher_hard_exit",
                      "LAB_FAILED_OR_UNVERIFIED",
                      "SOURCE_IDENTITY_MISMATCH","source_sha256",
                      "Get-FileHash","InjectHashMismatchForLab","Stop-ScheduledTask",
                      "LAB_TASK_STILL_RUNNING_CLEANUP_REFUSED",
                      "run.skipped","unexpected_successes",
-                     "$proof.passes -ne 7"):
+                     "$proof.passes -ne 8"):
             self.assertIn(item,script)
         for forbidden in ("Stop-Process","Set-ItemProperty",
                           "Start-Process","makensis.exe","CodeBridge-P9B"):
