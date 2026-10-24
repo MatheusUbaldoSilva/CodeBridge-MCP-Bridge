@@ -74,6 +74,10 @@ A base possui módulos de lock, lease, journal, cópia verificada, troca de pont
 | Escrita incremental/publicação de novas fontes | Bloqueada ou não certificada |
 | Transação completa NSIS com recuperação supervisionada P9-B | Não certificada para cutover da instalação em produção |
 
+## Continuidade por checkpoint MCP
+
+As ferramentas `codebridge_dev_checkpoint_save` e `codebridge_dev_checkpoint_latest` estão registradas em `author_mcp/development_checkpoint_tools.py`. Elas gravam/consultam resumos operacionais associados à sessão ativa, mas não substituem Git, backup, transações nem recuperação de processo.
+
 ## Regras de manutenção
 
 - Fixar a revisão Git e preservar alterações locais não commitadas antes de atualização.
