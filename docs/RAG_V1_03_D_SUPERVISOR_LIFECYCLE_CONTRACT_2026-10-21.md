@@ -2,7 +2,7 @@
 
 Data: 2026-10-21
 Estado: LABORATÓRIO SINTÉTICO, SEM AGENDADOR EM PRODUÇÃO
-Base: `6db1ca4` e `docs/HANDOFF_RAG_V1_03_D_SCHEDULER_PREPARATION_2026-10-21.md`.
+Escopo: máquina de estados do supervisor incremental em laboratório, sem ativação do agendador instalado.
 
 ## Alterações
 
