@@ -123,7 +123,7 @@ Ferramenta: `codebridge_search_context`.
 
 **Planejar inclusão de arquivo, sem publicar**
 ```json
-{"project_id":"codebridge","project_root":"C:\\Users\\Matheus\\CodeBridge-MCP-Bridge","scope":"TEXT","paths":["docs/ROADMAP.md"],"execute":false}
+{"project_id":"codebridge","project_root":"C:\\Users\\Matheus\\CodeBridge-MCP-Bridge","scope":"TEXT","paths":["docs/CURRENT_SYSTEM.md"],"execute":false}
 ```
 Ferramenta: `codebridge_rag_index`.
 
@@ -153,7 +153,7 @@ Os nomes `codebridge_ping`, `codebridge_terminal`, `codebridge_start`, `codebrid
 
 ## Instalação e atualização Windows
 
-Há instalador e atualizador em `installer/`; consulte [docs/INSTALLER.md](docs/INSTALLER.md) e [installer/build_installer.ps1](installer/build_installer.ps1). As rotinas incluem instalação de runtime isolado, componentes do túnel e configuração da conexão. A documentação/artefatos de instalador não substituem os gates de release ainda pendentes.
+Há instalador e atualizador em `installer/`; consulte [documentação de implantação](docs/DESKTOP_DEPLOYMENT_CURRENT.md) e [installer/build_installer.ps1](installer/build_installer.ps1). As rotinas incluem instalação de runtime isolado, componentes do túnel e configuração da conexão. A documentação/artefatos de instalador não substituem os gates de release ainda pendentes.
 
 ```powershell
 .\installer\build_installer.ps1 -InstallNSIS
@@ -163,13 +163,14 @@ Há instalador e atualizador em `installer/`; consulte [docs/INSTALLER.md](docs/
 
 ## Repositório e documentação
 
-Branch única de desenvolvimento e padrão do GitHub: `rag-017-optimized-inference-after-candidate` (referência inicial deste README: `b6a1a18`).
+A documentação técnica **do sistema atual** está centralizada em [docs/INDEX.md](docs/INDEX.md). Ela inclui os contratos do MCP, executor, RAG, segurança, interface, implantação e recuperação.
 
-- [Arquitetura](docs/ARCHITECTURE.md)
-- [Protocolo MCP](author_mcp/PROTOCOL.md)
-- [Contrato RAG](docs/RAG_CONTRACT.md)
-- [Roadmap geral](docs/ROADMAP.md)
-- [Nova prioridade: RAG leitura/escrita/fontes](docs/RAG_RW_PRIORITY_2026-10-24.md)
-- [Instalador](docs/INSTALLER.md)
-
-A limpeza de branches foi realizada mantendo backup independente dos refs anteriores. O código e a documentação continuam sob Git; arquivos locais não versionados devem ser revisados antes de qualquer limpeza.
+- [Visão do sistema](docs/CURRENT_SYSTEM.md)
+- [Executor MCP](docs/EXECUTION_RUNTIME_CURRENT.md)
+- [Ferramentas MCP](docs/MCP_TOOLS_CURRENT.md)
+- [Segurança e persistência](docs/SECURITY_AND_PERSISTENCE_CURRENT.md)
+- [RAG e funcionalidades](docs/RAG_CURRENT.md)
+- [RAG interno](docs/RAG_INTERNALS_CURRENT.md)
+- [Interface desktop](docs/DESKTOP_FEATURES_CURRENT.md)
+- [Instalação Windows](docs/DESKTOP_DEPLOYMENT_CURRENT.md)
+- [Operação e recuperação](docs/OPERATIONS_AND_RECOVERY_CURRENT.md)

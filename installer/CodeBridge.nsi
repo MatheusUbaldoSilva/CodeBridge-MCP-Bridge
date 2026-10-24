@@ -202,7 +202,7 @@ Section "CodeBridge" SEC_MAIN
   File "..\version.json"
 
   SetOutPath "$INSTDIR\docs"
-  File "..\docs\INSTALLER.md"
+  File "..\docs\DESKTOP_DEPLOYMENT_CURRENT.md"
 
   SetOutPath "$INSTDIR\app_rewrite"
   File "..\app_rewrite\*.py"

@@ -294,7 +294,7 @@ class RuntimeFingerprintTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp)/"baseline.json"
             valid = json.loads((Path(__file__).resolve().parents[1] /
-                "docs/RAG_V1_03_D_C_PUBLIC_INDEX_BASELINE_2026-10-20.json").read_text())
+                "tests/fixtures/rag_public_index_baseline_fixture.json").read_text())
             for field, invalid in (("sha256", "not-a-hash"),
                                    ("bytes", -1), ("exists", False)):
                 modified = json.loads(json.dumps(valid))

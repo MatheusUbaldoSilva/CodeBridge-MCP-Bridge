@@ -19,7 +19,7 @@ _ALLOWED_ROOTS = {
     "installer", "browser_extension", "tools",
 }
 _ALLOWED_FILES = {"requirements.txt", "README.md", "version.json",
-                  "docs/INSTALLER.md"}
+                  "docs/DESKTOP_DEPLOYMENT_CURRENT.md"}
 _DENIED_PARTS = {".env", ".ssh", "secrets", "private", "credentials"}
 _DENIED_SUFFIXES = {".key", ".pem", ".p12", ".pfx", ".sqlite", ".db"}
 

@@ -87,3 +87,18 @@ As ferramentas `codebridge_dev_checkpoint_save` e `codebridge_dev_checkpoint_lat
 - Diferenciar o estado **do código** do estado **do aplicativo instalado** e do estado **da conexão MCP**.
 
 **Fontes:** `installer/build_installer.ps1`, `installer/CodeBridge.nsi`, `app_rewrite/runtime.py`, `api_server.py`, `author_mcp_manager.py`, `secure_tunnel_manager.py`, `terminal_manager.py`, `execution_ledger.py`, `config_store.py`, `credential_store.py`, `dpapi_secret_store.py`, `rag/runtime/`.
+
+## Testes contra a fonte local
+
+Quando o Python isolado instalado é utilizado, seu `sys.path` pode preferir módulos da instalação em vez dos módulos da branch. Para executar a suíte contra o checkout, use `tests/run_repo_tests.py`, que posiciona a raiz do repositório primeiro e verifica a origem do pacote `installer`.
+
+```powershell
+$py = Join-Path $env:LOCALAPPDATA 'Programs\CodeBridge\runtime\python\python.exe'
+& $py tests\run_repo_tests.py test_installer_runtime_fingerprints.py test_rag_p9b_installer_rollback_scope.py
+```
+
+A fixture de baseline pública usada nos testes de integridade está em `tests/fixtures/rag_public_index_baseline_fixture.json`. Esse arquivo é material de teste; não deve ser confundido com a geração pública ativa.
+
+## Restrições atuais à retirada de documentos
+
+A suíte de 100 consultas `benchmarks/rag014_ground_truth.jsonl` contém 26 caminhos de documentos antigos utilizados por 32 consultas; esses caminhos ainda precisam de um corpus de avaliação apropriado antes de sua retirada. A geração RAG observada mantém 108 documentos antigos da pasta `docs/` e nenhum dos novos documentos principais. A exclusão desses arquivos não deve ocorrer antes de validar uma nova geração, sem modificar diretamente os artefatos ativos.
