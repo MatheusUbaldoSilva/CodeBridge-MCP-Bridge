@@ -5,6 +5,7 @@ import json
 import os
 import time
 from pathlib import Path
+from installer.rag_p9b_journal_exclusive_lock import exclusive_journal_lock
 
 
 def _reject_nonfinite_journal_number(value):
@@ -116,14 +117,15 @@ class RollbackJournal:
             raise ValueError("JOURNAL_PATH_INVALID")
         # A resumed writer must never append on a journal changed by another
         # process (or replaced) since its last observed sequence.
-        current=read_journal(self.path)
-        if (current.get("state")!="JOURNAL_OBSERVED_ONLY"
-                or current.get("count")!=self._sequence):
-            raise ValueError("JOURNAL_SEQUENCE_CHANGED")
-        with self.path.open("ab") as f:
-            f.write((json.dumps(entry,sort_keys=True)+chr(10)).encode("utf-8"))
-            f.flush()
-            os.fsync(f.fileno())
+        with exclusive_journal_lock(self.path):
+            current=read_journal(self.path)
+            if (current.get("state")!="JOURNAL_OBSERVED_ONLY"
+                    or current.get("count")!=self._sequence):
+                raise ValueError("JOURNAL_SEQUENCE_CHANGED")
+            with self.path.open("ab") as f:
+                f.write((json.dumps(entry,sort_keys=True)+chr(10)).encode("utf-8"))
+                f.flush()
+                os.fsync(f.fileno())
         self._sequence+=1
         return entry
 
