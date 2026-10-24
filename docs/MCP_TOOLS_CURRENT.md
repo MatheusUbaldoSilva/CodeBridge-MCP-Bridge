@@ -1,6 +1,6 @@
 # Ferramentas MCP — contratos da branch atual
 
-Catálogo declarado em `author_mcp/mcp_server.py`. A assinatura do servidor é a fonte de verdade; uma ferramenta declarada pode não estar exposta pela conexão ChatGPT da instalação corrente. As ferramentas de terminal operam com as permissões da sessão real do computador.
+Catálogo das **16 ferramentas principais** declaradas em `author_mcp/mcp_server.py` e das **2 ferramentas de checkpoint** registradas pelo módulo `author_mcp/development_checkpoint_tools.py`. A assinatura do servidor é a fonte de verdade; uma ferramenta declarada pode não estar exposta pela conexão ChatGPT da instalação corrente. As ferramentas de terminal operam com as permissões da sessão real do computador.
 
 ## Estado e descoberta
 
@@ -85,6 +85,17 @@ Para resposta `RUNNING`, continue por `codebridge_wait` com o **mesmo `execution
 ```
 
 A publicação incremental no índice público está **bloqueada ou não certificada**. `execute=true` não é um atalho de autorização. A ferramenta de bootstrap possui um contrato próprio de aprovação e gates; sua presença no servidor não prova que foi habilitada na conexão atual.
+
+## Checkpoint de desenvolvimento — ferramentas adicionais
+
+O servidor central também registra estas duas ferramentas a partir de `author_mcp/development_checkpoint_tools.py`:
+
+| Ferramenta | Parâmetros | Comportamento |
+|---|---|---|
+| `codebridge_dev_checkpoint_save` | `summary: str, next_step: str, completed: list[str] | None = None, pending: list[str] | None = None` | Salva checkpoint compacto da sessão ativa; requer sessão CodeBridge reivindicada em estágio permitido |
+| `codebridge_dev_checkpoint_latest` | `session_id: str | None = None` | Consulta último checkpoint da sessão informada ou o último disponível, sem executar terminal |
+
+O armazenamento está em `author_mcp/development_checkpoint.py::DevelopmentCheckpoints`. Checkpoints são anotações de continuidade do desenvolvimento, não snapshots do código, do índice RAG ou da instalação. Não incluir segredos no resumo.
 
 ## Nomes legados
 
