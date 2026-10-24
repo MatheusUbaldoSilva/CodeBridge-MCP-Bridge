@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from installer.rag_p9b_recovery_retry_ledger import reserve_disposable_retry
+from installer.rag_p9b_recovery_retry_ledger import reserve_disposable_retry, mark_disposable_retry_terminal
 
 
 def child_reserve(path, sha, result):
@@ -34,6 +34,40 @@ class RetryLedgerTests(unittest.TestCase):
         args.update(overrides)
         return reserve_disposable_retry(**args)
 
+    def terminal(self, **overrides):
+        args=dict(path=self.ledger, transaction_sha256=self.sha, temp_root=self.root,
+                  postverified=True)
+        args.update(overrides)
+        return mark_disposable_retry_terminal(**args)
+
+    def test_terminal_requires_reserved_attempt_and_postverify(self):
+        self.assertEqual(self.terminal()["reason"], "TERMINAL_PATH_NOT_DISPOSABLE")
+        self.reserve()
+        self.assertEqual(self.terminal(postverified=False)["reason"],
+                         "POSTVERIFICATION_REQUIRED")
+        self.assertTrue(self.terminal()["written"])
+        self.assertEqual(self.reserve()["state"], "P9B_RECOVERY_ALREADY_TERMINAL")
+
+    def test_repeated_terminal_is_idempotent(self):
+        self.reserve()
+        self.terminal()
+        first = self.ledger.read_bytes()
+        again = self.terminal()
+        self.assertEqual(again["state"], "P9B_TERMINAL_ALREADY_DURABLE")
+        self.assertEqual(self.ledger.read_bytes(), first)
+
+    def test_wrong_identity_cannot_set_terminal(self):
+        self.reserve()
+        before = self.ledger.read_bytes()
+        self.assertEqual(self.terminal(transaction_sha256="f"*64)["reason"],
+                         "LEDGER_IDENTITY_OR_SCHEMA_MISMATCH")
+        self.assertEqual(self.ledger.read_bytes(), before)
+
+    def test_attempt_budget_exhaustion_may_be_verified_terminal(self):
+        for _ in range(3):
+            self.assertTrue(self.reserve()["reserved"])
+        self.assertTrue(self.terminal()["written"])
+        self.assertEqual(self.reserve()["state"], "P9B_RECOVERY_ALREADY_TERMINAL")
     def test_three_durable_attempts_then_review(self):
         for attempt in range(1, 4):
             result = self.reserve()

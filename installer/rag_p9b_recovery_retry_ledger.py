@@ -38,7 +38,7 @@ def _validate_record(doc, transaction_sha):
             and doc["transaction_sha256"] == transaction_sha
             and type(doc["attempts"]) is int
             and 0 <= doc["attempts"] <= _MAX_ATTEMPTS
-            and doc["state"] in {"READY", "REVIEW_REQUIRED"})
+            and doc["state"] in {"READY", "REVIEW_REQUIRED", "TERMINAL"})
 
 
 def reserve_disposable_retry(path, *, transaction_sha256, temp_root=None):
@@ -66,6 +66,9 @@ def reserve_disposable_retry(path, *, transaction_sha256, temp_root=None):
                 doc = {"schema": 1, "purpose": _PURPOSE,
                        "transaction_sha256": transaction_sha256,
                        "attempts": 0, "state": "READY"}
+            if doc["state"] == "TERMINAL":
+                return {**refused, "state": "P9B_RECOVERY_ALREADY_TERMINAL",
+                        "reason": "DURABLE_TERMINAL_STATE", "attempts": doc["attempts"]}
             if doc["state"] == "REVIEW_REQUIRED" or doc["attempts"] >= _MAX_ATTEMPTS:
                 return {**refused, "state": "P9B_RECOVERY_REVIEW_REQUIRED",
                         "reason": "RETRY_BUDGET_EXHAUSTED",
@@ -91,5 +94,53 @@ def reserve_disposable_retry(path, *, transaction_sha256, temp_root=None):
                     "remaining": _MAX_ATTEMPTS - doc["attempts"],
                     "requires_external_scheduler": True,
                     "requires_authenticated_transaction": True}
+    except (OSError, TypeError, ValueError, UnicodeError, KeyError):
+        return {**refused, "reason": "LEDGER_UNVERIFIED"}
+
+def mark_disposable_retry_terminal(path, *, transaction_sha256, temp_root=None,
+                                   postverified=False):
+    """Store idempotent terminal evidence, never authorize production actions."""
+    refused = {"state": "P9B_TERMINAL_REFUSED", "written": False,
+               "production_modified": False, "cutover_authorized": False}
+    if postverified is not True:
+        return {**refused, "reason": "POSTVERIFICATION_REQUIRED"}
+    if not isinstance(transaction_sha256, str) or _HEX.fullmatch(transaction_sha256) is None:
+        return {**refused, "reason": "TRANSACTION_SHA_INVALID"}
+    target = Path(path).absolute()
+    temp = Path(temp_root or tempfile.gettempdir()).resolve(strict=True)
+    system_temp = Path(tempfile.gettempdir()).resolve(strict=True)
+    if (temp != system_temp and system_temp not in temp.parents
+            or not _contained(target.parent, temp) or target.is_symlink()
+            or not target.is_file()):
+        return {**refused, "reason": "TERMINAL_PATH_NOT_DISPOSABLE"}
+    try:
+        with exclusive_journal_lock(target):
+            if target.stat().st_size > 2048:
+                return {**refused, "reason": "LEDGER_UNVERIFIED"}
+            doc = json.loads(target.read_text(encoding="utf-8"),
+                             object_pairs_hook=_safe_pairs)
+            if not _validate_record(doc, transaction_sha256):
+                return {**refused, "reason": "LEDGER_IDENTITY_OR_SCHEMA_MISMATCH"}
+            if doc["state"] == "TERMINAL":
+                return {**refused, "state": "P9B_TERMINAL_ALREADY_DURABLE",
+                        "attempts": doc["attempts"]}
+            if doc["attempts"] == 0:
+                return {**refused, "reason": "NO_RECOVERY_ATTEMPT"}
+            doc["state"] = "TERMINAL"
+            encoded = (json.dumps(doc, sort_keys=True, separators=(",", ":"))+"\n").encode()
+            pending = target.with_name(target.name+".pending")
+            if pending.exists() or pending.is_symlink():
+                return {**refused, "reason": "RETRY_TEMP_COLLISION"}
+            try:
+                with pending.open("xb") as stream:
+                    stream.write(encoded)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(pending, target)
+            finally:
+                if pending.exists() and not pending.is_symlink():
+                    pending.unlink()
+            return {**refused, "state": "P9B_TERMINAL_PERSISTED",
+                    "written": True, "attempts": doc["attempts"]}
     except (OSError, TypeError, ValueError, UnicodeError, KeyError):
         return {**refused, "reason": "LEDGER_UNVERIFIED"}
