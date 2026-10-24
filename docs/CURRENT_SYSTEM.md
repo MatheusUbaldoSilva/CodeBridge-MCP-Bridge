@@ -54,6 +54,10 @@ O índice RAG informado estava `READY`, com 211 documentos e 8.774 chunks, gera�
 - O aplicativo instalado pode estar em versão diferente do código da branch até ocorrer atualização/reinício.
 - Para detalhes: [MCP_TOOLS_CURRENT.md](MCP_TOOLS_CURRENT.md), [EXECUTION_RUNTIME_CURRENT.md](EXECUTION_RUNTIME_CURRENT.md), [RAG_CURRENT.md](RAG_CURRENT.md) e [DESKTOP_DEPLOYMENT_CURRENT.md](DESKTOP_DEPLOYMENT_CURRENT.md).
 
+## Documentação complementar
+
+Além deste panorama, consulte [SECURITY_AND_PERSISTENCE_CURRENT.md](SECURITY_AND_PERSISTENCE_CURRENT.md) para segredos, IPC e ledger; [RAG_INTERNALS_CURRENT.md](RAG_INTERNALS_CURRENT.md) para recuperação, rankings e gerações; [DESKTOP_FEATURES_CURRENT.md](DESKTOP_FEATURES_CURRENT.md) para recursos da interface; [OPERATIONS_AND_RECOVERY_CURRENT.md](OPERATIONS_AND_RECOVERY_CURRENT.md) para NSIS, diagnóstico e recuperação.
+
 ## Fonte de verdade
 
 Comportamento executável: código-fonte da revisão Git ativa. Disponibilidade: handshake/status da instalação em execução. Este documento descreve capacidade confirmada ou limites explícitos; não atribui certificação de produção a recursos experimentais.
