@@ -249,7 +249,7 @@ class RagPanel(QWidget):
         if not names:
             return
         files = [Path(name).resolve() for name in names]
-        root = (Path(__file__).resolve().parents[1] if self.project_id == "codebridge"
+        root = (Path.home() / "CodeBridge-MCP-Bridge" if self.project_id == "codebridge"
                 else files[0].parent)
         if any(not f.is_file() or not f.is_relative_to(root) for f in files):
             QMessageBox.warning(self, "Adicionar conhecimentos",
