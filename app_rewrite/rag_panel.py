@@ -34,7 +34,7 @@ def _rag_operation(operation, args):
         initial_inventory = inventory_folder(args["root"])
         response = bridge.index_rag(
             project_id=args["project"], project_root=args["root"],
-            scope="BOTH", execute=False)
+            scope="BOTH", paths=args.get("paths"), execute=False)
         assert_discovery_unchanged(initial_inventory, args["root"])
         from rag.runtime.incremental_preflight import assess_incremental_plan
         from rag.runtime.incremental_preview_confirmation import snapshot_preview, revalidate_preview
@@ -83,6 +83,7 @@ class RagPanel(QWidget):
         self._results = []
         self._documents = []
         self._preview_snapshot = None
+        self._selected_paths = None
         self._preview_revision = 0
         self._plan_request = None
         self.project_id = "codebridge"
@@ -163,6 +164,9 @@ class RagPanel(QWidget):
         folder_row.addWidget(self.folder, 1)
         folder_row.addWidget(self.browse_btn)
         add_layout.addLayout(folder_row)
+        self.browse_files_btn = QPushButton("Escolher arquivos individuais")
+        self.browse_files_btn.clicked.connect(self.browse_files)
+        add_layout.addWidget(self.browse_files_btn)
         self.plan_btn = QPushButton("Ver arquivos que podem ser adicionados")
         self.plan_btn.clicked.connect(self.plan)
         add_layout.addWidget(self.plan_btn)
@@ -206,6 +210,7 @@ class RagPanel(QWidget):
             return
         self.cancel_preview()
         self.project_id = name
+        self._selected_paths = None
         self.files.clear()
         self._documents = []
         self.results.clear()
@@ -234,9 +239,26 @@ class RagPanel(QWidget):
         path = QFileDialog.getExistingDirectory(self, "Escolher pasta")
         if path:
             self.cancel_preview()
+            self._selected_paths = None
             self.folder.setText(path)
             self.candidates.clear()
             self.plan_summary.setText("Clique para conferir os arquivos selecionados.")
+
+    def browse_files(self):
+        names, _ = QFileDialog.getOpenFileNames(self, "Escolher arquivos")
+        if not names:
+            return
+        files = [Path(name).resolve() for name in names]
+        root = (Path(__file__).resolve().parents[1] if self.project_id == "codebridge"
+                else files[0].parent)
+        if any(not f.is_file() or not f.is_relative_to(root) for f in files):
+            QMessageBox.warning(self, "Adicionar conhecimentos",
+                "Selecione arquivos existentes dentro da pasta do projeto.")
+            return
+        self.cancel_preview()
+        self._selected_paths = [f.relative_to(root).as_posix() for f in files]
+        self.folder.setText(str(root))
+        self.plan_summary.setText(f"{len(files)} arquivo(s) selecionado(s) para previa.")
 
     def search(self):
         query = self.query.text().strip()
@@ -252,7 +274,7 @@ class RagPanel(QWidget):
             return
         self.cancel_preview()
         self._plan_request = (self._preview_revision, self.project_id, str(Path(path).resolve()))
-        self._run("plan", {"project": self.project_id, "root": path})
+        self._run("plan", {"project": self.project_id, "root": path, "paths": self._selected_paths})
 
     def cancel_preview(self):
         self._preview_revision += 1
@@ -365,6 +387,7 @@ class RagPanel(QWidget):
             self.project_picker.addItems(names)
             if self.project_id not in names:
                 self.project_id = names[0]
+                self._selected_paths = None
             self.project_picker.setCurrentText(self.project_id)
             self.project_picker.blockSignals(False)
             self._run("documents", {"project": self.project_id})

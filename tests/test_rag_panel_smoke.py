@@ -44,14 +44,13 @@ class RagPanelSmokeTests(unittest.TestCase):
         self.assertIn("hello world", panel.preview.toPlainText())
         panel.close()
 
-    def test_plan_is_preview_only(self):
+    def test_unsolicited_plan_is_ignored(self):
         panel = self.make_panel()
         panel._complete("plan", {"plan":{
             "candidate_count":1, "denied_count":2, "sensitive_count":0,
             "unsupported_count":3, "candidates":[{"path":"notes/test.md"}],
         }}, "")
-        self.assertEqual(panel.candidates.count(), 1)
-        self.assertIn("1 arquivos", panel.plan_summary.text())
+        self.assertEqual(panel.candidates.count(), 0)
         self.assertFalse(panel.index_btn.isEnabled())
         panel.close()
 
@@ -89,6 +88,22 @@ class RagPanelSmokeTests(unittest.TestCase):
         status = _rag_operation("status", {})
         self.assertIn("index", status)
         self.assertIn("projects", status)
+
+    def test_individual_file_selection_is_preview_only(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as folder:
+            chosen = Path(folder) / "notes.md"
+            chosen.write_text("hello", encoding="utf-8")
+            panel = self.make_panel()
+            panel.project_id = "personal-lab"
+            with patch("rag_panel.QFileDialog.getOpenFileNames", return_value=([str(chosen)], "")):
+                panel.browse_files()
+            self.assertEqual(panel._selected_paths, ["notes.md"])
+            self.assertFalse(panel.index_btn.isEnabled())
+            with patch.object(panel, "_run") as call:
+                panel.plan()
+                self.assertEqual(call.call_args.args[1]["paths"], ["notes.md"])
+            panel.close()
 
 if __name__ == "__main__":
     unittest.main()
