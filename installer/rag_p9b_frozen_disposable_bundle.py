@@ -26,9 +26,17 @@ def _unique_pairs(pairs):
 
 
 def _contained(path, root):
-    raw = Path(path)
-    if raw.is_symlink() or not raw.exists():
+    raw = Path(path).absolute()
+    if not raw.exists() or raw.is_symlink():
         return False
+    # Check lexical ancestry before following reparse/symlink entries.
+    if raw != root and root not in raw.parents:
+        return False
+    current = raw
+    while current != root:
+        if current.is_symlink():
+            return False
+        current = current.parent
     resolved = raw.resolve()
     return resolved == root or root in resolved.parents
 

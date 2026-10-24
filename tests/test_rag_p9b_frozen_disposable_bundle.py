@@ -101,6 +101,33 @@ class FrozenDisposableBundleTests(unittest.TestCase):
         self.assertEqual(self.freeze(transaction_id="z" * 32)["reason"],
                          "IDENTITY_INPUT_INVALID")
 
+    def test_symlinked_parent_of_scope_is_refused(self):
+        real = self.root / "real_parent"
+        real.mkdir()
+        (real / "nested").mkdir()
+        alias = self.root / "alias_parent"
+        try:
+            alias.symlink_to(real, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("directory symlink unavailable")
+        result = self.freeze(appdata=alias / "nested")
+        self.assertEqual(result["reason"], "SCOPE_OUTSIDE_LAB")
+        self.assertFalse(self.out.exists())
+
+    def test_symlinked_parent_of_artifact_is_refused(self):
+        real = self.root / "real_sources"
+        real.mkdir()
+        target = real / "installer.src"
+        target.write_bytes(b"disposable")
+        alias = self.root / "alias_sources"
+        try:
+            alias.symlink_to(real, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("directory symlink unavailable")
+        self.sources["installer"] = alias / "installer.src"
+        result = self.freeze()
+        self.assertEqual(result["reason"], "SOURCE_NOT_DISPOSABLE")
+        self.assertFalse(self.out.exists())
     def test_symlink_input_refused(self):
         link = self.root / "installer.link"
         try:
