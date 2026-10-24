@@ -29,6 +29,18 @@ Um build disponível no repositório não comprova que a atualização transacio
 
 O runtime instalado pode diferir do commit HEAD do repositório. Confirme versão, hashes e o funcionamento real antes de distribuir o instalador ou atualizar serviços.
 
+## Geração do instalador na branch
+
+O build é NSIS: `installer/build_installer.ps1` declara `[switch]$InstallNSIS` e utiliza `installer/CodeBridge.nsi` / `makensis`. O comando documentado da revisão atual é:
+
+```powershell
+.\\installer\\build_installer.ps1 -InstallNSIS
+```
+
+O script usa a versão de `version.json`, gera `installer/dist/CodeBridge-Setup.exe` e SHA-256 associado. Build não implica autorização para implantação ou cutover de atualização.
+
+Para detalhes de diagnóstico e recuperação, ver [OPERATIONS_AND_RECOVERY_CURRENT.md](OPERATIONS_AND_RECOVERY_CURRENT.md). Para capacidades da interface, ver [DESKTOP_FEATURES_CURRENT.md](DESKTOP_FEATURES_CURRENT.md).
+
 ## Dados locais e segurança
 
 - Configurações de organização, túnel e autenticação devem permanecer fora do Git e de relatórios públicos.
