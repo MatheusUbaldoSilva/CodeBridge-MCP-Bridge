@@ -1,4 +1,6 @@
 import json
+import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -127,6 +129,32 @@ class FrozenDisposableBundleTests(unittest.TestCase):
         self.sources["installer"] = alias / "installer.src"
         result = self.freeze()
         self.assertEqual(result["reason"], "SOURCE_NOT_DISPOSABLE")
+        self.assertFalse(self.out.exists())
+    @unittest.skipUnless(os.name == "nt", "Windows junction test")
+    def test_junctioned_parent_of_scope_is_refused(self):
+        real = self.root / "junction_real"
+        real.mkdir()
+        (real / "nested").mkdir()
+        alias = self.root / "junction_alias"
+        operation = subprocess.run(["cmd", "/c", "mklink", "/J", str(alias), str(real)],
+                                   capture_output=True, text=True)
+        if operation.returncode != 0:
+            self.skipTest("junction setup unavailable")
+        self.assertEqual(self.freeze(appdata=alias/"nested")["reason"],"SCOPE_OUTSIDE_LAB")
+        self.assertFalse(self.out.exists())
+
+    @unittest.skipUnless(os.name == "nt", "Windows junction test")
+    def test_junctioned_parent_of_source_is_refused(self):
+        real = self.root / "junction_sources"
+        real.mkdir()
+        (real/"installer.src").write_bytes(b"impostor")
+        alias = self.root/"junction_inputs"
+        operation = subprocess.run(["cmd", "/c", "mklink", "/J", str(alias), str(real)],
+                                   capture_output=True, text=True)
+        if operation.returncode != 0:
+            self.skipTest("junction setup unavailable")
+        self.sources["installer"] = alias/"installer.src"
+        self.assertEqual(self.freeze()["reason"],"SOURCE_NOT_DISPOSABLE")
         self.assertFalse(self.out.exists())
     def test_symlink_input_refused(self):
         link = self.root / "installer.link"

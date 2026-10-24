@@ -25,16 +25,22 @@ def _unique_pairs(pairs):
     return out
 
 
+def _reparse(path):
+    node = Path(path)
+    return (node.is_symlink() or (hasattr(node, "is_junction") and node.is_junction())
+            or bool(node.stat(follow_symlinks=False).st_file_attributes & 0x400)
+            if os.name == "nt" else node.is_symlink())
+
 def _contained(path, root):
     raw = Path(path).absolute()
-    if not raw.exists() or raw.is_symlink():
+    if not raw.exists() or _reparse(raw):
         return False
     # Check lexical ancestry before following reparse/symlink entries.
     if raw != root and root not in raw.parents:
         return False
     current = raw
     while current != root:
-        if current.is_symlink():
+        if _reparse(current):
             return False
         current = current.parent
     resolved = raw.resolve()
