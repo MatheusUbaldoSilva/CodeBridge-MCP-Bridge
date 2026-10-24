@@ -49,7 +49,7 @@ except Exception:
   if($summary.error_exists){$summary.error=Get-Content -LiteralPath (Join-Path $folder 'error.txt') -Raw}
   if($summary.import_exists){$summary.state='SCHEDULED_PYTHON_IMPORT_CONFIRMED'}
   $summary|ConvertTo-Json -Compress -Depth 6
-  if(!.import_exists){throw 'SCHEDULED_PYTHON_IMPORT_UNVERIFIED'}
+  if(!$summary.import_exists){throw 'SCHEDULED_PYTHON_IMPORT_UNVERIFIED'}
 }finally {
   if($created){
     $task=Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
