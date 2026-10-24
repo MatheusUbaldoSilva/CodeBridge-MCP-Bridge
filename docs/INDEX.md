@@ -1,27 +1,33 @@
 # Documentação principal — CodeBridge
 
-Este diretório contém os **documentos de referência do estado atual** da branch `rag-017-optimized-inference-after-candidate`. Descrevem o que o sistema possui, suas interfaces, contratos e limites, **não a sequência de desenvolvimento**.
+Referência técnica do **estado atual** de `rag-017-optimized-inference-after-candidate`. Este conjunto descreve componentes, funções, contratos, permissões e restrições reais do código e da instalação conectada — não uma cronologia de implementação.
 
-## Leitura recomendada
+## Referências oficiais
 
-1. **[CURRENT_SYSTEM.md](CURRENT_SYSTEM.md)** — visão do produto, componentes e arquitetura em operação.
-2. **[EXECUTION_RUNTIME_CURRENT.md](EXECUTION_RUNTIME_CURRENT.md)** — executor CBMCP/1, terminais, preparação, execução, espera, cancelamento e limites.
-3. **[MCP_TOOLS_CURRENT.md](MCP_TOOLS_CURRENT.md)** — catálogo das ferramentas MCP, argumentos, efeitos e exemplos.
-4. **[RAG_CURRENT.md](RAG_CURRENT.md)** — fontes, embeddings, SQLite, Qdrant, pesquisa, integridade e status de escrita.
-5. **[DESKTOP_DEPLOYMENT_CURRENT.md](DESKTOP_DEPLOYMENT_CURRENT.md)** — interface Windows, serviços, instalação, atualizador e segurança operacional.
+| Documento | Escopo |
+|---|---|
+| [CURRENT_SYSTEM.md](CURRENT_SYSTEM.md) | Produto, arquitetura, componentes e estado operacional |
+| [EXECUTION_RUNTIME_CURRENT.md](EXECUTION_RUNTIME_CURRENT.md) | Executor CBMCP/1, terminais, ledger, execução e limites |
+| [MCP_TOOLS_CURRENT.md](MCP_TOOLS_CURRENT.md) | Ferramentas MCP, assinaturas, campos e exemplos de chamadas |
+| [SECURITY_AND_PERSISTENCE_CURRENT.md](SECURITY_AND_PERSISTENCE_CURRENT.md) | Windows Credential Manager, DPAPI, Named Pipes, mutex, SQLite e autorização |
+| [RAG_CURRENT.md](RAG_CURRENT.md) | Estado público do RAG, leitura, pesquisa e admissão de fontes |
+| [RAG_INTERNALS_CURRENT.md](RAG_INTERNALS_CURRENT.md) | Inventário, chunking, modelos, SQLite/FTS5, Qdrant, ranking, gerações e gates |
+| [DESKTOP_FEATURES_CURRENT.md](DESKTOP_FEATURES_CURRENT.md) | Interface, terminais, telemetria, GPU, sons e painel de conhecimento |
+| [DESKTOP_DEPLOYMENT_CURRENT.md](DESKTOP_DEPLOYMENT_CURRENT.md) | Instalação e configuração do aplicativo Windows |
+| [OPERATIONS_AND_RECOVERY_CURRENT.md](OPERATIONS_AND_RECOVERY_CURRENT.md) | Diagnóstico, NSIS, runtime, proteção de dados e recuperação |
 
-**[README.md](../README.md)** é a apresentação do repositório. Para detalhe técnico, priorizar os cinco documentos acima.
+O [README](../README.md) apresenta o produto e encaminha para esta documentação.
 
-## Interpretação dos estados
+## Interpretação obrigatória
 
-- **Implementado:** existe no código da branch.
-- **Operacional/observado:** foi verificado na instalação MCP conectada.
-- **Condicional:** depende de configuração, conexão ou seleção de projeto.
-- **Não liberado:** componentes podem existir, mas o caminho real de produção permanece bloqueado.
-- **Não certificado:** o recurso não passou por toda a validação necessária à alegação de prontidão.
+- **Implementado:** existe na branch, ainda que possa não estar habilitado no aplicativo.
+- **Observado operacional:** comprovado por chamada/status da instalação.
+- **Condicional:** depende de configuração, permissões ou conexão.
+- **Não liberado / não certificado:** existência do código não autoriza uso no índice/instalação ativos.
+- **Conforme observado em:** identificadores de geração, quantidades e disponibilidade de processos são exemplos de estado e podem mudar.
 
-Arquivos de `docs/` fora deste conjunto continuam sendo material de apoio para auditoria enquanto permanecerem no repositório; **não alteram automaticamente a descrição do estado atual**. O código da revisão Git ativa e o status de execução são as fontes finais para comportamento e disponibilidade.
+A API MCP anunciada à conexão pode ser um subconjunto do servidor. O código da revisão Git e as ferramentas efetivamente anunciadas são as referências finais para assinatura/uso. Use os campos de status para avaliar disponibilidade.
 
-## Segurança para futura consolidação
+## Conservação dos dados e referências
 
-Não excluir indiscriminadamente contratos consumidos por testes/código, esquemas, políticas, registros de integridade/rollback e evidências exigidas para certificação. A eliminação das documentações antigas é uma operação separada e requer análise de dependências, backup recuperável e validação pós-exclusão. Um índice RAG ativo pode manter referências históricas até nova indexação autorizada.
+A documentação antiga só pode ser retirada após verificação de dependências em código/testes, arquivo de recuperação e auditoria final. O índice RAG atualmente publicado pode continuar citando versões antigas até que a indexação incremental autorizada esteja funcional. A consolidação documental não modifica nem apaga o índice ativo.
