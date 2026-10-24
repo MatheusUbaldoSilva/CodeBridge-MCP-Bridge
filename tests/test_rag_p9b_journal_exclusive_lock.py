@@ -21,6 +21,17 @@ def hard_crash_lock_worker(path, result):
         result.join_thread()
         os._exit(91)
 
+def crashing_owner_worker(path, ready, die):
+    with exclusive_journal_lock(path):
+        ready.set()
+        die.wait(10)
+        os._exit(92)
+
+
+def waiting_worker(path, done):
+    with exclusive_journal_lock(path):
+        done.put("recovered")
+
 class ExclusiveLockTests(unittest.TestCase):
     def test_lock_sidecar_survives_reentry(self):
         with tempfile.TemporaryDirectory() as root:
@@ -86,6 +97,34 @@ class ExclusiveLockTests(unittest.TestCase):
             finally:
                 if process.is_alive():
                     process.terminate()
+                    process.join(timeout=5)
+    def test_blocked_waiter_proceeds_after_owner_crash(self):
+        with tempfile.TemporaryDirectory() as root:
+            ctx=multiprocessing.get_context("spawn")
+            path=str(Path(root)/"recovery.jsonl")
+            ready=ctx.Event()
+            die=ctx.Event()
+            done=ctx.Queue()
+            owner=ctx.Process(target=crashing_owner_worker,args=(path,ready,die))
+            waiter=ctx.Process(target=waiting_worker,args=(path,done))
+            owner.start()
+            try:
+                self.assertTrue(ready.wait(10))
+                waiter.start()
+                with self.assertRaises(queue.Empty):
+                    done.get(timeout=0.5)
+                self.assertTrue(waiter.is_alive())
+                die.set()
+                owner.join(timeout=10)
+                self.assertEqual(owner.exitcode,92)
+                self.assertEqual(done.get(timeout=10),"recovered")
+                waiter.join(timeout=10)
+                self.assertEqual(waiter.exitcode,0)
+            finally:
+                die.set()
+                for process in (owner,waiter):
+                    if process.is_alive():
+                        process.terminate()
                     process.join(timeout=5)
     def test_symlink_sidecar_refused(self):
         with tempfile.TemporaryDirectory() as root:
