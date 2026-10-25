@@ -17,6 +17,7 @@ STABLE = HOME / "CodeBridge-Stable"
 BASE = HOME / "CodeBridge-Launcher"
 ENV = HOME / "CodeBridge-Runtime"
 MANIFEST = BASE / "stable-manifest.json"
+CANDIDATE_SELECTION = BASE / "selected-candidate.json"
 LOGS = BASE / "logs"
 APP_MUTEX = r"Local\CodeBridge.MCP.Bridge.v2"
 LAUNCHER_MUTEX = r"Local\CodeBridge.Local.Launcher.v1"
@@ -71,18 +72,37 @@ def digest(path):
     return h.hexdigest()
 
 
-def check_snapshot():
-    if not MANIFEST.is_file():
+def selected_snapshot():
+    if not CANDIDATE_SELECTION.exists():
+        return STABLE, MANIFEST, ENV / "stable" / "Scripts" / "python.exe", None
+    config = json.loads(CANDIDATE_SELECTION.read_text(encoding="utf-8"))
+    commit = config.get("candidate_commit") if isinstance(config, dict) else None
+    if (
+        not isinstance(commit, str) or len(commit) != 40
+        or any(c not in "0123456789abcdef" for c in commit)
+    ):
+        raise RuntimeError("Selecao de candidato invalida")
+    name = "stable-candidate-" + commit[:7]
+    root = HOME / ("CodeBridge-Stable-Candidate-" + commit[:7])
+    manifest = BASE / ("stable-candidate-" + commit[:7] + ".json")
+    python = ENV / name / "Scripts" / "python.exe"
+    return root, manifest, python, commit
+
+
+def check_snapshot(snapshot_root=None, manifest_file=None):
+    snapshot_root = snapshot_root or STABLE
+    manifest_file = manifest_file or MANIFEST
+    if not manifest_file.is_file():
         raise RuntimeError("Manifesto do snapshot estavel ausente")
-    info = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    info = json.loads(manifest_file.read_text(encoding="utf-8"))
     if not isinstance(info, dict):
         raise RuntimeError("Manifesto invalido")
     checksums = info.get("checksums")
     if info.get("state") != "CANDIDATE" or not isinstance(checksums, dict) or not checksums:
         raise RuntimeError("Manifesto invalido")
-    if STABLE.is_symlink() or STABLE.is_junction():
+    if snapshot_root.is_symlink() or snapshot_root.is_junction():
         raise RuntimeError("Snapshot redirecionado")
-    root = STABLE.resolve(strict=True)
+    root = snapshot_root.resolve(strict=True)
     names = set()
     for relative, expected in checksums.items():
         rel = Path(relative)
@@ -116,15 +136,22 @@ def check_snapshot():
 def verify(mode, require_idle=True):
     if mode not in ("dev", "stable"):
         raise ValueError("Modo invalido")
-    root = DEV if mode == "dev" else STABLE
-    python = ENV / mode / "Scripts" / "python.exe"
+    if mode == "dev":
+        root = DEV
+        python = ENV / "dev" / "Scripts" / "python.exe"
+        manifest = None
+        expected_commit = None
+    else:
+        root, manifest, python, expected_commit = selected_snapshot()
     main = root / "app_rewrite" / "main.py"
     mcp_python = root / "author_mcp" / ".venv" / "Scripts" / "python.exe"
     for item in (python, main, mcp_python):
         if not item.is_file():
             raise RuntimeError("Dependencia ausente: " + str(item))
     if mode == "stable":
-        check_snapshot()
+        record_info = check_snapshot(root, manifest)
+        if expected_commit is not None and record_info.get("source_commit") != expected_commit:
+            raise RuntimeError("Commit do candidato nao confere")
     for interpreter, imports in (
         (python, "import PySide6,paramiko,psutil,qdrant_client"),
         (mcp_python, "import mcp,psutil"),

@@ -75,6 +75,32 @@ class LauncherTests(unittest.TestCase):
                     launcher.verify("dev", require_idle=False)
             self.assertEqual(launcher.check_snapshot()["state"], "CANDIDATE")
 
+    def test_candidate_selector_is_commit_pinned(self):
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp)
+            base = home / "launcher"
+            base.mkdir()
+            pointer = base / "selection.json"
+            commit = "a" * 40
+            pointer.write_text(json.dumps({"candidate_commit": commit}), encoding="utf-8")
+            with patch.object(launcher, "HOME", home), \
+                 patch.object(launcher, "BASE", base), \
+                 patch.object(launcher, "ENV", home / "runtime"), \
+                 patch.object(launcher, "CANDIDATE_SELECTION", pointer):
+                root, manifest, python, selected = launcher.selected_snapshot()
+            self.assertEqual(selected, commit)
+            self.assertEqual(root, home / "CodeBridge-Stable-Candidate-aaaaaaa")
+            self.assertEqual(manifest, base / "stable-candidate-aaaaaaa.json")
+            self.assertEqual(python, home / "runtime" / "stable-candidate-aaaaaaa" / "Scripts" / "python.exe")
+
+    def test_candidate_selector_rejects_invalid_commit(self):
+        with tempfile.TemporaryDirectory() as temp:
+            pointer = Path(temp) / "selection.json"
+            pointer.write_text(json.dumps({"candidate_commit": "../unsafe"}), encoding="utf-8")
+            with patch.object(launcher, "CANDIDATE_SELECTION", pointer):
+                with self.assertRaisesRegex(RuntimeError, "Selecao de candidato invalida"):
+                    launcher.selected_snapshot()
+
     def test_prevent_duplicate_application(self):
         with patch.object(launcher, "app_running", return_value=True):
             with self.assertRaisesRegex(RuntimeError, "Ja existe"):
