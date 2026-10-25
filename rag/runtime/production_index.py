@@ -20,6 +20,10 @@ from rag.runtime.index_request import RagIndexPlan
 from rag.runtime.status import resolve_rag_sqlite_path
 
 
+# Smaller indexing batches reduce llama.cpp allocation pressure on 8 GB Windows.
+CODE_INDEX_UBATCH_TOKENS = 32
+
+
 def _drafts(path: str, content: str, code: bool):
     if code:
         result = safe_chunk_code(content, path=path)
@@ -146,12 +150,11 @@ def _write_vectors(path: Path, project_id: str, text_rows, code_rows) -> None:
     from rag.models.code_artifact_install import resolve_selected_code_model_path
     from rag.models.embedding import TextEmbeddingClient
     from rag.models.code_embedding import CodeEmbeddingClient,CodeRetrievalTask
-    from rag.models.lifecycle import LlamaServerConfig,TextModelLifecycle
+    from rag.models.lifecycle import LlamaServerConfig
     from rag.models.code_lifecycle import CodeModelLifecycle,build_code_server_config
     from rag.models.backend_policy import TEXT_SEARCH_CONTEXT_TOKENS, TEXT_SEARCH_UBATCH_TOKENS
     from rag.models.code_backend_policy import (
-        CODE_SEARCH_CONTEXT_TOKENS, CODE_SEARCH_UBATCH_TOKENS,
-        CODE_SEARCH_PARALLEL_SLOTS,
+        CODE_SEARCH_CONTEXT_TOKENS, CODE_SEARCH_PARALLEL_SLOTS,
     )
     from rag.models.fallback import TextModelFallbackManager, build_cpu_fallback_config
 
@@ -163,23 +166,24 @@ def _write_vectors(path: Path, project_id: str, text_rows, code_rows) -> None:
             if not rows:
                 continue
             if collection==TEXT_VECTOR_COLLECTION:
-                manager=None
-                life=TextModelLifecycle(LlamaServerConfig(
+                text_config=LlamaServerConfig(
                     executable_path=llama,
                     model_path=resolve_selected_model_path(),
                     port=0, gpu_layers=99, device="CUDA0",
                     context_size=TEXT_SEARCH_CONTEXT_TOKENS,
                     ubatch_size=TEXT_SEARCH_UBATCH_TOKENS,
                     parallel_slots=1,
-                ))
-                life.load(timeout_seconds=90)
+                )
+                manager=TextModelFallbackManager.auto(text_config)
+                manager.load(timeout_seconds=90)
+                life=manager.active_lifecycle
             else:
                 gpu_config=build_code_server_config(
                     executable_path=llama,
                     model_path=resolve_selected_code_model_path(),
                     port=0, gpu_layers=99, device="CUDA0",
                     context_size=CODE_SEARCH_CONTEXT_TOKENS,
-                    ubatch_size=CODE_SEARCH_UBATCH_TOKENS,
+                    ubatch_size=CODE_INDEX_UBATCH_TOKENS,
                     parallel_slots=CODE_SEARCH_PARALLEL_SLOTS,
                 )
                 manager=TextModelFallbackManager(
@@ -203,9 +207,6 @@ def _write_vectors(path: Path, project_id: str, text_rows, code_rows) -> None:
                 if batch:
                     client.upsert(collection_name=collection,points=batch,wait=True)
             finally:
-                if manager is not None:
-                    manager.unload(timeout_seconds=15)
-                else:
-                    life.unload(timeout_seconds=15)
+                manager.unload(timeout_seconds=15)
     finally:
         close_qdrant_local(client)

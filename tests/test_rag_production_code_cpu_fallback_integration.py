@@ -138,6 +138,8 @@ class CodeFallbackWiringTests(unittest.TestCase):
              "a"*64,"branch","b"*40)
         def make_manager(**kw):
             self.assertEqual(kw["gpu_config"].device,"CUDA0")
+            from rag.runtime.production_index import CODE_INDEX_UBATCH_TOKENS
+            self.assertEqual(kw["gpu_config"].ubatch_size,CODE_INDEX_UBATCH_TOKENS)
             self.assertEqual(kw["cpu_config"].device,"none")
             self.assertEqual(kw["cpu_config"].gpu_layers,0)
             self.assertIs(kw["lifecycle_factory"].__name__ == "CodeModelLifecycle", True)
@@ -179,6 +181,8 @@ class CodeFallbackWiringTests(unittest.TestCase):
              "a"*64,"branch","b"*40)
         def make_manager(**kw):
             self.assertEqual(kw["gpu_config"].device,"CUDA0")
+            from rag.runtime.production_index import CODE_INDEX_UBATCH_TOKENS
+            self.assertEqual(kw["gpu_config"].ubatch_size,CODE_INDEX_UBATCH_TOKENS)
             self.assertEqual(kw["cpu_config"].device,"none")
             self.assertEqual(kw["cpu_config"].gpu_layers,0)
             self.assertIs(kw["lifecycle_factory"].__name__ == "CodeModelLifecycle", True)
