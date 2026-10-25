@@ -440,6 +440,9 @@ class SecureTunnelManager:
                 f"tunnel-client init falhou: exit {result.returncode}"
             )
 
+    def _run_command(self):
+        return [str(self.client), "run", "--config", str(self.profile)]
+
     def _terminate(self):
         process = self._process
         if not self._process_running(process):
@@ -484,7 +487,7 @@ class SecureTunnelManager:
             log_handle = self._open_log()
             self._ensure_profile(env, log_handle)
             self._process = subprocess.Popen(
-                [str(self.client), "run", "--profile", self.profile_name],
+                self._run_command(),
                 cwd=str(self.root),
                 stdout=log_handle,
                 stderr=subprocess.STDOUT,
