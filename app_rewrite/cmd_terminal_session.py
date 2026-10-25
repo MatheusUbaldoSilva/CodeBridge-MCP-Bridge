@@ -77,19 +77,20 @@ class CmdTerminalSession:
         executable=None,
     ):
         if executable is None:
-            executable = os.environ.get(
-                "ComSpec"
-            )
-
-        if not executable:
-            executable = os.path.join(
-                os.environ.get(
-                    "WINDIR",
-                    r"C:\Windows",
-                ),
-                "System32",
-                "cmd.exe",
-            )
+            comspec = os.environ.get("ComSpec")
+            if comspec:
+                comspec = os.path.expandvars(comspec.strip().strip('"'))
+            if comspec and os.path.isfile(comspec):
+                executable = comspec
+            else:
+                windows_root = (
+                    os.environ.get("SystemRoot")
+                    or os.environ.get("WINDIR")
+                    or r"C:\Windows"
+                )
+                executable = os.path.join(
+                    windows_root, "System32", "cmd.exe"
+                )
 
         self._executable = os.path.abspath(
             executable
