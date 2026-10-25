@@ -1,39 +1,72 @@
-"""Record a one-time, read-only integrity manifest for the local stable candidate."""
+"""Build a fail-closed manifest for a Git-archived, isolated CodeBridge candidate.
+
+No Git updates, overwrites, installation changes, or data migrations.
+"""
+import argparse
+from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
-from datetime import datetime, timezone
 
-home = Path.home()
-root = home / "CodeBridge-Stable"
-manifest = home / "CodeBridge-Launcher" / "stable-manifest.json"
-repository = home / "CodeBridge-MCP-Bridge"
-if manifest.exists():
-    raise SystemExit("REFUSING_TO_OVERWRITE_EXISTING_MANIFEST")
-if not (root / "app_rewrite" / "main.py").is_file():
-    raise SystemExit("INVALID_SNAPSHOT")
-head = subprocess.check_output(
-    ["git", "-C", str(repository), "rev-parse", "HEAD"], text=True
-).strip()
-entries = {}
-for file in sorted(root.rglob("*")):
-    if not file.is_file():
-        continue
-    if file.is_symlink():
-        raise SystemExit("LINK_NOT_ALLOWED")
-    rel = file.relative_to(root).as_posix()
-    entries[rel] = hashlib.sha256(file.read_bytes()).hexdigest()
-if len(entries) < 100:
-    raise SystemExit("SNAPSHOT_UNEXPECTEDLY_SMALL")
-data = {
-    "state": "CANDIDATE",
-    "promotion_authorized": False,
-    "source_commit": head,
-    "created_at": datetime.now(timezone.utc).isoformat(),
-    "checksums": entries,
-}
-manifest.write_text(
-    json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-)
-print("SNAPSHOT_MANIFEST_OK", head[:12], "files", len(entries))
+
+def create_manifest(root: Path, destination: Path, repository: Path, ref: str = "HEAD"):
+    if root.is_symlink() or root.is_junction():
+        raise RuntimeError("SNAPSHOT_REPARSE_BLOCKED")
+    root = root.resolve(strict=True)
+    if destination.exists():
+        raise RuntimeError("MANIFEST_ALREADY_EXISTS")
+    commit = subprocess.check_output(
+        ["git", "-C", str(repository), "rev-parse", "--verify", ref + "^{commit}"],
+        text=True, encoding="utf-8",
+    ).strip()
+    names = subprocess.check_output(
+        ["git", "-C", str(repository), "ls-tree", "-r", "--name-only", commit],
+        text=True, encoding="utf-8",
+    ).splitlines()
+    if len(names) < 100 or not (root / "app_rewrite" / "main.py").is_file():
+        raise RuntimeError("SNAPSHOT_INCOMPLETE")
+    entries = {}
+    for name in names:
+        path = root / name
+        if path.is_symlink() or path.is_junction() or not path.is_file():
+            raise RuntimeError("FILE_MISSING_OR_REPARSE: " + name)
+        if not path.resolve().is_relative_to(root):
+            raise RuntimeError("PATH_OUTSIDE_ROOT: " + name)
+        h = hashlib.sha256()
+        with path.open("rb") as source:
+            for block in iter(lambda: source.read(1024 * 1024), b""):
+                h.update(block)
+        entries[name] = h.hexdigest()
+    extra = []
+    for file in root.rglob("*"):
+        if file.is_file() and file.relative_to(root).as_posix() not in entries:
+            extra.append(str(file.relative_to(root)))
+    if extra:
+        raise RuntimeError("SNAPSHOT_EXTRA_FILES: " + str(extra[:3]))
+    payload = {
+        "state": "CANDIDATE",
+        "promotion_authorized": False,
+        "source_commit": commit,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "checksums": entries,
+    }
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with destination.open("x", encoding="utf-8") as out:
+        json.dump(payload, out, ensure_ascii=False, indent=2)
+        out.write("\n")
+        out.flush()
+        os.fsync(out.fileno())
+    return commit, len(entries)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--root", required=True, type=Path)
+    parser.add_argument("--manifest", required=True, type=Path)
+    parser.add_argument("--repository", default=Path.home() / "CodeBridge-MCP-Bridge", type=Path)
+    parser.add_argument("--ref", default="HEAD")
+    args = parser.parse_args()
+    sha, count = create_manifest(args.root, args.manifest, args.repository, args.ref)
+    print("SNAPSHOT_MANIFEST_OK commit=%s files=%d" % (sha, count))
