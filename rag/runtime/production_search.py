@@ -15,6 +15,7 @@ from rag.index.qdrant_local import (
 )
 from rag.index.lexical_ranking import search_lexical_ranked
 from rag.models.artifact_install import resolve_selected_model_path
+from rag.models.backend_policy import TEXT_SEARCH_CONTEXT_TOKENS, TEXT_SEARCH_UBATCH_TOKENS
 from rag.models.code_artifact_install import resolve_selected_code_model_path
 from rag.models.embedding import TextEmbeddingClient
 from rag.models.code_embedding import CodeEmbeddingClient, CodeRetrievalTask
@@ -44,6 +45,8 @@ def _embed_text(query: str, llama_server: Path):
     base = LlamaServerConfig(
         executable_path=llama_server,
         model_path=resolve_selected_model_path(),
+        context_size=TEXT_SEARCH_CONTEXT_TOKENS,
+        ubatch_size=TEXT_SEARCH_UBATCH_TOKENS,
         port=0, gpu_layers=99, device="CUDA0",
     )
     manager = TextModelFallbackManager.auto(base)

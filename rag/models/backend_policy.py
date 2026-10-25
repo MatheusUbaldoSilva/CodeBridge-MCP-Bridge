@@ -11,6 +11,13 @@ from enum import Enum
 from typing import Optional, Tuple
 
 
+# Bounded query-time context: prevent llama.cpp default max-context KV
+# allocation from exhausting the local 6 GB GPU and CPU fallback.
+# Verified by actual Jina v5 text embedding at 8192 / 512 on Windows.
+TEXT_SEARCH_CONTEXT_TOKENS = 8192
+TEXT_SEARCH_UBATCH_TOKENS = 512
+
+
 class InferenceBackend(str, Enum):
     LLAMA_CPP_HTTP = "LLAMA_CPP_HTTP"
     PYTORCH_SENTENCE_TRANSFORMERS = "PYTORCH_SENTENCE_TRANSFORMERS"

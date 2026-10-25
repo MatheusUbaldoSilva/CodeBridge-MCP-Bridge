@@ -1,6 +1,7 @@
 """Experimental process-local resident embedding lifecycle."""
 import threading
 from rag.models.artifact_install import resolve_selected_model_path
+from rag.models.backend_policy import TEXT_SEARCH_CONTEXT_TOKENS, TEXT_SEARCH_UBATCH_TOKENS
 from rag.models.code_artifact_install import resolve_selected_code_model_path
 from rag.models.embedding import TextEmbeddingClient
 from rag.models.code_embedding import CodeEmbeddingClient, CodeRetrievalTask
@@ -25,7 +26,7 @@ class ResidentEmbeddingPool:
  def embed_text(self,query,exe):
   with self.lock:
    if self.text_lifecycle is None:
-    instance=TextModelLifecycle(LlamaServerConfig(executable_path=exe,model_path=resolve_selected_model_path(),port=0,gpu_layers=99,device="CUDA0"))
+    instance=TextModelLifecycle(LlamaServerConfig(executable_path=exe,model_path=resolve_selected_model_path(),port=0,gpu_layers=99,device="CUDA0",context_size=TEXT_SEARCH_CONTEXT_TOKENS,ubatch_size=TEXT_SEARCH_UBATCH_TOKENS))
     instance.load(timeout_seconds=90)
     self.text_lifecycle=instance
    try:
