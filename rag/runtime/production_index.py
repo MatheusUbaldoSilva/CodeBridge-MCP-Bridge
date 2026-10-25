@@ -8,6 +8,9 @@ import sqlite3
 from uuid import uuid4
 
 from rag.chunking import chunk_markdown, chunk_text_log, safe_chunk_code
+from rag.chunking.bounded import (
+    CODE_INDEX_MAX_CHARS, TEXT_INDEX_MAX_CHARS, bound_index_chunks,
+)
 from rag.chunking.provenance import source_sha256
 from rag.contracts import SourceType
 from rag.index.fts5 import initialize_fts5
@@ -20,8 +23,14 @@ from rag.runtime.status import resolve_rag_sqlite_path
 def _drafts(path: str, content: str, code: bool):
     if code:
         result = safe_chunk_code(content, path=path)
-        return result.structural_chunks or result.fallback_chunks
-    return chunk_markdown(content) if Path(path).suffix.lower()==".md" else chunk_text_log(content)
+        originals = result.structural_chunks or result.fallback_chunks
+        return bound_index_chunks(originals, max_chars=CODE_INDEX_MAX_CHARS)
+    originals = (
+        chunk_markdown(content)
+        if Path(path).suffix.lower() == ".md"
+        else chunk_text_log(content)
+    )
+    return bound_index_chunks(originals, max_chars=TEXT_INDEX_MAX_CHARS)
 
 
 def _source_type(path: str, code: bool) -> SourceType:
@@ -139,6 +148,11 @@ def _write_vectors(path: Path, project_id: str, text_rows, code_rows) -> None:
     from rag.models.code_embedding import CodeEmbeddingClient,CodeRetrievalTask
     from rag.models.lifecycle import LlamaServerConfig,TextModelLifecycle
     from rag.models.code_lifecycle import CodeModelLifecycle,build_code_server_config
+    from rag.models.backend_policy import TEXT_SEARCH_CONTEXT_TOKENS, TEXT_SEARCH_UBATCH_TOKENS
+    from rag.models.code_backend_policy import (
+        CODE_SEARCH_CONTEXT_TOKENS, CODE_SEARCH_UBATCH_TOKENS,
+        CODE_SEARCH_PARALLEL_SLOTS,
+    )
     from rag.models.fallback import TextModelFallbackManager, build_cpu_fallback_config
 
     client=open_qdrant_local(path)
@@ -150,10 +164,24 @@ def _write_vectors(path: Path, project_id: str, text_rows, code_rows) -> None:
                 continue
             if collection==TEXT_VECTOR_COLLECTION:
                 manager=None
-                life=TextModelLifecycle(LlamaServerConfig(executable_path=llama,model_path=resolve_selected_model_path(),port=0,gpu_layers=99,device="CUDA0"))
+                life=TextModelLifecycle(LlamaServerConfig(
+                    executable_path=llama,
+                    model_path=resolve_selected_model_path(),
+                    port=0, gpu_layers=99, device="CUDA0",
+                    context_size=TEXT_SEARCH_CONTEXT_TOKENS,
+                    ubatch_size=TEXT_SEARCH_UBATCH_TOKENS,
+                    parallel_slots=1,
+                ))
                 life.load(timeout_seconds=90)
             else:
-                gpu_config=build_code_server_config(executable_path=llama,model_path=resolve_selected_code_model_path(),port=0,gpu_layers=99,device="CUDA0")
+                gpu_config=build_code_server_config(
+                    executable_path=llama,
+                    model_path=resolve_selected_code_model_path(),
+                    port=0, gpu_layers=99, device="CUDA0",
+                    context_size=CODE_SEARCH_CONTEXT_TOKENS,
+                    ubatch_size=CODE_SEARCH_UBATCH_TOKENS,
+                    parallel_slots=CODE_SEARCH_PARALLEL_SLOTS,
+                )
                 manager=TextModelFallbackManager(
                     gpu_config=gpu_config,
                     cpu_config=build_cpu_fallback_config(gpu_config),
