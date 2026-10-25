@@ -75,15 +75,41 @@ def check_snapshot():
     if not MANIFEST.is_file():
         raise RuntimeError("Manifesto do snapshot estavel ausente")
     info = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    if info.get("state") != "CANDIDATE" or not info.get("checksums"):
+    if not isinstance(info, dict):
         raise RuntimeError("Manifesto invalido")
+    checksums = info.get("checksums")
+    if info.get("state") != "CANDIDATE" or not isinstance(checksums, dict) or not checksums:
+        raise RuntimeError("Manifesto invalido")
+    if STABLE.is_symlink() or STABLE.is_junction():
+        raise RuntimeError("Snapshot redirecionado")
     root = STABLE.resolve(strict=True)
-    for relative, expected in info["checksums"].items():
-        path = root / relative
-        if not path.is_file() or path.is_symlink():
+    names = set()
+    for relative, expected in checksums.items():
+        rel = Path(relative)
+        canonical = rel.as_posix().casefold()
+        if (
+            rel.is_absolute() or not rel.parts or ".." in rel.parts
+            or ":" in relative or canonical in names
+            or not isinstance(expected, str) or len(expected) != 64
+            or any(c not in "0123456789abcdefABCDEF" for c in expected)
+        ):
+            raise RuntimeError("Entrada insegura no manifesto")
+        names.add(canonical)
+        path = root / rel
+        if not path.is_file() or path.is_symlink() or path.is_junction():
             raise RuntimeError("Arquivo ausente ou link: " + relative)
         if not path.resolve().is_relative_to(root) or digest(path) != expected:
             raise RuntimeError("Integridade falhou: " + relative)
+    # Never start additional unverified Python/config sources from the stable snapshot.
+    # Runtime-only files from the isolated MCP venv and Python bytecode are excluded.
+    for path in root.rglob("*"):
+        rel = path.relative_to(root)
+        if ".venv" in rel.parts or "__pycache__" in rel.parts:
+            continue
+        if path.is_symlink() or path.is_junction():
+            raise RuntimeError("Link inesperado no snapshot: " + str(rel))
+        if path.is_file() and rel.as_posix().casefold() not in names:
+            raise RuntimeError("Arquivo nao verificado no snapshot: " + str(rel))
     return info
 
 
