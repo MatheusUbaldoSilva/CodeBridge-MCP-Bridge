@@ -28,6 +28,7 @@ def build_code_server_config(
     device: Optional[str] = None,
     context_size: int = CODE_RECOMMENDED_CONTEXT_TOKENS,
     ubatch_size: int = CODE_RECOMMENDED_UBATCH_SIZE,
+    parallel_slots: Optional[int] = None,
     log_path: Optional[Path] = None,
 ) -> LlamaServerConfig:
     return LlamaServerConfig(
@@ -39,6 +40,7 @@ def build_code_server_config(
         device=device,
         context_size=context_size,
         ubatch_size=ubatch_size,
+        parallel_slots=parallel_slots,
         pooling=SELECTED_CODE_BACKEND.pooling,
         health_path=SELECTED_CODE_BACKEND.health_endpoint,
         log_path=log_path,

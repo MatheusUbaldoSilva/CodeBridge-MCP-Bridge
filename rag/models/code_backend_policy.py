@@ -38,6 +38,12 @@ CODE_MAX_CONTEXT_TOKENS = 32768
 CODE_RECOMMENDED_CONTEXT_TOKENS = 8192
 CODE_RECOMMENDED_UBATCH_SIZE = 8192
 
+# Query-time memory budget proven on 8 GB Windows and RTX 3050 6 GB.
+# Other uses keep their existing configurable/default model settings.
+CODE_SEARCH_CONTEXT_TOKENS = 2048
+CODE_SEARCH_UBATCH_TOKENS = 128
+CODE_SEARCH_PARALLEL_SLOTS = 1
+
 REQUIRED_LLAMA_CPP_CODE_FLAGS: Tuple[str, ...] = (
     "--embedding",
     "--pooling",

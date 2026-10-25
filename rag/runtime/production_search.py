@@ -17,6 +17,7 @@ from rag.index.lexical_ranking import search_lexical_ranked
 from rag.models.artifact_install import resolve_selected_model_path
 from rag.models.backend_policy import TEXT_SEARCH_CONTEXT_TOKENS, TEXT_SEARCH_UBATCH_TOKENS
 from rag.models.code_artifact_install import resolve_selected_code_model_path
+from rag.models.code_backend_policy import CODE_SEARCH_CONTEXT_TOKENS, CODE_SEARCH_UBATCH_TOKENS, CODE_SEARCH_PARALLEL_SLOTS
 from rag.models.embedding import TextEmbeddingClient
 from rag.models.code_embedding import CodeEmbeddingClient, CodeRetrievalTask
 from rag.models.code_lifecycle import CodeModelLifecycle, build_code_server_config
@@ -63,6 +64,9 @@ def _embed_code(query: str, llama_server: Path):
     base = build_code_server_config(
         executable_path=llama_server,
         model_path=resolve_selected_code_model_path(),
+        context_size=CODE_SEARCH_CONTEXT_TOKENS,
+        ubatch_size=CODE_SEARCH_UBATCH_TOKENS,
+        parallel_slots=CODE_SEARCH_PARALLEL_SLOTS,
         port=0, gpu_layers=99, device="CUDA0",
     )
     manager = TextModelFallbackManager.auto(

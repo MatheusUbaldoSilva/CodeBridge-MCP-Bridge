@@ -3,6 +3,7 @@ import threading
 from rag.models.artifact_install import resolve_selected_model_path
 from rag.models.backend_policy import TEXT_SEARCH_CONTEXT_TOKENS, TEXT_SEARCH_UBATCH_TOKENS
 from rag.models.code_artifact_install import resolve_selected_code_model_path
+from rag.models.code_backend_policy import CODE_SEARCH_CONTEXT_TOKENS, CODE_SEARCH_UBATCH_TOKENS, CODE_SEARCH_PARALLEL_SLOTS
 from rag.models.embedding import TextEmbeddingClient
 from rag.models.code_embedding import CodeEmbeddingClient, CodeRetrievalTask
 from rag.models.lifecycle import LlamaServerConfig, TextModelLifecycle
@@ -38,7 +39,7 @@ class ResidentEmbeddingPool:
  def embed_code(self,query,exe):
   with self.lock:
    if self.code_lifecycle is None:
-    instance=CodeModelLifecycle(build_code_server_config(executable_path=exe,model_path=resolve_selected_code_model_path(),port=0,gpu_layers=99,device="CUDA0"))
+    instance=CodeModelLifecycle(build_code_server_config(executable_path=exe,model_path=resolve_selected_code_model_path(),port=0,gpu_layers=99,device="CUDA0",context_size=CODE_SEARCH_CONTEXT_TOKENS,ubatch_size=CODE_SEARCH_UBATCH_TOKENS,parallel_slots=CODE_SEARCH_PARALLEL_SLOTS))
     instance.load(timeout_seconds=90)
     self.code_lifecycle=instance
    try:

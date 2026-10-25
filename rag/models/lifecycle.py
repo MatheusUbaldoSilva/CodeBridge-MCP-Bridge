@@ -54,6 +54,7 @@ class LlamaServerConfig:
     device: Optional[str] = None
     context_size: Optional[int] = None
     ubatch_size: Optional[int] = None
+    parallel_slots: Optional[int] = None
     pooling: str = "last"
     health_path: str = "/health"
     log_path: Optional[Path] = None
@@ -89,7 +90,7 @@ class LlamaServerConfig:
                 raise ValueError(
                     "device none requires gpu_layers=0"
                 )
-        for field_name in ("context_size", "ubatch_size"):
+        for field_name in ("context_size", "ubatch_size", "parallel_slots"):
             value = getattr(self, field_name)
             if value is not None:
                 if not isinstance(value, int) or isinstance(value, bool):
@@ -172,6 +173,8 @@ def build_llama_server_argv(
         argv.extend(("--ctx-size", str(config.context_size)))
     if config.ubatch_size is not None:
         argv.extend(("--ubatch-size", str(config.ubatch_size)))
+    if config.parallel_slots is not None:
+        argv.extend(("--parallel", str(config.parallel_slots)))
     if config.device is not None:
         argv.extend(
             (
