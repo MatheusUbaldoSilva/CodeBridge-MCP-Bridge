@@ -9,7 +9,7 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import Icon, ToolAnnotations
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from http_client import ProtocolHTTPClient
 from development_checkpoint_tools import register_development_checkpoint_tools
@@ -42,6 +42,7 @@ class RagStatusResult(ProtocolOutcome):
     available: bool
     index: dict[str, Any]
     projects: list[dict[str, Any]]
+    isolated_project_indexes: list[dict[str, Any]] = Field(default_factory=list)
     models: dict[str, dict[str, Any]]
     backend: dict[str, Any]
     last_indexed_at: str | None
@@ -740,6 +741,7 @@ def codebridge_rag_status() -> RagStatusResult:
         available=True,
         index=dict(payload.get("index") or {}),
         projects=list(payload.get("projects") or []),
+        isolated_project_indexes=list(payload.get("isolated_project_indexes") or []),
         models=dict(payload.get("models") or {}),
         backend=dict(payload.get("backend") or {}),
         last_indexed_at=payload.get("last_indexed_at"),

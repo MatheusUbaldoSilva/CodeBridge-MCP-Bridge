@@ -270,10 +270,17 @@ def get_rag_status() -> dict[str, Any]:
     # Preserve EMPTY semantics and avoid creating a production lock in an
     # environment where no index exists (legacy MCP status unit tests).
     if _v1_legacy_index_missing():
-        return build_rag_status().to_dict()
-    from rag.runtime.production_generation_read import production_generation_read
-    with production_generation_read() as pinned:
-        return build_rag_status(_generation_paths=pinned).to_dict()
+        payload = build_rag_status().to_dict()
+    else:
+        from rag.runtime.production_generation_read import production_generation_read
+        with production_generation_read() as pinned:
+            payload = build_rag_status(_generation_paths=pinned).to_dict()
+    # Separate project candidates never change the selected legacy generation.
+    from rag.runtime.isolated_project_index import list_isolated_project_indexes
+    registered = list_isolated_project_indexes()
+    if registered:
+        payload["isolated_project_indexes"] = registered
+    return payload
 
 
 def index_rag(
@@ -410,6 +417,14 @@ def search_rag_context(
                 semantic_executor=_RAG_SEARCH_EXECUTOR,
             )
     else:
+        from rag.runtime.isolated_project_index import resolve_isolated_project
+        if resolve_isolated_project(project_id) is not None:
+            from rag.runtime.isolated_project_search import search_isolated_project
+            return search_isolated_project(
+                query=query, project_id=project_id,
+                source_types=tuple(source_types or ()), top_k=top_k,
+                path_filter=path_filter, branch=branch,
+            )
         result = search_context(
             query=query, project_id=project_id,
             source_types=tuple(source_types or ()), top_k=top_k,
@@ -462,6 +477,16 @@ def get_rag_context(
                 sqlite_path=pinned.sqlite,
             )
     else:
+        from rag.runtime.isolated_project_index import resolve_isolated_project
+        if resolve_isolated_project(project_id) is not None:
+            from rag.runtime.isolated_project_search import get_isolated_project_context
+            return get_isolated_project_context(
+                project_id=project_id,
+                chunk_ids=chunk_ids,
+                include_document_content=include_document_content,
+                project_root=project_root,
+                allow_stale=allow_stale,
+            )
         result = get_context(
             project_id=project_id,
             chunk_ids=tuple(chunk_ids),

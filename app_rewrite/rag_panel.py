@@ -50,7 +50,9 @@ def _rag_operation(operation, args):
         return response
     if operation == "documents":
         from rag.runtime.status import resolve_rag_sqlite_path
-        db = resolve_rag_sqlite_path()
+        from rag.runtime.isolated_project_index import resolve_isolated_project
+        project=resolve_isolated_project(args["project"]) if args["project"]!="codebridge" else None
+        db = project.sqlite if project is not None else resolve_rag_sqlite_path()
         if not db.is_file():
             return []
         with sqlite3.connect(f"{db.resolve().as_uri()}?mode=ro", uri=True) as con:
@@ -377,10 +379,18 @@ class RagPanel(QWidget):
             ready = str((data.get("index") or {}).get("state") or "").upper() == "READY"
             self.rag_status.setText("RAG: ONLINE" if ready else "RAG: OFFLINE")
             projects = data.get("projects") or []
-            count = sum(int(p.get("document_count") or 0) for p in projects)
+            isolated = [
+                p for p in (data.get("isolated_project_indexes") or [])
+                if p.get("state") == "ISOLATED_READ_ONLY"
+            ]
+            count = (
+                sum(int(p.get("document_count") or 0) for p in projects)
+                + sum(int(p.get("document_count") or 0) for p in isolated)
+            )
             self.summary.setText(f"Meus conhecimentos — {count} documentos")
             names = sorted(set(["codebridge"] +
                                [str(p.get("project_id")) for p in projects if p.get("project_id")] +
+                               [str(p.get("project_id")) for p in isolated if p.get("project_id")] +
                                list_projects()))
             self.project_picker.blockSignals(True)
             self.project_picker.clear()
