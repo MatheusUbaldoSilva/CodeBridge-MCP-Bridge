@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from rag.runtime.auto_index_controls import request_auto_index_control
-from rag.runtime.auto_index_queue import default_queue_path, list_jobs
+from rag.runtime.auto_index_queue import default_queue_path, list_jobs, inspect_queue_operational, preferred_display_job
 from rag.runtime.auto_index_telemetry import read_auto_index_job_status
 
 
@@ -118,6 +118,9 @@ class RagAutoJobCard(QFrame):
         self.subtitle=QLabel("Indexação automática — fila e progresso")
         self.subtitle.setObjectName("RagAutoSmall")
         outer.addWidget(self.subtitle)
+        self.details_toggle=QPushButton("▸ Diagnóstico e recursos")
+        self.details_toggle.setCheckable(True)
+        self.details_toggle.toggled.connect(self._toggle_diagnostics)
         self.project=QLabel(project_id)
         self.project.setObjectName("RagAutoProject")
         outer.addWidget(self.project)
@@ -138,7 +141,7 @@ class RagAutoJobCard(QFrame):
         counts=QHBoxLayout()
         self.counts=QLabel("Sem contadores disponíveis")
         self.counts.setObjectName("RagAutoSmall")
-        self.runtime=QLabel("Jina CODE · GPU · ubatch 32 | TEXT · CPU")
+        self.runtime=QLabel("Perfil previsto: CODE GPU · TEXT CPU")
         self.runtime.setObjectName("RagAutoSmall")
         counts.addWidget(self.counts,1)
         counts.addWidget(self.runtime)
@@ -175,11 +178,167 @@ class RagAutoJobCard(QFrame):
         self.detail.setObjectName("RagAutoSmall")
         self.detail.setWordWrap(True)
         outer.addWidget(self.detail)
+        self.alert=QLabel("")
+        self.alert.setObjectName("RagAutoSmall")
+        self.alert.setWordWrap(True)
+        self.alert.setVisible(False)
+        outer.addWidget(self.alert)
+        outer.addWidget(self.details_toggle)
+        self.diagnostics=QLabel("Diagnóstico não consultado")
+        self.diagnostics.setObjectName("RagAutoSmall")
+        self.diagnostics.setWordWrap(True)
+        self.diagnostics.setVisible(False)
+        outer.addWidget(self.diagnostics)
+        self.history_toggle=QPushButton("▸ Histórico recente")
+        self.history_toggle.setCheckable(True)
+        self.history_toggle.toggled.connect(self._toggle_history)
+        outer.addWidget(self.history_toggle)
+        self.history_label=QLabel("Histórico não consultado")
+        self.history_label.setObjectName("RagAutoSmall")
+        self.history_label.setWordWrap(True)
+        self.history_label.setVisible(False)
+        outer.addWidget(self.history_label)
+        self.queue_health=QLabel("Fila: aguardando consulta")
+        self.queue_health.setObjectName("RagAutoSmall")
+        self.queue_health.setWordWrap(True)
+        outer.addWidget(self.queue_health)
+        self.resource_sampled.connect(self._accept_resource_sample)
+        self._history_timer=QTimer(self)
+        self._history_timer.setInterval(15000)
+        self._history_timer.timeout.connect(self._refresh_expanded_history)
+        self._history_timer.start()
+        self._resource_timer=QTimer(self)
+        self._resource_timer.setInterval(15000)
+        self._resource_timer.timeout.connect(self._request_resource_sample)
+        self._resource_busy=False
+        self._resource_sample=None
+        self._resource_timer.start()
+        self._queue_timer=QTimer(self)
+        self._queue_timer.setInterval(30000)
+        self._queue_timer.timeout.connect(self._refresh_queue_health)
+        self._queue_timer.start()
+        self._refresh_queue_health()
         self._timer=QTimer(self)
         self._timer.setInterval(3000)
         self._timer.timeout.connect(self.refresh)
         self._timer.start()
         self.refresh()
+
+    def _refresh_queue_health(self) -> None:
+        try:
+            info=inspect_queue_operational(self.queue_path)
+            if info.get("state")=="NOT_INITIALIZED":
+                message="Fila ainda não inicializada"
+            else:
+                counts=info.get("by_state") or {}
+                active=sum(counts.get(state,0) for state in ("RUNNING","PAUSE_REQUESTED","CANCEL_REQUESTED"))
+                pending=counts.get("QUEUED",0)
+                message=f'Fila: {info["jobs"]} jobs · {active} em operação · {pending} aguardando'
+            self.queue_health.setText(message)
+        except (OSError,ValueError,RuntimeError,KeyError) as exc:
+            self.queue_health.setText("Fila indisponível: "+type(exc).__name__)
+
+    def _toggle_history(self, expanded: bool) -> None:
+        self.history_label.setVisible(expanded)
+        self.history_toggle.setText("▾ Ocultar histórico" if expanded else "▸ Histórico recente")
+        if expanded:
+            self._refresh_history()
+
+    def _refresh_expanded_history(self) -> None:
+        if self.history_toggle.isChecked():
+            self._refresh_history()
+
+    def _refresh_history(self) -> None:
+        try:
+            from datetime import datetime
+            jobs=list_jobs(self.queue_path,project_id=self.project_id,limit=8)
+            pinned=preferred_display_job(self.queue_path,self.project_id)
+            if pinned and pinned["state"] in ("RUNNING","PAUSE_REQUESTED","CANCEL_REQUESTED","VALIDATING"):
+                if all(job["job_id"]!=pinned["job_id"] for job in jobs):
+                    jobs=[pinned,*jobs]
+            rows=[]
+            for job in jobs:
+                changed=job.get("updated_at_epoch")
+                when=datetime.fromtimestamp(changed).strftime("%d/%m %H:%M") if changed else "sem data"
+                rows.append(
+                    f'{str(job["job_id"])[:12]} · {_LABELS.get(job["state"],job["state"])}'
+                    f' · {job["file_count"]} arquivos · {when}'
+                )
+            self.history_label.setText("\n".join(rows) if rows else "Nenhum trabalho registrado neste projeto")
+        except (OSError,ValueError,RuntimeError,KeyError) as exc:
+            self.history_label.setText("Histórico indisponível: "+type(exc).__name__)
+
+    def _request_resource_sample(self) -> None:
+        if not self.details_toggle.isChecked() or self._resource_busy:
+            return
+        self._resource_busy=True
+        import threading
+        # Probe in a background thread; communicate only through Qt signals.
+        threading.Thread(target=self._sample_resources,daemon=True).start()
+
+    resource_sampled=Signal(object)
+
+    def _sample_resources(self) -> None:
+        from rag.runtime.auto_index_telemetry import _probe_system_resources
+        try:
+            value=_probe_system_resources()
+        except Exception:
+            value=(None,None)
+        try:
+            self.resource_sampled.emit(value)
+        except RuntimeError:
+            # The Qt widget may have been destroyed while the probe was running.
+            return
+
+    def _accept_resource_sample(self, value: object) -> None:
+        self._resource_sample=value
+        self._resource_busy=False
+        if self.details_toggle.isChecked():
+            self._refresh_diagnostics()
+
+    def _toggle_diagnostics(self, expanded: bool) -> None:
+        self.diagnostics.setVisible(expanded)
+        self.details_toggle.setText("▾ Ocultar diagnóstico" if expanded else "▸ Diagnóstico e recursos")
+        if expanded:
+            self._refresh_diagnostics()
+            self._request_resource_sample()
+
+    def _refresh_diagnostics(self) -> None:
+        if not self._job_id:
+            self.diagnostics.setText("Nenhum job selecionado")
+            return
+        try:
+            data=self._status
+            if data is None or data.get("job_id")!=self._job_id:
+                self.diagnostics.setText("Diagnóstico aguardando job atual")
+                return
+            import time
+            from rag.runtime.auto_index_supervisor import inspect_index_supervisor
+            lease=inspect_index_supervisor(self.queue_path)
+            expiry=lease.get("lease_until_epoch")
+            lease_expired=(lease.get("state")=="LEASE_RECORDED" and isinstance(expiry,(int,float)) and expiry<=time.time())
+            lines=[
+                f'Job: {data["job_id"]}',
+                f'Estado: {_LABELS.get(data["state"],data["state"])}',
+                f'TEXT: {data["text_vectors_done"]} vetores · CODE: {data["code_vectors_done"]} vetores',
+                f'Supervisor reservado: {"sim" if data["supervisor_reserved"] else "não"}',
+                f'Último evento: {data["last_event"] or "indisponível"}',
+            ]
+            if lease_expired:
+                lines.append('Atenção: reserva do supervisor expirada; confira a recuperação do worker.')
+            elif lease.get("state")=="LEASE_RECORDED" and lease.get("job_id")==self._job_id:
+                lines.append('Reserva atual do job registrada no supervisor.')
+            if data.get("last_error"):
+                lines.append('Erro: '+str(data["last_error"]))
+            if self._resource_sample:
+                memory,gpu=self._resource_sample
+                if memory:
+                    lines.append(f'RAM livre: {memory["free_mib"]} / {memory["total_mib"]} MiB')
+                if gpu:
+                    lines.append(f'GPU: {gpu["used_mib"]} / {gpu["total_mib"]} MiB · uso {gpu["utilization_percent"]}%')
+            self.diagnostics.setText("\n".join(lines))
+        except (OSError, ValueError, RuntimeError, KeyError) as exc:
+            self.diagnostics.setText("Diagnóstico indisponível: "+type(exc).__name__)
 
     def set_project(self,project_id: str) -> None:
         self.project_id=project_id
@@ -187,22 +346,26 @@ class RagAutoJobCard(QFrame):
         self._job_id=None
         self._launched_job_id=None
         self._launched_pid=None
+        self._resource_sample=None
         self.refresh()
 
     def refresh(self) -> None:
         try:
-            jobs=list_jobs(self.queue_path,project_id=self.project_id,limit=1)
-            if not jobs:
+            selected=preferred_display_job(self.queue_path,self.project_id)
+            if selected is None:
                 self._job_id=None
                 self._status=None
                 self._clear()
+                if self.history_toggle.isChecked():
+                    self._refresh_history()
                 return
-            selected=jobs[0]
             self._job_id=selected["job_id"]
             self._status=read_auto_index_job_status(
                 self.queue_path,self._job_id,probe_resources=False,
             )
             self._render(self._status)
+            if self.details_toggle.isChecked():
+                self._refresh_diagnostics()
         except Exception as exc:
             self._job_id=None
             self._status=None
@@ -222,9 +385,22 @@ class RagAutoJobCard(QFrame):
         self.pause_button.setEnabled(False)
         self.cancel_button.setEnabled(False)
         self.detail.setText("Selecione arquivos e aprove a preparação de uma fila.")
+        self.alert.setText("")
+        self.alert.setVisible(False)
 
     def _render(self,data: dict) -> None:
         current=data["state"]
+        warning={
+            "FAILED":"Falha registrada: consulte o diagnóstico antes de retomar.",
+            "PAUSE_REQUESTED":"Pausa solicitada: aguardando checkpoint seguro.",
+            "CANCEL_REQUESTED":"Cancelamento solicitado: aguardando confirmação do worker.",
+        }.get(current,"")
+        if current in ("RUNNING","PAUSE_REQUESTED","CANCEL_REQUESTED","VALIDATING") and data.get("supervisor_lease_expired"):
+            warning=(warning+" Reserva do worker expirada: revisar retomada antes de agir.").strip()
+        if data.get("last_error"):
+            warning=(warning+" "+str(data["last_error"])).strip()
+        self.alert.setText(warning)
+        self.alert.setVisible(bool(warning))
         self.status.setText(_LABELS.get(current,current))
         self.sources.setText(
             f'{data["file_count"]} arquivos · {data["chunk_count"]} trechos'

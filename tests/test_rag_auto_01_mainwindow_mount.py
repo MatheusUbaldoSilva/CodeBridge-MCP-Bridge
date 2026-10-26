@@ -44,7 +44,16 @@ class MainWindowRagAutoTests(unittest.TestCase):
                     "Indexação automática"
                 )
                 self.assertIsNotNone(main.rag_tab.auto_card)
-                self.assertFalse(main.rag_tab.auto_card.pause_button.isEnabled())
+                card=main.rag_tab.auto_card
+                self.assertFalse(card.pause_button.isEnabled())
+                self.assertFalse(card.details_toggle.isChecked())
+                self.assertFalse(card.history_toggle.isChecked())
+                self.assertTrue(card.queue_health.text())
+                with patch.object(card,"_request_resource_sample"):
+                    card.details_toggle.click()
+                self.assertIn("Nenhum job",card.diagnostics.text())
+                card.history_toggle.click()
+                self.assertTrue(card.history_label.text())
                 service.return_value.start.assert_called_once()
             finally:
                 main.close()

@@ -275,6 +275,24 @@ def list_jobs(queue_path: Path, *, project_id: str | None = None,
         return [_to_job(row) for row in connection.execute(sql, (*args,limit))]
 
 
+def preferred_display_job(queue_path: Path, project_id: str) -> dict | None:
+    """Select a live job first, regardless of how many newer drafts exist."""
+    if not isinstance(project_id,str) or not _PROJECT.fullmatch(project_id):
+        raise ValueError("invalid project namespace")
+    cn=_connect(_canonical_queue_path(queue_path),create=False)
+    if cn is None:
+        return None
+    with closing(cn):
+        row=cn.execute(
+            f"SELECT {_COLUMNS} FROM auto_jobs WHERE project_id=? "
+            "ORDER BY CASE WHEN state IN "
+            "('RUNNING','PAUSE_REQUESTED','CANCEL_REQUESTED','VALIDATING') "
+            "THEN 0 ELSE 1 END, created_at_epoch DESC,job_id DESC LIMIT 1",
+            (project_id,),
+        ).fetchone()
+    return _to_job(row) if row else None
+
+
 def get_job(queue_path: Path, job_id: str) -> dict | None:
     if not isinstance(job_id,str) or not re.fullmatch("[0-9a-f]{32}",job_id):
         raise ValueError("invalid job id")
@@ -286,6 +304,18 @@ def get_job(queue_path: Path, job_id: str) -> dict | None:
             f"SELECT {_COLUMNS} FROM auto_jobs WHERE job_id=?",(job_id,),
         ).fetchone()
         return _to_job(row) if row else None
+
+
+def inspect_queue_operational(queue_path: Path) -> dict:
+    """Cheap read-only counters for the UI; not a full integrity verification."""
+    connection=_connect(_canonical_queue_path(queue_path),create=False)
+    if connection is None:
+        return {"state":"NOT_INITIALIZED","jobs":0,"by_state":{}}
+    with closing(connection):
+        counts=dict(connection.execute(
+            "SELECT state,count(*) FROM auto_jobs GROUP BY state"
+        ).fetchall())
+    return {"state":"READY","jobs":sum(counts.values()),"by_state":counts}
 
 
 def inspect_queue(queue_path: Path) -> dict:
@@ -306,6 +336,28 @@ def inspect_queue(queue_path: Path) -> dict:
             "schema_version":_SCHEMA_VERSION,"integrity":integrity,
             "worker_started":False,"index_updated":False,
         }
+
+
+def latest_event(queue_path: Path, job_id: str) -> dict | None:
+    """Read the newest persisted event without scanning the full event history."""
+    if not isinstance(job_id,str) or not re.fullmatch("[0-9a-f]{32}",job_id):
+        raise ValueError("invalid job id")
+    connection=_connect(_canonical_queue_path(queue_path),create=False)
+    if connection is None:
+        return None
+    with closing(connection):
+        row=connection.execute(
+            "SELECT event_id,event_type,recorded_at_epoch,details_json "
+            "FROM auto_job_events WHERE job_id=? ORDER BY event_id DESC LIMIT 1",
+            (job_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    event_id,event_type,stamp,details=row
+    return {
+        "event_id":event_id,"event_type":event_type,
+        "recorded_at_epoch":stamp,"details":json.loads(details),
+    }
 
 
 def list_events(queue_path: Path, job_id: str) -> list[dict]:
