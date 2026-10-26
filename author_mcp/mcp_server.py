@@ -704,7 +704,8 @@ def _rag_auto_return(operation):
     """Keep errors structured without exposing an index mutation pathway."""
     try:
         result=operation()
-        return {"operation_ok":True,"details":result,"worker_started":False,
+        return {"operation_ok":True,"details":result,
+                "worker_started":bool(result.get("process_started",False)),
                 "public_generation_changed":False,"index_published":False}
     except Exception as exc:
         error=_rag_public_error(exc)
@@ -797,6 +798,36 @@ def codebridge_rag_auto_control(
             confirmation=confirmation,
         )
     )
+
+
+@mcp.tool(
+    name="codebridge_rag_auto_start",
+    description=(
+        "RAG-AUTO: inicia worker de indexacao em subprocesso isolado apenas para "
+        "job aprovado e QUEUED. Requer execute=true, operator_approved=true "
+        "e confirmation='RAG_AUTO_LAUNCH:<job_id>'. Retorna PID, NAO conclusao; "
+        "nunca publica ou modifica o indice RAG publico."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,idempotent_hint=False,open_world_hint=False,
+    ),
+    structured_output=True,
+)
+def codebridge_rag_auto_start(
+    job_id: str,execute: bool=False,operator_approved: bool=False,
+    confirmation: str | None=None,
+) -> dict[str, Any]:
+    def launch_with_gate():
+        if (execute is not True or operator_approved is not True
+                or confirmation!="RAG_AUTO_LAUNCH:"+job_id):
+            raise PermissionError("explicit job-specific launch authorization required")
+        from rag.runtime.auto_index_launch import launch_approved_auto_job
+        from rag.runtime.auto_index_queue import default_queue_path
+        return launch_approved_auto_job(
+            default_queue_path(),job_id,execute=True,
+            operator_approved=True,confirmation=confirmation,
+        )
+    return _rag_auto_return(launch_with_gate)
 
 
 @mcp.tool(

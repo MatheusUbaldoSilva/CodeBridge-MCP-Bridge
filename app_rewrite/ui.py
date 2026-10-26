@@ -735,6 +735,16 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         try:
+            self.rag_tab.request_graceful_stop_of_workers()
+        except Exception as exc:
+            QMessageBox.warning(
+                self,APP_NAME,
+                "Não foi possível solicitar pausa do RAG-AUTO: "+str(exc)
+                +"\nFechamento cancelado para preservar a indexação.",
+            )
+            event.ignore()
+            return
+        try:
             self.telemetry.stop()
         finally:
             super().closeEvent(event)

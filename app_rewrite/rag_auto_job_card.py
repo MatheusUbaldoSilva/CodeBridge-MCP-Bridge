@@ -99,6 +99,8 @@ class RagAutoJobCard(QFrame):
         self.project_id=project_id
         self._job_id: str | None=None
         self._status: dict | None=None
+        self._launched_job_id: str | None=None
+        self._launched_pid: int | None=None
         outer=QVBoxLayout(self)
         outer.setContentsMargins(18,17,18,16)
         outer.setSpacing(11)
@@ -139,10 +141,13 @@ class RagAutoJobCard(QFrame):
         counts.addWidget(self.runtime)
         outer.addLayout(counts)
         controls=QHBoxLayout()
+        self.start_button=QPushButton("Iniciar indexação")
+        self.start_button.clicked.connect(self._request_start)
         self.pause_button=QPushButton("Pausar")
         self.cancel_button=QPushButton("Cancelar trabalho")
         self.pause_button.clicked.connect(self._request_pause_or_resume)
         self.cancel_button.clicked.connect(self._request_cancel)
+        controls.addWidget(self.start_button,1)
         controls.addWidget(self.pause_button,1)
         controls.addWidget(self.cancel_button,1)
         outer.addLayout(controls)
@@ -160,6 +165,8 @@ class RagAutoJobCard(QFrame):
         self.project_id=project_id
         self.project.setText(project_id)
         self._job_id=None
+        self._launched_job_id=None
+        self._launched_pid=None
         self.refresh()
 
     def refresh(self) -> None:
@@ -188,6 +195,7 @@ class RagAutoJobCard(QFrame):
         self.percent.setText("--%")
         self.bar.setValue(0)
         self.counts.setText("Sem contadores disponíveis")
+        self.start_button.setEnabled(False)
         self.pause_button.setEnabled(False)
         self.cancel_button.setEnabled(False)
         self.detail.setText("Selecione arquivos e aprove a preparação de uma fila.")
@@ -210,6 +218,24 @@ class RagAutoJobCard(QFrame):
             self.percent.setText("--%")
             self.bar.setValue(0)
             self.counts.setText("Aguardando inventário e contagem real de chunks")
+        recently_launched=False
+        if current=="QUEUED" and self._launched_job_id==self._job_id:
+            import psutil
+            try:
+                process=psutil.Process(self._launched_pid)
+                arguments=process.cmdline()
+                recently_launched=(
+                    "rag.runtime.auto_index_runner" in arguments
+                    and self._job_id in arguments and process.is_running()
+                )
+            except (psutil.Error,TypeError,ValueError):
+                recently_launched=False
+            if not recently_launched:
+                self._launched_job_id=None
+                self._launched_pid=None
+        self.start_button.setEnabled(
+            current=="QUEUED" and data["reviewed"] and not recently_launched
+        )
         self.pause_button.setText("Retomar" if current=="PAUSED" else "Pausar")
         self.pause_button.setEnabled(current in ("QUEUED","RUNNING","PAUSED"))
         self.cancel_button.setEnabled(current in (
@@ -232,6 +258,59 @@ class RagAutoJobCard(QFrame):
             self.detail.setText(
                 "Controle persistente: não altera a geração pública do RAG."
             )
+
+    def _request_start(self) -> None:
+        if not self._status or not self._job_id or self._status["state"]!="QUEUED":
+            return
+        answer=QMessageBox.question(
+            self,"Iniciar indexação real",
+            "Iniciar o worker Jina para os arquivos já aprovados?\n\n"
+            "CODE: GPU CUDA (ubatch 32). TEXT: CPU.\n"
+            "Os embeddings serão gravados somente em um índice isolado.\n"
+            "A geração pública não será substituída.\n"
+            "É possível solicitar pausa na fronteira de um lote.",
+            QMessageBox.Yes|QMessageBox.No,QMessageBox.No,
+        )
+        if answer!=QMessageBox.Yes:
+            return
+        self.start_button.setEnabled(False)
+        try:
+            from rag.runtime.auto_index_launch import launch_approved_auto_job
+            outcome=launch_approved_auto_job(
+                self.queue_path,self._job_id,execute=True,
+                operator_approved=True,
+                confirmation="RAG_AUTO_LAUNCH:"+self._job_id,
+            )
+        except (OSError,ValueError,PermissionError,RuntimeError) as exc:
+            self.detail.setText("Falha ao iniciar indexação: "+str(exc))
+            self.start_button.setEnabled(True)
+            return
+        self.refresh()
+        if outcome["state"]=="PROCESS_STARTED_UNVERIFIED":
+            self._launched_job_id=self._job_id
+            self._launched_pid=int(outcome["pid"])
+            self.start_button.setEnabled(False)
+            self.detail.setText(
+                "Processo iniciado. Progresso conferido no SQLite/Qdrant; "
+                "PID "+str(outcome["pid"])
+            )
+        else:
+            self.detail.setText("Início adiado: memória insuficiente.")
+        self.job_changed.emit(self._job_id,outcome["state"])
+
+    def request_graceful_pause(self) -> bool:
+        """Request a safe batch-boundary stop when the app is closing."""
+        if not self._job_id:
+            return False
+        from rag.runtime.auto_index_queue import get_job
+        state=get_job(self.queue_path,self._job_id)
+        if state is None or state["state"]!="RUNNING":
+            return False
+        request_auto_index_control(
+            self.queue_path,self._job_id,"PAUSE",
+            operator_requested=True,control_enabled=True,
+        )
+        return True
 
     def _request_pause_or_resume(self) -> None:
         if not self._status or not self._job_id:

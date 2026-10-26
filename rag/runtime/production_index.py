@@ -138,7 +138,7 @@ def build_staged_index(plan: RagIndexPlan, *, isolated_staging_parent: Path | No
             connection.close()
 
 
-def _write_vectors(path: Path, project_id: str, text_rows, code_rows) -> None:
+def _write_vectors(path: Path, project_id: str, text_rows, code_rows, *, text_cpu_only: bool = False) -> None:
     from qdrant_client import models
     from rag.index.qdrant_local import (
         open_qdrant_local,close_qdrant_local,ensure_vector_collections,
@@ -150,7 +150,7 @@ def _write_vectors(path: Path, project_id: str, text_rows, code_rows) -> None:
     from rag.models.code_artifact_install import resolve_selected_code_model_path
     from rag.models.embedding import TextEmbeddingClient
     from rag.models.code_embedding import CodeEmbeddingClient,CodeRetrievalTask
-    from rag.models.lifecycle import LlamaServerConfig
+    from rag.models.lifecycle import LlamaServerConfig, TextModelLifecycle
     from rag.models.code_lifecycle import CodeModelLifecycle,build_code_server_config
     from rag.models.backend_policy import TEXT_SEARCH_CONTEXT_TOKENS, TEXT_SEARCH_UBATCH_TOKENS
     from rag.models.code_backend_policy import (
@@ -174,7 +174,16 @@ def _write_vectors(path: Path, project_id: str, text_rows, code_rows) -> None:
                     ubatch_size=TEXT_SEARCH_UBATCH_TOKENS,
                     parallel_slots=1,
                 )
-                manager=TextModelFallbackManager.auto(text_config)
+                manager=(
+                    TextModelFallbackManager(
+                        gpu_config=None,
+                        cpu_config=build_cpu_fallback_config(text_config),
+                        selected_gpu_device=None,
+                        lifecycle_factory=TextModelLifecycle,
+                        gpu_unavailable_reason="isolated auto-index TEXT CPU policy",
+                    )
+                    if text_cpu_only else TextModelFallbackManager.auto(text_config)
+                )
                 manager.load(timeout_seconds=90)
                 life=manager.active_lifecycle
             else:

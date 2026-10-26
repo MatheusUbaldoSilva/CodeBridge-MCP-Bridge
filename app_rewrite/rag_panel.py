@@ -239,6 +239,34 @@ class RagPanel(QWidget):
         self.set_page(0)
         self.refresh()
 
+    def request_graceful_stop_of_workers(self):
+        """Closing the GUI requests PAUSE for every active auto-index worker."""
+        from rag.runtime.auto_index_queue import (
+            AutoIndexQueueError,default_queue_path,get_job,list_jobs,
+        )
+        from rag.runtime.auto_index_controls import request_auto_index_control
+        queue=default_queue_path()
+        requested=[]
+        for job in list_jobs(queue,limit=200):
+            # Also pause a queued child that has just been launched but has
+            # not yet acquired its lease, closing the start/exit race.
+            if job["state"] in ("RUNNING","QUEUED"):
+                try:
+                    request_auto_index_control(
+                        queue,job["job_id"],"PAUSE",
+                        operator_requested=True,control_enabled=True,
+                    )
+                except AutoIndexQueueError:
+                    # A job may finish between listing and the pause request.
+                    fresh=get_job(queue,job["job_id"])
+                    if fresh is None or fresh["state"] not in (
+                        "PAUSED","PAUSE_REQUESTED","CANCELLED",
+                        "READY_FOR_REVIEW","FAILED",
+                    ):
+                        raise
+                requested.append(job["job_id"])
+        return requested
+
     def set_page(self, index):
         self.pages.setCurrentIndex(index)
         for number, button in enumerate(self.nav_buttons):
