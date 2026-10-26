@@ -700,6 +700,105 @@ def _rag_public_error(exc: BaseException) -> dict[str, Any]:
     }
 
 
+def _rag_auto_return(operation):
+    """Keep errors structured without exposing an index mutation pathway."""
+    try:
+        result=operation()
+        return {"operation_ok":True,"details":result,"worker_started":False,
+                "public_generation_changed":False,"index_published":False}
+    except Exception as exc:
+        error=_rag_public_error(exc)
+        return {"operation_ok":False,"error_type":str(error["error_type"]),
+                "error_message":str(error["error_message"]),
+                "details":{},"worker_started":False,
+                "public_generation_changed":False,"index_published":False}
+
+
+@mcp.tool(
+    name="codebridge_rag_auto_status",
+    description=(
+        "RAG-AUTO: consulta somente leitura da fila persistente de indexacao "
+        "multiprojeto; sem iniciar worker, carregar modelos ou publicar."
+    ),
+    annotations=ToolAnnotations(read_only_hint=True,idempotent_hint=True,open_world_hint=False),
+    structured_output=True,
+)
+def codebridge_rag_auto_status(
+    project_id: str | None=None,job_id: str | None=None,
+) -> dict[str, Any]:
+    from rag.runtime.auto_index_api import auto_status
+    return _rag_auto_return(lambda:auto_status(project_id=project_id,job_id=job_id))
+
+
+@mcp.tool(
+    name="codebridge_rag_auto_preview",
+    description=(
+        "RAG-AUTO: audita somente leitura os arquivos selecionados, escopo "
+        "e hashes SHA256 para autorizacao futura. Nao cria fila."
+    ),
+    annotations=ToolAnnotations(read_only_hint=True,idempotent_hint=True,open_world_hint=False),
+    structured_output=True,
+)
+def codebridge_rag_auto_preview(
+    project_id: str,source_root: str,scope: str="BOTH",
+    paths: list[str] | None=None,
+) -> dict[str, Any]:
+    from rag.runtime.auto_index_api import auto_preview
+    return _rag_auto_return(
+        lambda:auto_preview(project_id,source_root,scope=scope,paths=paths)
+    )
+
+
+@mcp.tool(
+    name="codebridge_rag_auto_approve",
+    description=(
+        "RAG-AUTO: apenas registra fila de fontes, sem executar indexacao. "
+        "Exige execute=true, operator_approved=true, hash integral confirmado "
+        "e confirmation='RAG_AUTO_QUEUE:<project_id>:<sha256>'. "
+        "NUNCA inicia GPU, muda indice ativo ou publica."
+    ),
+    annotations=ToolAnnotations(read_only_hint=False,idempotent_hint=True,open_world_hint=False),
+    structured_output=True,
+)
+def codebridge_rag_auto_approve(
+    project_id: str,source_root: str,confirmed_digest: str,
+    scope: str="BOTH",paths: list[str] | None=None,execute: bool=False,
+    operator_approved: bool=False,confirmation: str | None=None,
+) -> dict[str, Any]:
+    from rag.runtime.auto_index_api import auto_approve
+    return _rag_auto_return(
+        lambda:auto_approve(
+            project_id,source_root,scope=scope,paths=paths,
+            confirmed_digest=confirmed_digest,execute=execute,
+            operator_approved=operator_approved,confirmation=confirmation,
+        )
+    )
+
+
+@mcp.tool(
+    name="codebridge_rag_auto_control",
+    description=(
+        "RAG-AUTO: grava pausa/retomada/cancelamento em trabalho existente. "
+        "Exige execute=true, operator_approved=true e "
+        "confirmation='RAG_AUTO_CONTROL:<job_id>:<action>'. "
+        "Nao inicia modelos ou publica indices."
+    ),
+    annotations=ToolAnnotations(read_only_hint=False,idempotent_hint=False,open_world_hint=False),
+    structured_output=True,
+)
+def codebridge_rag_auto_control(
+    job_id: str,action: str,execute: bool=False,
+    operator_approved: bool=False,confirmation: str | None=None,
+) -> dict[str, Any]:
+    from rag.runtime.auto_index_api import auto_control
+    return _rag_auto_return(
+        lambda:auto_control(
+            job_id,action,execute=execute,operator_approved=operator_approved,
+            confirmation=confirmation,
+        )
+    )
+
+
 @mcp.tool(
     name="codebridge_rag_status",
     description=(

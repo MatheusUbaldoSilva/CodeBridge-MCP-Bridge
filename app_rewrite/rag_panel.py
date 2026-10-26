@@ -6,6 +6,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal
 from rag_projects import list_projects, create_project, validate_preview_folder
+from rag_auto_job_card import RagAutoJobCard
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
     QPlainTextEdit, QListWidget, QListWidgetItem, QStackedWidget,
@@ -48,6 +49,23 @@ def _rag_operation(operation, args):
             revalidate_preview(start, args["project"], args["root"])
         response["preview_start"] = start
         return response
+    if operation == "auto_preview":
+        from rag.runtime.auto_index_api import auto_preview
+        validate_preview_folder(args["root"])
+        return auto_preview(
+            args["project"],args["root"],
+            paths=args.get("paths"),scope="BOTH",
+        )
+    if operation == "auto_approve":
+        from rag.runtime.auto_index_api import auto_approve
+        return auto_approve(
+            args["project"],args["root"],
+            paths=args.get("paths"),scope="BOTH",
+            confirmed_digest=args["review_sha256"],
+            operator_approved=True,
+            execute=True,
+            confirmation=("RAG_AUTO_QUEUE:"+args["project"]+":"+args["review_sha256"]),
+        )
     if operation == "documents":
         from rag.runtime.status import resolve_rag_sqlite_path
         from rag.runtime.isolated_project_index import resolve_isolated_project
@@ -85,6 +103,8 @@ class RagPanel(QWidget):
         self._results = []
         self._documents = []
         self._preview_snapshot = None
+        self._auto_manifest = None
+        self._auto_request = None
         self._selected_paths = None
         self._preview_revision = 0
         self._plan_request = None
@@ -113,7 +133,7 @@ class RagPanel(QWidget):
         navigation = QHBoxLayout()
         self.nav_buttons = []
         self.pages = QStackedWidget()
-        for index, title in enumerate(("Meus arquivos", "Pesquisar", "Adicionar")):
+        for index, title in enumerate(("Meus arquivos", "Pesquisar", "Adicionar", "Indexação automática")):
             button = QPushButton(title)
             button.setCheckable(True)
             button.clicked.connect(lambda checked=False, i=index: self.set_page(i))
@@ -194,7 +214,24 @@ class RagPanel(QWidget):
         add_layout.addWidget(self.index_btn)
         add_layout.addWidget(QLabel(
             "A inclusao real ainda nao esta disponivel. A previa nao altera seus conhecimentos."))
+        self.auto_prepare_btn = QPushButton("Preparar fila automática (sem indexar)")
+        self.auto_prepare_btn.clicked.connect(self.prepare_auto_job)
+        add_layout.addWidget(self.auto_prepare_btn)
+        self.auto_authorize_btn = QPushButton("Autorizar arquivos e criar trabalho")
+        self.auto_authorize_btn.setEnabled(False)
+        self.auto_authorize_btn.clicked.connect(self.authorize_auto_job)
+        add_layout.addWidget(self.auto_authorize_btn)
+        self.auto_info = QLabel("Sem aprovação: nenhum worker ou modelo é iniciado.")
+        self.auto_info.setWordWrap(True)
+        add_layout.addWidget(self.auto_info)
         self.pages.addWidget(add_page)
+
+        auto_page = QWidget()
+        auto_layout = QVBoxLayout(auto_page)
+        self.auto_card = RagAutoJobCard(auto_page, project_id=self.project_id)
+        auto_layout.addWidget(self.auto_card)
+        auto_layout.addStretch(1)
+        self.pages.addWidget(auto_page)
 
         self.notice = QLabel("")
         self.notice.setWordWrap(True)
@@ -212,6 +249,7 @@ class RagPanel(QWidget):
             return
         self.cancel_preview()
         self.project_id = name
+        self.auto_card.set_project(name)
         self._selected_paths = None
         self.files.clear()
         self._documents = []
@@ -281,6 +319,9 @@ class RagPanel(QWidget):
     def cancel_preview(self):
         self._preview_revision += 1
         self._plan_request = None
+        self._auto_request = None
+        self._auto_manifest = None
+        self.auto_authorize_btn.setEnabled(False)
         self._preview_snapshot = None
         self.candidates.clear()
         self.confirm_preview_btn.setEnabled(False)
@@ -343,25 +384,100 @@ class RagPanel(QWidget):
                             "Simulacao cancelada. Nenhum indice alterado.")
         self.index_btn.setEnabled(False)
 
+    def prepare_auto_job(self):
+        """Compute a fingerprinted preview; no persistent queue is created."""
+        root = self.folder.text().strip()
+        if self._busy:
+            return
+        if not root or not Path(root).is_dir():
+            QMessageBox.information(self, "Indexação automática", "Escolha uma pasta primeiro.")
+            return
+        self._auto_manifest = None
+        self.auto_authorize_btn.setEnabled(False)
+        self._auto_request = (
+            self._preview_revision, self.project_id,
+            str(Path(root).resolve()),
+            tuple(self._selected_paths or ()),
+        )
+        self.auto_info.setText("Auditando fontes, hashes e permissões...")
+        self._run("auto_preview", {
+            "project":self.project_id,"root":root,
+            "paths":list(self._selected_paths) if self._selected_paths else None,
+        })
+
+    def authorize_auto_job(self):
+        """Ask the operator before persisting a source-scoped inert queue job."""
+        if self._busy or not self._auto_manifest or not self._auto_request:
+            return
+        preview=self._auto_manifest
+        expected=self._auto_request
+        current=(
+            self._preview_revision, self.project_id,
+            str(Path(self.folder.text().strip()).resolve()),
+            tuple(self._selected_paths or ()),
+        )
+        if current != expected:
+            self.cancel_preview()
+            QMessageBox.warning(self, "Prévia desatualizada", "Prepare os arquivos novamente.")
+            return
+        question = (
+            "Autorizar a criação de um trabalho na fila?\n\n"
+            f"Projeto: {preview['project_id']}\n"
+            f"Pasta: {preview['source_root']}\n"
+            f"Arquivos aprováveis: {preview['candidate_count']}\n"
+            f"Código: {preview['code_count']} · documentação: {preview['text_count']}\n"
+            f"SHA-256: {preview['review_sha256']}\n\n"
+            "Não inicia GPU, CPU Jina ou publicação. A execução automática "
+            "ainda será habilitada em uma etapa posterior."
+        )
+        answer=QMessageBox.question(
+            self,"Aprovar arquivos para a fila",question,
+            QMessageBox.Yes|QMessageBox.No,QMessageBox.No,
+        )
+        if answer!=QMessageBox.Yes:
+            self.auto_info.setText("Autorização cancelada; nenhum trabalho criado.")
+            return
+        self.auto_authorize_btn.setEnabled(False)
+        self._run("auto_approve", {
+            "project":preview["project_id"],
+            "root":preview["source_root"],
+            "paths":list(self._selected_paths) if self._selected_paths else None,
+            "review_sha256":preview["review_sha256"],
+        })
+
     def _run(self, operation, args):
         if self._busy:
             return
         self._busy = True
         self.notice.setText("Carregando...")
-        for button in (self.refresh_btn, self.search_btn, self.plan_btn):
+        for button in (
+            self.refresh_btn,self.search_btn,self.plan_btn,
+            self.project_picker,self.new_project_btn,self.browse_btn,
+            self.browse_files_btn,self.auto_prepare_btn,self.auto_authorize_btn,
+        ):
             button.setEnabled(False)
         def work():
             try:
-                value = _rag_operation(operation, args)
-                self._worker.completed.emit(operation, value, "")
+                outcome = (operation, _rag_operation(operation, args), "")
             except Exception as exc:
-                self._worker.completed.emit(operation, {}, str(exc))
+                outcome = (operation, {}, str(exc))
+            try:
+                self._worker.completed.emit(*outcome)
+            except RuntimeError:
+                # Qt already destroyed the receiver during a graceful close.
+                # Do not make a second emit against a deleted QObject.
+                pass
         threading.Thread(target=work, daemon=True).start()
 
     def _complete(self, operation, data, error):
         self._busy = False
-        for button in (self.refresh_btn, self.search_btn, self.plan_btn):
+        for button in (
+            self.refresh_btn,self.search_btn,self.plan_btn,
+            self.project_picker,self.new_project_btn,self.browse_btn,
+            self.browse_files_btn,self.auto_prepare_btn,
+        ):
             button.setEnabled(True)
+        self.auto_authorize_btn.setEnabled(self._auto_manifest is not None)
         if error:
             if operation == "plan":
                 from rag.runtime.incremental_preview_request import matching_preview_request
@@ -372,6 +488,11 @@ class RagPanel(QWidget):
                     return
             if operation == "status":
                 self.rag_status.setText("RAG: OFFLINE")
+            if operation in ("auto_preview","auto_approve"):
+                self._auto_manifest = None
+                self._auto_request = None
+                self.auto_authorize_btn.setEnabled(False)
+                self.auto_info.setText("Falha na preparação da fila: "+error)
             self.notice.setText("Nao foi possivel carregar: " + error)
             return
         self.notice.setText("")
@@ -398,9 +519,38 @@ class RagPanel(QWidget):
             if self.project_id not in names:
                 self.project_id = names[0]
                 self._selected_paths = None
+            self.auto_card.set_project(self.project_id)
             self.project_picker.setCurrentText(self.project_id)
             self.project_picker.blockSignals(False)
             self._run("documents", {"project": self.project_id})
+        elif operation == "auto_preview":
+            expected=self._auto_request
+            current=(
+                self._preview_revision,self.project_id,
+                str(Path(self.folder.text().strip()).resolve()),
+                tuple(self._selected_paths or ()),
+            )
+            if expected is None or current!=expected:
+                self._auto_manifest=None
+                self.auto_authorize_btn.setEnabled(False)
+                return
+            self._auto_manifest=data
+            self.auto_authorize_btn.setEnabled(True)
+            self.auto_info.setText(
+                f"{data['candidate_count']} arquivos auditados · "
+                f"SHA-256: {data['review_sha256'][:16]}… · "
+                "Nenhuma fila criada."
+            )
+        elif operation == "auto_approve":
+            self._auto_manifest=None
+            self._auto_request=None
+            self.auto_authorize_btn.setEnabled(False)
+            self.auto_info.setText(
+                "Trabalho registrado: "+str(data['job_id'])+
+                ". Aguardando executor; nenhum modelo iniciado."
+            )
+            self.auto_card.refresh()
+            self.set_page(3)
         elif operation == "documents":
             self._documents = list(data)
             self.files.clear()
