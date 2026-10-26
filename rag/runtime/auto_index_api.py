@@ -34,6 +34,10 @@ def auto_approve(
     queue_path: Path | None=None,
 ) -> dict:
     """Explicit consent binds the immutable file list before any new DB write."""
+    if project_id=="codebridge":
+        raise PermissionError(
+            "public codebridge namespace is reserved; choose a distinct isolated project"
+        )
     if (execute is not True or operator_approved is not True
             or confirmation != "RAG_AUTO_QUEUE:"+project_id+":"+confirmed_digest):
         raise PermissionError("explicit project+SHA approval required")

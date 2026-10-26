@@ -87,6 +87,9 @@ QFrame#RagAutoJobCard QPushButton:hover:enabled {
 
 class RagAutoJobCard(QFrame):
     job_changed = Signal(str, str)
+    prepare_requested = Signal(str)
+    enable_requested = Signal(str)
+    rollback_requested = Signal(str)
 
     def __init__(
         self, parent: QWidget | None=None, *,
@@ -151,6 +154,23 @@ class RagAutoJobCard(QFrame):
         controls.addWidget(self.pause_button,1)
         controls.addWidget(self.cancel_button,1)
         outer.addLayout(controls)
+        canary_controls=QHBoxLayout()
+        self.prepare_button=QPushButton("Preparar versão")
+        self.enable_button=QPushButton("Habilitar leitura")
+        self.rollback_button=QPushButton("Reverter habilitação")
+        self.prepare_button.clicked.connect(
+            lambda: self.prepare_requested.emit(self._job_id) if self._job_id else None
+        )
+        self.enable_button.clicked.connect(
+            lambda: self.enable_requested.emit(self._job_id) if self._job_id else None
+        )
+        self.rollback_button.clicked.connect(
+            lambda: self.rollback_requested.emit(self._job_id) if self._job_id else None
+        )
+        canary_controls.addWidget(self.prepare_button,1)
+        canary_controls.addWidget(self.enable_button,1)
+        canary_controls.addWidget(self.rollback_button,1)
+        outer.addLayout(canary_controls)
         self.detail=QLabel("Nenhum worker automático será iniciado por este painel.")
         self.detail.setObjectName("RagAutoSmall")
         self.detail.setWordWrap(True)
@@ -196,6 +216,9 @@ class RagAutoJobCard(QFrame):
         self.bar.setValue(0)
         self.counts.setText("Sem contadores disponíveis")
         self.start_button.setEnabled(False)
+        self.prepare_button.setEnabled(False)
+        self.enable_button.setEnabled(False)
+        self.rollback_button.setEnabled(False)
         self.pause_button.setEnabled(False)
         self.cancel_button.setEnabled(False)
         self.detail.setText("Selecione arquivos e aprove a preparação de uma fila.")
@@ -242,18 +265,43 @@ class RagAutoJobCard(QFrame):
             "DRAFT","AWAITING_APPROVAL","QUEUED","RUNNING",
             "PAUSE_REQUESTED","PAUSED"
         ))
+        canary_state="NOT_PREPARED"
+        if current=="READY_FOR_REVIEW":
+            try:
+                from rag.runtime.auto_index_generation import _paths
+                generation,snapshot=_paths(self.queue_path,self._job_id,self.project_id)
+                if generation.is_dir() and snapshot.is_dir():
+                    canary_state="PREPARED_NOT_REGISTERED"
+                if self.queue_path==default_queue_path() and canary_state!="NOT_PREPARED":
+                    from rag.runtime.auto_index_promotion import auto_canary_status
+                    canary_state=auto_canary_status(self._job_id)["state"]
+            except Exception:
+                canary_state="UNAVAILABLE"
+        self.prepare_button.setEnabled(
+            current=="READY_FOR_REVIEW" and canary_state=="NOT_PREPARED"
+        )
+        self.enable_button.setEnabled(
+            current=="READY_FOR_REVIEW" and canary_state=="PREPARED_NOT_REGISTERED"
+        )
+        self.rollback_button.setEnabled(
+            current=="READY_FOR_REVIEW" and canary_state=="CANARY_ACTIVE"
+        )
         if current=="QUEUED":
             self.detail.setText(
-                "Arquivos aprovados. O executor automático ainda não foi liberado."
+                "Arquivos aprovados. Use Iniciar indexação quando desejar executar o Jina."
             )
         elif current in ("PAUSE_REQUESTED","CANCEL_REQUESTED"):
             self.detail.setText(
                 "Solicitação registrada. Aguardando confirmação do worker no checkpoint."
             )
         elif current=="READY_FOR_REVIEW":
-            self.detail.setText(
-                "Concluído em staging. Publicação exige autorização e rollback."
-            )
+            details={
+                "NOT_PREPARED":"Índice concluído. Prepare a versão verificada para consulta isolada.",
+                "PREPARED_NOT_REGISTERED":"Versão verificada; habilitação de leitura requer confirmação.",
+                "CANARY_ACTIVE":"Canário em leitura isolada. Geração pública preservada.",
+                "UNAVAILABLE":"Estado do candidato indisponível: confira integridade antes de habilitar.",
+            }
+            self.detail.setText(details.get(canary_state,"Estado não reconhecido."))
         else:
             self.detail.setText(
                 "Controle persistente: não altera a geração pública do RAG."

@@ -92,6 +92,13 @@ class RagAutoPanelIntegrationTests(unittest.TestCase):
         self.assertFalse(self.db.exists())
         self.assertIsNone(self.panel._auto_manifest)
 
+    def test_public_project_auto_index_guard(self):
+        self.panel.project_id="codebridge"
+        with patch.object(QMessageBox,"warning") as warning:
+            self.panel.prepare_auto_job()
+        warning.assert_called_once()
+        self.assertFalse(self.db.exists())
+
     def test_cancel_preview_discards_existing_digest(self):
         self.panel.prepare_auto_job()
         self.panel.cancel_preview()

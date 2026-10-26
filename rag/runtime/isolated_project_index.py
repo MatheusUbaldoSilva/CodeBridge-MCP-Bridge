@@ -98,8 +98,33 @@ def resolve_isolated_project(project_id: str) -> IsolatedProjectIndex | None:
     if generation.parent.name != "generations":
         raise IsolatedProjectUnavailable("candidate must be within a generations directory")
     revision = row["source_revision"]
-    if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
-        raise IsolatedProjectUnavailable("invalid pinned Git revision")
+    is_auto=row.get("index_family")=="RAG_AUTO_03"
+    revision_pattern=r"[0-9a-f]{64}" if is_auto else r"[0-9a-f]{40}"
+    if not isinstance(revision, str) or not re.fullmatch(revision_pattern, revision):
+        raise IsolatedProjectUnavailable("invalid pinned source revision")
+    if is_auto:
+        job_id=row.get("job_id")
+        if not isinstance(job_id,str) or not re.fullmatch(r"[0-9a-f]{32}",job_id):
+            raise IsolatedProjectUnavailable("invalid automatic generation job")
+        if generation.name!="auto_"+job_id:
+            raise IsolatedProjectUnavailable("automatic generation name mismatch")
+        if source_root.name!="source_"+job_id or source_root.parent.name!="snapshots":
+            raise IsolatedProjectUnavailable("automatic source snapshot mismatch")
+        receipt_file=generation/"auto-generation-receipt.json"
+        expected_receipt=row.get("generation_receipt_sha256")
+        if (not isinstance(expected_receipt,str)
+                or not re.fullmatch(r"[0-9a-f]{64}",expected_receipt)
+                or not receipt_file.is_file()
+                or _fingerprint(receipt_file)!=expected_receipt):
+            raise IsolatedProjectUnavailable("automatic generation receipt changed")
+        receipt=json.loads(receipt_file.read_text(encoding="utf-8"))
+        if (receipt.get("job_id")!=job_id
+                or receipt.get("project_id")!=project_id
+                or receipt.get("source_snapshot")!=str(source_root)
+                or receipt.get("source_revision")!=revision
+                or receipt.get("state")!="VERIFIED_NOT_REGISTERED"
+                or receipt.get("published_publicly") is not False):
+            raise IsolatedProjectUnavailable("automatic generation receipt invalid")
     python = Path(row.get("python_executable", ""))
     if not python.is_absolute() or not python.is_file():
         raise IsolatedProjectUnavailable("approved project Python is missing")
@@ -117,7 +142,8 @@ def resolve_isolated_project(project_id: str) -> IsolatedProjectIndex | None:
             or progress.get("source_revision") != revision
             or progress.get("state") != "INDEXING_NOT_PUBLISHED"
             or progress.get("total_vectors_done") != progress.get("expected_chunks")
-            or progress.get("last_batch_result") != "PASS"
+            or progress.get("last_batch_result") != ("COMPLETE" if is_auto else "PASS")
+            or (is_auto and progress.get("job_id")!=row.get("job_id"))
             or progress.get("published") is not False):
         raise IsolatedProjectUnavailable("candidate index has not passed final staging validation")
     # A full index check was completed before registration. Compare the two
@@ -151,7 +177,8 @@ def list_isolated_project_indexes() -> list[dict[str, Any]]:
         try:
             index = resolve_isolated_project(name)
             import sqlite3
-            with sqlite3.connect(f"{index.sqlite.as_uri()}?mode=ro",uri=True) as db:
+            from contextlib import closing
+            with closing(sqlite3.connect(f"{index.sqlite.as_uri()}?mode=ro",uri=True)) as db:
                 documents=db.execute(
                     "SELECT count(*) FROM rag_documents WHERE project_id=?",(name,)
                 ).fetchone()[0]

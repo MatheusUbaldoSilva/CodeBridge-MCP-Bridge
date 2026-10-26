@@ -831,6 +831,77 @@ def codebridge_rag_auto_start(
 
 
 @mcp.tool(
+    name="codebridge_rag_auto_canary_status",
+    description="RAG-AUTO: estado somente leitura da geracao preparada e registro isolado; nenhum cutover.",
+    annotations=ToolAnnotations(read_only_hint=True,idempotent_hint=True,open_world_hint=False),
+    structured_output=True,
+)
+def codebridge_rag_auto_canary_status(job_id: str) -> dict[str, Any]:
+    from rag.runtime.auto_index_promotion import auto_canary_status
+    return _rag_auto_return(lambda:auto_canary_status(job_id))
+
+
+@mcp.tool(
+    name="codebridge_rag_auto_prepare_candidate",
+    description=(
+        "RAG-AUTO: copiar staging READY_FOR_REVIEW para geracao verificada com snapshot "
+        "de fontes; exige execute, operator_approved e confirmation="
+        "'RAG_AUTO_PREPARE:<project_id>:<job_id>'. Nao registra nem publica."
+    ),
+    annotations=ToolAnnotations(read_only_hint=False,idempotent_hint=False,open_world_hint=False),
+    structured_output=True,
+)
+def codebridge_rag_auto_prepare_candidate(
+    job_id: str,execute: bool=False,operator_approved: bool=False,
+    confirmation: str | None=None,
+) -> dict[str, Any]:
+    from rag.runtime.auto_index_promotion import prepare_auto_candidate
+    return _rag_auto_return(lambda:prepare_auto_candidate(
+        job_id,execute=execute,operator_approved=operator_approved,confirmation=confirmation,
+    ))
+
+
+@mcp.tool(
+    name="codebridge_rag_auto_enable_canary",
+    description=(
+        "RAG-AUTO: registrar leitura isolada multiprojeto, com backup do catalogo; "
+        "exige execute, operator_approved e confirmation="
+        "'RAG_AUTO_CANARY:<project_id>:<job_id>'. Nunca move a geracao publica."
+    ),
+    annotations=ToolAnnotations(read_only_hint=False,idempotent_hint=False,open_world_hint=False),
+    structured_output=True,
+)
+def codebridge_rag_auto_enable_canary(
+    job_id: str,execute: bool=False,operator_approved: bool=False,
+    confirmation: str | None=None,
+) -> dict[str, Any]:
+    from rag.runtime.auto_index_promotion import enable_auto_canary
+    return _rag_auto_return(lambda:enable_auto_canary(
+        job_id,execute=execute,operator_approved=operator_approved,confirmation=confirmation,
+    ))
+
+
+@mcp.tool(
+    name="codebridge_rag_auto_rollback_canary",
+    description=(
+        "RAG-AUTO: restaurar bytes do catalogo anterior sem apagar geracoes; "
+        "exige execute, operator_approved e confirmation="
+        "'RAG_AUTO_CANARY_ROLLBACK:<job_id>'. Nunca move a geracao publica."
+    ),
+    annotations=ToolAnnotations(read_only_hint=False,idempotent_hint=False,open_world_hint=False),
+    structured_output=True,
+)
+def codebridge_rag_auto_rollback_canary(
+    job_id: str,execute: bool=False,operator_approved: bool=False,
+    confirmation: str | None=None,
+) -> dict[str, Any]:
+    from rag.runtime.auto_index_promotion import disable_auto_canary
+    return _rag_auto_return(lambda:disable_auto_canary(
+        job_id,execute=execute,operator_approved=operator_approved,confirmation=confirmation,
+    ))
+
+
+@mcp.tool(
     name="codebridge_rag_status",
     description=(
         "Consulta somente leitura do estado do RAG local incluindo indice "

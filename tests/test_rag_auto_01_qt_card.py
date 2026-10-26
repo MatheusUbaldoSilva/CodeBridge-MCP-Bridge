@@ -68,7 +68,7 @@ class RagAutoQtCardTests(unittest.TestCase):
         self.assertEqual(card.status.text(),"Aguardando executor")
         self.assertEqual(card.percent.text(),"--%")
         self.assertEqual(card.bar.value(),0)
-        self.assertIn("não foi liberado",card.detail.text())
+        self.assertIn("Iniciar indexação",card.detail.text())
         self.assertTrue(card.pause_button.isEnabled())
 
     def test_pause_and_resume_update_durable_job(self):

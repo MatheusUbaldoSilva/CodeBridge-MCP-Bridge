@@ -105,6 +105,17 @@ class AutoIndexApprovalTests(unittest.TestCase):
         with self.assertRaises(PermissionError):
             read_reviewed_sources(self.db,self.job["job_id"])
 
+    def test_api_refuses_public_namespace_even_with_consent(self):
+        from rag.runtime.auto_index_api import auto_approve
+        with self.assertRaises(PermissionError):
+            auto_approve(
+                "codebridge",str(self.root),
+                confirmed_digest="0"*64,
+                execute=True,operator_approved=True,
+                confirmation="RAG_AUTO_QUEUE:codebridge:"+"0"*64,
+                queue_path=self.db,
+            )
+
     def test_hidden_sensitive_file_is_not_in_approved_snapshot(self):
         (self.root/".env").write_text("OPENAI_API_KEY=an-example-secret",encoding="utf-8")
         preview=build_auto_index_preview(self.project,self.root)

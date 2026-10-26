@@ -66,6 +66,20 @@ def _rag_operation(operation, args):
             execute=True,
             confirmation=("RAG_AUTO_QUEUE:"+args["project"]+":"+args["review_sha256"]),
         )
+    if operation in ("auto_prepare_generation","auto_enable_canary","auto_rollback_canary"):
+        from rag.runtime.auto_index_promotion import (
+            prepare_auto_candidate,enable_auto_canary,disable_auto_canary,
+        )
+        job_id=args["job_id"]
+        action={
+            "auto_prepare_generation":prepare_auto_candidate,
+            "auto_enable_canary":enable_auto_canary,
+            "auto_rollback_canary":disable_auto_canary,
+        }[operation]
+        return action(
+            job_id,execute=True,operator_approved=True,
+            confirmation=args["confirmation"],
+        )
     if operation == "documents":
         from rag.runtime.status import resolve_rag_sqlite_path
         from rag.runtime.isolated_project_index import resolve_isolated_project
@@ -73,7 +87,8 @@ def _rag_operation(operation, args):
         db = project.sqlite if project is not None else resolve_rag_sqlite_path()
         if not db.is_file():
             return []
-        with sqlite3.connect(f"{db.resolve().as_uri()}?mode=ro", uri=True) as con:
+        from contextlib import closing
+        with closing(sqlite3.connect(f"{db.resolve().as_uri()}?mode=ro", uri=True)) as con:
             rows = con.execute(
                 "SELECT path, COUNT(*), MAX(source_type) FROM rag_documents "
                 "WHERE project_id=? GROUP BY path ORDER BY path LIMIT 2000",
@@ -229,6 +244,9 @@ class RagPanel(QWidget):
         auto_page = QWidget()
         auto_layout = QVBoxLayout(auto_page)
         self.auto_card = RagAutoJobCard(auto_page, project_id=self.project_id)
+        self.auto_card.prepare_requested.connect(self._prepare_generation)
+        self.auto_card.enable_requested.connect(self._enable_canary)
+        self.auto_card.rollback_requested.connect(self._rollback_canary)
         auto_layout.addWidget(self.auto_card)
         auto_layout.addStretch(1)
         self.pages.addWidget(auto_page)
@@ -412,8 +430,59 @@ class RagPanel(QWidget):
                             "Simulacao cancelada. Nenhum indice alterado.")
         self.index_btn.setEnabled(False)
 
+    def _confirm_generation_operation(self,job_id,operation,title,description,token):
+        if self._busy:
+            return
+        from rag.runtime.auto_index_queue import default_queue_path,get_job
+        job=get_job(default_queue_path(),job_id)
+        if job is None or job["project_id"]!=self.project_id:
+            QMessageBox.warning(self,title,"Job não pertence ao projeto selecionado.")
+            return
+        message=(
+            description+"\n\nProjeto: "+self.project_id+
+            "\nJob: "+job_id+
+            "\n\nA geração pública codebridge NÃO será alterada."
+        )
+        if QMessageBox.question(
+            self,title,message,
+            QMessageBox.Yes|QMessageBox.No,QMessageBox.No,
+        )!=QMessageBox.Yes:
+            return
+        self._run(operation,{"job_id":job_id,"confirmation":token})
+
+    def _prepare_generation(self,job_id):
+        self._confirm_generation_operation(
+            job_id,"auto_prepare_generation","Preparar geração verificada",
+            "Copiar o índice concluído e o snapshot das fontes aprovadas "
+            "para uma geração isolada? Isso pode ocupar espaço em disco.",
+            "RAG_AUTO_PREPARE:"+self.project_id+":"+job_id,
+        )
+
+    def _enable_canary(self,job_id):
+        self._confirm_generation_operation(
+            job_id,"auto_enable_canary","Habilitar consulta isolada",
+            "Registrar a geração no catálogo de leitura, com backup e "
+            "rollback. Não substitui o RAG público e não remove outros projetos.",
+            "RAG_AUTO_CANARY:"+self.project_id+":"+job_id,
+        )
+
+    def _rollback_canary(self,job_id):
+        self._confirm_generation_operation(
+            job_id,"auto_rollback_canary","Reverter habilitação isolada",
+            "Restaurar o catálogo anterior pelo backup auditado? "
+            "A geração preparada será preservada em disco.",
+            "RAG_AUTO_CANARY_ROLLBACK:"+job_id,
+        )
+
     def prepare_auto_job(self):
         """Compute a fingerprinted preview; no persistent queue is created."""
+        if self.project_id=="codebridge":
+            QMessageBox.warning(
+                self,"Projeto reservado",
+                "O identificador codebridge pertence ao índice público. "
+                "Crie ou selecione outro projeto para a indexação automática.",
+            )
+            return
         root = self.folder.text().strip()
         if self._busy:
             return
@@ -507,6 +576,12 @@ class RagPanel(QWidget):
             button.setEnabled(True)
         self.auto_authorize_btn.setEnabled(self._auto_manifest is not None)
         if error:
+            if operation in (
+                "auto_prepare_generation","auto_enable_canary","auto_rollback_canary"
+            ):
+                self.auto_card.refresh()
+                self.notice.setText("Operação de geração recusada: "+error)
+                return
             if operation == "plan":
                 from rag.runtime.incremental_preview_request import matching_preview_request
                 pending = self._plan_request
@@ -579,6 +654,17 @@ class RagPanel(QWidget):
             )
             self.auto_card.refresh()
             self.set_page(3)
+        elif operation in (
+            "auto_prepare_generation","auto_enable_canary","auto_rollback_canary"
+        ):
+            self.auto_card.refresh()
+            self.notice.setText({
+                "auto_prepare_generation":"Versão verificada preparada (sem publicar).",
+                "auto_enable_canary":"Consulta isolada habilitada (catálogo com backup).",
+                "auto_rollback_canary":"Catálogo anterior restaurado.",
+            }[operation])
+            if operation!="auto_prepare_generation":
+                self.refresh()
         elif operation == "documents":
             self._documents = list(data)
             self.files.clear()
