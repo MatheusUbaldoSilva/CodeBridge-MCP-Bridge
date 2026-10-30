@@ -1,4 +1,4 @@
-﻿"""Temporary Qdrant local canary: surviving vector copied without model inference."""
+"""Temporary Qdrant local canary: surviving vector copied without model inference."""
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -8,6 +8,7 @@ from rag.index.qdrant_local import open_qdrant_local,close_qdrant_local,ensure_v
 from rag.index.vector_ids import deterministic_vector_point_id
 from rag.models.code_embedding import CODE_EMBEDDING_DIMENSION
 from rag.runtime.knowledge_deletion_vector_copy import copy_survivor_batch
+from rag.runtime.knowledge_deletion_checkpoint import checkpoint_survivor_batch,inspect_survivor_batch_checkpoint
 
 
 class SurvivorQdrantCanary(TestCase):
@@ -40,6 +41,13 @@ class SurvivorQdrantCanary(TestCase):
                 self.assertFalse(result["generation_activated"])
                 self.assertEqual(len(stage.retrieve("code",[point_id],with_vectors=True)),1)
                 self.assertEqual(len(source.retrieve("code",[point_id],with_vectors=True)),1)
+                checkpoint=checkpoint_survivor_batch(
+                    stage,root/"stage","c"*32,result,receipt,plan["sources"],
+                    operator_approved=True,
+                )
+                self.assertEqual(checkpoint["state"],"SURVIVOR_BATCH_DURABLY_VERIFIED")
+                self.assertEqual(inspect_survivor_batch_checkpoint(
+                    root/"stage","c"*32)["vectors_declared"],1)
             finally:
                 close_qdrant_local(stage)
                 close_qdrant_local(source)
