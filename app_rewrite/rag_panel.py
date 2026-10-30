@@ -83,8 +83,12 @@ def _rag_operation(operation, args):
     if operation == "documents":
         from rag.runtime.status import resolve_rag_sqlite_path
         from rag.runtime.isolated_project_index import resolve_isolated_project
-        project=resolve_isolated_project(args["project"]) if args["project"]!="codebridge" else None
-        db = project.sqlite if project is not None else resolve_rag_sqlite_path()
+        is_public=args["project"]=="codebridge"
+        project=resolve_isolated_project(args["project"]) if not is_public else None
+        if not is_public and project is None:
+            # Never leak public/legacy inventory into a private project view.
+            return []
+        db = resolve_rag_sqlite_path() if is_public else project.sqlite
         if not db.is_file():
             return []
         from contextlib import closing
