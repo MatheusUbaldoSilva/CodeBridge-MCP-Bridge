@@ -1,4 +1,4 @@
-﻿import json
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -30,7 +30,7 @@ class VerifiedSwapLabTests(TestCase):
     @patch("rag.runtime.knowledge_deletion_verified_swap_lab.verify_deletion_generation")
     def test_verified_candidate_switch_and_rollback(self,verify):
         result=self.run_swap()
-        verify.assert_called_once()
+        self.assertEqual(verify.call_count, 2)
         self.assertEqual(result["state"],"LAB_SWAP_ACTIVE")
         self.assertEqual(self.pointer.read_bytes(),self.old_pointer)
         restored=laboratory_rollback(result["transaction"],

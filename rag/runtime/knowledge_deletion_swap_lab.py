@@ -73,7 +73,7 @@ def _lab_paths(catalog_file: Path, pointer: Path):
 def laboratory_swap(project_id: str, expected_revision: str, candidate: dict, *,
                     catalog_file: Path, public_pointer: Path,
                     operator_approved: bool=False, laboratory_mode: bool=False,
-                    _fail_at: str|None=None) -> dict:
+                    _fail_at: str|None=None, _locked_validation=None) -> dict:
     if operator_approved is not True or laboratory_mode is not True:
         raise PermissionError("explicit laboratory approval required")
     catalog,pointer=_lab_paths(catalog_file,public_pointer)
@@ -101,6 +101,10 @@ def laboratory_swap(project_id: str, expected_revision: str, candidate: dict, *,
             if prior["state"]!="ROLLED_BACK":
                 raise DeletionSwapError("unresolved prior transaction; reconcile first")
         plan=plan_private_generation_replacement(catalog,pointer,project_id,expected_revision,candidate)
+        if _locked_validation is not None:
+            if not callable(_locked_validation):
+                raise DeletionSwapError("invalid locked validator")
+            _locked_validation()
         before=_catalog_bytes(catalog)
         before_pointer=_read_pointer(pointer)
         if plan["old_catalog_sha256"]!=_sha(before) or plan["public_pointer_sha256"]!=_sha(before_pointer):

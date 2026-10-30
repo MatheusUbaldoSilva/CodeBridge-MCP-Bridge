@@ -1,4 +1,4 @@
-﻿"""RAG-DEL-01.04: verified lab-only transition, no operational catalog support."""
+"""RAG-DEL-01.04: verified lab-only transition, no operational catalog support."""
 from pathlib import Path
 from rag.runtime.knowledge_deletion_generation import verify_deletion_generation
 from rag.runtime.knowledge_deletion_swap_lab import (
@@ -20,8 +20,11 @@ def laboratory_verified_swap(project_id:str,old_revision:str,candidate:dict,
         raise DeletionSwapError("absolute generation and snapshot required")
     # An unverified arbitrary row must never reach catalog_swap.
     verify_deletion_generation(candidate,project_id,generation,snapshot,revision)
+    def _recheck_closed_candidate_under_catalog_mutex():
+        verify_deletion_generation(candidate,project_id,generation,snapshot,revision)
     return laboratory_swap(
         project_id,old_revision,candidate,
         catalog_file=catalog_file,public_pointer=public_pointer,
         operator_approved=True,laboratory_mode=True,_fail_at=_fail_at,
+        _locked_validation=_recheck_closed_candidate_under_catalog_mutex,
     )
