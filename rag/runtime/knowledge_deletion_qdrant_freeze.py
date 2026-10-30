@@ -59,3 +59,20 @@ def fingerprint_closed_qdrant_store(root: str | Path, *, max_files: int = 100000
             "inventory_sha256":sha256(encoded).hexdigest(),
             "activation_authorized":False,
             "source_modified":False}
+
+
+def verify_closed_qdrant_inventory(root: str | Path, expected: dict) -> dict:
+    """Verify that a CLOSED store still matches a previously frozen inventory."""
+    if (not isinstance(expected,dict)
+            or expected.get("state")!="CLOSED_QDRANT_FILES_FINGERPRINTED"
+            or expected.get("activation_authorized") is not False
+            or not isinstance(expected.get("files"),list)):
+        raise QdrantFreezeError("invalid baseline Qdrant inventory")
+    current=fingerprint_closed_qdrant_store(root)
+    if (current["inventory_sha256"]!=expected.get("inventory_sha256")
+            or current["files"]!=expected["files"]
+            or current["total_bytes"]!=expected.get("total_bytes")):
+        raise QdrantFreezeError("isolated Qdrant files drifted after close")
+    return {"state":"CLOSED_QDRANT_FINGERPRINT_REVALIDATED",
+            "inventory_sha256":current["inventory_sha256"],
+            "activation_authorized":False}

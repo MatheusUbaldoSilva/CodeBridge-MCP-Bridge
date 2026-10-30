@@ -2,7 +2,7 @@
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 from rag.runtime.knowledge_deletion_qdrant_freeze import (
-    QdrantFreezeError, fingerprint_closed_qdrant_store
+    QdrantFreezeError, fingerprint_closed_qdrant_store, verify_closed_qdrant_inventory
 )
 
 class ClosedStoreFreezeTests(TestCase):
@@ -29,6 +29,14 @@ class ClosedStoreFreezeTests(TestCase):
         (self.folder/"storage.bin").write_bytes(b"changed")
         second=fingerprint_closed_qdrant_store(self.folder)
         self.assertNotEqual(first["inventory_sha256"],second["inventory_sha256"])
+
+    def test_revalidate_saved_inventory(self):
+        saved=fingerprint_closed_qdrant_store(self.folder)
+        checked=verify_closed_qdrant_inventory(self.folder,saved)
+        self.assertEqual(checked["inventory_sha256"],saved["inventory_sha256"])
+        (self.folder/"other.json").write_text("changed")
+        with self.assertRaises(QdrantFreezeError):
+            verify_closed_qdrant_inventory(self.folder,saved)
 
     def test_empty_folder_rejected(self):
         (self.folder/"storage.bin").unlink()
