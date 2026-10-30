@@ -1,0 +1,2 @@
+RAG-DEL-01.03-J — Proveniencia de arquivos no snapshot (DEV)
+Auditoria de leitura dos arquivos sobreviventes dentro do source snapshot, usando caminhos relativos do manifesto. Confere SHA-256, quantidade e tamanho, recusa arquivos ausentes, caminhos Windows invalidos, projetos estrangeiros e tentativas de escapar da pasta; symlinks e junctions tambem sao bloqueados. Sete testes em diretorios temporarios. Nenhuma escrita em snapshots ou indices reais.
