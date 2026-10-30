@@ -75,6 +75,22 @@ def inspect_deletion_supervisor_read_only(queue_path: Path) -> dict:
                 return result
             owner, token, until, gen = rows[0]
             result["supervisor_generation"] = gen
+            # A persisted freeze is observed, never created, repaired or
+            # interpreted as permission to activate/deploy.
+            from rag.runtime.knowledge_deletion_reservation_freeze_lab import (
+                _read_marker_locked, DeletionReservationFreezeError,
+            )
+            try:
+                freeze = _read_marker_locked(db)
+            except DeletionReservationFreezeError:
+                result["blockers"].append("RESERVATION_FREEZE_MARKER_INVALID")
+                return result
+            result["reservation_freeze_active"] = (
+                freeze is not None and freeze["state"] == "FROZEN"
+            )
+            result["reservation_freeze_generation"] = (
+                freeze["generation"] if freeze is not None else None
+            )
             result["lease_recorded"] = any(x is not None for x in (owner, token, until))
             if result["lease_recorded"]:
                 result["blockers"].append("LEASE_RECONCILIATION_REQUIRED")

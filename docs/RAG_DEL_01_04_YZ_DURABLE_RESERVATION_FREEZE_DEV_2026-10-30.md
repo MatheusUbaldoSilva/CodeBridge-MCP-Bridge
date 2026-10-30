@@ -27,3 +27,6 @@ A restricao de worker quiescence, levantada na etapa anterior, continua obrigato
 ## Testes
 
 RAG-DEL 264 (262 PASS, 2 SKIP), RAG-AUTO sem caso MCP 241 (236 PASS, 5 SKIP). Total 505 executados, 498 PASS, 7 SKIP, 0 FAIL.
+## Etapa AA — Revisao e revalidacao do freeze dentro do gate de transicao
+
+A inspecao do supervisor em mode=ro observa reservation_freeze_active e reservation_freeze_generation sem revelar o token. O writer_fence recebe expected_freeze_generation e verifica FROZEN e a mesma generation sob a transacao BEGIN IMMEDIATE, antes dos locks generation/semantic. A revisao da candidata e recusada se o freeze for retirado ou recriado entre revisao e uso. Testes negativos incluem token nao exposto, marcador de schema incorreto e revisao desatualizada. O uso operacional continua desabilitado.

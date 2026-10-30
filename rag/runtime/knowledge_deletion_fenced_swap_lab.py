@@ -55,12 +55,16 @@ def laboratory_fenced_provenance_transition(
             or review.get("operational_use_allowed") is not False
             or review.get("blockers") != []
             or review.get("queue_identity_sha256") != queue_id
+            or review.get("reservation_freeze_active") is not True
+            or type(review.get("reservation_freeze_generation")) is not int
+            or review["reservation_freeze_generation"] < 1
             or type(review.get("supervisor_generation")) is not int
             or review["supervisor_generation"] < 0):
         raise DeletionFencedTransitionError("valid quiet supervisor review required")
     with laboratory_writer_fence(
         queue_path, generation_guard_factory, semantic_guard_factory,
         laboratory_mode=True, operator_approved=True,
+        expected_freeze_generation=review["reservation_freeze_generation"],
     ) as fence:
         if fence["supervisor_generation"] != review["supervisor_generation"]:
             raise DeletionFencedTransitionError("supervisor generation drift; review again")

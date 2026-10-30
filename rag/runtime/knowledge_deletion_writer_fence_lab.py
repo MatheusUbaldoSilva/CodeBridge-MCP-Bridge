@@ -82,6 +82,7 @@ def laboratory_writer_fence(
     *,
     laboratory_mode: bool = False,
     operator_approved: bool = False,
+    expected_freeze_generation: int | None = None,
 ):
     """Hold lab SQLite reservation barrier -> generation -> semantic locks.
 
@@ -105,6 +106,17 @@ def laboratory_writer_fence(
         except sqlite3.Error as exc:
             raise DeletionWriterFenceBlocked("queue reservation barrier busy") from exc
         try:
+            if expected_freeze_generation is not None:
+                from rag.runtime.knowledge_deletion_reservation_freeze_lab import (
+                    _read_marker_locked,
+                )
+                marker = _read_marker_locked(db)
+                if (type(expected_freeze_generation) is not int
+                        or expected_freeze_generation < 1
+                        or marker is None or marker["state"] != "FROZEN"
+                        or marker["generation"] != expected_freeze_generation):
+                    raise DeletionWriterFenceBlocked(
+                        "durable reservation freeze changed or absent")
             before = _assert_no_live_or_runnable_workers(db)
             with generation_guard():
                 with semantic_guard():

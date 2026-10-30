@@ -12,6 +12,9 @@ from rag.runtime.knowledge_deletion_fenced_swap_lab import (
 )
 from rag.runtime.knowledge_deletion_writer_fence_lab import DeletionWriterFenceBlocked
 from rag.runtime.knowledge_deletion_supervisor_review import inspect_deletion_supervisor_read_only
+from rag.runtime.knowledge_deletion_reservation_freeze_lab import (
+    freeze_deletion_reservations_lab, thaw_deletion_reservations_lab,
+)
 
 
 class FencedProvenanceAdapterTests(TestCase):
@@ -38,6 +41,9 @@ class FencedProvenanceAdapterTests(TestCase):
         self.public = self.pointer.read_bytes()
         self.row = {"project_id": "demo", "index_family": "RAG_DEL_01"}
         self.preview = {"project_id": "demo"}
+        self.freeze = freeze_deletion_reservations_lab(
+            self.queue, laboratory_mode=True, operator_approved=True,
+        )
         self.reviewed = inspect_deletion_supervisor_read_only(self.queue)
         self.events = []
         self.fake_swap = {
@@ -174,4 +180,42 @@ class FencedProvenanceAdapterTests(TestCase):
         forged = {**self.reviewed, "supervisor_generation": True}
         with self.assertRaises(DeletionFencedTransitionError):
             self.transition(reviewed_supervisor_evidence=forged)
+        swap.assert_not_called()
+    @patch("rag.runtime.knowledge_deletion_fenced_swap_lab.laboratory_provenance_gated_swap")
+    def test_stale_review_after_thaw_rejected_inside_queue_barrier(self, swap):
+        thaw_deletion_reservations_lab(
+            self.queue, self.freeze["freeze_token"], self.freeze["freeze_generation"],
+            laboratory_mode=True, operator_approved=True,
+        )
+        with self.assertRaisesRegex(DeletionWriterFenceBlocked, "freeze changed"):
+            self.transition()
+        swap.assert_not_called()
+        self.assertEqual(self.events, [])
+
+    @patch("rag.runtime.knowledge_deletion_fenced_swap_lab.laboratory_provenance_gated_swap")
+    def test_stale_review_after_new_freeze_rejected(self, swap):
+        thaw_deletion_reservations_lab(
+            self.queue, self.freeze["freeze_token"], self.freeze["freeze_generation"],
+            laboratory_mode=True, operator_approved=True,
+        )
+        freeze_deletion_reservations_lab(
+            self.queue, laboratory_mode=True, operator_approved=True,
+        )
+        with self.assertRaisesRegex(DeletionWriterFenceBlocked, "freeze changed"):
+            self.transition()
+        swap.assert_not_called()
+
+    @patch("rag.runtime.knowledge_deletion_fenced_swap_lab.laboratory_provenance_gated_swap")
+    def test_review_without_freeze_is_rejected_before_locks(self, swap):
+        malformed = {**self.reviewed, "reservation_freeze_active": False}
+        with self.assertRaises(DeletionFencedTransitionError):
+            self.transition(reviewed_supervisor_evidence=malformed)
+        swap.assert_not_called()
+        self.assertEqual(self.events, [])
+
+    @patch("rag.runtime.knowledge_deletion_fenced_swap_lab.laboratory_provenance_gated_swap")
+    def test_wrong_freeze_generation_is_rejected_under_barrier(self, swap):
+        altered = {**self.reviewed, "reservation_freeze_generation": 100}
+        with self.assertRaisesRegex(DeletionWriterFenceBlocked, "freeze changed"):
+            self.transition(reviewed_supervisor_evidence=altered)
         swap.assert_not_called()

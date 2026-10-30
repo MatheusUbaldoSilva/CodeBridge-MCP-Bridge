@@ -125,3 +125,41 @@ class SupervisorObservationTests(TestCase):
         self.assertFalse(evidence["supervisor_observed_quiet"])
         self.assertFalse(evidence["activation_authorized"])
         self.assertIn("UNRESOLVED_QUEUE_JOBS", evidence["blockers"])
+    def test_freeze_marker_is_observed_without_exposing_token(self):
+        from rag.runtime.knowledge_deletion_reservation_freeze_lab import (
+            freeze_deletion_reservations_lab, thaw_deletion_reservations_lab,
+        )
+        self.seed()
+        before = self.review()
+        self.assertFalse(before["reservation_freeze_active"])
+        freeze = freeze_deletion_reservations_lab(
+            self.queue, laboratory_mode=True, operator_approved=True,
+        )
+        evidence = self.review()
+        self.assertTrue(evidence["reservation_freeze_active"])
+        self.assertEqual(
+            evidence["reservation_freeze_generation"], freeze["freeze_generation"]
+        )
+        self.assertNotIn("freeze_token", evidence)
+        self.assertTrue(evidence["supervisor_observed_quiet"])
+        self.assertFalse(evidence["activation_authorized"])
+        thaw_deletion_reservations_lab(
+            self.queue, freeze["freeze_token"], freeze["freeze_generation"],
+            laboratory_mode=True, operator_approved=True,
+        )
+        opened = self.review()
+        self.assertFalse(opened["reservation_freeze_active"])
+        self.assertGreater(
+            opened["reservation_freeze_generation"],
+            evidence["reservation_freeze_generation"]
+        )
+
+    def test_invalid_freeze_marker_is_reported_fail_closed(self):
+        self.seed()
+        with closing(sqlite3.connect(self.queue)) as db:
+            db.execute("CREATE TABLE auto_deletion_reservation_freeze (wrong TEXT)")
+            db.commit()
+        evidence = self.review()
+        self.assertIn("RESERVATION_FREEZE_MARKER_INVALID", evidence["blockers"])
+        self.assertFalse(evidence["supervisor_observed_quiet"])
+        self.assertFalse(evidence["activation_authorized"])
