@@ -39,3 +39,6 @@ Esta correcao elimina o ciclo conhecido no executor testado, NAO prova inexisten
 ## Evidencias de teste nesta sessao
 
 RAG-DEL: 270 executados, 268 PASS, 2 SKIP. RAG-AUTO exceto caso MCP: 241 executados, 236 PASS, 5 SKIP. Zero falhas nas suites executadas. MCP nao validado por falta do pacote Python no runtime DEV.
+## DD — Leitura direta do ponteiro publico
+
+Em auto_index_worker._public_generation, o arquivo active-generation.json e lido diretamente por Path.read_text, inclusive durante o ciclo do worker, sem o context manager production_generation_read. Essa observacao nao prova uma falha ativa porque o ponteiro nao foi trocado nesta sessao; e uma lacuna de cooperacao a auditar antes de qualquer cutover operacional. production_generation_read, por sua vez, usa lock generation compartilhado e recusa journal de transicao pendente. Exigir cobertura de TODOS os caminhos que leem o ponteiro, incluindo GUI/MCP e workers, antes de ativar o executor real. A fase DD foi somente uma auditoria estatica; nenhum arquivo em producao foi alterado.
