@@ -5,6 +5,7 @@ A quiet observation is NOT a deletion authorization and is never a lock.
 from __future__ import annotations
 
 from contextlib import closing
+from hashlib import sha256
 from pathlib import Path
 import sqlite3
 
@@ -37,6 +38,7 @@ def inspect_deletion_supervisor_read_only(queue_path: Path) -> dict:
         "operational_use_allowed": False,
         "activation_authorized": False,
         "read_only": True,
+        "queue_identity_sha256": sha256(str(path.resolve()).encode("utf-8")).hexdigest(),
         "blockers": [],
     }
     if not path.is_file():

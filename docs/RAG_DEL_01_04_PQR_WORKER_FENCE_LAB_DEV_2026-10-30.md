@@ -26,3 +26,7 @@ RAG-DEL: 222 testes, 220 aprovados, 2 dispensados, zero falhas no runtime Python
 ## RAG-DEL-01.04-S — Teste do lock Win32 real em fixture
 
 Com unittest.mock.patch para redirecionar exclusivamente resolve_rag_sqlite_path a um CodeBridge/rag em TemporaryDirectory, os testes exercitam production_generation_lock (LockFileEx) nos dois canais reais. Outro processo recebe ProductionGenerationBusy enquanto ambos estao ativos, e apos liberar consegue adquirir. Se semantic estiver ocupado por processo concorrente, o lock generation e a barreira SQLite sao liberados. Nao ha abertura nem criacao de lock no root RAG do usuario.
+
+## U/V — Orquestracao de laboratorio com revisao pinada
+
+knowledge_deletion_fenced_swap_lab.py exige aprovacao explicita e catalogo temporario, valida revisao previamente observada do supervisor, pin da identidade do caminho da fila e da geracao do singleton sob a barreira SQLite, e chama laboratory_provenance_gated_swap somente com os dois guards adquiridos. Uma geracao diferente, lease ativo, revisao malformada ou caminho alterado bloqueia a transicao, sem autorizar uso operacional. A identidade de caminho em SHA-256 nao autentica a revisao e nao substitui comprovacao do estado dos workers reais.
