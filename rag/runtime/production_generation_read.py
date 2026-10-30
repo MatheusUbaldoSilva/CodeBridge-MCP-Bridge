@@ -26,6 +26,12 @@ class SearchStoragePaths:
 
 def _read_pointer(state: Path):
     pointer = state / "active-generation.json"
+    # Do not follow an operator-unreviewed symlink/junction to read a
+    # replacement active generation outside the audited state directory.
+    if pointer.is_symlink() or (
+        hasattr(pointer, "is_junction") and pointer.is_junction()
+    ):
+        raise RuntimeError("redirected production generation pointer")
     if not pointer.is_file():
         return None
     data = json.loads(pointer.read_text(encoding="utf-8"))
