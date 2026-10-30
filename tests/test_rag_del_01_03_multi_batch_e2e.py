@@ -78,6 +78,12 @@ class MultiBatchCandidateTests(TestCase):
                 self.assertEqual(verified["batches_verified"],3)
                 with self.assertRaises(IncrementalPlanError):
                     validate_deletion_candidate(stage,plan,dest,batch_ids[:-1])
+                # Tampering with the payload after a valid checkpoint must fail.
+                victim=deterministic_vector_point_id("demo","code","chunk0")
+                dest.set_payload(collection_name="code",
+                    payload={"sha256":"b"*64},points=[victim])
+                with self.assertRaises(IncrementalPlanError):
+                    validate_deletion_candidate(stage,plan,dest,batch_ids)
                 (stage/("batch_"+batch_ids[1]+".json")).unlink()
                 with self.assertRaises(IncrementalPlanError):
                     validate_deletion_candidate(stage,plan,dest,batch_ids)

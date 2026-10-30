@@ -25,8 +25,19 @@ def _sha(data: bytes) -> str:
     return sha256(data).hexdigest()
 
 def _lab_paths(catalog_file: Path, pointer: Path):
-    catalog=Path(catalog_file).resolve()
-    public=Path(pointer).resolve()
+    input_catalog=Path(catalog_file)
+    input_pointer=Path(pointer)
+    for supplied in (input_catalog, input_pointer):
+        if not supplied.is_absolute():
+            raise DeletionSwapError("laboratory paths must be absolute")
+        # Prevent a redirected parent escaping the authorized scratch root.
+        for part in (supplied, *supplied.parents):
+            if part.exists() and (part.is_symlink() or (
+                hasattr(part,"is_junction") and part.is_junction()
+            )):
+                raise DeletionSwapError("redirected laboratory path forbidden")
+    catalog=input_catalog.resolve()
+    public=input_pointer.resolve()
     temp=Path(tempfile.gettempdir()).resolve()
     # Only an ephemeral unittest-style scratch directory is accepted.
     lab_name=catalog.parent.name
