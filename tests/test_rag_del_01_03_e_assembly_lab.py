@@ -58,6 +58,24 @@ class AssemblyLabTests(TestCase):
     def test_rejects_replay(self):
         self.assemble()
         with self.assertRaises(DeletionGenerationAssemblyError): self.assemble()
+    def test_interrupted_receipt_write_quarantines_stage(self):
+        from rag.runtime.knowledge_deletion_assemble_lab import os as module_os
+        native_open=module_os.open
+        calls=[0]
+        def fail_second_open(*args,**kwargs):
+            calls[0]+=1
+            if calls[0]==2:
+                raise OSError("simulated disk interruption")
+            return native_open(*args,**kwargs)
+        with patch("rag.runtime.knowledge_deletion_assemble_lab.os.open",
+                   side_effect=fail_second_open):
+            with self.assertRaises(OSError):
+                self.assemble()
+        self.assertTrue((self.stage/"progress.json").exists())
+        self.assertFalse((self.stage/"deletion-generation-receipt.json").exists())
+        with self.assertRaises(DeletionGenerationAssemblyError):
+            self.assemble()
+
     def test_changed_qdrant_since_review_refused(self):
         (self.stage/"qdrant"/"segment.bin").write_bytes(b"modified")
         with self.assertRaises(Exception): self.assemble()
