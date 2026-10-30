@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch,Mock
@@ -14,6 +14,7 @@ class ProvenanceSwapLabTests(TestCase):
         self.preview={"project_id":"demo"}
         self.args={"catalog_file":self.root/"project-indexes.json",
                    "public_pointer":self.root/"public.json",
+                   "source_snapshot_root":self.root/"snapshots",
                    "laboratory_mode":True,"operator_approved":True}
     def call(self,**kwargs):
         return laboratory_provenance_gated_swap(
@@ -24,7 +25,8 @@ class ProvenanceSwapLabTests(TestCase):
     def test_provenance_required_before_swap(self,audit,swap):
         audit.return_value={"state":"PRIVATE_REMOVAL_AUDIT_ONLY",
             "activation_authorized":False,"catalog_modified":False,
-            "lineage_sha256":"a"*64,"vectors_verified":7}
+            "lineage_sha256":"a"*64,"vectors_verified":7,
+            "snapshot_inventory_sha256":"b"*64}
         swap.return_value={"state":"LAB_SWAP_ACTIVE","operational_use_allowed":False}
         result=self.call()
         self.assertEqual(result["semantic_vectors_checked"],7)

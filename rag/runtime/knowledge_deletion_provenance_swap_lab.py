@@ -1,4 +1,4 @@
-﻿"""RAG-DEL fully evidence-gated temp-only catalog transition."""
+"""RAG-DEL fully evidence-gated temp-only catalog transition."""
 from pathlib import Path
 from rag.runtime.knowledge_deletion_audit_gate import audit_private_removal_candidate
 from rag.runtime.knowledge_deletion_verified_swap_lab import laboratory_verified_swap
@@ -9,6 +9,7 @@ class DeletionEvidenceGateError(RuntimeError):
 def laboratory_provenance_gated_swap(
     project_id: str, expected_revision: str, candidate: dict, preview: dict,
     baseline_manifest: Path, isolated_candidate_client, *,
+    source_snapshot_root: Path,
     catalog_file: Path, public_pointer: Path,
     laboratory_mode: bool = False, operator_approved: bool = False,
 ) -> dict:
@@ -22,6 +23,7 @@ def laboratory_provenance_gated_swap(
     proof = audit_private_removal_candidate(
         baseline_manifest, Path(candidate["generation_directory"]),
         project_id, preview, isolated_candidate_client,
+        source_snapshot_root=source_snapshot_root,
     )
     if (proof["state"] != "PRIVATE_REMOVAL_AUDIT_ONLY"
             or proof["activation_authorized"] is not False
@@ -33,5 +35,6 @@ def laboratory_provenance_gated_swap(
         operator_approved=True, laboratory_mode=True,
     )
     return {**switched, "lineage_sha256": proof["lineage_sha256"],
+            "snapshot_inventory_sha256":proof["snapshot_inventory_sha256"],
             "semantic_vectors_checked": proof["vectors_verified"],
             "operational_use_allowed": False}

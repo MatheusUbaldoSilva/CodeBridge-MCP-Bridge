@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 from rag.index.manifest import IndexManifest,ManifestEntry,ManifestIndexKind,save_index_manifest
@@ -54,11 +54,14 @@ class DeletionLineageTests(TestCase):
         from unittest.mock import patch, Mock
         from rag.runtime.knowledge_deletion_audit_gate import audit_private_removal_candidate
         save_index_manifest(self.root/"rag-index-manifest.json",IndexManifest(tuple(self.rows[1:])))
-        with patch("rag.runtime.knowledge_deletion_audit_gate.verify_candidate_vector_semantics",
+        with patch("rag.runtime.knowledge_deletion_audit_gate.inspect_survivor_snapshot",
+                   return_value={"files_verified":2,"snapshot_inventory_sha256":"a"*64}), patch(
+                   "rag.runtime.knowledge_deletion_audit_gate.verify_candidate_vector_semantics",
                    return_value={"vectors_verified":3,"documents_verified":2}):
             with self.assertRaises(ValueError):
                 audit_private_removal_candidate(
-                    self.baseline,self.root,"demo",self.preview,Mock()
+                    self.baseline,self.root,"demo",self.preview,Mock(),
+                    source_snapshot_root=self.root
                 )
 
     def test_public_project_denied(self):
