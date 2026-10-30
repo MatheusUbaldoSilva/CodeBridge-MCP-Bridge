@@ -49,6 +49,8 @@ def inspect_survivor_snapshot(snapshot_root: str | Path, manifest_path: str | Pa
         if not resolved.is_relative_to(root_real) or not resolved.is_file():
             raise DeletionSnapshotError("source escaped snapshot")
         size=resolved.stat().st_size
+        if size!=entry.size:
+            raise DeletionSnapshotError("source size differs from manifest")
         aggregate+=size
         if aggregate>max_bytes:
             raise DeletionSnapshotError("snapshot size limit exceeded")

@@ -26,6 +26,14 @@ class SnapshotSurvivorTests(TestCase):
         result=self.inspect()
         self.assertEqual(result["files_verified"],1)
         self.assertFalse(result["activation_authorized"])
+    def test_manifest_size_mismatch_rejected(self):
+        save_index_manifest(self.manifest,IndexManifest((ManifestEntry(
+            project_id="demo",index_kind=ManifestIndexKind.CODE,
+            path="game/src/shop.cpp",size=999,mtime_ns=1,
+            sha256=sha256(b"hello source").hexdigest(),
+            chunk_ids=("chunk1",),model_version="lab"),)))
+        with self.assertRaises(DeletionSnapshotError):self.inspect()
+
     def test_content_change_rejected(self):
         self.file.write_bytes(b"changed")
         with self.assertRaises(DeletionSnapshotError):self.inspect()
