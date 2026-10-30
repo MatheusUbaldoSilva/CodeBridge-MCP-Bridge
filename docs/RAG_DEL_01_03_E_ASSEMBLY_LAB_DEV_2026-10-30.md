@@ -1,0 +1,2 @@
+﻿RAG-DEL-01.03-E - montagem do recibo em laboratorio (DEV)
+Rotina restrita ao diretorio temporario gera progress.json e deletion-generation-receipt.json com vinculo a preview, bundle de revisao, artefatos SQLite/manifesto e hash do Qdrant fechado. Teste end-to-end de laboratorio confirma leitura por resolve_isolated_project. Sem registro no catalogo real, sem exclusao ou ativacao. Requer homologacao de proveniencia, recibos independentes e rollback antes de uso operacional.
