@@ -22,8 +22,8 @@ def preview_knowledge_removal(project_id: str, paths: list[str]) -> dict:
     if not isinstance(project_id, str) or project_id == "codebridge":
         raise KnowledgeDeletionPreviewError("public project cannot be modified")
     if (not isinstance(paths, list) or not paths
-            or any(not isinstance(p, str) or not p or p.startswith(("/", "\\\\"))
-                   or "\\\\" in p or "\\x00" in p or p in (".", "..")
+            or any(not isinstance(p, str) or not p or p.startswith(("/", "\\"))
+                   or "\\" in p or "\\x00" in p or p in (".", "..")
                    or any(segment in ("", ".", "..") for segment in p.split("/"))
                    for p in paths)
             or len(paths) != len(set(paths))):

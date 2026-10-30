@@ -77,6 +77,15 @@ class KnowledgeDeletionPreviewTests(TestCase):
                 with self.assertRaises(KnowledgeDeletionPreviewError):
                     preview_knowledge_removal("demo", selection)
 
+    def test_single_windows_backslash_rejected_before_index_lookup(self):
+        from unittest.mock import patch
+        with patch("rag.runtime.knowledge_deletion_preview.resolve_isolated_project") as lookup:
+            for path in (r"a\b.cpp",r"C:\absolute.cpp",r"folder\..\file.cpp",r"\server\share"):
+                with self.subTest(path=path):
+                    with self.assertRaises(KnowledgeDeletionPreviewError):
+                        preview_knowledge_removal("demo",[path])
+            lookup.assert_not_called()
+
     def test_public_project_denied(self):
         with self.assertRaises(KnowledgeDeletionPreviewError):
             preview_knowledge_removal("codebridge", ["a.cpp"])
