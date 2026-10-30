@@ -46,3 +46,5 @@ RAG-DEL-01.04-DE (DEV): auto_index_worker._public_generation passa a usar produc
 RAG-DEL-01.04-DF (DEV): o diagnostico read-only do scheduler incremental agora exige generation shared LockFileEx durante inspeção e, sob exclusividade concorrente, retorna PUBLIC_POINTER_BUSY sem fazer leitura insegura. 4 novos testes multi-processos scratch + 5 testes anteriores do agendador passaram. Nao autoriza schedule, cutover, nem exclusao real.
 
 RAG-DEL-01.04-DG (DEV): auditoria read-only de lease (NONE/ACTIVE/EXPIRED_RECONCILIATION_REQUIRED/MALFORMED) e teste de recuperação real de job sintetico sob freeze. Expiracao nao autoriza exclusao, recuperacao requer operador e deixa job QUEUED bloqueado pelo freeze. Regressoes: RAG-DEL 286 (284 PASS/2 SKIP), RAG-AUTO non-MCP 241 (236 PASS/5 SKIP), sem falhas. Nenhum lease real foi alterado.
+
+RAG-DEL-01.04-DH (DEV): testes multiprocessos reais com Win32 semantic exclusivo, heartbeat SQLite concorrente e crash via terminate. A fila permanece disponivel durante espera pelo lock; morte do processo nao limpa lease persistida nem desbloqueia exclusao. Somente fixtures em TEMP, sem alteracao de RAG real.
