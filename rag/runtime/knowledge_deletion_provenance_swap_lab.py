@@ -29,10 +29,25 @@ def laboratory_provenance_gated_swap(
             or proof["activation_authorized"] is not False
             or proof["catalog_modified"] is not False):
         raise DeletionEvidenceGateError("invalid deletion provenance evidence")
+    def _recheck_provenance_under_catalog_mutex():
+        latest = audit_private_removal_candidate(
+            baseline_manifest, Path(candidate['generation_directory']),
+            project_id, preview, isolated_candidate_client,
+            source_snapshot_root=source_snapshot_root,
+        )
+        protected = ('state', 'project_id', 'lineage_sha256',
+                     'snapshot_inventory_sha256', 'candidate_manifest_sha256',
+                     'source_snapshot_files_verified', 'documents_verified',
+                     'vectors_verified', 'activation_authorized', 'catalog_modified')
+        if any(latest.get(key) != proof.get(key) for key in protected):
+            raise DeletionEvidenceGateError(
+                'candidate provenance changed before catalog swap')
+
     switched = laboratory_verified_swap(
         project_id, expected_revision, candidate,
         catalog_file=catalog_file, public_pointer=public_pointer,
         operator_approved=True, laboratory_mode=True,
+        _locked_provenance_check=_recheck_provenance_under_catalog_mutex,
     )
     return {**switched, "lineage_sha256": proof["lineage_sha256"],
             "snapshot_inventory_sha256":proof["snapshot_inventory_sha256"],

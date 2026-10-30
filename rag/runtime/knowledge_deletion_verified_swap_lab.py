@@ -8,7 +8,7 @@ from rag.runtime.knowledge_deletion_swap_lab import (
 def laboratory_verified_swap(project_id:str,old_revision:str,candidate:dict,
                              *,catalog_file:Path,public_pointer:Path,
                              operator_approved:bool=False,laboratory_mode:bool=False,
-                             _fail_at:str|None=None)->dict:
+                             _fail_at:str|None=None, _locked_provenance_check=None)->dict:
     if operator_approved is not True or laboratory_mode is not True:
         raise PermissionError("explicit laboratory approval required")
     if candidate.get("project_id")!=project_id or candidate.get("index_family")!="RAG_DEL_01":
@@ -22,6 +22,10 @@ def laboratory_verified_swap(project_id:str,old_revision:str,candidate:dict,
     verify_deletion_generation(candidate,project_id,generation,snapshot,revision)
     def _recheck_closed_candidate_under_catalog_mutex():
         verify_deletion_generation(candidate,project_id,generation,snapshot,revision)
+        if _locked_provenance_check is not None:
+            if not callable(_locked_provenance_check):
+                raise DeletionSwapError('invalid locked provenance check')
+            _locked_provenance_check()
     return laboratory_swap(
         project_id,old_revision,candidate,
         catalog_file=catalog_file,public_pointer=public_pointer,
