@@ -1,0 +1,119 @@
+"""RAG-DEL-01.04-A: transactional catalog replacement lab.
+
+Strictly TEST-ONLY: rejects catalogs outside the OS temporary directory.
+This is not an operational activation API for real knowledge.
+"""
+from __future__ import annotations
+
+from hashlib import sha256
+import json
+from pathlib import Path
+import tempfile
+import uuid
+
+from rag.runtime.auto_index_canary import (
+    _atomic_write, _catalog_bytes, _catalog_mutex, _parse_catalog, _read_pointer,
+)
+from rag.runtime.knowledge_deletion_catalog_plan import (
+    plan_private_generation_replacement,
+)
+
+class DeletionSwapError(RuntimeError):
+    pass
+
+def _sha(data: bytes) -> str:
+    return sha256(data).hexdigest()
+
+def _lab_paths(catalog_file: Path, pointer: Path):
+    catalog=Path(catalog_file).resolve()
+    public=Path(pointer).resolve()
+    temp=Path(tempfile.gettempdir()).resolve()
+    # Only an ephemeral unittest-style scratch directory is accepted.
+    lab_name=catalog.parent.name
+    if (not (lab_name.startswith("tmp") and lab_name != "tmp")
+            or not catalog.is_relative_to(temp) or catalog.parent==temp
+            or not public.is_relative_to(temp) or public.parent==temp
+            or catalog.parent!=public.parent
+            or catalog.name!="project-indexes.json"):
+        raise DeletionSwapError("temporary, same-directory laboratory only")
+    if (catalog.is_symlink() or public.is_symlink()
+            or (hasattr(catalog, "is_junction") and catalog.is_junction())
+            or (hasattr(public, "is_junction") and public.is_junction())):
+        raise DeletionSwapError("redirected lab path forbidden")
+    return catalog,public
+
+def laboratory_swap(project_id: str, expected_revision: str, candidate: dict, *,
+                    catalog_file: Path, public_pointer: Path,
+                    operator_approved: bool=False, laboratory_mode: bool=False,
+                    _fail_at: str|None=None) -> dict:
+    if operator_approved is not True or laboratory_mode is not True:
+        raise PermissionError("explicit laboratory approval required")
+    catalog,pointer=_lab_paths(catalog_file,public_pointer)
+    with _catalog_mutex(catalog.parent):
+        plan=plan_private_generation_replacement(catalog,pointer,project_id,expected_revision,candidate)
+        before=_catalog_bytes(catalog)
+        before_pointer=_read_pointer(pointer)
+        if plan["old_catalog_sha256"]!=_sha(before) or plan["public_pointer_sha256"]!=_sha(before_pointer):
+            raise DeletionSwapError("preflight drift")
+        updated=_parse_catalog(before)
+        updated["projects"][project_id]=candidate
+        target=(json.dumps(updated,sort_keys=True,indent=2,ensure_ascii=False)+"\n").encode()
+        if _sha(target)!=plan["proposed_catalog_sha256"]:
+            raise DeletionSwapError("candidate projection mismatch")
+        transaction=uuid.uuid4().hex
+        backup=catalog.parent/("rag-del-"+transaction+".previous.json")
+        journal=catalog.parent/("rag-del-"+transaction+".journal.json")
+        _atomic_write(backup,before)
+        record={"schema_version":1,"state":"PREPARED","transaction":transaction,
+                "project_id":project_id,"catalog":str(catalog),"backup":str(backup),
+                "old_sha256":_sha(before),"new_sha256":_sha(target),
+                "public_pointer_sha256":_sha(before_pointer)}
+        _atomic_write(journal,(json.dumps(record,indent=2,sort_keys=True)+"\n").encode())
+        if _fail_at=="before":
+            raise DeletionSwapError("injected pre-switch failure")
+        if _catalog_bytes(catalog)!=before or _read_pointer(pointer)!=before_pointer:
+            raise DeletionSwapError("concurrent modification detected")
+        _atomic_write(catalog,target)
+        if _fail_at=="after":
+            raise DeletionSwapError("injected post-switch failure")
+        if _catalog_bytes(catalog)!=target or _read_pointer(pointer)!=before_pointer:
+            raise DeletionSwapError("post-switch mismatch; rollback required")
+        record["state"]="ACTIVE"
+        _atomic_write(journal,(json.dumps(record,indent=2,sort_keys=True)+"\n").encode())
+        return {"state":"LAB_SWAP_ACTIVE","transaction":transaction,
+                "journal":str(journal),"public_pointer_updated":False,
+                "operational_use_allowed":False}
+
+def laboratory_rollback(transaction: str, *,catalog_file: Path,public_pointer: Path,
+                        operator_approved: bool=False,laboratory_mode: bool=False) -> dict:
+    if operator_approved is not True or laboratory_mode is not True:
+        raise PermissionError("explicit laboratory rollback approval required")
+    if len(transaction)!=32 or any(ch not in "0123456789abcdef" for ch in transaction):
+        raise DeletionSwapError("invalid transaction")
+    catalog,pointer=_lab_paths(catalog_file,public_pointer)
+    journal=catalog.parent/("rag-del-"+transaction+".journal.json")
+    expected_backup=catalog.parent/("rag-del-"+transaction+".previous.json")
+    with _catalog_mutex(catalog.parent):
+        if not journal.is_file() or journal.is_symlink() or not expected_backup.is_file() or expected_backup.is_symlink():
+            raise DeletionSwapError("missing transaction journal or backup")
+        data=json.loads(journal.read_text(encoding="utf-8"))
+        if (data.get("schema_version")!=1 or data.get("transaction")!=transaction
+                or data.get("catalog")!=str(catalog) or data.get("backup")!=str(expected_backup)
+                or data.get("state") not in ("PREPARED","ACTIVE","ROLLED_BACK")):
+            raise DeletionSwapError("journal mismatch")
+        old=expected_backup.read_bytes()
+        if _sha(old)!=data.get("old_sha256") or _sha(_read_pointer(pointer))!=data.get("public_pointer_sha256"):
+            raise DeletionSwapError("backup or public pointer changed")
+        present=_catalog_bytes(catalog)
+        if _sha(present)==data["old_sha256"]:
+            state="ALREADY_ROLLED_BACK"
+        elif _sha(present)==data.get("new_sha256"):
+            _atomic_write(catalog,old)
+            if _catalog_bytes(catalog)!=old:
+                raise DeletionSwapError("rollback verification failure")
+            state="LAB_ROLLBACK_COMPLETE"
+        else:
+            raise DeletionSwapError("catalog modified by another transaction")
+        data["state"]="ROLLED_BACK"
+        _atomic_write(journal,(json.dumps(data,indent=2,sort_keys=True)+"\n").encode())
+        return {"state":state,"public_pointer_updated":False,"operational_use_allowed":False}
