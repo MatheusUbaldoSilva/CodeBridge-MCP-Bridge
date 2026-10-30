@@ -1,0 +1,2 @@
+RAG-DEL-01.04-I — Contrato de revisão de ativação (DEV)
+Cruza preview de exclusao, preflight do catalogo, auditoria de sobreviventes e recibo da geracao RAG_DEL_01. Cria hash deterministico para apresentar a revisao ao operador. Mesmo quando todas as provas coincidem, retorna activation_authorized=False, catalog_modified=False e exige confirmacao. Testes negativos: sete aprovados. Nao existe comando de exclusao ou troca real neste modulo.
