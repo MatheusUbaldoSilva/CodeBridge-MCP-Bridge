@@ -1,0 +1,2 @@
+RAG-DEL-01.04-G — Concorrencia e retomada entre processos (DEV)
+Dois processos Python independentes disputam a mesma revisao do catalogo temporario: apenas um faz a troca e o segundo e recusado sob lock. Um teste separado injeta falha depois de escrever o catalogo e executa rollback em um novo processo, confirmando recuperacao byte a byte e ponteiro publico intacto. Nenhuma operacao em catalogo real. Testes Windows locais, nao substituem homologacao operacional.
