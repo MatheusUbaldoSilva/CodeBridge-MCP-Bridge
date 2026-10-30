@@ -40,3 +40,5 @@ para generation -> semantic -> queue para evitar espera circular entre
 semantic worker e heartbeat SQLite. Novo teste verifica que BEGIN IMMEDIATE
 do worker continua disponivel enquanto a transicao espera semantic.
 Sem alteracao de indice real nem autorizacao de exclusao.
+
+RAG-DEL-01.04-DE (DEV): auto_index_worker._public_generation passa a usar production_generation_lock shared para leitura do ponteiro, com fail-closed para journal pendente, symlink, ponteiro invalido e lock Win32 ocupado. Testes multiprocessos inteiramente scratch. RAG-DEL 276 (274 PASS, 2 SKIP), RAG-AUTO non-MCP 241 (236 PASS, 5 SKIP), zero falhas; sem push nem Stable.

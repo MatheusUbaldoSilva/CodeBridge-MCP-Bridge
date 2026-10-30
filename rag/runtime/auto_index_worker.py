@@ -76,15 +76,30 @@ def _revalidate_receipt(queue_path: Path,job_id: str) -> None:
 
 
 def _public_generation() -> str:
-    import os
-    base=os.environ.get("LOCALAPPDATA")
-    if not base:
-        raise RuntimeError("cannot verify production RAG pointer")
-    pointer=Path(base)/"CodeBridge"/"rag"/"active-generation.json"
-    value=json.loads(pointer.read_text(encoding="utf-8"))
-    if value.get("schema_version")!=1 or not value.get("generation"):
-        raise RuntimeError("public RAG pointer invalid")
-    return value["generation"]
+    """Read the published generation cooperatively, never during cutover.
+
+    This is a *brief* shared generation lock, not a writer or a reader pin for
+    the full vector job. The semantic worker may already hold its own lock.
+    A busy generation fails closed rather than reading a torn pointer.
+    """
+    from rag.runtime.production_generation_lock import production_generation_lock
+    from rag.runtime.status import resolve_rag_sqlite_path
+    import re
+
+    with production_generation_lock(exclusive=False, channel="generation"):
+        state = resolve_rag_sqlite_path().resolve().parent
+        if (state / "production-generation-transition.json").exists():
+            raise RuntimeError("production generation transition pending")
+        pointer = state / "active-generation.json"
+        if pointer.is_symlink() or not pointer.is_file():
+            raise RuntimeError("cannot verify production RAG pointer")
+        value = json.loads(pointer.read_text(encoding="utf-8"))
+        generation = value.get("generation")
+        if (value.get("schema_version") != 1
+                or not isinstance(generation, str)
+                or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", generation) is None):
+            raise RuntimeError("public RAG pointer invalid")
+        return generation
 
 
 def execute_auto_vector_batch(
