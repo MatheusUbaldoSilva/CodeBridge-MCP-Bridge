@@ -42,6 +42,20 @@ class PrivatePreflightTests(TestCase):
                 catalog_file=self.catalog,public_pointer=self.pointer,
                 operator_approved=True,laboratory_mode=True,_fail_at="before")
         with self.assertRaises(PrivateDeletionPreflightError):self.preflight()
+    def test_tampered_rolled_back_journal_backup_refused(self):
+        from rag.runtime.knowledge_deletion_swap_lab import laboratory_rollback
+        result=laboratory_swap("demo","old",{
+            "project_id":"demo","enabled":True,"source_revision":"new",
+            "generation_directory":"new-generation"},
+            catalog_file=self.catalog,public_pointer=self.pointer,
+            operator_approved=True,laboratory_mode=True)
+        laboratory_rollback(result["transaction"],catalog_file=self.catalog,
+            public_pointer=self.pointer,operator_approved=True,laboratory_mode=True)
+        backup=next(self.root.glob("rag-del-*.previous.json"))
+        backup.write_bytes(b"modified backup")
+        with self.assertRaises(PrivateDeletionPreflightError):
+            self.preflight()
+
     def test_wrong_family_denied(self):
         self.candidate["index_family"]="RAG_AUTO_03"
         with self.assertRaises(PrivateDeletionPreflightError):self.preflight()

@@ -36,6 +36,16 @@ def inspect_private_deletion_preflight(catalog_file:Path,public_pointer:Path,
         from rag.runtime.knowledge_deletion_swap_lab import _validate_journal
         record=json.loads(file.read_text(encoding="utf-8"))
         _validate_journal(record)
+        tid=file.name.removeprefix("rag-del-").removesuffix(".journal.json")
+        backup=catalog.parent/("rag-del-"+tid+".previous.json")
+        if (len(tid)!=32 or any(ch not in "0123456789abcdef" for ch in tid)
+                or record.get("transaction")!=tid
+                or record.get("catalog")!=str(catalog.resolve())
+                or record.get("backup")!=str(backup)
+                or record.get("state") not in ("PREPARED","ACTIVE","ROLLED_BACK")
+                or not backup.is_file() or backup.is_symlink()
+                or sha256(backup.read_bytes()).hexdigest()!=record.get("old_sha256")):
+            raise PrivateDeletionPreflightError("journal identity or backup mismatch")
         if record.get("state")!="ROLLED_BACK":
             pending.append(file.name)
     if pending:
