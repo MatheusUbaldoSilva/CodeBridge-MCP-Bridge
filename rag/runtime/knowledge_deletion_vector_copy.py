@@ -1,4 +1,4 @@
-﻿"""RAG-DEL-01.03-B: single bounded batch transfer between supplied isolated clients.
+"""RAG-DEL-01.03-B: single bounded batch transfer between supplied isolated clients.
 
 Caller must enforce the client filesystem boundaries and discard incomplete stages.
 No catalog registration or public collection opening is performed here.
@@ -41,6 +41,16 @@ def copy_survivor_batch(source_client, staging_client, plan: dict, batch_index: 
     written=sum(len(verified[k]) for k in ("TEXT","CODE"))
     if written!=imported["vectors_written"]:
         raise IncrementalPlanError("post-write vector count mismatch; discard stage")
+    for kind in ("TEXT", "CODE"):
+        before={point["id"]:point for point in records[kind]}
+        after={point["id"]:point for point in verified[kind]}
+        if set(before)!=set(after):
+            raise IncrementalPlanError("post-write point identity mismatch; discard stage")
+        for point_id,original in before.items():
+            persisted=after[point_id]
+            if (persisted["payload"]!=original["payload"]
+                    or persisted["vector"]!=original["vector"]):
+                raise IncrementalPlanError("post-write vector/payload mismatch; discard stage")
     return {"state":"SURVIVOR_BATCH_READBACK_VERIFIED",
             "batch_index":batch_index,"vectors_verified":written,
             "requires_durable_checkpoint":True,

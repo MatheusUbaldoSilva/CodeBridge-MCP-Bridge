@@ -1,4 +1,4 @@
-﻿from unittest import TestCase
+from unittest import TestCase
 from unittest.mock import patch,Mock
 from rag.runtime.knowledge_deletion_vector_copy import copy_survivor_batch
 from rag.runtime.auto_index_incremental_plan import IncrementalPlanError
@@ -21,7 +21,7 @@ class SurvivorCopyTests(TestCase):
     @patch("rag.runtime.knowledge_deletion_vector_copy.import_verified_reuse_batch")
     @patch("rag.runtime.knowledge_deletion_vector_copy.read_reusable_vectors")
     def test_rechecks_after_import(self, read,write):
-        read.return_value={"TEXT":[],"CODE":[{"id":"abc"}]}
+        read.return_value={"TEXT":[],"CODE":[{"id":"abc","payload":{"chunk_id":"chunk"},"vector":[1.0]}]}
         write.return_value={"vectors_written":1}
         result=self.call()
         self.assertEqual(result["vectors_verified"],1)
@@ -53,8 +53,18 @@ class SurvivorCopyTests(TestCase):
     @patch("rag.runtime.knowledge_deletion_vector_copy.import_verified_reuse_batch")
     @patch("rag.runtime.knowledge_deletion_vector_copy.read_reusable_vectors")
     def test_readback_failure_refused(self,read,write):
-        read.side_effect=[{"TEXT":[],"CODE":[{"id":"abc"}]},
+        read.side_effect=[{"TEXT":[],"CODE":[{"id":"abc","payload":{"chunk_id":"chunk"},"vector":[1.0]}]},
                           {"TEXT":[],"CODE":[]}]
+        write.return_value={"vectors_written":1}
+        with self.assertRaises(IncrementalPlanError):
+            self.call()
+
+    @patch("rag.runtime.knowledge_deletion_vector_copy.import_verified_reuse_batch")
+    @patch("rag.runtime.knowledge_deletion_vector_copy.read_reusable_vectors")
+    def test_readback_payload_change_refused(self,read,write):
+        first={"TEXT":[],"CODE":[{"id":"abc","payload":{"chunk_id":"chunk"},"vector":[1.0]}]}
+        changed={"TEXT":[],"CODE":[{"id":"abc","payload":{"chunk_id":"wrong"},"vector":[1.0]}]}
+        read.side_effect=[first,changed]
         write.return_value={"vectors_written":1}
         with self.assertRaises(IncrementalPlanError):
             self.call()
