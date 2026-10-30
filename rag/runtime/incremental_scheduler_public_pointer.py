@@ -9,6 +9,21 @@ from rag.runtime.status import resolve_rag_sqlite_path
 
 
 def inspect_public_pointer_for_scheduler() -> dict:
+    """Hold shared generation guard for the complete read-only inspection."""
+    from rag.runtime.production_generation_lock import (
+        ProductionGenerationBusy, production_generation_lock,
+    )
+    try:
+        with production_generation_lock(exclusive=False, channel="generation"):
+            return _inspect_public_pointer_guarded()
+    except ProductionGenerationBusy:
+        return {
+            "state": "PUBLIC_POINTER_BUSY",
+            "generation": None, "safe_to_schedule": False, "read_only": True,
+        }
+
+
+def _inspect_public_pointer_guarded() -> dict:
     root = resolve_rag_sqlite_path().resolve().parent
     pointer = root / "active-generation.json"
     journal = root / "production-generation-transition.json"

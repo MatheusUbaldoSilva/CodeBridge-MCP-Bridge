@@ -1,3 +1,4 @@
+from contextlib import nullcontext
 import json
 import tempfile
 import unittest
@@ -9,9 +10,15 @@ from rag.runtime.incremental_scheduler_public_pointer import inspect_public_poin
 
 class PublicPointerDiagnosticTests(unittest.TestCase):
     def inspect(self, root):
-        with patch(
-            "rag.runtime.incremental_scheduler_public_pointer.resolve_rag_sqlite_path",
-            return_value=root / "rag_index.sqlite3",
+        with (
+            patch(
+                "rag.runtime.incremental_scheduler_public_pointer.resolve_rag_sqlite_path",
+                return_value=root / "rag_index.sqlite3",
+            ),
+            patch(
+                "rag.runtime.production_generation_lock.production_generation_lock",
+                return_value=nullcontext(),
+            ),
         ):
             return inspect_public_pointer_for_scheduler()
 

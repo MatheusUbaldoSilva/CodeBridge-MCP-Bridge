@@ -42,3 +42,5 @@ do worker continua disponivel enquanto a transicao espera semantic.
 Sem alteracao de indice real nem autorizacao de exclusao.
 
 RAG-DEL-01.04-DE (DEV): auto_index_worker._public_generation passa a usar production_generation_lock shared para leitura do ponteiro, com fail-closed para journal pendente, symlink, ponteiro invalido e lock Win32 ocupado. Testes multiprocessos inteiramente scratch. RAG-DEL 276 (274 PASS, 2 SKIP), RAG-AUTO non-MCP 241 (236 PASS, 5 SKIP), zero falhas; sem push nem Stable.
+
+RAG-DEL-01.04-DF (DEV): o diagnostico read-only do scheduler incremental agora exige generation shared LockFileEx durante inspeção e, sob exclusividade concorrente, retorna PUBLIC_POINTER_BUSY sem fazer leitura insegura. 4 novos testes multi-processos scratch + 5 testes anteriores do agendador passaram. Nao autoriza schedule, cutover, nem exclusao real.
