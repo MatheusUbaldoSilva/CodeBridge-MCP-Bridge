@@ -93,6 +93,10 @@ def validate_deletion_candidate(stage_path: str | Path, plan: dict,
         checked+=amount
     if checked!=len(chunks):
         raise IncrementalPlanError("incomplete candidate vector readback")
+    from rag.runtime.knowledge_deletion_structure import (
+        inspect_deletion_generation_structure,
+    )
+    inspect_deletion_generation_structure(stage, project, checked)
     return {"state":"DELETION_STAGING_STRUCTURALLY_VALID",
             "project_id":project,"documents":len(docs),"chunks":len(chunks),
             "vectors_verified":checked,"batches_verified":len(batches),
