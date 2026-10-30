@@ -7,6 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, Signal
 from rag_projects import list_projects, create_project, validate_preview_folder
 from rag_auto_job_card import RagAutoJobCard
+from rag_deletion_review_panel import KnowledgeRemovalReviewPanel
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
     QPlainTextEdit, QListWidget, QListWidgetItem, QStackedWidget,
@@ -171,6 +172,8 @@ class RagPanel(QWidget):
         self.file_details.setReadOnly(True)
         self.file_details.setPlaceholderText("Selecione um arquivo.")
         files_layout.addWidget(self.file_details, 1)
+        self.deletion_review_panel = KnowledgeRemovalReviewPanel(files_page)
+        files_layout.addWidget(self.deletion_review_panel, 1)
         self.pages.addWidget(files_page)
 
         search_page = QWidget()
@@ -303,6 +306,7 @@ class RagPanel(QWidget):
         self._selected_paths = None
         self.files.clear()
         self._documents = []
+        self.deletion_review_panel.set_project_files(name, [])
         self.results.clear()
         self._results = []
         self.preview.clear()
@@ -674,6 +678,13 @@ class RagPanel(QWidget):
             self.files.clear()
             for item in self._documents:
                 self.files.addItem(str(item["path"]))
+            private_paths = (
+                [str(item["path"]) for item in self._documents]
+                if self.project_id != "codebridge" else []
+            )
+            self.deletion_review_panel.set_project_files(
+                self.project_id, private_paths,
+            )
             if not self._documents:
                 self.file_details.setPlainText("Nenhum arquivo encontrado.")
         elif operation == "search":
