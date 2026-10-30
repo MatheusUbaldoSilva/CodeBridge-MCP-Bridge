@@ -1,4 +1,4 @@
-﻿import json
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -50,6 +50,19 @@ class RecoveryAuditLabTests(TestCase):
         self.run_swap()
         self.catalog.write_text(json.dumps({"schema_version":1,"projects":{}}))
         self.assertTrue(self.inspect()[0]["requires_manual_review"])
+    def test_tampered_journal_rejected_by_audit_and_rollback(self):
+        from rag.runtime.knowledge_deletion_swap_lab import laboratory_rollback
+        result=self.run_swap()
+        journal=Path(result["journal"])
+        data=json.loads(journal.read_text(encoding="utf-8"))
+        data["project_id"]="foreign"
+        journal.write_text(json.dumps(data),encoding="utf-8")
+        with self.assertRaises(DeletionSwapError):
+            self.inspect()
+        with self.assertRaises(DeletionSwapError):
+            laboratory_rollback(result["transaction"],catalog_file=self.catalog,
+                public_pointer=self.pointer,operator_approved=True,laboratory_mode=True)
+
     def test_tampered_backup_refused(self):
         self.run_swap()
         next(self.root.glob("*.previous.json")).write_text("tampered")

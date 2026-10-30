@@ -1,4 +1,4 @@
-﻿"""RAG-DEL-01.04-B: read-only audit of temporary swap transaction journals.
+"""RAG-DEL-01.04-B: read-only audit of temporary swap transaction journals.
 
 Does not rollback, repair, or mutate any file.
 """
@@ -8,7 +8,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 
-from rag.runtime.knowledge_deletion_swap_lab import _lab_paths, DeletionSwapError
+from rag.runtime.knowledge_deletion_swap_lab import _lab_paths, _validate_journal, DeletionSwapError
 
 
 def inspect_laboratory_transactions(catalog_file: Path, public_pointer: Path) -> list[dict]:
@@ -26,6 +26,7 @@ def inspect_laboratory_transactions(catalog_file: Path, public_pointer: Path) ->
         if len(tid)!=32 or any(c not in "0123456789abcdef" for c in tid):
             raise DeletionSwapError("unexpected journal name")
         item=json.loads(journal.read_text(encoding="utf-8"))
+        _validate_journal(item)
         backup=catalog.parent/("rag-del-"+tid+".previous.json")
         if (item.get("transaction")!=tid or item.get("catalog")!=str(catalog)
                 or item.get("backup")!=str(backup)

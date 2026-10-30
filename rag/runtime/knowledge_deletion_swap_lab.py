@@ -24,6 +24,23 @@ class DeletionSwapError(RuntimeError):
 def _sha(data: bytes) -> str:
     return sha256(data).hexdigest()
 
+def _journal_payload(record: dict) -> bytes:
+    unsigned={key:value for key,value in record.items() if key!="journal_sha256"}
+    canonical=json.dumps(unsigned,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode("utf-8")
+    record["journal_sha256"]=_sha(canonical)
+    return (json.dumps(record,indent=2,sort_keys=True,ensure_ascii=False)+"\n").encode("utf-8")
+
+
+def _validate_journal(record: dict):
+    if not isinstance(record,dict) or not isinstance(record.get("journal_sha256"),str):
+        raise DeletionSwapError("journal signature missing")
+    digest=record["journal_sha256"]
+    unsigned={key:value for key,value in record.items() if key!="journal_sha256"}
+    canonical=json.dumps(unsigned,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode("utf-8")
+    if digest!=_sha(canonical):
+        raise DeletionSwapError("journal record changed")
+
+
 def _lab_paths(catalog_file: Path, pointer: Path):
     input_catalog=Path(catalog_file)
     input_pointer=Path(pointer)
@@ -66,6 +83,7 @@ def laboratory_swap(project_id: str, expected_revision: str, candidate: dict, *,
             if not pending.is_file() or pending.is_symlink():
                 raise DeletionSwapError("redirected transaction journal")
             prior=json.loads(pending.read_text(encoding="utf-8"))
+            _validate_journal(prior)
             if prior.get("state")!="ROLLED_BACK":
                 raise DeletionSwapError("unresolved prior transaction; reconcile first")
         plan=plan_private_generation_replacement(catalog,pointer,project_id,expected_revision,candidate)
@@ -86,7 +104,7 @@ def laboratory_swap(project_id: str, expected_revision: str, candidate: dict, *,
                 "project_id":project_id,"catalog":str(catalog),"backup":str(backup),
                 "old_sha256":_sha(before),"new_sha256":_sha(target),
                 "public_pointer_sha256":_sha(before_pointer)}
-        _atomic_write(journal,(json.dumps(record,indent=2,sort_keys=True)+"\n").encode())
+        _atomic_write(journal,_journal_payload(record))
         if _fail_at=="before":
             raise DeletionSwapError("injected pre-switch failure")
         if _catalog_bytes(catalog)!=before or _read_pointer(pointer)!=before_pointer:
@@ -97,7 +115,7 @@ def laboratory_swap(project_id: str, expected_revision: str, candidate: dict, *,
         if _catalog_bytes(catalog)!=target or _read_pointer(pointer)!=before_pointer:
             raise DeletionSwapError("post-switch mismatch; rollback required")
         record["state"]="ACTIVE"
-        _atomic_write(journal,(json.dumps(record,indent=2,sort_keys=True)+"\n").encode())
+        _atomic_write(journal,_journal_payload(record))
         return {"state":"LAB_SWAP_ACTIVE","transaction":transaction,
                 "journal":str(journal),"public_pointer_updated":False,
                 "operational_use_allowed":False}
@@ -115,6 +133,7 @@ def laboratory_rollback(transaction: str, *,catalog_file: Path,public_pointer: P
         if not journal.is_file() or journal.is_symlink() or not expected_backup.is_file() or expected_backup.is_symlink():
             raise DeletionSwapError("missing transaction journal or backup")
         data=json.loads(journal.read_text(encoding="utf-8"))
+        _validate_journal(data)
         if (data.get("schema_version")!=1 or data.get("transaction")!=transaction
                 or data.get("catalog")!=str(catalog) or data.get("backup")!=str(expected_backup)
                 or data.get("state") not in ("PREPARED","ACTIVE","ROLLED_BACK")):
@@ -133,5 +152,5 @@ def laboratory_rollback(transaction: str, *,catalog_file: Path,public_pointer: P
         else:
             raise DeletionSwapError("catalog modified by another transaction")
         data["state"]="ROLLED_BACK"
-        _atomic_write(journal,(json.dumps(data,indent=2,sort_keys=True)+"\n").encode())
+        _atomic_write(journal,_journal_payload(data))
         return {"state":state,"public_pointer_updated":False,"operational_use_allowed":False}
