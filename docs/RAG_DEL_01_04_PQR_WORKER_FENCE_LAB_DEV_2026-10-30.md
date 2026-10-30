@@ -23,3 +23,6 @@
 ## Validação
 
 RAG-DEL: 222 testes, 220 aprovados, 2 dispensados, zero falhas no runtime Python DEV. Todos os novos testes utilizam dados artificiais sob Temp.
+## RAG-DEL-01.04-S — Teste do lock Win32 real em fixture
+
+Com unittest.mock.patch para redirecionar exclusivamente resolve_rag_sqlite_path a um CodeBridge/rag em TemporaryDirectory, os testes exercitam production_generation_lock (LockFileEx) nos dois canais reais. Outro processo recebe ProductionGenerationBusy enquanto ambos estao ativos, e apos liberar consegue adquirir. Se semantic estiver ocupado por processo concorrente, o lock generation e a barreira SQLite sao liberados. Nao ha abertura nem criacao de lock no root RAG do usuario.
