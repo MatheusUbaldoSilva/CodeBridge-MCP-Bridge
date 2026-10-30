@@ -92,6 +92,21 @@ class LabCatalogSwitchTests(TestCase):
         self.assertFalse(result["operational_use_allowed"])
         self.assertFalse(result["public_pointer_updated"])
 
+    def test_second_swap_refused_with_active_transaction(self):
+        self.swap()
+        with self.assertRaises(DeletionSwapError):
+            laboratory_swap("demo","new",
+                {"project_id":"demo","enabled":True,"source_revision":"third",
+                 "generation_directory":"third"},
+                catalog_file=self.cat,public_pointer=self.pointer,
+                operator_approved=True,laboratory_mode=True)
+
+    def test_second_swap_allowed_after_prior_rollback(self):
+        record=self.swap()
+        self.undo(record["transaction"])
+        again=self.swap()
+        self.assertEqual(again["state"],"LAB_SWAP_ACTIVE")
+
     def test_foreign_catalog_change_refuses_rollback(self):
         result=self.swap()
         data=json.loads(self.cat.read_text())

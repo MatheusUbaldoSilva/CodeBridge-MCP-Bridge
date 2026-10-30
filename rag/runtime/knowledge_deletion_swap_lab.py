@@ -50,6 +50,13 @@ def laboratory_swap(project_id: str, expected_revision: str, candidate: dict, *,
         raise PermissionError("explicit laboratory approval required")
     catalog,pointer=_lab_paths(catalog_file,public_pointer)
     with _catalog_mutex(catalog.parent):
+        # No new transition while any earlier journal is unresolved.
+        for pending in catalog.parent.glob("rag-del-*.journal.json"):
+            if not pending.is_file() or pending.is_symlink():
+                raise DeletionSwapError("redirected transaction journal")
+            prior=json.loads(pending.read_text(encoding="utf-8"))
+            if prior.get("state")!="ROLLED_BACK":
+                raise DeletionSwapError("unresolved prior transaction; reconcile first")
         plan=plan_private_generation_replacement(catalog,pointer,project_id,expected_revision,candidate)
         before=_catalog_bytes(catalog)
         before_pointer=_read_pointer(pointer)
