@@ -84,7 +84,7 @@ def laboratory_writer_fence(
     operator_approved: bool = False,
     expected_freeze_generation: int | None = None,
 ):
-    """Hold lab SQLite reservation barrier -> generation -> semantic locks.
+    """Hold lab generation -> semantic -> SQLite reservation barrier.
 
     Does not mutate catalog, pointer, leases or indexes. Never use to activate.
     """
@@ -93,46 +93,48 @@ def laboratory_writer_fence(
     if not callable(generation_guard) or not callable(semantic_guard):
         raise DeletionWriterFenceBlocked("missing mandatory lock providers")
     queue = _scratch_queue_path(queue_path)
-    try:
-        db = sqlite3.connect(
-            queue.as_uri() + "?mode=rw", uri=True,
-            timeout=0.1, isolation_level=None,
-        )
-    except sqlite3.Error as exc:
-        raise DeletionWriterFenceBlocked("queue connection unavailable") from exc
-    try:
-        try:
-            db.execute("BEGIN IMMEDIATE")
-        except sqlite3.Error as exc:
-            raise DeletionWriterFenceBlocked("queue reservation barrier busy") from exc
-        try:
-            if expected_freeze_generation is not None:
-                from rag.runtime.knowledge_deletion_reservation_freeze_lab import (
-                    _read_marker_locked,
+    # Never hold SQLite BEGIN IMMEDIATE while waiting for semantic: existing
+    # semantic workers renew/release their supervisor lease via SQLite.
+    # Waiting for semantic with the queue locked can deadlock that heartbeat.
+    with generation_guard():
+        with semantic_guard():
+            try:
+                db = sqlite3.connect(
+                    queue.as_uri() + "?mode=rw", uri=True,
+                    timeout=0.1, isolation_level=None,
                 )
-                marker = _read_marker_locked(db)
-                if (type(expected_freeze_generation) is not int
-                        or expected_freeze_generation < 1
-                        or marker is None or marker["state"] != "FROZEN"
-                        or marker["generation"] != expected_freeze_generation):
+            except sqlite3.Error as exc:
+                raise DeletionWriterFenceBlocked(
+                    "queue connection unavailable") from exc
+            try:
+                try:
+                    db.execute("BEGIN IMMEDIATE")
+                except sqlite3.Error as exc:
                     raise DeletionWriterFenceBlocked(
-                        "durable reservation freeze changed or absent")
-            before = _assert_no_live_or_runnable_workers(db)
-            with generation_guard():
-                with semantic_guard():
-                    after = _assert_no_live_or_runnable_workers(db)
-                    if before != after:
-                        raise DeletionWriterFenceBlocked("supervisor observation drift")
+                        "queue reservation barrier busy") from exc
+                try:
+                    if expected_freeze_generation is not None:
+                        from rag.runtime.knowledge_deletion_reservation_freeze_lab import (
+                            _read_marker_locked,
+                        )
+                        marker = _read_marker_locked(db)
+                        if (type(expected_freeze_generation) is not int
+                                or expected_freeze_generation < 1
+                                or marker is None or marker["state"] != "FROZEN"
+                                or marker["generation"] != expected_freeze_generation):
+                            raise DeletionWriterFenceBlocked(
+                                "durable reservation freeze changed or absent")
+                    observation = _assert_no_live_or_runnable_workers(db)
                     yield {
                         "state": "LAB_WRITER_FENCE_HELD",
-                        **after,
-                        "lock_order": ["queue", "generation", "semantic"],
+                        **observation,
+                        "lock_order": ["generation", "semantic", "queue"],
                         "queue_barrier_held": True,
                         "operational_use_allowed": False,
                         "activation_authorized": False,
                     }
-        finally:
-            if db.in_transaction:
-                db.execute("ROLLBACK")
-    finally:
-        db.close()
+                finally:
+                    if db.in_transaction:
+                        db.execute("ROLLBACK")
+            finally:
+                db.close()

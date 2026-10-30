@@ -31,3 +31,12 @@ RAG-DEL-01.04-W (DEV): regressao valida que READY_FOR_REVIEW, apesar de nao mant
 RAG-DEL-01.04-Y/Z (DEV): marcador duravel auto_deletion_reservation_freeze (FROZEN/OPEN, token, generation) criado SOMENTE em banco de laboratorio. reserve_index_supervisor consulta marcador na mesma transacao BEGIN IMMEDIATE antes da reserva, falhando fechado se congelado/malformado. Testes de persistencia apos crash e concorrencia multiprocessos; workers existentes nao sao interrompidos. RAG-DEL 264/262 PASS/2 SKIP e RAG-AUTO 241/236 PASS/5 SKIP, 0 falhas. Nao houve alteracao Stable ou escrita de fila real.
 
 RAG-DEL-01.04-AA (DEV): a revisao READ_ONLY do supervisor reporta apenas ativo e generation do freeze. O adapter provenance gated exige freeze ativo e writer-fence valida generation sob BEGIN IMMEDIATE; thaw/re-freeze invalida revisoes anteriores. Testes RAG-DEL: 266 (264 PASS, 2 SKIP); RAG-AUTO (apos Y/Z): 241 (236 PASS, 5 SKIP). Nenhuma exclusao ou ativacao real.
+
+
+RAG-DEL-01.04-BB (DEV): teste integrado real de laboratorio
+freeze->review->locks->catalog CAS->rollback->thaw (3 casos) passou com
+auditoria de proveniencia/geracao isolada por mocks; corrigida a ordem de locks
+para generation -> semantic -> queue para evitar espera circular entre
+semantic worker e heartbeat SQLite. Novo teste verifica que BEGIN IMMEDIATE
+do worker continua disponivel enquanto a transicao espera semantic.
+Sem alteracao de indice real nem autorizacao de exclusao.

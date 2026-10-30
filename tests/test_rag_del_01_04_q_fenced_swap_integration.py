@@ -116,4 +116,7 @@ class FencedSwapIntegrationTests(TestCase):
                 self.swap()
         self.assertEqual(self.catalog.read_bytes(), self.initial)
         self.assertFalse(list(self.root.glob("rag-del-*.journal.json")))
-        self.assertEqual(self.acquired, [])
+        self.assertEqual(
+            self.acquired,
+            ["generation+", "semantic+", "semantic-", "generation-"],
+        )

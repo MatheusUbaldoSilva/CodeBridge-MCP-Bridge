@@ -88,7 +88,7 @@ class FencedProvenanceAdapterTests(TestCase):
         swap.side_effect = witness
         result = self.transition()
         self.assertEqual(result["fence_state"], "LAB_WRITER_FENCE_HELD")
-        self.assertEqual(result["fence_lock_order"], ["queue", "generation", "semantic"])
+        self.assertEqual(result["fence_lock_order"], ["generation", "semantic", "queue"])
         self.assertFalse(result["activation_authorized"])
         self.assertFalse(result["operational_use_allowed"])
         self.assertEqual(
@@ -104,7 +104,10 @@ class FencedProvenanceAdapterTests(TestCase):
         with self.assertRaises(DeletionWriterFenceBlocked):
             self.transition()
         swap.assert_not_called()
-        self.assertEqual(self.events, [])
+        self.assertEqual(
+            self.events,
+            ["generation+", "semantic+", "semantic-", "generation-"],
+        )
 
     @patch("rag.runtime.knowledge_deletion_fenced_swap_lab.laboratory_provenance_gated_swap")
     def test_unapproved_transition_denied(self, swap):
@@ -190,7 +193,10 @@ class FencedProvenanceAdapterTests(TestCase):
         with self.assertRaisesRegex(DeletionWriterFenceBlocked, "freeze changed"):
             self.transition()
         swap.assert_not_called()
-        self.assertEqual(self.events, [])
+        self.assertEqual(
+            self.events,
+            ["generation+", "semantic+", "semantic-", "generation-"],
+        )
 
     @patch("rag.runtime.knowledge_deletion_fenced_swap_lab.laboratory_provenance_gated_swap")
     def test_stale_review_after_new_freeze_rejected(self, swap):

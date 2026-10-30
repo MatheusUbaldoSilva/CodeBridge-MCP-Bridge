@@ -3,7 +3,7 @@
 ## Implementação confirmada
 
 - knowledge_deletion_writer_fence_lab.py utiliza SOMENTE fila SQLite em TemporaryDirectory()/auto/jobs/auto_index_jobs.sqlite3. Rejeita caminhos de produção, redirecionamentos e arquivos inexistentes.
-- Mantém BEGIN IMMEDIATE na fila e adquire guards injetados em ordem fixa: **queue -> generation -> semantic**. Não altera o catálogo, o ponteiro, os índices nem os leases.
+- Mantém BEGIN IMMEDIATE na fila e adquire guards injetados em ordem fixa: **generation -> semantic -> queue (ordem corrigida em BB)**. Não altera o catálogo, o ponteiro, os índices nem os leases.
 - Verifica schema esperado (PRAGMA user_version=1, tabelas do supervisor e singleton); recusa qualquer lease gravado, inclusive expirado, e quaisquer jobs fora de CANCELLED ou FAILED.
 - Sempre libera locks e transação SQLite ao sair. Resposta contém operational_use_allowed=False e activation_authorized=False.
 - Testes de processo independente comprovam que uma nova transação SQLite de reserva não obtém BEGIN IMMEDIATE durante a barreira temporária.
@@ -30,3 +30,24 @@ Com unittest.mock.patch para redirecionar exclusivamente resolve_rag_sqlite_path
 ## U/V — Orquestracao de laboratorio com revisao pinada
 
 knowledge_deletion_fenced_swap_lab.py exige aprovacao explicita e catalogo temporario, valida revisao previamente observada do supervisor, pin da identidade do caminho da fila e da geracao do singleton sob a barreira SQLite, e chama laboratory_provenance_gated_swap somente com os dois guards adquiridos. Uma geracao diferente, lease ativo, revisao malformada ou caminho alterado bloqueia a transicao, sem autorizar uso operacional. A identidade de caminho em SHA-256 nao autentica a revisao e nao substitui comprovacao do estado dos workers reais.
+
+
+## RAG-DEL-01.04-BB — Correcao de ordem por risco de deadlock
+
+O contrato temporario foi corrigido de queue -> generation -> semantic para
+**generation -> semantic -> queue**. Um worker existente pode possuir
+semantic exclusivo e renovar o lease por SQLite em uma thread heartbeat.
+Se o executor segurasse BEGIN IMMEDIATE na fila enquanto aguardasse semantic,
+o heartbeat ficaria impedido de renovar e poderia causar espera circular,
+timeout ou perda indevida do lease. A fila agora so e bloqueada APOS os guards
+serem adquiridos, e o estado do supervisor/freeze e confirmado dentro do
+BEGIN IMMEDIATE. O freeze duravel impede novas reservas na janela anterior.
+
+O teste test_semantic_wait_does_not_block_worker_lease_heartbeat comprova
+que um writer SQLite consegue abrir BEGIN IMMEDIATE enquanto a transicao
+aguarda semantic. Outros testes confirmam que a fila fica bloqueada durante
+o corpo da transicao e e liberada em erros ou rollback.
+
+Esta alteracao NAO comprova que todos os caminhos de readers/writers
+da instalacao obedecem generation -> semantic -> queue. A certificacao
+global continua pendente; o adaptador permanece exclusivamente laboratorial.

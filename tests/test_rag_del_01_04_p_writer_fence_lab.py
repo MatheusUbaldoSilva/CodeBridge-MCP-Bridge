@@ -58,7 +58,7 @@ class ScratchWriterFenceTests(TestCase):
 
     def test_order_and_denial_of_operational_use(self):
         with self.fence() as result:
-            self.assertEqual(result["lock_order"], ["queue", "generation", "semantic"])
+            self.assertEqual(result["lock_order"], ["generation", "semantic", "queue"])
             self.assertFalse(result["activation_authorized"])
             self.assertFalse(result["operational_use_allowed"])
             self.assertEqual(result["supervisor_generation"], 2)
@@ -97,7 +97,10 @@ class ScratchWriterFenceTests(TestCase):
         with self.assertRaises(DeletionWriterFenceBlocked):
             with self.fence():
                 self.fail("cannot enter while reserved")
-        self.assertEqual(self.events, [])
+        self.assertEqual(
+            self.events,
+            ["generation+", "semantic+", "semantic-", "generation-"],
+        )
 
     def test_expired_lease_also_rejected(self):
         with closing(sqlite3.connect(self.queue)) as db:
@@ -172,3 +175,51 @@ class ScratchWriterFenceTests(TestCase):
                 laboratory_mode=True, operator_approved=True
             ):
                 pass
+    def test_semantic_wait_does_not_block_worker_lease_heartbeat(self):
+        """Queue must be free while a transition waits for semantic lock."""
+        import threading
+
+        semantic = threading.Lock()
+        entered_generation = threading.Event()
+        completed = threading.Event()
+        errors = []
+
+        @contextmanager
+        def generation():
+            entered_generation.set()
+            yield
+
+        @contextmanager
+        def semantic_guard():
+            with semantic:
+                yield
+
+        def transition():
+            try:
+                with laboratory_writer_fence(
+                    self.queue, generation, semantic_guard,
+                    laboratory_mode=True, operator_approved=True,
+                ) as evidence:
+                    self.assertEqual(evidence["lock_order"],
+                                     ["generation", "semantic", "queue"])
+            except BaseException as exc:
+                errors.append(exc)
+            finally:
+                completed.set()
+
+        semantic.acquire()
+        thread = threading.Thread(target=transition, daemon=True)
+        thread.start()
+        try:
+            self.assertTrue(entered_generation.wait(2))
+            # Simulated worker heartbeat is allowed to renew while the
+            # transition waits for semantic. Old queue-first ordering would
+            # prevent this BEGIN IMMEDIATE and trigger a lease timeout.
+            with closing(sqlite3.connect(self.queue, timeout=0.1)) as db:
+                db.execute("BEGIN IMMEDIATE")
+                db.rollback()
+        finally:
+            semantic.release()
+            thread.join(timeout=5)
+        self.assertTrue(completed.is_set())
+        self.assertEqual(errors, [])
