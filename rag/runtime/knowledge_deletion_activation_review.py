@@ -5,6 +5,7 @@ No side effects, no activation token, no catalog replacement.
 from __future__ import annotations
 from hashlib import sha256
 import json
+import re
 
 class DeletionActivationReviewError(ValueError):
     pass
@@ -57,6 +58,11 @@ def compose_deletion_activation_review(
            "public_pointer_sha256":preflight.get("public_pointer_sha256")}
     if any(not isinstance(x,str) or not x for x in proof.values() if not isinstance(x,list)):
         raise fail("incomplete pinned evidence")
+    for name in ("baseline_revision","selection_sha256","lineage_sha256",
+                 "generation_receipt_sha256","catalog_sha256","public_pointer_sha256"):
+        value=proof[name]
+        if not isinstance(value,str) or re.fullmatch(r"[0-9a-f]{64}",value) is None:
+            raise fail("invalid immutable proof digest: "+name)
     digest=sha256(json.dumps(proof,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()).hexdigest()
     return {"state":"DELETION_REVIEW_READY_BUT_NOT_AUTHORIZED",
             "project_id":project,"review_sha256":digest,

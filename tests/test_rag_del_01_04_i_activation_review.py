@@ -46,6 +46,16 @@ class ActivationReviewContractTests(TestCase):
     def test_public_namespace_denied(self):
         self.preview["project_id"]="codebridge"
         with self.assertRaises(DeletionActivationReviewError):self.review()
+    def test_short_lineage_digest_denied(self):
+        self.audit["lineage_sha256"]="short"
+        with self.assertRaises(DeletionActivationReviewError):self.review()
+    def test_nonhex_catalog_digest_denied(self):
+        self.preflight["old_catalog_sha256"]="z"*64
+        with self.assertRaises(DeletionActivationReviewError):self.review()
+    def test_missing_generation_receipt_digest_denied(self):
+        self.row.pop("generation_receipt_sha256")
+        with self.assertRaises(DeletionActivationReviewError):self.review()
+
     def test_authorized_receipt_denied(self):
         self.receipt["activation_authorized"]=True
         with self.assertRaises(DeletionActivationReviewError):self.review()
