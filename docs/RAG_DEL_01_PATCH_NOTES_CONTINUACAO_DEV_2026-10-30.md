@@ -50,3 +50,5 @@ RAG-DEL-01.04-DG (DEV): auditoria read-only de lease (NONE/ACTIVE/EXPIRED_RECONC
 RAG-DEL-01.04-DH (DEV): testes multiprocessos reais com Win32 semantic exclusivo, heartbeat SQLite concorrente e crash via terminate. A fila permanece disponivel durante espera pelo lock; morte do processo nao limpa lease persistida nem desbloqueia exclusao. Somente fixtures em TEMP, sem alteracao de RAG real.
 
 RAG-DEL-01.04-DI (DEV): production_generation_read._read_pointer rejeita symlink/junction do ponteiro. Testes em root temp, mock deterministico de redirecionamento aprovado e criacao real de symlink dispensada por WinError 1314. RAG-DEL 291 (288 PASS, 3 SKIP), generation journal 14 PASS, P3 16 PASS; sem ativacao operacional.
+
+RAG-DEL-01.04-DJ (DEV): novo inventario publico SQLite read-only sob production_generation_read() com pin de geracao na consulta inteira; 5 testes Win32/temp passaram, sem misturar projetos privados. Auditoria aponta que public search/context do bridge MCP ja usa pin, porem a GUI documents ainda faz leitura direta (arquivo preexistente sujo PRESERVADO). Novo helper nao conectado a GUI; nenhum uso operacional.
