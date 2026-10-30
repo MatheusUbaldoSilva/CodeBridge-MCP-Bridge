@@ -12,11 +12,11 @@ class DeletionActivationReviewError(ValueError):
 
 def compose_deletion_activation_review(
     preview:dict, preflight:dict, survivor_audit:dict,
-    generation_row:dict, generation_receipt:dict,
+    generation_row:dict, generation_receipt:dict, snapshot_proof:dict,
 ) -> dict:
     fail=DeletionActivationReviewError
     if any(not isinstance(x,dict) for x in (
-            preview,preflight,survivor_audit,generation_row,generation_receipt)):
+            preview,preflight,survivor_audit,generation_row,generation_receipt,snapshot_proof)):
         raise fail("missing evidence")
     project=preview.get("project_id")
     if not isinstance(project,str) or not project or project=="codebridge":
@@ -49,16 +49,23 @@ def compose_deletion_activation_review(
             or generation_receipt.get("vectors_verified")!=survivor_audit.get("vectors_verified")
             or generation_receipt.get("activation_authorized") is not False):
         raise fail("generation receipt does not match review")
+    if (snapshot_proof.get("state")!="SURVIVOR_SNAPSHOT_READ_ONLY_VERIFIED"
+            or snapshot_proof.get("project_id")!=project
+            or snapshot_proof.get("files_verified")!=preview.get("documents_to_preserve")
+            or snapshot_proof.get("sources_modified") is not False
+            or snapshot_proof.get("activation_authorized") is not False):
+        raise fail("source snapshot provenance missing")
     proof={"project_id":project,"baseline_revision":preview.get("source_revision"),
            "selected_paths":preview["selected_paths"],
            "selection_sha256":preview.get("review_sha256"),
            "lineage_sha256":survivor_audit.get("lineage_sha256"),
            "generation_receipt_sha256":generation_row.get("generation_receipt_sha256"),
+           "snapshot_inventory_sha256":snapshot_proof.get("snapshot_inventory_sha256"),
            "catalog_sha256":preflight.get("old_catalog_sha256"),
            "public_pointer_sha256":preflight.get("public_pointer_sha256")}
     if any(not isinstance(x,str) or not x for x in proof.values() if not isinstance(x,list)):
         raise fail("incomplete pinned evidence")
-    for name in ("baseline_revision","selection_sha256","lineage_sha256",
+    for name in ("baseline_revision","selection_sha256","snapshot_inventory_sha256","lineage_sha256",
                  "generation_receipt_sha256","catalog_sha256","public_pointer_sha256"):
         value=proof[name]
         if not isinstance(value,str) or re.fullmatch(r"[0-9a-f]{64}",value) is None:

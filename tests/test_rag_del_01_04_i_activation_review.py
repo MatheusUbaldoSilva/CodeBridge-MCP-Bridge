@@ -19,12 +19,15 @@ class ActivationReviewContractTests(TestCase):
             "vectors_verified":2,"documents_verified":1,"lineage_sha256":"e"*64}
         self.row={"index_family":"RAG_DEL_01","project_id":"demo",
                   "source_revision":"f"*64,"generation_receipt_sha256":"1"*64}
+        self.snapshot={"state":"SURVIVOR_SNAPSHOT_READ_ONLY_VERIFIED",
+            "project_id":"demo","files_verified":1,"sources_modified":False,
+            "activation_authorized":False,"snapshot_inventory_sha256":"2"*64}
         self.receipt={"project_id":"demo","source_revision":"f"*64,
             "baseline_generation":"baseline","selection_sha256":"b"*64,
             "vectors_verified":2,"activation_authorized":False}
     def review(self):
         return compose_deletion_activation_review(
-            self.preview,self.preflight,self.audit,self.row,self.receipt)
+            self.preview,self.preflight,self.audit,self.row,self.receipt,self.snapshot)
     def test_matching_review_never_authorizes(self):
         first=self.review()
         self.assertEqual(first,self.review())
@@ -54,6 +57,13 @@ class ActivationReviewContractTests(TestCase):
         with self.assertRaises(DeletionActivationReviewError):self.review()
     def test_missing_generation_receipt_digest_denied(self):
         self.row.pop("generation_receipt_sha256")
+        with self.assertRaises(DeletionActivationReviewError):self.review()
+
+    def test_stale_snapshot_proof_denied(self):
+        self.snapshot["snapshot_inventory_sha256"]="invalid"
+        with self.assertRaises(DeletionActivationReviewError):self.review()
+    def test_mismatched_snapshot_count_denied(self):
+        self.snapshot["files_verified"]=2
         with self.assertRaises(DeletionActivationReviewError):self.review()
 
     def test_authorized_receipt_denied(self):
