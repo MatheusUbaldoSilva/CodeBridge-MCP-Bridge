@@ -79,6 +79,15 @@ def laboratory_swap(project_id: str, expected_revision: str, candidate: dict, *,
     catalog,pointer=_lab_paths(catalog_file,public_pointer)
     with _catalog_mutex(catalog.parent):
         # No new transition while any earlier journal is unresolved.
+        for backup in catalog.parent.glob("rag-del-*.previous.json"):
+            if (not backup.is_file() or backup.is_symlink()
+                    or (hasattr(backup, "is_junction") and backup.is_junction())):
+                raise DeletionSwapError("redirected deletion backup")
+            tid=backup.name[len("rag-del-"):-len(".previous.json")]
+            journal=catalog.parent/("rag-del-"+tid+".journal.json")
+            if (len(tid)!=32 or any(c not in "0123456789abcdef" for c in tid)
+                    or not journal.is_file() or journal.is_symlink()):
+                raise DeletionSwapError("orphan backup without valid journal")
         for pending in catalog.parent.glob("rag-del-*.journal.json"):
             if (not pending.is_file() or pending.is_symlink()
                     or (hasattr(pending, "is_junction") and pending.is_junction())):

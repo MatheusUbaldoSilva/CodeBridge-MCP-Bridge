@@ -29,6 +29,15 @@ def inspect_private_deletion_preflight(catalog_file:Path,public_pointer:Path,
     if candidate.get("index_family")!="RAG_DEL_01" or candidate.get("project_id")!=project_id:
         raise PrivateDeletionPreflightError("candidate is not a private deletion generation")
     # Verify the catalog has no incomplete deletion journal; never repair it here.
+    for backup in catalog.parent.glob("rag-del-*.previous.json"):
+        if (not backup.is_file() or backup.is_symlink()
+                or (hasattr(backup, "is_junction") and backup.is_junction())):
+            raise PrivateDeletionPreflightError("redirected deletion backup")
+        tid=backup.name[len("rag-del-"):-len(".previous.json")]
+        journal=catalog.parent/("rag-del-"+tid+".journal.json")
+        if (len(tid)!=32 or any(c not in "0123456789abcdef" for c in tid)
+                or not journal.is_file() or journal.is_symlink()):
+            raise PrivateDeletionPreflightError("orphan deletion backup")
     pending=[]
     for file in catalog.parent.glob("rag-del-*.journal.json"):
         if not file.is_file() or file.is_symlink():

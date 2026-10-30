@@ -13,3 +13,5 @@ RAG-DEL-01.04-K (DEV): segunda validacao do recibo da geracao candidata enquanto
 RAG-DEL-01.04-L (DEV): reauditoria de proveniencia da candidata dentro da secao critica de catalogo no laboratorio, comparando linhagem, snapshot, manifesto, contagem de sobreviventes e flags de nao ativacao. Alteracao de prova bloqueia a transacao. RAG-DEL: 201 testes (199 PASS, 2 SKIP), sem falhas. Sem worker fencing operacional, sem exclusao real ou push.
 
 RAG-DEL-01.04-M (DEV): testes ponta a ponta em catalogo temporario validam integracao da reauditoria sob mutex: divergencia de manifesto causa abort sem gravar journal/backup, e provas estaveis permitem troca e rollback mantendo projeto vizinho e ponteiro publico. Suite RAG-DEL: 203 testes (201 PASS, 2 SKIP). Teste real com workers ainda pendente; ativacao permanece bloqueada.
+
+RAG-DEL-01.04-N (DEV): detecta backups orfaos rag-del-*.previous.json sem journal correspondente no preflight e antes da troca do catalogo temporario; falha de fechamento seguro sem gravar novo journal. Testes: 3 novos aprovados, RAG-DEL 206 executados (204 PASS, 2 SKIP), zero falhas. Nenhum catalogo real alterado.
