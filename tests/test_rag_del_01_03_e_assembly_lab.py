@@ -58,6 +58,39 @@ class AssemblyLabTests(TestCase):
     def test_rejects_replay(self):
         self.assemble()
         with self.assertRaises(DeletionGenerationAssemblyError): self.assemble()
+    def test_real_verified_lab_swap_then_rollback(self):
+        from rag.runtime.knowledge_deletion_verified_swap_lab import laboratory_verified_swap
+        from rag.runtime.knowledge_deletion_swap_lab import laboratory_rollback
+        row=self.assemble()
+        row["python_executable"]=sys.executable
+        catalog=self.root/"project-indexes.json"
+        pointer=self.root/"active-generation.json"
+        catalog.write_text(json.dumps({
+            "schema_version":1,
+            "projects":{"demo":{"project_id":"demo","enabled":True,
+                                "source_revision":"e"*64,
+                                "generation_directory":"previous-generation"},
+                        "other":{"project_id":"other","enabled":True,
+                                 "source_revision":"f"*64,
+                                 "generation_directory":"unrelated"}}}))
+        pointer.write_text(json.dumps({"schema_version":1,"generation":"public"}))
+        original=catalog.read_bytes()
+        public=pointer.read_bytes()
+        switched=laboratory_verified_swap("demo","e"*64,row,
+            catalog_file=catalog,public_pointer=pointer,
+            operator_approved=True,laboratory_mode=True)
+        self.assertEqual(switched["state"],"LAB_SWAP_ACTIVE")
+        self.assertEqual(pointer.read_bytes(),public)
+        after=json.loads(catalog.read_text())
+        self.assertEqual(after["projects"]["demo"]["index_family"],"RAG_DEL_01")
+        self.assertEqual(after["projects"]["other"]["source_revision"],"f"*64)
+        rolled=laboratory_rollback(switched["transaction"],
+            catalog_file=catalog,public_pointer=pointer,
+            operator_approved=True,laboratory_mode=True)
+        self.assertEqual(rolled["state"],"LAB_ROLLBACK_COMPLETE")
+        self.assertEqual(catalog.read_bytes(),original)
+        self.assertEqual(pointer.read_bytes(),public)
+
     def test_interrupted_receipt_write_quarantines_stage(self):
         from rag.runtime.knowledge_deletion_assemble_lab import os as module_os
         native_open=module_os.open
