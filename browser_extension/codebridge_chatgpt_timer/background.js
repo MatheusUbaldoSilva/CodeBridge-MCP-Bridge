@@ -36,7 +36,19 @@ chrome.runtime.onInstalled.addListener(ensureHeartbeat);
 chrome.runtime.onStartup.addListener(ensureHeartbeat);
 ensureHeartbeat();
 
-async function sendTimerEvent(action) {
+async function readTimer() {
+  const response = await fetch(COMPANION_BASE + "/v1/chatgpt/timer", {
+    headers: { [COMPANION_HEADER]: COMPANION_HEADER_VALUE },
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error("Timer HTTP " + response.status);
+  return response.json();
+}
+
+async function sendTimerEvent(action, requestId) {
+  if (typeof requestId !== "string" || !requestId) {
+    throw new Error("request_id obrigat?rio para finalizar turno");
+  }
   const response = await fetch(
     `${COMPANION_BASE}/v1/chatgpt/timer/${action}`,
     {
@@ -46,7 +58,7 @@ async function sendTimerEvent(action) {
         [COMPANION_HEADER]: COMPANION_HEADER_VALUE,
       },
       body: JSON.stringify({
-        request_id: null,
+        request_id: requestId,
       }),
       cache: "no-store",
     }
@@ -74,7 +86,7 @@ chrome.runtime.onMessage.addListener(
     ).toLowerCase();
 
     if (
-      !["finish", "cancel", "heartbeat"].includes(action)
+      !["finish", "cancel", "heartbeat", "snapshot"].includes(action)
     ) {
       sendResponse({
         ok: false,
@@ -86,7 +98,9 @@ chrome.runtime.onMessage.addListener(
     const request = (
       action === "heartbeat"
         ? sendHeartbeat()
-        : sendTimerEvent(action)
+        : action === "snapshot"
+          ? readTimer()
+          : sendTimerEvent(action, message.request_id)
     );
 
     request

@@ -6,15 +6,26 @@
   let seenStopButton = false;
   let finishSent = false;
   let manualStopClicked = false;
+  let observedRequestId = null;
+  let snapshotInFlight = false;
+  let pendingCompletion = null;
 
-  function sendEvent(action) {
+  function sendEvent(action, requestId = null) {
     chrome.runtime.sendMessage(
       {
         type: MESSAGE_TYPE,
         action,
+        request_id: requestId,
       },
-      () => {
+      (result) => {
         void chrome.runtime.lastError;
+        if (action === "finish" || action === "cancel") {
+          if (!result || !result.ok || !result.payload || !result.payload.applied) {
+            pendingCompletion = { action, requestId };
+          } else {
+            pendingCompletion = null;
+          }
+        }
       }
     );
   }
@@ -87,6 +98,32 @@
 
     return null;
   }
+  function syncTimer() {
+    if (snapshotInFlight) return;
+    snapshotInFlight = true;
+    chrome.runtime.sendMessage(
+      { type: MESSAGE_TYPE, action: "snapshot" },
+      (result) => {
+        snapshotInFlight = false;
+        if (chrome.runtime.lastError || !result || !result.ok) return;
+        const timer = result.payload && result.payload.timer;
+        if (!timer) return;
+        if (timer.state === "RUNNING" && timer.claimed_by_codebridge) {
+          observedRequestId = timer.request_id;
+          if (pendingCompletion && pendingCompletion.requestId === observedRequestId
+              && !findVisibleStopButton()) {
+            const pending = pendingCompletion;
+            pendingCompletion = null;
+            sendEvent(pending.action, pending.requestId);
+          }
+        } else {
+          observedRequestId = null;
+          pendingCompletion = null;
+        }
+      }
+    );
+  }
+
   function checkGenerationState() {
     const stopButton = findVisibleStopButton();
 
@@ -103,11 +140,12 @@
       finishSent = true;
       seenStopButton = false;
 
-      sendEvent(
-        manualStopClicked
-          ? "cancel"
-          : "finish"
-      );
+      const action = manualStopClicked ? "cancel" : "finish";
+      if (observedRequestId) {
+        sendEvent(action, observedRequestId);
+      } else {
+        pendingCompletion = null;
+      }
       manualStopClicked = false;
     }
   }
@@ -153,10 +191,8 @@
     }
   );
 
-  window.setInterval(
-    checkGenerationState,
-    CHECK_INTERVAL_MS
-  );
-
+  window.setInterval(checkGenerationState, CHECK_INTERVAL_MS);
+  window.setInterval(syncTimer, 1000);
+  syncTimer();
   checkGenerationState();
 })();
