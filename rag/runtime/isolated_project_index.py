@@ -98,8 +98,12 @@ def resolve_isolated_project(project_id: str) -> IsolatedProjectIndex | None:
     if generation.parent.name != "generations":
         raise IsolatedProjectUnavailable("candidate must be within a generations directory")
     revision = row["source_revision"]
-    is_auto=row.get("index_family")=="RAG_AUTO_03"
-    revision_pattern=r"[0-9a-f]{64}" if is_auto else r"[0-9a-f]{40}"
+    family=row.get("index_family")
+    is_auto=family=="RAG_AUTO_03"
+    is_delete=family=="RAG_DEL_01"
+    if family not in (None, "RAG_AUTO_03", "RAG_DEL_01"):
+        raise IsolatedProjectUnavailable("unsupported private index family")
+    revision_pattern=r"[0-9a-f]{64}" if (is_auto or is_delete) else r"[0-9a-f]{40}"
     if not isinstance(revision, str) or not re.fullmatch(revision_pattern, revision):
         raise IsolatedProjectUnavailable("invalid pinned source revision")
     if is_auto:
@@ -125,6 +129,14 @@ def resolve_isolated_project(project_id: str) -> IsolatedProjectIndex | None:
                 or receipt.get("state")!="VERIFIED_NOT_REGISTERED"
                 or receipt.get("published_publicly") is not False):
             raise IsolatedProjectUnavailable("automatic generation receipt invalid")
+    if is_delete:
+        from rag.runtime.knowledge_deletion_generation import (
+            verify_deletion_generation, DeletionGenerationUnavailable,
+        )
+        try:
+            verify_deletion_generation(row,project_id,generation,source_root,revision)
+        except (DeletionGenerationUnavailable, OSError, ValueError, KeyError, TypeError) as exc:
+            raise IsolatedProjectUnavailable("deletion generation not verified") from exc
     python = Path(row.get("python_executable", ""))
     if not python.is_absolute() or not python.is_file():
         raise IsolatedProjectUnavailable("approved project Python is missing")
@@ -142,7 +154,7 @@ def resolve_isolated_project(project_id: str) -> IsolatedProjectIndex | None:
             or progress.get("source_revision") != revision
             or progress.get("state") != "INDEXING_NOT_PUBLISHED"
             or progress.get("total_vectors_done") != progress.get("expected_chunks")
-            or progress.get("last_batch_result") != ("COMPLETE" if is_auto else "PASS")
+            or progress.get("last_batch_result") != ("COMPLETE" if (is_auto or is_delete) else "PASS")
             or (is_auto and progress.get("job_id")!=row.get("job_id"))
             or progress.get("published") is not False):
         raise IsolatedProjectUnavailable("candidate index has not passed final staging validation")
