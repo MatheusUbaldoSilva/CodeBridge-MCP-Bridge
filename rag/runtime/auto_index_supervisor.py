@@ -93,6 +93,13 @@ def reserve_index_supervisor(
     with closing(_connect(_canonical_queue_path(queue_path),create=True)) as cn:
         cn.execute("BEGIN IMMEDIATE")
         try:
+            # The optional RAG-DEL reservation-freeze marker is checked
+            # inside the SAME SQLite writer transaction as the new lease.
+            # No marker is created or modified by the normal reservation path.
+            from rag.runtime.knowledge_deletion_reservation_freeze_lab import (
+                reject_if_deletion_reservations_frozen,
+            )
+            reject_if_deletion_reservations_frozen(cn)
             _ensure_lease_store(cn)
             row=cn.execute(
                 "SELECT job_id,lease_token,lease_until_epoch,generation "
