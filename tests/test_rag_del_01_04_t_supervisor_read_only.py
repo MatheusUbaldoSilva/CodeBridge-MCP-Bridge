@@ -163,3 +163,45 @@ class SupervisorObservationTests(TestCase):
         self.assertIn("RESERVATION_FREEZE_MARKER_INVALID", evidence["blockers"])
         self.assertFalse(evidence["supervisor_observed_quiet"])
         self.assertFalse(evidence["activation_authorized"])
+    def test_explicit_clock_classifies_active_expired_and_none(self):
+        self.seed()
+        idle = inspect_deletion_supervisor_read_only(self.queue, now_epoch=100)
+        self.assertEqual(idle["lease_status"], "NONE")
+        with closing(sqlite3.connect(self.queue)) as db:
+            db.execute(
+                "UPDATE auto_worker_lease SET job_id='worker-1',"
+                "lease_token='0123456789abcdef0123456789abcdef',lease_until_epoch=130"
+            )
+            db.commit()
+        current = inspect_deletion_supervisor_read_only(self.queue, now_epoch=120)
+        self.assertEqual(current["lease_status"], "ACTIVE")
+        old = inspect_deletion_supervisor_read_only(self.queue, now_epoch=130)
+        self.assertEqual(old["lease_status"], "EXPIRED_RECONCILIATION_REQUIRED")
+        self.assertFalse(old["supervisor_observed_quiet"])
+        self.assertFalse(old["activation_authorized"])
+        self.assertNotIn("lease_token", str(old))
+        self.assertNotIn("0123456789abcdef0123456789abcdef", str(old))
+
+    def test_partial_lease_record_is_malformed_and_blocked(self):
+        self.seed()
+        with closing(sqlite3.connect(self.queue)) as db:
+            db.execute(
+                "UPDATE auto_worker_lease SET job_id=NULL,"
+                "lease_token='stale-token',lease_until_epoch=1"
+            )
+            db.commit()
+        answer = inspect_deletion_supervisor_read_only(self.queue, now_epoch=100)
+        self.assertEqual(answer["lease_status"], "MALFORMED")
+        self.assertIn("LEASE_RECONCILIATION_REQUIRED", answer["blockers"])
+        self.assertFalse(answer["activation_authorized"])
+
+    def test_rejects_invalid_observation_time_without_mutation(self):
+        self.seed()
+        original = self.queue.read_bytes()
+        for invalid in (-1, True, float("inf"), float("nan"), "100"):
+            with self.subTest(value=invalid):
+                with self.assertRaises(ValueError):
+                    inspect_deletion_supervisor_read_only(
+                        self.queue, now_epoch=invalid,
+                    )
+        self.assertEqual(self.queue.read_bytes(), original)

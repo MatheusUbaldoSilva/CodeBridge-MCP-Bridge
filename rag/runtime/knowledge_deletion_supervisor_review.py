@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from contextlib import closing
 from hashlib import sha256
+import math
+import time
 from pathlib import Path
 import sqlite3
 
@@ -19,8 +21,13 @@ class DeletionSupervisorReviewError(RuntimeError):
 _TERMINAL = frozenset(("CANCELLED", "FAILED"))
 
 
-def inspect_deletion_supervisor_read_only(queue_path: Path) -> dict:
-    """Inspect an existing queue without reservations, leases or status writes."""
+def inspect_deletion_supervisor_read_only(
+    queue_path: Path, *, now_epoch: float | None = None,
+) -> dict:
+    """Inspect queue/lease expiry without modifying jobs, tokens or indexes."""
+    now = time.time() if now_epoch is None else now_epoch
+    if type(now) not in (int, float) or not math.isfinite(now) or now < 0:
+        raise ValueError("invalid supervisor observation time")
     try:
         path = _canonical_queue_path(queue_path)
     except (ValueError, OSError) as exc:
@@ -92,6 +99,17 @@ def inspect_deletion_supervisor_read_only(queue_path: Path) -> dict:
                 freeze["generation"] if freeze is not None else None
             )
             result["lease_recorded"] = any(x is not None for x in (owner, token, until))
+            if not result["lease_recorded"]:
+                result["lease_status"] = "NONE"
+            elif (not isinstance(owner, str) or not owner
+                  or not isinstance(token, str) or not token
+                  or type(until) not in (int, float)
+                  or not math.isfinite(until) or until < 0):
+                result["lease_status"] = "MALFORMED"
+            elif until <= now:
+                result["lease_status"] = "EXPIRED_RECONCILIATION_REQUIRED"
+            else:
+                result["lease_status"] = "ACTIVE"
             if result["lease_recorded"]:
                 result["blockers"].append("LEASE_RECONCILIATION_REQUIRED")
             states = dict(db.execute(
