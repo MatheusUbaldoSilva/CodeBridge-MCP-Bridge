@@ -1,0 +1,2 @@
+RAG-DEL-01.04-H — Preflight operacional somente leitura (DEV)
+Confere caminho do catalogo privado, ponteiro publico, familia RAG_DEL_01, revisao esperada, integridade do journal e ausencia de transacoes pendentes. Repete leitura e compara hashes para detectar divergencias; nao ativa nem considera candidato homologado. Testes em catalogo temporario: 5 aprovados. Nenhuma modificacao em indices reais.
