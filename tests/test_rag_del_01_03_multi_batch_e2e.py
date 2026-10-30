@@ -15,6 +15,7 @@ from rag.models.code_embedding import CODE_EMBEDDING_DIMENSION
 from rag.runtime.knowledge_deletion_vector_copy import copy_survivor_batch
 from rag.runtime.knowledge_deletion_checkpoint import checkpoint_survivor_batch
 from rag.runtime.knowledge_deletion_verify import validate_deletion_candidate
+from rag.runtime.knowledge_deletion_semantics import verify_candidate_vector_semantics
 from rag.runtime.auto_index_incremental_batches import partition_reuse_receipt
 from rag.runtime.auto_index_incremental_plan import IncrementalPlanError
 
@@ -75,6 +76,9 @@ class MultiBatchCandidateTests(TestCase):
                     batch_ids.append(batch_id)
                 verified=validate_deletion_candidate(stage,plan,dest,batch_ids)
                 self.assertEqual(verified["vectors_verified"],5)
+                semantic=verify_candidate_vector_semantics(stage,"demo",dest,max_batch=2)
+                self.assertEqual(semantic["vectors_verified"],5)
+                self.assertFalse(semantic["activation_authorized"])
                 self.assertEqual(verified["batches_verified"],3)
                 with self.assertRaises(IncrementalPlanError):
                     validate_deletion_candidate(stage,plan,dest,batch_ids[:-1])
