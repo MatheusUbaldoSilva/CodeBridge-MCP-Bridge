@@ -5,3 +5,5 @@ Entregas: a531903 planejamento de recuperacao somente leitura; 2eb9a32 integrida
 Validacoes: RAG-DEL 189 testes (187 PASS, 2 SKIP); RAG-AUTO 241 testes (236 PASS, 5 SKIP); MCP 5 PASS. Total 435, zero falhas nas suites separadas. Snapshot real newworldpvp verificado somente leitura: 435 arquivos, 4.358.269 bytes, hash e tamanho compativeis.
 
 Continuam bloqueadas: exclusao real, troca operacional do catalogo e ativacao da geracao. Faltam fencing de workers em producao, verificacao final do candidato fechado sob lock, rollback e homologacao de falhas. Sem alteracao na Stable, no indice publico ou nas fontes reais; sem push.
+
+RAG-DEL-01.04-J (DEV): journals terminais ROLLED_BACK passam a exigir identidade, schema, backup existente e SHA-256 consistente antes de autorizar nova transacao de laboratorio. Novos testes em tests/test_rag_del_01_04_j_terminal_journal.py: 7 PASS. Suite RAG-DEL no runtime dev: 196 executados (194 PASS, 2 SKIP), zero falhas. Nao habilita exclusao real nem ativacao operacional; sem push.

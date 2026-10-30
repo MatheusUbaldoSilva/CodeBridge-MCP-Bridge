@@ -80,11 +80,25 @@ def laboratory_swap(project_id: str, expected_revision: str, candidate: dict, *,
     with _catalog_mutex(catalog.parent):
         # No new transition while any earlier journal is unresolved.
         for pending in catalog.parent.glob("rag-del-*.journal.json"):
-            if not pending.is_file() or pending.is_symlink():
+            if (not pending.is_file() or pending.is_symlink()
+                    or (hasattr(pending, "is_junction") and pending.is_junction())):
                 raise DeletionSwapError("redirected transaction journal")
+            tid=pending.name[len("rag-del-"):-len(".journal.json")]
+            if len(tid)!=32 or any(c not in "0123456789abcdef" for c in tid):
+                raise DeletionSwapError("invalid prior transaction name")
             prior=json.loads(pending.read_text(encoding="utf-8"))
             _validate_journal(prior)
-            if prior.get("state")!="ROLLED_BACK":
+            backup=catalog.parent/("rag-del-"+tid+".previous.json")
+            if (prior.get("schema_version")!=1
+                    or prior.get("transaction")!=tid
+                    or prior.get("catalog")!=str(catalog)
+                    or prior.get("backup")!=str(backup)
+                    or prior.get("state") not in ("PREPARED", "ACTIVE", "ROLLED_BACK")
+                    or not backup.is_file() or backup.is_symlink()
+                    or (hasattr(backup, "is_junction") and backup.is_junction())
+                    or _sha(backup.read_bytes())!=prior.get("old_sha256")):
+                raise DeletionSwapError("invalid prior transaction or backup")
+            if prior["state"]!="ROLLED_BACK":
                 raise DeletionSwapError("unresolved prior transaction; reconcile first")
         plan=plan_private_generation_replacement(catalog,pointer,project_id,expected_revision,candidate)
         before=_catalog_bytes(catalog)
