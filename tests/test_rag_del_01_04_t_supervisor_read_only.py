@@ -115,3 +115,13 @@ class SupervisorObservationTests(TestCase):
             db.execute("DELETE FROM auto_worker_lease")
             db.commit()
         self.assertIn("LEASE_SINGLETON_INVALID", self.review()["blockers"])
+    def test_ready_for_review_is_not_final_deletion_quiescence(self):
+        self.seed()
+        with closing(sqlite3.connect(self.queue)) as db:
+            db.execute("INSERT INTO auto_jobs VALUES ('pending-review','READY_FOR_REVIEW')")
+            db.commit()
+        evidence = self.review()
+        self.assertEqual(evidence["job_state_counts"], {"READY_FOR_REVIEW": 1})
+        self.assertFalse(evidence["supervisor_observed_quiet"])
+        self.assertFalse(evidence["activation_authorized"])
+        self.assertIn("UNRESOLVED_QUEUE_JOBS", evidence["blockers"])
