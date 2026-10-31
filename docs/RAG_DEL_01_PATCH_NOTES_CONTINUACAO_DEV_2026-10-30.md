@@ -58,3 +58,5 @@ RAG-DEL-01.04-DL (DEV): interface documents/codebridge usa inventario pinado DJ 
 RAG-DEL-01.04-DM (DEV): helper NOVO e somente laboratorial para inventario privado com _catalog_mutex, fingerprint SQLite, bloqueio de journals e namespaces segregados; sete testes com subprocesso/mutex reais em TemporaryDirectory. Nenhuma integracao GUI privada ou exclusao real foi habilitada.
 
 RAG-DEL-01.04-DN (DEV): 3 testes Qt offscreen de erro de leitura com generation busy/catalago ocupado e isolamento na troca de projeto; publica nao libera selecao de exclusao. Sem alteracao adicional da GUI, Stable ou index real.
+
+RAG-DEL-01.04-DO (DEV): auditada via fonte a rotina MCP codebridge_rag_generation_probe, disponivel no mcp_server.py mas nao exportada pela conexao CodeBridge atual; tres testes AST/mocks garantem read_only, writer bloqueado e safe_to_activate=False. Nao equivale a prova do processo MCP instalado e nao altera indice real.
