@@ -15,6 +15,7 @@ import subprocess
 import sys
 import time
 from rag.runtime.knowledge_deletion_parent_identity_lab import _creation_filetime
+from rag.runtime.knowledge_deletion_remote_handle_mac_lab import verify_remote_handle_lab
 from rag.runtime.knowledge_deletion_remote_handle_compare_lab import (
     compare_remote_same_end_pipe_handle_scratch,
 )
@@ -49,6 +50,8 @@ def scratch_remote_same_end_roundtrip(*,timeout_seconds:float=5.0)->dict:
     if type(timeout_seconds) not in (int,float) or not .2<=timeout_seconds<=10:
         raise ValueError("bounded scratch timeout required")
     challenge=secrets.token_hex(32)
+    session_id=secrets.token_hex(32)
+    secret=secrets.token_bytes(32)
     in_r,in_w=os.pipe()
     out_r,out_w=os.pipe()
     err_r,err_w=os.pipe()
@@ -60,12 +63,13 @@ def scratch_remote_same_end_roundtrip(*,timeout_seconds:float=5.0)->dict:
              "rag.runtime.knowledge_deletion_remote_handle_child_lab"],
             stdin=in_r,stdout=out_w,stderr=err_w,close_fds=True,shell=False)
         deadline=time.monotonic()+timeout_seconds
-        wire=json.dumps({"challenge":challenge,"project_id":"scratch",
+        wire=json.dumps({"challenge":challenge,"session_id":session_id,
+                         "secret":secret.hex(),"project_id":"scratch",
                          "generation":"lab"},separators=(",",":")).encode()+b"\n"
         if os.write(in_w,wire)!=len(wire):
             raise RuntimeError("scratch challenge write incomplete")
         response=json.loads(_read_scratch_line(out_r,deadline))
-        if not isinstance(response,dict) or set(response)!={"pid","birth","challenge","std_handles"}:
+        if not isinstance(response,dict) or set(response)!={"pid","birth","challenge","std_handles","mac"}:
             raise RuntimeError("scratch child receipt malformed")
         if response["challenge"]!=challenge:
             raise RuntimeError("scratch challenge mismatch")
@@ -76,6 +80,11 @@ def scratch_remote_same_end_roundtrip(*,timeout_seconds:float=5.0)->dict:
         received=response["std_handles"]
         if not isinstance(received,dict) or set(received)!=set(_NAMES):
             raise RuntimeError("scratch child std handle set invalid")
+        if not verify_remote_handle_lab(secret,response["mac"],
+                session_id=session_id,challenge=challenge,project_id="scratch",
+                generation="lab",child_pid=response["pid"],
+                creation_filetime=response["birth"],std_handles=received):
+            raise RuntimeError("scratch native handle MAC mismatch")
         matching={}
         for name,parent_fd in zip(_NAMES,(in_r,out_w,err_w)):
             evidence=compare_remote_same_end_pipe_handle_scratch(
@@ -93,6 +102,7 @@ def scratch_remote_same_end_roundtrip(*,timeout_seconds:float=5.0)->dict:
             "state":"SCRATCH_CROSS_PROCESS_SAME_END_HANDLES_MATCHED",
             "same_end_handles_match":matching,
             "child_pid_and_win32_birth_matched":True,
+            "native_handle_hmac_verified":True,
             "child_binary_trusted_for_production":False,
             "token_effective_acl_attested":False,
             "installation_attested":False,

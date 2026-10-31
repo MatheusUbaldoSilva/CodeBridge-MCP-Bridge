@@ -40,7 +40,7 @@ class RemoteRealProcessSameEndTests(TestCase):
                 parent.scratch_remote_same_end_roundtrip()
     def test_wrong_challenge_denied(self):
         with patch.object(parent,"_read_scratch_line",
-                          return_value=b'{"pid":1,"birth":1,"challenge":"bad","std_handles":{}}\n'):
+                          return_value=b'{"pid":1,"birth":1,"challenge":"bad","std_handles":{},"mac":"x"}\n'):
             with self.assertRaisesRegex(RuntimeError,"challenge mismatch"):
                 parent.scratch_remote_same_end_roundtrip()
     def test_timeout_is_bounded(self):
