@@ -1,0 +1,7 @@
+﻿# RAG-DEL-01.04 DQ-E-D-3C-G-26 — Real child same-end Win32 handle identity (DEV)
+
+Built a scratch-only two-phase child process that stays alive while its parent inspects the child's native Win32 handle table. The parent creates six local temporary anonymous pipe fds and passes only the intended read/write ends as stdio. Child sends a bounded challenge-bound receipt with its native stdin/stdout/stderr HANDLE values, PID and creation FILETIME, without model/index access. Parent verifies PID and Win32 creation time from the held subprocess process HANDLE, duplicates each live child std handle into the parent's process using DuplicateHandle, then compares the imported object with the parent's retained SAME-END original via kernelbase CompareObjectHandles. Child receives ACK before clean exit; all temporary fds closed and child reaped even on rejection.
+
+Seven live Windows tests PASS: three real same-end identity checks, repeated runs, injected mismatch, bad receipt, replayed challenge and bounded timeout, invalid inputs. This is stronger than matching SDDL hashes because kernel-object identity is compared against a held same-end handle, rather than against an opposite end.
+
+Limitations: Does not guarantee the child inherited *no additional* handles, does not establish effective ACL/token restrictions, identify a deployed code binary, or attest any installed GUI. It's a separate scratch executable and cannot authorize operational deletion. Stable, indexes, installed GUI/MCP, GitHub remain untouched.
