@@ -21,11 +21,12 @@ class RagPanelSmokeTests(unittest.TestCase):
         with patch.object(RagPanel, "_run"):
             return RagPanel()
 
-    def test_three_pages_and_protected_indexing(self):
+    def test_four_pages_and_protected_indexing(self):
         panel = self.make_panel()
-        self.assertEqual(panel.pages.count(), 3)
+        self.assertEqual(panel.pages.count(), 4)
         self.assertEqual([x.text() for x in panel.nav_buttons],
-                         ["Meus arquivos", "Pesquisar", "Adicionar"])
+                         ["Meus arquivos", "Pesquisar", "Adicionar",
+                          "Indexação automática"])
         self.assertFalse(panel.index_btn.isEnabled())
         self.assertTrue(panel.folder.isReadOnly())
         panel.set_page(2)

@@ -82,6 +82,14 @@ def _rag_operation(operation, args):
             confirmation=args["confirmation"],
         )
     if operation == "documents":
+        if args["project"] == "codebridge":
+            # Hold a generation pin throughout the public SQLite inventory.
+            from rag.runtime.knowledge_deletion_public_inventory_read import (
+                read_pinned_public_document_inventory,
+            )
+            return read_pinned_public_document_inventory(
+                project_id="codebridge",
+            )["documents"]
         from rag.runtime.status import resolve_rag_sqlite_path
         from rag.runtime.isolated_project_index import resolve_isolated_project
         is_public=args["project"]=="codebridge"
