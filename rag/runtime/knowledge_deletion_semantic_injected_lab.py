@@ -20,6 +20,9 @@ from rag.runtime.knowledge_deletion_semantic_request_lab import (
 from rag.runtime.knowledge_deletion_bounded_catalog_lab import (
     _validated_scratch_catalog,
 )
+from rag.runtime.knowledge_deletion_vector_tree_receipt_lab import (
+    create_vector_tree_receipt_lab, verify_vector_tree_receipt_lab,
+)
 
 
 class InjectedSemanticLabError(RuntimeError):
@@ -64,6 +67,11 @@ def invoke_pinned_semantic_injected_lab(
             manifest=generation/"rag-index-manifest.json",
             qdrant=qdrant,
         )
+        # The synthetic tree receipt is computed under the parent-held locks.
+        # No unapproved Qdrant/vector tree is silently accepted after the stub.
+        vector_receipt=create_vector_tree_receipt_lab(
+            request.pin,catalog_file=catalog,laboratory_mode=True,
+        )
         # The real production_search path is NEVER called here. Stub receives
         # exactly the same pinned storage dataclass used by the real engine.
         returned=model_stub(q,r,_generation_paths=paths)
@@ -76,6 +84,9 @@ def invoke_pinned_semantic_injected_lab(
             raise InjectedSemanticLabError("synthetic results escaped private namespace or became stale")
         verify_pinned_semantic_request_lab(
             request,catalog_file=catalog,laboratory_mode=True,
+        )
+        verify_vector_tree_receipt_lab(
+            vector_receipt,request.pin,catalog_file=catalog,laboratory_mode=True,
         )
         return returned
 

@@ -186,3 +186,141 @@ class PinnedSyntheticSemanticRunnerTests(TestCase):
                 capture_output=True,text=True,timeout=10,
             )
             self.assertIn("WRITER_ALLOWED",other.stdout)
+
+    def test_vector_receipt_is_deterministic_for_nested_files(self):
+        from rag.runtime.knowledge_deletion_vector_tree_receipt_lab import (
+            create_vector_tree_receipt_lab,verify_vector_tree_receipt_lab,
+        )
+        folder=self.qdrant/"collection"
+        folder.mkdir()
+        (folder/"z.vec").write_bytes(b"vector-z")
+        (folder/"a.vec").write_bytes(b"vector-a")
+        with self.patch_root():
+            with self.session() as pin:
+                from rag.runtime.knowledge_deletion_pin_ipc_lab import envelope_from_private_lab_pin
+                envelope=envelope_from_private_lab_pin(
+                    pin,catalog_file=self.catalog,laboratory_mode=True,
+                )
+                first=create_vector_tree_receipt_lab(
+                    envelope,catalog_file=self.catalog,laboratory_mode=True,
+                )
+                second=create_vector_tree_receipt_lab(
+                    envelope,catalog_file=self.catalog,laboratory_mode=True,
+                )
+                self.assertEqual(first,second)
+                self.assertEqual(first.directories,("collection",))
+                self.assertEqual(tuple(x.relative_path for x in first.files),
+                                 ("collection/a.vec","collection/z.vec"))
+                self.assertEqual(len(first.tree_sha256),64)
+                self.assertEqual(
+                    verify_vector_tree_receipt_lab(
+                        first,envelope,catalog_file=self.catalog,
+                        laboratory_mode=True,
+                    )["file_count"],2,
+                )
+
+    def test_same_size_qdrant_vector_tamper_during_callback_is_rejected(self):
+        from rag.runtime.knowledge_deletion_vector_tree_receipt_lab import (
+            VectorTreeReceiptLabError,
+        )
+        vectors=self.qdrant/"collection"/"vectors.bin"
+        vectors.parent.mkdir()
+        vectors.write_bytes(b"ABCD")
+        def tamper(*args,**kwargs):
+            vectors.write_bytes(b"WXYZ") # same size but changed content
+            return (self.result(),)
+        with self.patch_root():
+            with self.session() as pin:
+                try:
+                    with self.assertRaisesRegex(VectorTreeReceiptLabError,"drift"):
+                        self.dispatch(pin,tamper)
+                finally:
+                    vectors.write_bytes(b"ABCD")
+
+    def test_new_or_deleted_qdrant_file_during_callback_is_rejected(self):
+        from rag.runtime.knowledge_deletion_vector_tree_receipt_lab import VectorTreeReceiptLabError
+        source=self.qdrant/"primary.vec"
+        source.write_bytes(b"old")
+        def new(*args,**kwargs):
+            (self.qdrant/"unregistered.vec").write_bytes(b"new")
+            return (self.result(),)
+        with self.patch_root():
+            with self.session() as pin:
+                try:
+                    with self.assertRaises(VectorTreeReceiptLabError):
+                        self.dispatch(pin,new)
+                finally:
+                    (self.qdrant/"unregistered.vec").unlink()
+                def remove(*args,**kwargs):
+                    source.unlink()
+                    return (self.result(),)
+                try:
+                    with self.assertRaises(VectorTreeReceiptLabError):
+                        self.dispatch(pin,remove)
+                finally:
+                    source.write_bytes(b"old")
+
+    def test_empty_directory_changes_fingerprint(self):
+        from rag.runtime.knowledge_deletion_vector_tree_receipt_lab import VectorTreeReceiptLabError
+        def create_empty(*args,**kwargs):
+            (self.qdrant/"new_empty_dir").mkdir()
+            return (self.result(),)
+        with self.patch_root():
+            with self.session() as pin:
+                try:
+                    with self.assertRaises(VectorTreeReceiptLabError):
+                        self.dispatch(pin,create_empty)
+                finally:
+                    (self.qdrant/"new_empty_dir").rmdir()
+
+    def test_qdrant_symlink_to_external_directory_rejected_when_supported(self):
+        from rag.runtime.knowledge_deletion_vector_tree_receipt_lab import VectorTreeReceiptLabError
+        outside=self.root/"other_qdrant"
+        outside.mkdir()
+        (outside/"bad.vec").write_bytes(b"x")
+        link=self.qdrant/"alias"
+        try:
+            link.symlink_to(outside,target_is_directory=True)
+        except (OSError,NotImplementedError) as exc:
+            self.skipTest("Windows symlink privilege unavailable: "+str(exc))
+        try:
+            with self.patch_root():
+                with self.session() as pin:
+                    with self.assertRaises(VectorTreeReceiptLabError):
+                        self.dispatch(pin,lambda *a,**kw:(self.result(),))
+        finally:
+            link.unlink()
+
+    def test_vector_receipt_wrong_nonce_is_refused(self):
+        from dataclasses import replace
+        from rag.runtime.knowledge_deletion_pin_ipc_lab import envelope_from_private_lab_pin
+        from rag.runtime.knowledge_deletion_vector_tree_receipt_lab import (
+            create_vector_tree_receipt_lab,verify_vector_tree_receipt_lab,
+            VectorTreeReceiptLabError,
+        )
+        with self.patch_root():
+            with self.session() as pin:
+                envelope=envelope_from_private_lab_pin(
+                    pin,catalog_file=self.catalog,laboratory_mode=True,
+                )
+                receipt=create_vector_tree_receipt_lab(
+                    envelope,catalog_file=self.catalog,laboratory_mode=True,
+                )
+                forged=replace(envelope,nonce="0"*32)
+                with self.assertRaisesRegex(VectorTreeReceiptLabError,"identity mismatch"):
+                    verify_vector_tree_receipt_lab(
+                        receipt,forged,catalog_file=self.catalog,
+                        laboratory_mode=True,
+                    )
+
+    def test_vector_tree_size_limit_fails_closed_before_model_callback(self):
+        from rag.runtime.knowledge_deletion_vector_tree_receipt_lab import VectorTreeReceiptLabError
+        oversized=self.qdrant/"oversize.bin"
+        oversized.write_bytes(b"a"*(16*1024*1024+1))
+        try:
+            with self.patch_root():
+                with self.session() as pin:
+                    with self.assertRaisesRegex(VectorTreeReceiptLabError,"limits exceeded"):
+                        self.dispatch(pin,lambda *args,**kwargs:self.fail("stub invoked"))
+        finally:
+            oversized.unlink()
