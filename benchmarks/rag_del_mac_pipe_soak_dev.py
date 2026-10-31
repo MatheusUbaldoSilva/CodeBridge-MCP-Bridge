@@ -3,6 +3,11 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from pathlib import Path
+import sys
+if __package__ in (None, ""):
+    # Direct invocation from benchmarks/ must still resolve the DEV repo root.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from rag.runtime.knowledge_deletion_mac_pipe_parent_lab import scratch_mac_pipe_roundtrip
 
 def soak(iterations:int=20)->dict:

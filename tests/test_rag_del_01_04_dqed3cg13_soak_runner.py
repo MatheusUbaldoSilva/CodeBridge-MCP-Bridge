@@ -11,3 +11,14 @@ class SoakRunnerDevTests(TestCase):
         result=soak(2)
         self.assertEqual(result["iterations"],2)
         self.assertFalse(result["activation_authorized"])
+
+    def test_direct_script_from_repo_root(self):
+        import subprocess,sys
+        from pathlib import Path
+        root=Path(__file__).resolve().parents[1]
+        cmd=[sys._base_executable,"-B",
+            str(root/"benchmarks"/"rag_del_mac_pipe_soak_dev.py"),
+            "--iterations","1"]
+        completed=subprocess.run(cmd,cwd=root,capture_output=True,
+            text=True,timeout=8,check=True)
+        self.assertIn("SCRATCH_REAL_WORKER_SOAK_PASS",completed.stdout)
