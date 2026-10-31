@@ -20,7 +20,7 @@ def scratch_mac_pipe_roundtrip(*,project_id="scratch",generation="lab",
             or type(timeout_seconds) not in (int,float)
             or not 0.1 <= timeout_seconds <= 10.0):
         raise ValueError("strict scratch only")
-    if entrypoint not in ("synthetic","real-worker"):
+    if entrypoint not in ("synthetic","real-worker","hang-fixture"):
         raise ValueError("unsupported scratch entrypoint")
     key=issue_lab_secret()
     fields={"session_id":secrets.token_hex(32),"challenge":secrets.token_hex(32),
@@ -28,7 +28,11 @@ def scratch_mac_pipe_roundtrip(*,project_id="scratch",generation="lab",
             "generation":generation}
     wire=json.dumps({"secret":key.hex(),**fields},
                      sort_keys=True,separators=(",",":")).encode("utf-8")+b"\n"
-    worker=["-m","rag.runtime.knowledge_deletion_mac_child_lab"] if entrypoint=="synthetic" else ["-m","rag.runtime.isolated_project_worker","--pinned-mac-scratch"]
+    worker={
+        "synthetic":["-m","rag.runtime.knowledge_deletion_mac_child_lab"],
+        "real-worker":["-m","rag.runtime.isolated_project_worker","--pinned-mac-scratch"],
+        "hang-fixture":["-m","rag.runtime.knowledge_deletion_mac_hang_lab"],
+    }[entrypoint]
     proc=subprocess.Popen(
         [sys._base_executable,"-B",*worker],
         stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
