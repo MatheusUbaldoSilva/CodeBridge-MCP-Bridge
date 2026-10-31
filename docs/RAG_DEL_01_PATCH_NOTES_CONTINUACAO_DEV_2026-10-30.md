@@ -54,3 +54,5 @@ RAG-DEL-01.04-DI (DEV): production_generation_read._read_pointer rejeita symlink
 RAG-DEL-01.04-DJ (DEV): novo inventario publico SQLite read-only sob production_generation_read() com pin de geracao na consulta inteira; 5 testes Win32/temp passaram, sem misturar projetos privados. Auditoria aponta que public search/context do bridge MCP ja usa pin, porem a GUI documents ainda faz leitura direta (arquivo preexistente sujo PRESERVADO). Novo helper nao conectado a GUI; nenhum uso operacional.
 
 RAG-DEL-01.04-DL (DEV): interface documents/codebridge usa inventario pinado DJ e preserva list[dict] sem fallback ao SQLite legado. Commit seletivo do ramo GUI (somente 8 linhas; diff preexistente intocado). Seis testes GUI scratch incluindo E2E com LockFileEx; teste smoke da quarta pagina corrigido segundo a base HEAD existente. Stable, indice real e exclusao sem alteracao.
+
+RAG-DEL-01.04-DM (DEV): helper NOVO e somente laboratorial para inventario privado com _catalog_mutex, fingerprint SQLite, bloqueio de journals e namespaces segregados; sete testes com subprocesso/mutex reais em TemporaryDirectory. Nenhuma integracao GUI privada ou exclusao real foi habilitada.
