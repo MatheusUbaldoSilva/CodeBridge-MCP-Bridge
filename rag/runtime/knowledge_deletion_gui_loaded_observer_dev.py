@@ -9,6 +9,9 @@ import hashlib
 import os
 from pathlib import Path
 import sys
+from rag.runtime.knowledge_deletion_gui_loaded_code_match_dev import (
+    match_loaded_top_level_function_dev,
+)
 
 def inspect_gui_loaded_reader_dev(panel:object, repo_root:Path)->dict:
     if not isinstance(repo_root,Path) or not repo_root.is_absolute():
@@ -50,6 +53,14 @@ def inspect_gui_loaded_reader_dev(panel:object, repo_root:Path)->dict:
         Path(reader_code.co_filename).resolve()==expected_helper and
         "production_generation_read" in reader_code.co_names
     )
+    # F-7: presence of names and a source path is not proof of loaded code.
+    # Recompile from bytes without import/exec and compare CodeType exactly.
+    panel_match=(match_loaded_top_level_function_dev(
+        operation,expected_panel,"_rag_operation")
+        if loaded_panel else {})
+    helper_match=(match_loaded_top_level_function_dev(
+        reader,expected_helper,"read_pinned_public_document_inventory")
+        if helper_loaded else {})
     qt_instance=False
     thread_correct=False
     if app is not None and loaded_panel and qt_core is not None:
@@ -65,6 +76,10 @@ def inspect_gui_loaded_reader_dev(panel:object, repo_root:Path)->dict:
         "public_documents_route_present_in_loaded_code":bool(pinned_code),
         "pinned_reader_module_loaded_from_dev_source":bool(helper_loaded),
         "pinned_reader_lock_reference_loaded":bool(helper_code),
+        "gui_route_loaded_bytecode_matches_dev_file":bool(
+            panel_match.get("loaded_code_matches_disk",False)),
+        "reader_loaded_bytecode_matches_dev_file":bool(
+            helper_match.get("loaded_code_matches_disk",False)),
         "qapplication_running":qt_instance,
         "on_gui_owner_thread":thread_correct,
     }
