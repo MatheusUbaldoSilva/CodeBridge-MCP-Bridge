@@ -484,3 +484,62 @@ class ParentChildLivenessWin32LabTests(TestCase):
         self.assertNotEqual(result.returncode,0)
         self.assertNotIn("CHILD_VERIFIED",result.stdout)
         self.assertIn("identity mismatch",result.stderr)
+
+
+    def test_parent_times_out_if_child_never_finishes_preflight(self):
+        # Parent owns generation + semantic locks while waiting for child.
+        # After timeout it must kill/reap synthetic worker and release locks.
+        result=subprocess.run(
+            [sys.executable,"-m",
+             "rag.runtime.knowledge_deletion_liveness_parent_lab",
+             str(self.root),"--lab-hang-before-ready"],
+            cwd=str(Path(__file__).resolve().parents[1]),
+            capture_output=True,text=True,timeout=14,
+        )
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn("scratch child output timed out",result.stderr)
+        self.assertNotIn("PARENT_CONFIRMED",result.stdout)
+        writer=self.writer()
+        self.assertEqual(writer.returncode,0,writer.stderr)
+        self.assertIn("WRITER_ALLOWED",writer.stdout)
+        self.assert_original_artifacts()
+
+    def test_parent_times_out_if_child_hangs_after_ready(self):
+        parent=subprocess.Popen(
+            [sys.executable,"-m",
+             "rag.runtime.knowledge_deletion_liveness_parent_lab",
+             str(self.root),"--lab-hang-after-ready"],
+            cwd=str(Path(__file__).resolve().parents[1]),
+            stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            self.ready(parent)
+            busy=self.writer()
+            self.assertEqual(busy.returncode,0,busy.stderr)
+            self.assertIn("WRITER_BUSY",busy.stdout)
+            out,error=parent.communicate(input="ACK\n",timeout=14)
+            self.assertNotEqual(parent.returncode,0)
+            self.assertIn("scratch child output timed out",error)
+            self.assertNotIn("PARENT_CONFIRMED",out)
+            released=self.writer()
+            self.assertEqual(released.returncode,0,released.stderr)
+            self.assertIn("WRITER_ALLOWED",released.stdout)
+        finally:
+            if parent.poll() is None:
+                parent.kill()
+                parent.communicate(timeout=4)
+        self.assert_original_artifacts()
+
+    def test_parent_rejects_unrecognized_synthetic_hang_flag(self):
+        result=subprocess.run(
+            [sys.executable,"-m",
+             "rag.runtime.knowledge_deletion_liveness_parent_lab",
+             str(self.root),"--lab-other-mode"],
+            cwd=str(Path(__file__).resolve().parents[1]),
+            capture_output=True,text=True,timeout=8,
+        )
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn("PermissionError",result.stderr)
+        self.assertNotIn("PARENT_READY",result.stdout)
+        self.assert_original_artifacts()

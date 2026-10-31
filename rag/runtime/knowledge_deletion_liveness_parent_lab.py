@@ -38,6 +38,32 @@ def _read_parent_confirmation_bounded(seconds: float = 6.0) -> str | None:
     return lines[0] if lines else ""
 
 
+def _read_child_line_bounded(stream, *, seconds: float = 7.0) -> str:
+    """Bounded read while parent holds locks; kill the child on timeout.
+
+    The caller owns the subprocess and must kill/reap it in its finally block.
+    """
+    lines: list[str] = []
+    errors: list[BaseException] = []
+
+    def read() -> None:
+        try:
+            lines.append(stream.readline(8193))
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread=Thread(target=read,daemon=True)
+    thread.start()
+    thread.join(seconds)
+    if thread.is_alive():
+        raise RuntimeError("scratch child output timed out")
+    if errors:
+        raise RuntimeError("scratch child output unreadable") from errors[0]
+    if not lines or not lines[0] or len(lines[0])>8192:
+        raise RuntimeError("scratch child output missing or oversized")
+    return lines[0]
+
+
 def validate_supervised_scratch_response_lab(
     body, request, receipt, challenge_digest: str,
 ) -> None:
@@ -58,8 +84,13 @@ def validate_supervised_scratch_response_lab(
 
 
 def main() -> None:
-    if len(sys.argv)!=2:
-        raise PermissionError("only trusted scratch root argument allowed")
+    allowed_hangs={"--lab-hang-before-ready":"before-ready",
+                   "--lab-hang-after-ready":"after-ready"}
+    if len(sys.argv) not in (2,3) or (
+        len(sys.argv)==3 and sys.argv[2] not in allowed_hangs
+    ):
+        raise PermissionError("only trusted scratch parent arguments allowed")
+    hang=allowed_hangs.get(sys.argv[2]) if len(sys.argv)==3 else None
     catalog,root=_validated_scratch_catalog(Path(sys.argv[1])/"project-indexes.json")
     db=root/"generations"/"private_liveness"/"rag_index.sqlite3"
     manifest=db.with_name("rag-index-manifest.json")
@@ -93,12 +124,18 @@ def main() -> None:
             if not receipt.files:
                 raise RuntimeError("non-empty vector tree required for liveness test")
             try:
-                child=subprocess.Popen(
+                args=(
+                    [sys.executable,"-m",
+                     "rag.runtime.knowledge_deletion_hang_worker_lab",hang]
+                    if hang else
                     [sys.executable,"-m",
                      "rag.runtime.isolated_project_worker",
                      "--pinned-scratch-supervised",
                      str(root),str(os.getpid()),
-                     str(current_process_creation_filetime_lab())],
+                     str(current_process_creation_filetime_lab())]
+                )
+                child=subprocess.Popen(
+                    args,
                     cwd=str(Path(__file__).resolve().parents[2]),
                     stdin=subprocess.PIPE,stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,text=True,
@@ -108,7 +145,7 @@ def main() -> None:
                     "tree_sha256":receipt.tree_sha256,
                 })+"\n")
                 child.stdin.flush()
-                first=child.stdout.readline().strip()
+                first=_read_child_line_bounded(child.stdout).strip()
                 if first!="CHILD_VERIFIED":
                     raise RuntimeError("scratch child failed preflight")
                 print("PARENT_READY "+str(child.pid),flush=True)
@@ -120,7 +157,7 @@ def main() -> None:
                 challenge=secrets.token_hex(32)
                 child.stdin.write("ACK "+envelope.nonce+" "+challenge+"\n")
                 child.stdin.flush()
-                answer=child.stdout.readline()
+                answer=_read_child_line_bounded(child.stdout)
                 if not answer:
                     raise RuntimeError("scratch child disappeared before response")
                 body=json.loads(answer)
