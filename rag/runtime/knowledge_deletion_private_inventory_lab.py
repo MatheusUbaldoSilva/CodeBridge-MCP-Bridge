@@ -5,18 +5,32 @@ fixtures, and currently only proves cooperation with the lab catalog mutex.
 """
 from __future__ import annotations
 
-from contextlib import closing
+from contextlib import closing, contextmanager
 from hashlib import sha256
 from pathlib import Path
 import json
 import sqlite3
 
-from rag.runtime.auto_index_canary import _catalog_mutex
+from rag.runtime.knowledge_deletion_bounded_catalog_lab import (
+    bounded_catalog_mutex_lab, LaboratoryCatalogUnsafe,
+)
 from rag.runtime.knowledge_deletion_swap_lab import _lab_paths
 
 
 class PrivateInventoryLabError(RuntimeError):
     pass
+
+
+@contextmanager
+def _private_lab_catalog_guard(catalog: Path):
+    """Keep the previous DM unsafe-catalog exception contract."""
+    try:
+        with bounded_catalog_mutex_lab(
+            catalog, laboratory_mode=True, operator_approved=True,
+        ):
+            yield
+    except LaboratoryCatalogUnsafe as exc:
+        raise PrivateInventoryLabError(str(exc)) from exc
 
 
 def laboratory_private_inventory_locked(
@@ -43,7 +57,7 @@ def laboratory_private_inventory_locked(
                 hasattr(p, "is_junction") and p.is_junction()
             ) for p in (sqlite, sqlite.parent, sqlite.parent.parent))):
         raise PrivateInventoryLabError("invalid scratch private SQLite")
-    with _catalog_mutex(folder):
+    with _private_lab_catalog_guard(catalog):
         for pending in folder.glob("rag-del-*.journal.json"):
             # Even a historical journal is rejected in this conservative
             # preview; recovery should occur before a new inventory audit.
