@@ -9,6 +9,7 @@ import re
 import secrets
 import subprocess
 import sys
+from rag.runtime.knowledge_deletion_parent_identity_lab import _creation_filetime
 from rag.runtime.knowledge_deletion_channel_mac_lab import (
     issue_lab_secret, verify_lab_response,
 )
@@ -40,13 +41,16 @@ def scratch_mac_pipe_roundtrip(*,project_id="scratch",generation="lab",
         if proc.returncode!=0 or stderr or len(stdout)>1024:
             raise RuntimeError("scratch child blocked")
         response=json.loads(stdout)
-        if not isinstance(response,dict) or set(response)!={"pid","mac"}:
+        if not isinstance(response,dict) or set(response)!={"pid","mac","birth"}:
             raise RuntimeError("scratch response malformed")
         pid=response["pid"]
         if type(pid) is not int or pid<=0:
             raise RuntimeError("scratch process PID invalid")
         if pid != proc.pid:
             raise RuntimeError("scratch child PID mismatch")
+        birth=response["birth"]
+        if type(birth) is not int or birth != _creation_filetime(proc._handle):
+            raise RuntimeError("scratch Win32 object birth mismatch")
         if not verify_lab_response(key,response["mac"],**fields,child_pid=pid):
             raise RuntimeError("scratch MAC mismatch")
         return {
@@ -54,6 +58,7 @@ def scratch_mac_pipe_roundtrip(*,project_id="scratch",generation="lab",
             "child_reported_pid":pid,
             "mac_verified":True,
             "spawned_pid_matches_response":True,
+            "win32_birth_matches_response":True,
             "os_process_identity_attested":False,
             "secure_handle_acl_attested":False,
             "activation_authorized":False,
