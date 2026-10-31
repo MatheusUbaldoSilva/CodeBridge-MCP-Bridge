@@ -16,6 +16,7 @@ import sys
 import time
 from rag.runtime.knowledge_deletion_parent_identity_lab import _creation_filetime
 from rag.runtime.knowledge_deletion_remote_handle_mac_lab import verify_remote_handle_lab
+from rag.runtime.knowledge_deletion_child_token_observer_dev import inspect_child_token_identity_scratch
 from rag.runtime.knowledge_deletion_remote_handle_compare_lab import (
     compare_remote_same_end_pipe_handle_scratch,
 )
@@ -93,6 +94,10 @@ def scratch_remote_same_end_roundtrip(*,timeout_seconds:float=5.0)->dict:
             if evidence["same_kernel_object"] is not True:
                 raise RuntimeError("scratch child native same-end handle mismatch")
             matching[name]=True
+        # Read-only token lineage: same user principal is NOT effective isolation.
+        token_evidence=inspect_child_token_identity_scratch(int(proc._handle))
+        if not token_evidence["child_token_inspected"]:
+            raise RuntimeError("scratch child token could not be inspected")
         os.write(in_w,b"ACK\n")
         remaining=max(.1,deadline-time.monotonic())
         proc.wait(timeout=remaining)
@@ -103,6 +108,9 @@ def scratch_remote_same_end_roundtrip(*,timeout_seconds:float=5.0)->dict:
             "same_end_handles_match":matching,
             "child_pid_and_win32_birth_matched":True,
             "native_handle_hmac_verified":True,
+            "parent_child_account_sid_equal":token_evidence["parent_child_account_sid_equal"],
+            "child_appcontainer":token_evidence["child_appcontainer"],
+            "effective_token_isolation_attested":False,
             "child_binary_trusted_for_production":False,
             "token_effective_acl_attested":False,
             "installation_attested":False,
