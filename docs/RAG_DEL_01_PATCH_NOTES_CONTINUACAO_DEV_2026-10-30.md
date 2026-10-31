@@ -64,3 +64,5 @@ RAG-DEL-01.04-DO (DEV): auditada via fonte a rotina MCP codebridge_rag_generatio
 RAG-DEL-01.04-DQ-B (DEV): novo bounded_catalog_mutex_lab somente TEMP com timeout nao bloqueante e identidade de lock conferida, usado no inventario DM. 325 RAG-DEL (321 PASS/4 SKIP), 241 RAG-AUTO non-MCP (236 PASS/5 SKIP), zero falhas; sem integracao operacional.
 
 RAG-DEL-01.04-DQ-C-A (DEV): sessao composta TEMP-only generation(shared)->semantic(exclusive opcional)->catalog bounded, pin de hashes SQLite/manifesto durante leitura, callback semantico sintetico de uso unico e invalidado apos fechamento. 9 testes novos PASS; RAG-DEL 334 (330 PASS/4 SKIP), RAG-AUTO 241 (236 PASS/5 SKIP), sem falhas. Integracao real reservada a DQ-C-B.
+
+RAG-DEL-01.04-DQ-C-B (DEV): testes dos servicos reais search_context/get_context com SQLite privado FTS5 temporario sob sessao composta DQ-C-A, isolamento de namespace e executor semantico sintetico sem segundo lock. 3 testes PASS; RAG-DEL 337 (333 PASS/4 SKIP), RAG-AUTO 241 (236 PASS/5 SKIP). Nenhuma integracao operacional.
