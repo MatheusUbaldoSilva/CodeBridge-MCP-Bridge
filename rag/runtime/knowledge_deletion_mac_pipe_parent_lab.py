@@ -11,6 +11,7 @@ import subprocess
 import sys
 from rag.runtime.knowledge_deletion_parent_identity_lab import _creation_filetime
 from rag.runtime.knowledge_deletion_pipe_acl_inspection_dev import inspect_pipe_fd_acl_dev
+from rag.runtime.knowledge_deletion_pipe_ace_inventory_dev import inspect_pipe_allow_aces_read_only_dev
 from rag.runtime.knowledge_deletion_channel_mac_lab import (
     issue_lab_secret, verify_lab_birth_response,
 )
@@ -54,6 +55,23 @@ def scratch_mac_pipe_roundtrip(*,project_id="scratch",generation="lab",
             for item in pipe_evidence
         ):
             raise RuntimeError("scratch parent pipe security unverified")
+        # G-19: deny unexpectedly broad or undecodable ACEs before any secret.
+        # This does not attest effective permissions: unknown principal ACEs
+        # remain a blocker for the future production authorization process.
+        ace_evidence=[
+            inspect_pipe_allow_aces_read_only_dev(stream.fileno())
+            for stream in (proc.stdin,proc.stdout,proc.stderr)
+        ]
+        if not all(
+            item["state"]=="WIN32_PIPE_ACE_INVENTORY_READ_ONLY"
+            and item["dacl_observed"] is True
+            and item["broad_allow_ace_detected"] is False
+            and item["unsupported_ace_detected"] is False
+            and isinstance(item["ace_count"],int)
+            and item["ace_count"]>=1
+            for item in ace_evidence
+        ):
+            raise RuntimeError("scratch parent pipe ACE risk unverified")
         try:
             stdout,stderr=proc.communicate(input=wire,timeout=timeout_seconds)
         except subprocess.TimeoutExpired as exc:
@@ -84,6 +102,7 @@ def scratch_mac_pipe_roundtrip(*,project_id="scratch",generation="lab",
             "win32_birth_matches_response":True,
             "parent_pipe_descriptors_observed":True,
             "parent_pipe_ends_not_inheritable":True,
+            "parent_pipe_known_broad_aces_absent":True,
             "os_process_identity_attested":False,
             "secure_handle_acl_attested":False,
             "activation_authorized":False,
