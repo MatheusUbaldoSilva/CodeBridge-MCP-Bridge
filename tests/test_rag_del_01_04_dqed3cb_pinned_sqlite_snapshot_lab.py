@@ -194,3 +194,86 @@ class RealWorkerPinnedSQLiteReadTests(TestCase):
             (self.db.read_bytes(),self.manifest.read_bytes(),self.catalog.read_bytes()),
             original,
         )
+
+    def test_unreconciled_journal_blocks_child_even_when_rolled_back(self):
+        with self.patch_root():
+            with self.session() as pin:
+                request=self.request(pin)
+                journal=self.root/"rag-del-1234567890abcdef1234567890abcdef.journal.json"
+                journal.write_text(
+                    '{"state":"ROLLED_BACK","synthetic":true}',encoding="utf-8",
+                )
+                try:
+                    child=self.child(request.to_payload())
+                    self.assertNotEqual(child.returncode,0)
+                    self.assertIn("unreconciled scratch deletion journal",child.stderr)
+                    self.assertTrue(journal.exists())
+                finally:
+                    journal.unlink()
+
+    def test_detached_worker_still_rejects_preexisting_scratch_journal(self):
+        with self.patch_root():
+            with self.session() as pin:
+                request=self.request(pin)
+        journal=self.root/"rag-del-deadbeef.journal.json"
+        journal.write_text('{"state":"PREPARED"}',encoding="utf-8")
+        child=self.child(request.to_payload())
+        self.assertNotEqual(child.returncode,0)
+        self.assertIn("unreconciled scratch deletion journal",child.stderr)
+        self.assertTrue(journal.exists())
+
+    def test_journal_appearing_during_worker_hash_validation_is_refused(self):
+        from rag.runtime.knowledge_deletion_pin_ipc_lab import (
+            verify_private_pin_envelope_lab, PinEnvelopeLabError,
+        )
+        from rag.runtime import knowledge_deletion_pin_ipc_lab as pin_mod
+        real_sha=pin_mod._sha
+        injected=[False]
+        journal=self.root/"rag-del-race.journal.json"
+        def injected_sha(path):
+            result=real_sha(path)
+            # After the initial catalog check, create the journal during
+            # the last hash verification before the worker returns success.
+            if not injected[0] and Path(path)==self.catalog:
+                injected[0]=True
+                journal.write_text('{"state":"PREPARED"}',encoding="utf-8")
+            return result
+        with self.patch_root():
+            with self.session() as pin:
+                request=self.request(pin)
+                try:
+                    with patch.object(pin_mod,"_sha",side_effect=injected_sha):
+                        with self.assertRaisesRegex(PinEnvelopeLabError,"journal appeared"):
+                            verify_private_pin_envelope_lab(
+                                request.pin,catalog_file=self.catalog,
+                                laboratory_mode=True,
+                            )
+                    self.assertTrue(injected[0])
+                finally:
+                    journal.unlink(missing_ok=True)
+
+    def test_redirected_generations_root_rejected_if_symlink_is_permitted(self):
+        from rag.runtime.knowledge_deletion_pin_ipc_lab import (
+            verify_private_pin_envelope_lab, PinEnvelopeLabError,
+        )
+        with self.patch_root():
+            with self.session() as pin:
+                request=self.request(pin)
+                # Renaming the real directory within scratch is reversible;
+                # link to it is unsafe regardless of contained target.
+                original=self.root/"generations"
+                moved=self.root/"archived_generations"
+                original.rename(moved)
+                try:
+                    try:
+                        original.symlink_to(moved,target_is_directory=True)
+                    except (OSError,NotImplementedError) as exc:
+                        self.skipTest("Windows symlink privilege unavailable: "+str(exc))
+                    with self.assertRaisesRegex(PinEnvelopeLabError,"redirected"):
+                        verify_private_pin_envelope_lab(
+                            request.pin,catalog_file=self.catalog,laboratory_mode=True,
+                        )
+                finally:
+                    if original.is_symlink():
+                        original.unlink()
+                    moved.rename(original)

@@ -87,7 +87,15 @@ def verify_private_pin_envelope_lab(
         raise PinEnvelopeLabError("typed immutable envelope required")
     envelope = PrivateReadPinEnvelopeV1.parse(envelope.to_payload())
     catalog, root = _validated_scratch_catalog(Path(catalog_file))
-    generation_dir = root / "generations" / envelope.generation_id
+    # The parent refuses any unresolved journal. A detached child MUST fail
+    # closed too: even a ROLLED_BACK journal requires explicit reconciliation.
+    for journal in root.glob("rag-del-*.journal.json"):
+        raise PinEnvelopeLabError("unreconciled scratch deletion journal")
+    generations = root / "generations"
+    if (generations.is_symlink()
+            or (hasattr(generations,"is_junction") and generations.is_junction())):
+        raise PinEnvelopeLabError("redirected scratch generations root")
+    generation_dir = generations / envelope.generation_id
     if (not generation_dir.is_dir() or generation_dir.is_symlink()
             or (hasattr(generation_dir, "is_junction") and generation_dir.is_junction())
             or not generation_dir.resolve(strict=True).is_relative_to(root)):
@@ -130,6 +138,8 @@ def verify_private_pin_envelope_lab(
             or _sha(db) != envelope.sqlite_sha256
             or _sha(manifest) != envelope.manifest_sha256):
         raise PinEnvelopeLabError("artifact drift during worker verification")
+    if any(root.glob("rag-del-*.journal.json")):
+        raise PinEnvelopeLabError("journal appeared during worker verification")
     return {
         "state": "LAB_PIN_ENVELOPE_VALIDATED",
         "project_id":envelope.project_id,
