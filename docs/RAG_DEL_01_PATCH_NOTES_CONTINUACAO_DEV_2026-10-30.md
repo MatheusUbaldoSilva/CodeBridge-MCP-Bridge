@@ -66,3 +66,5 @@ RAG-DEL-01.04-DQ-B (DEV): novo bounded_catalog_mutex_lab somente TEMP com timeou
 RAG-DEL-01.04-DQ-C-A (DEV): sessao composta TEMP-only generation(shared)->semantic(exclusive opcional)->catalog bounded, pin de hashes SQLite/manifesto durante leitura, callback semantico sintetico de uso unico e invalidado apos fechamento. 9 testes novos PASS; RAG-DEL 334 (330 PASS/4 SKIP), RAG-AUTO 241 (236 PASS/5 SKIP), sem falhas. Integracao real reservada a DQ-C-B.
 
 RAG-DEL-01.04-DQ-C-B (DEV): testes dos servicos reais search_context/get_context com SQLite privado FTS5 temporario sob sessao composta DQ-C-A, isolamento de namespace e executor semantico sintetico sem segundo lock. 3 testes PASS; RAG-DEL 337 (333 PASS/4 SKIP), RAG-AUTO 241 (236 PASS/5 SKIP). Nenhuma integracao operacional.
+
+RAG-DEL-01.04-DQ-D-A (DEV): testes Windows multiprocessos TEMP comprovam que morte do leitor libera generation/semantic/catalog locks e journal pendente permanece como bloqueio de leitura; fixture SQLite fecha handle explicitamente. RAG-DEL 339 (335 PASS/4 SKIP), RAG-AUTO 241 (236 PASS/5 SKIP), zero falhas. Sem recovery operacional.
