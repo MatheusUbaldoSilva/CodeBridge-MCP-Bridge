@@ -40,8 +40,47 @@ def _verify_pinned_source(source_root: Path, source_path: str | None, expected_s
     }
 
 
-def semantic_isolated_project(query: Any, route: Any) -> tuple[Any, ...]:
+def _invoke_isolated_semantic_subprocess_unlocked(index: Any, payload: dict) -> tuple[Any, ...]:
+    """Internal subprocess invocation ONLY. It does not acquire semantic lock.
+
+    Its sole operational caller is the legacy lock-owning wrapper below.
+    Do not use this helper from a pinned reader until the real child IPC
+    identity binding is implemented and attested.
+    """
     from rag.contracts import SearchResult, SourceMetadata, SourceType
+
+    try:
+        completed = subprocess.run(
+            [str(index.python_executable), "-m", "rag.runtime.isolated_project_worker"],
+            cwd=str(Path(__file__).resolve().parents[2]),
+            input=json.dumps(payload), text=True,
+            capture_output=True, timeout=180, check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("isolated project inference timed out") from exc
+    if completed.returncode != 0:
+        raise RuntimeError("isolated project inference failed: " + completed.stderr[-650:])
+    items = json.loads(completed.stdout)
+    return tuple(
+        SearchResult(
+            chunk_id=item["chunk_id"],
+            document_id=item["document_id"],
+            content=item["content"],
+            metadata=SourceMetadata(**{
+                **item["metadata"],
+                "source_type":SourceType(item["metadata"]["source_type"]),
+            }),
+            score=float(item["score"]),
+            rank=int(item["rank"]),
+            retrieval_modes=tuple(item.get("retrieval_modes", ())),
+            stale=bool(item.get("stale", False)),
+        )
+        for item in items
+    )
+
+
+def semantic_isolated_project(query: Any, route: Any) -> tuple[Any, ...]:
+    """Legacy public semantic entry: preserves self-managed semantic lock."""
     from rag.runtime.production_generation_lock import (
         ProductionGenerationBusy, production_generation_lock,
     )
@@ -61,39 +100,11 @@ def semantic_isolated_project(query: Any, route: Any) -> tuple[Any, ...]:
     while True:
         try:
             with production_generation_lock(exclusive=True, channel="semantic"):
-                try:
-                    completed = subprocess.run(
-                        [str(index.python_executable),"-m","rag.runtime.isolated_project_worker"],
-                        cwd=str(Path(__file__).resolve().parents[2]),
-                        input=json.dumps(payload), text=True,
-                        capture_output=True, timeout=180, check=False,
-                    )
-                except subprocess.TimeoutExpired as exc:
-                    raise RuntimeError("isolated project inference timed out") from exc
-            break
+                return _invoke_isolated_semantic_subprocess_unlocked(index,payload)
         except ProductionGenerationBusy as exc:
             if time.monotonic() >= deadline:
                 raise RuntimeError("semantic process queue timed out") from exc
             time.sleep(0.2)
-    if completed.returncode != 0:
-        raise RuntimeError("isolated project inference failed: "+completed.stderr[-650:])
-    items = json.loads(completed.stdout)
-    return tuple(
-        SearchResult(
-            chunk_id=item["chunk_id"],
-            document_id=item["document_id"],
-            content=item["content"],
-            metadata=SourceMetadata(**{
-                **item["metadata"],
-                "source_type":SourceType(item["metadata"]["source_type"]),
-            }),
-            score=float(item["score"]),
-            rank=int(item["rank"]),
-            retrieval_modes=tuple(item.get("retrieval_modes",())),
-            stale=bool(item.get("stale",False)),
-        )
-        for item in items
-    )
 
 
 def search_isolated_project(
