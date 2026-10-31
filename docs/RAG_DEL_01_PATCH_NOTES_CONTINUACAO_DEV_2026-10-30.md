@@ -62,3 +62,5 @@ RAG-DEL-01.04-DN (DEV): 3 testes Qt offscreen de erro de leitura com generation 
 RAG-DEL-01.04-DO (DEV): auditada via fonte a rotina MCP codebridge_rag_generation_probe, disponivel no mcp_server.py mas nao exportada pela conexao CodeBridge atual; tres testes AST/mocks garantem read_only, writer bloqueado e safe_to_activate=False. Nao equivale a prova do processo MCP instalado e nao altera indice real.
 
 RAG-DEL-01.04-DQ-B (DEV): novo bounded_catalog_mutex_lab somente TEMP com timeout nao bloqueante e identidade de lock conferida, usado no inventario DM. 325 RAG-DEL (321 PASS/4 SKIP), 241 RAG-AUTO non-MCP (236 PASS/5 SKIP), zero falhas; sem integracao operacional.
+
+RAG-DEL-01.04-DQ-C-A (DEV): sessao composta TEMP-only generation(shared)->semantic(exclusive opcional)->catalog bounded, pin de hashes SQLite/manifesto durante leitura, callback semantico sintetico de uso unico e invalidado apos fechamento. 9 testes novos PASS; RAG-DEL 334 (330 PASS/4 SKIP), RAG-AUTO 241 (236 PASS/5 SKIP), sem falhas. Integracao real reservada a DQ-C-B.
