@@ -16,7 +16,35 @@ from rag.runtime.query_classifier import QueryRoute
 from rag.runtime.search_service import search_result_to_dict
 
 
+
+def _pinned_request_scratch_only() -> None:
+    """Opt-in DQ-E-D-3C-A parser on REAL worker entrypoint, TEMP ONLY.
+
+    Shares validated request contract with the synthetic worker but MUST NOT
+    invoke semantic search, registered-project lookup, or a model in this mode.
+    The real pinned semantic inference path remains intentionally unavailable.
+    """
+    from pathlib import Path
+    from rag.runtime.knowledge_deletion_semantic_request_lab import (
+        PinnedSemanticRequestV1, verify_pinned_semantic_request_lab,
+    )
+    raw = sys.stdin.readline(8193)
+    if len(raw) > 8192:
+        raise ValueError("scratch pinned request exceeds 8192 bytes")
+    request = PinnedSemanticRequestV1.parse(json.loads(raw))
+    result = verify_pinned_semantic_request_lab(
+        request, catalog_file=Path(sys.argv[2]) / "project-indexes.json",
+        laboratory_mode=True,
+    )
+    json.dump(result, sys.stdout, ensure_ascii=True)
+    sys.stdout.write("\n")
+
+
 def main() -> None:
+    if len(sys.argv) != 1:
+        if len(sys.argv) == 3 and sys.argv[1] == "--pinned-scratch-only":
+            return _pinned_request_scratch_only()
+        raise PermissionError("unsupported isolated project worker arguments")
     data = json.load(sys.stdin)
     if not isinstance(data, dict) or not isinstance(data.get("project_id"),str):
         raise PermissionError("project namespace is required")
