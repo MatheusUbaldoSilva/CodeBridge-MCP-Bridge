@@ -33,6 +33,22 @@ def _read_parent_confirmation_bounded(seconds: float = 6.0) -> str | None:
     return lines[0] if lines else ""
 
 
+def validate_supervised_scratch_response_lab(body, request, receipt) -> None:
+    """Exact response correlation; no operational credentials are produced."""
+    expected = {
+        "state": "LAB_CHILD_COMPLETED_WHILE_PARENT_PIPE_OPEN",
+        "project_id": request.pin.project_id,
+        "generation_id": request.pin.generation_id,
+        "nonce": request.pin.nonce,
+        "request_sha256": request.request_digest(),
+        "tree_sha256": receipt.tree_sha256,
+        "operational_use_allowed": False,
+        "activation_authorized": False,
+    }
+    if type(body) is not dict or body != expected:
+        raise RuntimeError("scratch supervised worker response mismatch")
+
+
 def main() -> None:
     if len(sys.argv)!=2:
         raise PermissionError("only trusted scratch root argument allowed")
@@ -71,7 +87,8 @@ def main() -> None:
             try:
                 child=subprocess.Popen(
                     [sys.executable,"-m",
-                     "rag.runtime.knowledge_deletion_liveness_child_lab",
+                     "rag.runtime.isolated_project_worker",
+                     "--pinned-scratch-supervised",
                      str(root),str(os.getpid())],
                     cwd=str(Path(__file__).resolve().parents[2]),
                     stdin=subprocess.PIPE,stdout=subprocess.PIPE,
@@ -95,12 +112,7 @@ def main() -> None:
                 if not answer:
                     raise RuntimeError("scratch child disappeared before response")
                 body=json.loads(answer)
-                if (body.get("state")!="LAB_CHILD_COMPLETED_WHILE_PARENT_PIPE_OPEN"
-                        or body.get("nonce")!=envelope.nonce
-                        or body.get("request_sha256")!=request.request_digest()
-                        or body.get("tree_sha256")!=receipt.tree_sha256
-                        or body.get("operational_use_allowed") is not False):
-                    raise RuntimeError("scratch child correlation failed")
+                validate_supervised_scratch_response_lab(body,request,receipt)
                 # No locks released until the response has been validated.
                 if child.wait(timeout=3)!=0:
                     raise RuntimeError("scratch child completion failed")

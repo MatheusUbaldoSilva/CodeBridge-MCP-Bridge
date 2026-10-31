@@ -7,6 +7,7 @@ from __future__ import annotations
 import ctypes
 from ctypes import wintypes
 import json
+import os
 from pathlib import Path
 import sys
 from threading import Thread
@@ -42,18 +43,14 @@ _close_handle.argtypes = [wintypes.HANDLE]
 _close_handle.restype = wintypes.BOOL
 
 
-def _parent_still_active(parent_pid: int) -> bool:
-    handle=_open_process(_PROCESS_QUERY_LIMITED_INFORMATION,False,parent_pid)
-    if not handle:
-        return False
-    try:
-        code=wintypes.DWORD(0)
-        return bool(_get_exit_code(handle,ctypes.byref(code))) and code.value == _STILL_ACTIVE
-    finally:
-        _close_handle(handle)
+def _held_parent_handle_still_active(handle: wintypes.HANDLE) -> bool:
+    # A persistent Win32 handle refers to ONE process object: PID reuse
+    # cannot cause this check to switch to an unrelated process.
+    code=wintypes.DWORD(0)
+    return bool(_get_exit_code(handle,ctypes.byref(code))) and code.value == _STILL_ACTIVE
 
 
-def _read_ack_bounded(parent_pid: int, seconds: float = 8.0) -> str | None:
+def _read_ack_bounded(parent_handle: wintypes.HANDLE, seconds: float = 8.0) -> str | None:
     lines: list[str] = []
     def read():
         lines.append(sys.stdin.readline(100))
@@ -63,7 +60,7 @@ def _read_ack_bounded(parent_pid: int, seconds: float = 8.0) -> str | None:
     while True:
         # PID liveness is independent of EOF delivery; polling stops a child
         # promptly even when Windows delays closing an inherited pipe.
-        if not _parent_still_active(parent_pid):
+        if not _held_parent_handle_still_active(parent_handle):
             return "__PARENT_PROCESS_EXITED__"
         remaining=deadline-time.monotonic()
         if remaining<=0:
@@ -74,13 +71,31 @@ def _read_ack_bounded(parent_pid: int, seconds: float = 8.0) -> str | None:
 
 
 def main() -> None:
-    if (len(sys.argv)!=3 or not sys.argv[2].isdigit()
-            or not 1 <= int(sys.argv[2]) < 0xFFFFFFFF):
+    if len(sys.argv)!=3:
         raise PermissionError("scratch child requires lab root and parent PID")
-    parent_pid=int(sys.argv[2])
-    if not _parent_still_active(parent_pid):
-        raise PermissionError("scratch parent process is not alive")
-    root=Path(sys.argv[1])
+    return run_supervised_scratch_child_lab(sys.argv[1],sys.argv[2])
+
+
+def run_supervised_scratch_child_lab(root_arg: str, parent_pid_arg: str) -> None:
+    """Entry for the isolated worker's strictly scratch-only opt-in mode."""
+    if (not isinstance(parent_pid_arg,str) or not parent_pid_arg.isdigit()
+            or not 1 <= int(parent_pid_arg) < 0xFFFFFFFF):
+        raise PermissionError("scratch child requires valid parent PID")
+    parent_pid=int(parent_pid_arg)
+    if parent_pid == os.getpid():
+        raise PermissionError("parent must not be the child process")
+    parent_handle=_open_process(_PROCESS_QUERY_LIMITED_INFORMATION,False,parent_pid)
+    if not parent_handle:
+        raise PermissionError("scratch parent process cannot be pinned")
+    try:
+        if not _held_parent_handle_still_active(parent_handle):
+            raise PermissionError("scratch parent process already exited")
+        _run_pinned_child_with_parent_handle(Path(root_arg),parent_handle)
+    finally:
+        _close_handle(parent_handle)
+
+
+def _run_pinned_child_with_parent_handle(root: Path, parent_handle: wintypes.HANDLE) -> None:
     catalog, root=_validated_scratch_catalog(root/"project-indexes.json")
     raw=sys.stdin.readline(8193)
     if len(raw)>8192:
@@ -101,7 +116,7 @@ def main() -> None:
     if not observed.files or observed.tree_sha256!=digest:
         raise RuntimeError("scratch vector receipt mismatch")
     print("CHILD_VERIFIED",flush=True)
-    ack=_read_ack_bounded(parent_pid)
+    ack=_read_ack_bounded(parent_handle)
     if ack=="__PARENT_PROCESS_EXITED__":
         _mark_failure(root,"PARENT_PROCESS_EXITED")
         raise SystemExit(72)
@@ -114,7 +129,7 @@ def main() -> None:
     if ack != "ACK "+request.pin.nonce+"\n":
         _mark_failure(root,"CHILD_ACK_REJECTED")
         raise SystemExit(73)
-    if not _parent_still_active(parent_pid):
+    if not _held_parent_handle_still_active(parent_handle):
         _mark_failure(root,"PARENT_PROCESS_EXITED")
         raise SystemExit(72)
     verify_pinned_semantic_request_lab(
@@ -126,7 +141,7 @@ def main() -> None:
     if after != observed:
         _mark_failure(root,"CHILD_VECTOR_DRIFT")
         raise SystemExit(75)
-    if not _parent_still_active(parent_pid):
+    if not _held_parent_handle_still_active(parent_handle):
         _mark_failure(root,"PARENT_PROCESS_EXITED")
         raise SystemExit(72)
     print(json.dumps({

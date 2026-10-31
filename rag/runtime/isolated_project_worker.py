@@ -67,6 +67,13 @@ def main() -> None:
             return _pinned_request_scratch_only()
         if len(sys.argv) == 3 and sys.argv[1] == "--pinned-scratch-snapshot":
             return _pinned_snapshot_scratch_only()
+        if len(sys.argv) == 4 and sys.argv[1] == "--pinned-scratch-supervised":
+            # Opt-in DEV scratch-only child. NEVER falls back to legacy
+            # project resolution, Qdrant, or production semantic inference.
+            from rag.runtime.knowledge_deletion_liveness_child_lab import (
+                run_supervised_scratch_child_lab,
+            )
+            return run_supervised_scratch_child_lab(sys.argv[2],sys.argv[3])
         raise PermissionError("unsupported isolated project worker arguments")
     data = json.load(sys.stdin)
     if not isinstance(data, dict) or not isinstance(data.get("project_id"),str):

@@ -237,3 +237,122 @@ class ParentChildLivenessWin32LabTests(TestCase):
             if parent.poll() is None:
                 parent.kill()
                 parent.communicate(timeout=4)
+
+
+    def test_worker_supervised_mode_never_falls_back_to_semantic_model(self):
+        from rag.runtime import isolated_project_worker
+        from unittest.mock import patch
+        with (
+            patch.object(sys,"argv",[
+                "worker","--pinned-scratch-supervised",str(self.root),"12345",
+            ]),
+            patch.object(isolated_project_worker,"resolve_isolated_project",
+                         side_effect=AssertionError("legacy catalog resolver used")),
+            patch.object(isolated_project_worker,"search_persistent_semantic",
+                         side_effect=AssertionError("actual model invoked")),
+            patch("rag.runtime.knowledge_deletion_liveness_child_lab.run_supervised_scratch_child_lab")
+            as supervised,
+        ):
+            isolated_project_worker.main()
+        supervised.assert_called_once_with(str(self.root),"12345")
+
+    def test_worker_supervised_mode_rejects_invalid_cli_arity_and_self_pid(self):
+        from rag.runtime import isolated_project_worker
+        from unittest.mock import patch
+        for argv in (
+            ["worker","--pinned-scratch-supervised"],
+            ["worker","--pinned-scratch-supervised",str(self.root)],
+            ["worker","--pinned-scratch-supervised",str(self.root),"not-a-pid"],
+            ["worker","--pinned-scratch-supervised",str(self.root),str(os.getpid())],
+            ["worker","--pinned-scratch-supervised",str(self.root),"0"],
+            ["worker","--pinned-scratch-supervised",str(self.root),"123","extra"],
+        ):
+            with self.subTest(argv=argv):
+                with (
+                    patch.object(sys,"argv",argv),
+                    patch.object(isolated_project_worker,"resolve_isolated_project",
+                                 side_effect=AssertionError("legacy resolver reached")),
+                ):
+                    with self.assertRaises(PermissionError):
+                        isolated_project_worker.main()
+
+    def test_exact_response_correlation_refuses_replay_and_cross_project(self):
+        from types import SimpleNamespace
+        from rag.runtime.knowledge_deletion_liveness_parent_lab import (
+            validate_supervised_scratch_response_lab,
+        )
+        pin=SimpleNamespace(project_id="private-lab",generation_id="private_liveness",
+                            nonce="a"*32)
+        request=SimpleNamespace(pin=pin,request_digest=lambda:"b"*64)
+        receipt=SimpleNamespace(tree_sha256="c"*64)
+        valid={
+            "state":"LAB_CHILD_COMPLETED_WHILE_PARENT_PIPE_OPEN",
+            "project_id":pin.project_id,
+            "generation_id":pin.generation_id,
+            "nonce":pin.nonce,
+            "request_sha256":request.request_digest(),
+            "tree_sha256":receipt.tree_sha256,
+            "operational_use_allowed":False,
+            "activation_authorized":False,
+        }
+        validate_supervised_scratch_response_lab(valid,request,receipt)
+        for key,value in (
+            ("project_id","foreign-lab"),
+            ("generation_id","replayed-generation"),
+            ("nonce","0"*32),
+            ("request_sha256","0"*64),
+            ("tree_sha256","0"*64),
+            ("state","LAB_OPERATIONAL_SUCCESS"),
+            ("operational_use_allowed",True),
+            ("activation_authorized",True),
+            ("extra",123),
+        ):
+            with self.subTest(key=key):
+                with self.assertRaisesRegex(RuntimeError,"response mismatch"):
+                    validate_supervised_scratch_response_lab(
+                        {**valid,key:value},request,receipt,
+                    )
+        for malformed in (None,[],{"state":"LAB_CHILD_COMPLETED_WHILE_PARENT_PIPE_OPEN"}):
+            with self.subTest(malformed=malformed):
+                with self.assertRaisesRegex(RuntimeError,"response mismatch"):
+                    validate_supervised_scratch_response_lab(
+                        malformed,request,receipt,
+                    )
+
+    def test_journal_appearing_during_supervised_child_wait_fails_closed(self):
+        parent=self.start_parent()
+        journal=self.root/"rag-del-supervised-race.journal.json"
+        try:
+            self.ready(parent)
+            self.assertIn("WRITER_BUSY",self.writer().stdout)
+            journal.write_text('{"state":"ROLLED_BACK"}',encoding="utf-8")
+            out,err=parent.communicate(input="ACK\n",timeout=9)
+            self.assertNotEqual(parent.returncode,0,(out,err))
+            self.assertNotIn("PARENT_CONFIRMED",out)
+            self.assertTrue(journal.exists())
+            self.assertIn("WRITER_ALLOWED",self.writer().stdout)
+        finally:
+            if parent.poll() is None:
+                parent.kill()
+                parent.communicate(timeout=4)
+            journal.unlink(missing_ok=True)
+        self.assert_original_artifacts()
+
+    def test_catalog_change_during_supervised_child_wait_rejected(self):
+        parent=self.start_parent()
+        original=self.catalog.read_bytes()
+        try:
+            self.ready(parent)
+            mutated=json.loads(original)
+            mutated["projects"]["private-lab"]["source_revision"]="changed"
+            self.catalog.write_text(json.dumps(mutated),encoding="utf-8")
+            out,err=parent.communicate(input="ACK\n",timeout=9)
+            self.assertNotEqual(parent.returncode,0,(out,err))
+            self.assertNotIn("PARENT_CONFIRMED",out)
+            self.assertIn("WRITER_ALLOWED",self.writer().stdout)
+        finally:
+            if parent.poll() is None:
+                parent.kill()
+                parent.communicate(timeout=4)
+            self.catalog.write_bytes(original)
+        self.assert_original_artifacts()
