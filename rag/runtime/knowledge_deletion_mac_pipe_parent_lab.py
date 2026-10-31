@@ -26,7 +26,7 @@ def scratch_mac_pipe_roundtrip(*,project_id="scratch",generation="lab",
     wire=json.dumps({"secret":key.hex(),**fields},
                      sort_keys=True,separators=(",",":")).encode("utf-8")+b"\n"
     proc=subprocess.Popen(
-        [sys.executable,"-B","-m","rag.runtime.knowledge_deletion_mac_child_lab"],
+        [sys._base_executable,"-B","-m","rag.runtime.knowledge_deletion_mac_child_lab"],
         stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
         close_fds=True, shell=False,
     )
@@ -45,12 +45,15 @@ def scratch_mac_pipe_roundtrip(*,project_id="scratch",generation="lab",
         pid=response["pid"]
         if type(pid) is not int or pid<=0:
             raise RuntimeError("scratch process PID invalid")
+        if pid != proc.pid:
+            raise RuntimeError("scratch child PID mismatch")
         if not verify_lab_response(key,response["mac"],**fields,child_pid=pid):
             raise RuntimeError("scratch MAC mismatch")
         return {
             "state":"SCRATCH_MAC_PIPE_ROUNDTRIP_ONLY",
             "child_reported_pid":pid,
             "mac_verified":True,
+            "spawned_pid_matches_response":True,
             "os_process_identity_attested":False,
             "secure_handle_acl_attested":False,
             "activation_authorized":False,

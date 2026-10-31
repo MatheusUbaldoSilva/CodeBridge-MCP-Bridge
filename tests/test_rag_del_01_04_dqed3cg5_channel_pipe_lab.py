@@ -6,6 +6,7 @@ class PipeProofLabTests(TestCase):
     def test_real_child_pipe_proof(self):
         r=scratch_mac_pipe_roundtrip()
         self.assertTrue(r["mac_verified"])
+        self.assertTrue(r["spawned_pid_matches_response"])
         self.assertFalse(r["os_process_identity_attested"])
         self.assertFalse(r["activation_authorized"])
     def test_repeat_has_no_authority(self):
