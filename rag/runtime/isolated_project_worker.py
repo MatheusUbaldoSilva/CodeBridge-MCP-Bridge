@@ -40,10 +40,33 @@ def _pinned_request_scratch_only() -> None:
     sys.stdout.write("\n")
 
 
+def _pinned_snapshot_scratch_only() -> None:
+    """Read only authorized TEMP SQLite namespace; no model or Qdrant."""
+    from pathlib import Path
+    from rag.runtime.knowledge_deletion_semantic_request_lab import (
+        PinnedSemanticRequestV1,
+    )
+    from rag.runtime.knowledge_deletion_semantic_snapshot_lab import (
+        read_pinned_semantic_snapshot_lab,
+    )
+    raw=sys.stdin.readline(8193)
+    if len(raw)>8192:
+        raise ValueError("scratch snapshot request exceeds 8192 bytes")
+    request=PinnedSemanticRequestV1.parse(json.loads(raw))
+    result=read_pinned_semantic_snapshot_lab(
+        request,catalog_file=Path(sys.argv[2])/"project-indexes.json",
+        laboratory_mode=True,
+    )
+    json.dump(result,sys.stdout,ensure_ascii=True)
+    sys.stdout.write("\n")
+
+
 def main() -> None:
     if len(sys.argv) != 1:
         if len(sys.argv) == 3 and sys.argv[1] == "--pinned-scratch-only":
             return _pinned_request_scratch_only()
+        if len(sys.argv) == 3 and sys.argv[1] == "--pinned-scratch-snapshot":
+            return _pinned_snapshot_scratch_only()
         raise PermissionError("unsupported isolated project worker arguments")
     data = json.load(sys.stdin)
     if not isinstance(data, dict) or not isinstance(data.get("project_id"),str):
