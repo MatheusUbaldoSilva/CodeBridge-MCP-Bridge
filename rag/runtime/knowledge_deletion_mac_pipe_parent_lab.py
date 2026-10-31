@@ -11,7 +11,7 @@ import subprocess
 import sys
 from rag.runtime.knowledge_deletion_parent_identity_lab import _creation_filetime
 from rag.runtime.knowledge_deletion_channel_mac_lab import (
-    issue_lab_secret, verify_lab_response,
+    issue_lab_secret, verify_lab_birth_response,
 )
 
 def scratch_mac_pipe_roundtrip(*,project_id="scratch",generation="lab",
@@ -51,7 +51,8 @@ def scratch_mac_pipe_roundtrip(*,project_id="scratch",generation="lab",
         birth=response["birth"]
         if type(birth) is not int or birth != _creation_filetime(proc._handle):
             raise RuntimeError("scratch Win32 object birth mismatch")
-        if not verify_lab_response(key,response["mac"],**fields,child_pid=pid):
+        if not verify_lab_birth_response(key,response["mac"],creation_filetime=birth,
+                **fields,child_pid=pid):
             raise RuntimeError("scratch MAC mismatch")
         return {
             "state":"SCRATCH_MAC_PIPE_ROUNDTRIP_ONLY",

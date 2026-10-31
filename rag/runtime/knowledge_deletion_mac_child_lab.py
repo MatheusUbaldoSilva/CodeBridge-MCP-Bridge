@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from rag.runtime.knowledge_deletion_channel_mac_lab import sign_lab_response
+from rag.runtime.knowledge_deletion_channel_mac_lab import sign_lab_birth_response
 from rag.runtime.knowledge_deletion_parent_identity_lab import current_process_creation_filetime_lab
 
 def main() -> int:
@@ -18,10 +18,11 @@ def main() -> int:
             return 2
         secret=bytes.fromhex(item["secret"])
         pid=os.getpid()
-        mac=sign_lab_response(secret,session_id=item["session_id"],
+        birth=current_process_creation_filetime_lab()
+        mac=sign_lab_birth_response(secret,creation_filetime=birth,session_id=item["session_id"],
             challenge=item["challenge"],request_sha256=item["request_sha256"],
             project_id=item["project_id"],generation=item["generation"],child_pid=pid)
-        print(json.dumps({"pid":pid,"mac":mac,"birth":current_process_creation_filetime_lab()},sort_keys=True),flush=True)
+        print(json.dumps({"pid":pid,"mac":mac,"birth":birth},sort_keys=True),flush=True)
         return 0
     except (TypeError,KeyError,ValueError,UnicodeError,OverflowError):
         return 2

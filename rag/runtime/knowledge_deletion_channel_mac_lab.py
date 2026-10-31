@@ -48,3 +48,26 @@ def verify_lab_response(secret:bytes,mac:str,*,session_id:str,challenge:str,
         request_sha256=request_sha256,project_id=project_id,generation=generation,
         child_pid=child_pid)
     return hmac.compare_digest(mac,expected)
+
+
+def sign_lab_birth_response(secret:bytes,*,creation_filetime:int,
+                            session_id:str,challenge:str,request_sha256:str,
+                            project_id:str,generation:str,child_pid:int)->str:
+    if type(secret) is not bytes or len(secret)!=32:
+        raise ValueError("lab secret must be exactly 32 bytes")
+    if type(creation_filetime) is not int or not 0 < creation_filetime <= 0xFFFFFFFFFFFFFFFF:
+        raise ValueError("invalid Win32 creation FILETIME")
+    payload=_message(session_id,challenge,request_sha256,project_id,generation,child_pid)
+    transcript=b"CODEBRIDGE-LAB-WIN32-BIRTH-V1\0"+payload+b"\0"+str(creation_filetime).encode("ascii")
+    return hmac.new(secret,transcript,hashlib.sha256).hexdigest()
+
+
+def verify_lab_birth_response(secret:bytes,mac:str,*,creation_filetime:int,
+                              session_id:str,challenge:str,request_sha256:str,
+                              project_id:str,generation:str,child_pid:int)->bool:
+    if not isinstance(mac,str) or not _HEX64.fullmatch(mac):
+        return False
+    expected=sign_lab_birth_response(secret,creation_filetime=creation_filetime,
+        session_id=session_id,challenge=challenge,request_sha256=request_sha256,
+        project_id=project_id,generation=generation,child_pid=child_pid)
+    return hmac.compare_digest(mac,expected)
