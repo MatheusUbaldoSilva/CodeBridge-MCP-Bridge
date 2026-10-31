@@ -130,11 +130,19 @@ class ParentChildLivenessWin32LabTests(TestCase):
             parent.kill()
             parent.communicate(timeout=5)
             self.assertNotEqual(parent.returncode,0)
+            # Existence can precede a completed JSON write on Windows.
+            # Wait for a valid marker without weakening the required state.
+            marker_state=None
             for _ in range(150):
-                if marker.exists(): break
+                if marker.is_file():
+                    try:
+                        marker_state=json.loads(marker.read_text())["state"]
+                    except (json.JSONDecodeError,KeyError,OSError):
+                        marker_state=None
+                    if marker_state is not None:
+                        break
                 time.sleep(0.03)
-            self.assertTrue(marker.is_file(),"orphan child did not detect parent EOF")
-            self.assertIn(json.loads(marker.read_text())["state"],
+            self.assertIn(marker_state,
                           {"PARENT_PIPE_CLOSED","PARENT_PROCESS_EXITED"})
             self.assertIn("WRITER_ALLOWED",self.writer().stdout)
         finally:
