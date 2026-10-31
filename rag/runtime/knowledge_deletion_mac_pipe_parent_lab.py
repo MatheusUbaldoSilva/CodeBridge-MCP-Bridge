@@ -15,19 +15,22 @@ from rag.runtime.knowledge_deletion_channel_mac_lab import (
 )
 
 def scratch_mac_pipe_roundtrip(*,project_id="scratch",generation="lab",
-                               timeout_seconds:float=5.0)->dict:
+                               timeout_seconds:float=5.0,entrypoint:str="synthetic")->dict:
     if (project_id!="scratch" or generation!="lab"
             or type(timeout_seconds) not in (int,float)
             or not 0.1 <= timeout_seconds <= 10.0):
         raise ValueError("strict scratch only")
+    if entrypoint not in ("synthetic","real-worker"):
+        raise ValueError("unsupported scratch entrypoint")
     key=issue_lab_secret()
     fields={"session_id":secrets.token_hex(32),"challenge":secrets.token_hex(32),
             "request_sha256":secrets.token_hex(32),"project_id":project_id,
             "generation":generation}
     wire=json.dumps({"secret":key.hex(),**fields},
                      sort_keys=True,separators=(",",":")).encode("utf-8")+b"\n"
+    worker=["-m","rag.runtime.knowledge_deletion_mac_child_lab"] if entrypoint=="synthetic" else ["-m","rag.runtime.isolated_project_worker","--pinned-mac-scratch"]
     proc=subprocess.Popen(
-        [sys._base_executable,"-B","-m","rag.runtime.knowledge_deletion_mac_child_lab"],
+        [sys._base_executable,"-B",*worker],
         stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
         close_fds=True, shell=False,
     )

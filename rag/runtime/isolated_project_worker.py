@@ -62,6 +62,12 @@ def _pinned_snapshot_scratch_only() -> None:
 
 
 def main() -> None:
+    if len(sys.argv) == 2 and sys.argv[1] == "--pinned-mac-scratch":
+        # Opt-in scratch-only protocol. No model, Qdrant or project resolver.
+        from rag.runtime.knowledge_deletion_mac_child_lab import main as mac_lab_main
+        if mac_lab_main()!=0:
+            raise PermissionError("scratch MAC channel rejected")
+        return
     if len(sys.argv) != 1:
         if len(sys.argv) == 3 and sys.argv[1] == "--pinned-scratch-only":
             return _pinned_request_scratch_only()
