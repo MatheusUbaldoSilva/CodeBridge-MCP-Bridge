@@ -5,9 +5,11 @@ import os
 import sys
 from rag.runtime.knowledge_deletion_channel_mac_lab import sign_lab_birth_response
 from rag.runtime.knowledge_deletion_parent_identity_lab import current_process_creation_filetime_lab
+from rag.runtime.knowledge_deletion_child_stdio_lab import assert_scratch_stdio_pipes_win32
 
 def main() -> int:
     try:
+        assert_scratch_stdio_pipes_win32()
         raw=sys.stdin.buffer.readline(8193)
         if not raw or len(raw)>8192:
             return 2
