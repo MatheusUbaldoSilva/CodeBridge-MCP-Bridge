@@ -12,17 +12,28 @@ from rag.runtime.knowledge_deletion_pin_ipc_lab import (
 
 def main() -> None:
     hold_for_ack=len(sys.argv) == 3 and sys.argv[2] == "--hold-for-ack"
-    if len(sys.argv) != 2 and not hold_for_ack:
+    semantic_request=len(sys.argv) == 3 and sys.argv[2] == "--semantic-request"
+    if len(sys.argv) != 2 and not (hold_for_ack or semantic_request):
         raise ValueError("one trusted scratch lab root argument required")
     root=Path(sys.argv[1])
     raw=sys.stdin.readline(8193)
     if len(raw) > 8192:
         raise ValueError("oversized scratch envelope")
-    envelope=PrivateReadPinEnvelopeV1.parse(json.loads(raw))
-    response=verify_private_pin_envelope_lab(
-        envelope,catalog_file=root/"project-indexes.json",
-        laboratory_mode=True,
-    )
+    if semantic_request:
+        from rag.runtime.knowledge_deletion_semantic_request_lab import (
+            PinnedSemanticRequestV1, verify_pinned_semantic_request_lab,
+        )
+        request=PinnedSemanticRequestV1.parse(json.loads(raw))
+        response=verify_pinned_semantic_request_lab(
+            request,catalog_file=root/"project-indexes.json",
+            laboratory_mode=True,
+        )
+    else:
+        envelope=PrivateReadPinEnvelopeV1.parse(json.loads(raw))
+        response=verify_private_pin_envelope_lab(
+            envelope,catalog_file=root/"project-indexes.json",
+            laboratory_mode=True,
+        )
     if hold_for_ack:
         # A test-only handshake holds the CHILD active while another process
         # attempts an exclusive writer lock against the parent's live pin.
