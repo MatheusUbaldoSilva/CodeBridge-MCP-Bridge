@@ -292,16 +292,18 @@ class ParentChildLivenessWin32LabTests(TestCase):
             "nonce":pin.nonce,
             "request_sha256":request.request_digest(),
             "tree_sha256":receipt.tree_sha256,
+            "challenge_sha256":"d"*64,
             "operational_use_allowed":False,
             "activation_authorized":False,
         }
-        validate_supervised_scratch_response_lab(valid,request,receipt)
+        validate_supervised_scratch_response_lab(valid,request,receipt,"d"*64)
         for key,value in (
             ("project_id","foreign-lab"),
             ("generation_id","replayed-generation"),
             ("nonce","0"*32),
             ("request_sha256","0"*64),
             ("tree_sha256","0"*64),
+            ("challenge_sha256","0"*64),
             ("state","LAB_OPERATIONAL_SUCCESS"),
             ("operational_use_allowed",True),
             ("activation_authorized",True),
@@ -310,13 +312,13 @@ class ParentChildLivenessWin32LabTests(TestCase):
             with self.subTest(key=key):
                 with self.assertRaisesRegex(RuntimeError,"response mismatch"):
                     validate_supervised_scratch_response_lab(
-                        {**valid,key:value},request,receipt,
+                        {**valid,key:value},request,receipt,"d"*64,
                     )
         for malformed in (None,[],{"state":"LAB_CHILD_COMPLETED_WHILE_PARENT_PIPE_OPEN"}):
             with self.subTest(malformed=malformed):
                 with self.assertRaisesRegex(RuntimeError,"response mismatch"):
                     validate_supervised_scratch_response_lab(
-                        malformed,request,receipt,
+                        malformed,request,receipt,"d"*64,
                     )
 
     def test_journal_appearing_during_supervised_child_wait_fails_closed(self):
@@ -356,3 +358,57 @@ class ParentChildLivenessWin32LabTests(TestCase):
                 parent.communicate(timeout=4)
             self.catalog.write_bytes(original)
         self.assert_original_artifacts()
+
+
+    def test_one_shot_scratch_ack_parser_rejects_reused_nonce_and_bad_challenges(self):
+        from hashlib import sha256
+        from rag.runtime.knowledge_deletion_liveness_child_lab import (
+            _parse_one_shot_scratch_ack_lab,
+        )
+        nonce="a"*32
+        one="b"*64
+        good="ACK "+nonce+" "+one+"\n"
+        digest=_parse_one_shot_scratch_ack_lab(good,nonce)
+        self.assertEqual(digest,sha256(bytes.fromhex(one)).hexdigest())
+        for invalid in (
+            "ACK "+nonce+"\n",
+            "ACK "+nonce+" "+("c"*63)+"\n",
+            "ACK "+nonce+" "+("C"*64)+"\n",
+            "ACK "+nonce+" "+("g"*64)+"\n",
+            "ACK "+("0"*32)+" "+one+"\n",
+            "ACK "+nonce+" "+one,
+            "ACK "+nonce+" "+one+"\nEXTRA",
+            "INVALID\n",
+        ):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(ValueError):
+                    _parse_one_shot_scratch_ack_lab(invalid,nonce)
+
+    def test_replayed_response_rejected_even_if_envelope_nonce_is_same(self):
+        from hashlib import sha256
+        from types import SimpleNamespace
+        from rag.runtime.knowledge_deletion_liveness_parent_lab import (
+            validate_supervised_scratch_response_lab,
+        )
+        pin=SimpleNamespace(project_id="private-lab",generation_id="private_liveness",
+                            nonce="a"*32)
+        request=SimpleNamespace(pin=pin,request_digest=lambda:"b"*64)
+        receipt=SimpleNamespace(tree_sha256="c"*64)
+        first=sha256(bytes.fromhex("d"*64)).hexdigest()
+        next_challenge=sha256(bytes.fromhex("e"*64)).hexdigest()
+        stale={
+            "state":"LAB_CHILD_COMPLETED_WHILE_PARENT_PIPE_OPEN",
+            "project_id":pin.project_id,
+            "generation_id":pin.generation_id,
+            "nonce":pin.nonce,
+            "request_sha256":request.request_digest(),
+            "tree_sha256":receipt.tree_sha256,
+            "challenge_sha256":first,
+            "operational_use_allowed":False,
+            "activation_authorized":False,
+        }
+        validate_supervised_scratch_response_lab(stale,request,receipt,first)
+        with self.assertRaisesRegex(RuntimeError,"response mismatch"):
+            validate_supervised_scratch_response_lab(
+                stale,request,receipt,next_challenge,
+            )

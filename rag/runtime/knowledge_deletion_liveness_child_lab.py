@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import ctypes
 from ctypes import wintypes
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
@@ -53,7 +54,7 @@ def _held_parent_handle_still_active(handle: wintypes.HANDLE) -> bool:
 def _read_ack_bounded(parent_handle: wintypes.HANDLE, seconds: float = 8.0) -> str | None:
     lines: list[str] = []
     def read():
-        lines.append(sys.stdin.readline(100))
+        lines.append(sys.stdin.readline(130))
     thread=Thread(target=read,daemon=True)
     thread.start()
     deadline=time.monotonic()+seconds
@@ -68,6 +69,23 @@ def _read_ack_bounded(parent_handle: wintypes.HANDLE, seconds: float = 8.0) -> s
         thread.join(min(0.05,remaining))
         if not thread.is_alive():
             return lines[0] if lines else ""
+
+
+def _parse_one_shot_scratch_ack_lab(ack: str, nonce: str) -> str:
+    """Return digest of fresh parent challenge, not the challenge itself.
+
+    This is a *scratch only* anti-stale-response correlation check.
+    The parent is NOT cryptographically authenticated by this protocol.
+    """
+    prefix="ACK "+nonce+" "
+    if (not isinstance(ack,str) or not ack.startswith(prefix)
+            or not ack.endswith("\n")
+            or len(ack)!=len(prefix)+64+1):
+        raise ValueError("scratch ACK challenge schema mismatch")
+    challenge=ack[len(prefix):-1]
+    if any(character not in "0123456789abcdef" for character in challenge):
+        raise ValueError("scratch ACK challenge is not lowercase hexadecimal")
+    return sha256(bytes.fromhex(challenge)).hexdigest()
 
 
 def main() -> None:
@@ -126,7 +144,11 @@ def _run_pinned_child_with_parent_handle(root: Path, parent_handle: wintypes.HAN
     if ack=="":
         _mark_failure(root,"PARENT_PIPE_CLOSED")
         raise SystemExit(72)
-    if ack != "ACK "+request.pin.nonce+"\n":
+    try:
+        challenge_digest=_parse_one_shot_scratch_ack_lab(
+            ack,request.pin.nonce,
+        )
+    except ValueError:
         _mark_failure(root,"CHILD_ACK_REJECTED")
         raise SystemExit(73)
     if not _held_parent_handle_still_active(parent_handle):
@@ -151,6 +173,7 @@ def _run_pinned_child_with_parent_handle(root: Path, parent_handle: wintypes.HAN
         "nonce":request.pin.nonce,
         "request_sha256":request.request_digest(),
         "tree_sha256":digest,
+        "challenge_sha256":challenge_digest,
         "operational_use_allowed":False,
         "activation_authorized":False,
     },sort_keys=True),flush=True)

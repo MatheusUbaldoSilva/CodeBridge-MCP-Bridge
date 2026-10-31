@@ -5,8 +5,10 @@ MCP, run models, or authorize generation cutover/deletion.
 """
 from __future__ import annotations
 
+from hashlib import sha256
 import json
 import os
+import secrets
 from pathlib import Path
 import subprocess
 import sys
@@ -33,7 +35,9 @@ def _read_parent_confirmation_bounded(seconds: float = 6.0) -> str | None:
     return lines[0] if lines else ""
 
 
-def validate_supervised_scratch_response_lab(body, request, receipt) -> None:
+def validate_supervised_scratch_response_lab(
+    body, request, receipt, challenge_digest: str,
+) -> None:
     """Exact response correlation; no operational credentials are produced."""
     expected = {
         "state": "LAB_CHILD_COMPLETED_WHILE_PARENT_PIPE_OPEN",
@@ -42,6 +46,7 @@ def validate_supervised_scratch_response_lab(body, request, receipt) -> None:
         "nonce": request.pin.nonce,
         "request_sha256": request.request_digest(),
         "tree_sha256": receipt.tree_sha256,
+        "challenge_sha256": challenge_digest,
         "operational_use_allowed": False,
         "activation_authorized": False,
     }
@@ -106,13 +111,19 @@ def main() -> None:
                 command=_read_parent_confirmation_bounded()
                 if command!="ACK\n":
                     raise RuntimeError("scratch parent received no ACK")
-                child.stdin.write("ACK "+envelope.nonce+"\n")
+                # New independent challenge AFTER the child's preflight;
+                # stale/recorded responses from another session cannot match.
+                challenge=secrets.token_hex(32)
+                child.stdin.write("ACK "+envelope.nonce+" "+challenge+"\n")
                 child.stdin.flush()
                 answer=child.stdout.readline()
                 if not answer:
                     raise RuntimeError("scratch child disappeared before response")
                 body=json.loads(answer)
-                validate_supervised_scratch_response_lab(body,request,receipt)
+                validate_supervised_scratch_response_lab(
+                    body,request,receipt,
+                    sha256(bytes.fromhex(challenge)).hexdigest(),
+                )
                 # No locks released until the response has been validated.
                 if child.wait(timeout=3)!=0:
                     raise RuntimeError("scratch child completion failed")
