@@ -21,6 +21,9 @@ from rag.runtime.knowledge_deletion_pin_ipc_lab import envelope_from_private_lab
 from rag.runtime.knowledge_deletion_semantic_request_lab import PinnedSemanticRequestV1
 from rag.runtime.knowledge_deletion_vector_tree_receipt_lab import create_vector_tree_receipt_lab
 from rag.runtime.production_generation_lock import production_generation_lock
+from rag.runtime.knowledge_deletion_parent_identity_lab import (
+    current_process_creation_filetime_lab,
+)
 
 
 def _read_parent_confirmation_bounded(seconds: float = 6.0) -> str | None:
@@ -94,7 +97,8 @@ def main() -> None:
                     [sys.executable,"-m",
                      "rag.runtime.isolated_project_worker",
                      "--pinned-scratch-supervised",
-                     str(root),str(os.getpid())],
+                     str(root),str(os.getpid()),
+                     str(current_process_creation_filetime_lab())],
                     cwd=str(Path(__file__).resolve().parents[2]),
                     stdin=subprocess.PIPE,stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,text=True,

@@ -8,7 +8,6 @@ import ctypes
 from ctypes import wintypes
 from hashlib import sha256
 import json
-import os
 from pathlib import Path
 import sys
 from threading import Thread
@@ -21,6 +20,10 @@ from rag.runtime.knowledge_deletion_semantic_request_lab import (
 from rag.runtime.knowledge_deletion_vector_tree_receipt_lab import (
     create_vector_tree_receipt_lab,
 )
+from rag.runtime.knowledge_deletion_parent_identity_lab import (
+    open_pinned_parent_identity_lab,
+    close_parent_identity_lab,
+)
 
 
 def _mark_failure(root: Path, state: str) -> None:
@@ -30,18 +33,11 @@ def _mark_failure(root: Path, state: str) -> None:
         json.dump({"state":state},out)
 
 
-_PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 _STILL_ACTIVE = 259
 _kernel32 = ctypes.WinDLL("kernel32",use_last_error=True)
-_open_process = _kernel32.OpenProcess
-_open_process.argtypes = [wintypes.DWORD,wintypes.BOOL,wintypes.DWORD]
-_open_process.restype = wintypes.HANDLE
 _get_exit_code = _kernel32.GetExitCodeProcess
 _get_exit_code.argtypes = [wintypes.HANDLE,ctypes.POINTER(wintypes.DWORD)]
 _get_exit_code.restype = wintypes.BOOL
-_close_handle = _kernel32.CloseHandle
-_close_handle.argtypes = [wintypes.HANDLE]
-_close_handle.restype = wintypes.BOOL
 
 
 def _held_parent_handle_still_active(handle: wintypes.HANDLE) -> bool:
@@ -89,28 +85,22 @@ def _parse_one_shot_scratch_ack_lab(ack: str, nonce: str) -> str:
 
 
 def main() -> None:
-    if len(sys.argv)!=3:
-        raise PermissionError("scratch child requires lab root and parent PID")
-    return run_supervised_scratch_child_lab(sys.argv[1],sys.argv[2])
+    if len(sys.argv)!=4:
+        raise PermissionError("scratch child requires lab root and parent identity")
+    return run_supervised_scratch_child_lab(sys.argv[1],sys.argv[2],sys.argv[3])
 
 
-def run_supervised_scratch_child_lab(root_arg: str, parent_pid_arg: str) -> None:
-    """Entry for the isolated worker's strictly scratch-only opt-in mode."""
-    if (not isinstance(parent_pid_arg,str) or not parent_pid_arg.isdigit()
-            or not 1 <= int(parent_pid_arg) < 0xFFFFFFFF):
-        raise PermissionError("scratch child requires valid parent PID")
-    parent_pid=int(parent_pid_arg)
-    if parent_pid == os.getpid():
-        raise PermissionError("parent must not be the child process")
-    parent_handle=_open_process(_PROCESS_QUERY_LIMITED_INFORMATION,False,parent_pid)
-    if not parent_handle:
-        raise PermissionError("scratch parent process cannot be pinned")
+def run_supervised_scratch_child_lab(
+    root_arg: str, parent_pid_arg: str, parent_created_arg: str,
+) -> None:
+    """Scratch worker: bind the intended parent PID and birth FILETIME."""
+    identity=open_pinned_parent_identity_lab(
+        parent_pid_arg,parent_created_arg,
+    )
     try:
-        if not _held_parent_handle_still_active(parent_handle):
-            raise PermissionError("scratch parent process already exited")
-        _run_pinned_child_with_parent_handle(Path(root_arg),parent_handle)
+        _run_pinned_child_with_parent_handle(Path(root_arg),identity.handle)
     finally:
-        _close_handle(parent_handle)
+        close_parent_identity_lab(identity)
 
 
 def _run_pinned_child_with_parent_handle(root: Path, parent_handle: wintypes.HANDLE) -> None:

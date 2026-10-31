@@ -244,7 +244,7 @@ class ParentChildLivenessWin32LabTests(TestCase):
         from unittest.mock import patch
         with (
             patch.object(sys,"argv",[
-                "worker","--pinned-scratch-supervised",str(self.root),"12345",
+                "worker","--pinned-scratch-supervised",str(self.root),"12345","123456789",
             ]),
             patch.object(isolated_project_worker,"resolve_isolated_project",
                          side_effect=AssertionError("legacy catalog resolver used")),
@@ -254,7 +254,7 @@ class ParentChildLivenessWin32LabTests(TestCase):
             as supervised,
         ):
             isolated_project_worker.main()
-        supervised.assert_called_once_with(str(self.root),"12345")
+        supervised.assert_called_once_with(str(self.root),"12345","123456789")
 
     def test_worker_supervised_mode_rejects_invalid_cli_arity_and_self_pid(self):
         from rag.runtime import isolated_project_worker
@@ -262,10 +262,11 @@ class ParentChildLivenessWin32LabTests(TestCase):
         for argv in (
             ["worker","--pinned-scratch-supervised"],
             ["worker","--pinned-scratch-supervised",str(self.root)],
-            ["worker","--pinned-scratch-supervised",str(self.root),"not-a-pid"],
-            ["worker","--pinned-scratch-supervised",str(self.root),str(os.getpid())],
-            ["worker","--pinned-scratch-supervised",str(self.root),"0"],
+            ["worker","--pinned-scratch-supervised",str(self.root),"not-a-pid","12345"],
+            ["worker","--pinned-scratch-supervised",str(self.root),str(os.getpid()),"12345"],
+            ["worker","--pinned-scratch-supervised",str(self.root),"0","12345"],
             ["worker","--pinned-scratch-supervised",str(self.root),"123","extra"],
+            ["worker","--pinned-scratch-supervised",str(self.root),"123","12345","extra"],
         ):
             with self.subTest(argv=argv):
                 with (
@@ -412,3 +413,74 @@ class ParentChildLivenessWin32LabTests(TestCase):
             validate_supervised_scratch_response_lab(
                 stale,request,receipt,next_challenge,
             )
+
+
+    def test_pinned_parent_birth_roundtrip_survives_venv_redirector(self):
+        from rag.runtime.knowledge_deletion_parent_identity_lab import (
+            current_process_creation_filetime_lab,
+        )
+        birth=current_process_creation_filetime_lab()
+        self.assertGreater(birth,0)
+        # Venv redirector may be immediate OS parent, yet the provided
+        # intended parent PID and immutable birth time must be verified.
+        code=(
+            "import sys;"
+            "from rag.runtime.knowledge_deletion_parent_identity_lab import "
+            "open_pinned_parent_identity_lab,held_parent_still_alive_lab,"
+            "close_parent_identity_lab;"
+            "identity=open_pinned_parent_identity_lab(sys.argv[1],sys.argv[2]);"
+            "assert held_parent_still_alive_lab(identity);"
+            "close_parent_identity_lab(identity);"
+            "print('IDENTITY_MATCH')"
+        )
+        result=subprocess.run(
+            [sys.executable,"-c",code,str(os.getpid()),str(birth)],
+            cwd=str(Path(__file__).resolve().parents[1]),
+            capture_output=True,text=True,timeout=8,
+        )
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn("IDENTITY_MATCH",result.stdout)
+
+    def test_wrong_parent_birth_is_refused_for_direct_child(self):
+        from rag.runtime.knowledge_deletion_parent_identity_lab import (
+            current_process_creation_filetime_lab,
+        )
+        birth=current_process_creation_filetime_lab()
+        code=(
+            "import sys;"
+            "from rag.runtime.knowledge_deletion_parent_identity_lab import "
+            "open_pinned_parent_identity_lab;"
+            "open_pinned_parent_identity_lab(sys.argv[1],sys.argv[2])"
+        )
+        cases=(
+            (str(os.getpid()),str(birth+1)),
+            (str(os.getpid()),"wrong"),
+            ("0",str(birth)),
+            ("4294967295",str(birth)),
+            (str(os.getppid()),str(birth)),
+        )
+        for pid,created in cases:
+            with self.subTest(pid=pid,created=created):
+                result=subprocess.run(
+                    [sys.executable,"-c",code,pid,created],
+                    cwd=str(Path(__file__).resolve().parents[1]),
+                    capture_output=True,text=True,timeout=8,
+                )
+                self.assertNotEqual(result.returncode,0)
+                self.assertIn("ProcessIdentityLabError",result.stderr)
+
+    def test_worker_supervised_rejects_correct_parent_pid_wrong_birth(self):
+        from rag.runtime.knowledge_deletion_parent_identity_lab import (
+            current_process_creation_filetime_lab,
+        )
+        birth=current_process_creation_filetime_lab()
+        result=subprocess.run(
+            [sys.executable,"-m","rag.runtime.isolated_project_worker",
+             "--pinned-scratch-supervised",str(self.root),
+             str(os.getpid()),str(birth+1)],
+            cwd=str(Path(__file__).resolve().parents[1]),
+            input="",capture_output=True,text=True,timeout=8,
+        )
+        self.assertNotEqual(result.returncode,0)
+        self.assertNotIn("CHILD_VERIFIED",result.stdout)
+        self.assertIn("identity mismatch",result.stderr)
