@@ -10,6 +10,7 @@ import secrets
 import subprocess
 import sys
 from rag.runtime.knowledge_deletion_parent_identity_lab import _creation_filetime
+from rag.runtime.knowledge_deletion_pipe_acl_inspection_dev import inspect_pipe_fd_acl_dev
 from rag.runtime.knowledge_deletion_channel_mac_lab import (
     issue_lab_secret, verify_lab_birth_response,
 )
@@ -39,6 +40,20 @@ def scratch_mac_pipe_roundtrip(*,project_id="scratch",generation="lab",
         close_fds=True, shell=False,
     )
     try:
+        # Examine the three caller-side pipe ends BEFORE sending the secret.
+        # This is evidence of source handle descriptors, not a child ACL audit.
+        pipe_evidence=[
+            inspect_pipe_fd_acl_dev(stream.fileno())
+            for stream in (proc.stdin,proc.stdout,proc.stderr)
+        ]
+        if not all(
+            item["descriptor_observed"] is True
+            and item["dacl_present"] is True
+            and item["owner_present"] is True
+            and item["parent_handle_inheritable"] is False
+            for item in pipe_evidence
+        ):
+            raise RuntimeError("scratch parent pipe security unverified")
         try:
             stdout,stderr=proc.communicate(input=wire,timeout=timeout_seconds)
         except subprocess.TimeoutExpired as exc:
@@ -67,6 +82,8 @@ def scratch_mac_pipe_roundtrip(*,project_id="scratch",generation="lab",
             "mac_verified":True,
             "spawned_pid_matches_response":True,
             "win32_birth_matches_response":True,
+            "parent_pipe_descriptors_observed":True,
+            "parent_pipe_ends_not_inheritable":True,
             "os_process_identity_attested":False,
             "secure_handle_acl_attested":False,
             "activation_authorized":False,
@@ -76,6 +93,13 @@ def scratch_mac_pipe_roundtrip(*,project_id="scratch",generation="lab",
     except (ValueError,TypeError,KeyError) as exc:
         raise RuntimeError("scratch channel invalid") from exc
     finally:
-        if proc.poll() is None:
-            proc.kill()
-            proc.wait()
+        try:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait()
+        finally:
+            # Preflight may reject before communicate() closes pipe streams.
+            # Release all parent-side descriptors even on failed ACL evidence.
+            for stream in (proc.stdin,proc.stdout,proc.stderr):
+                if stream is not None:
+                    stream.close()
