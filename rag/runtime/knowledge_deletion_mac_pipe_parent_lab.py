@@ -12,9 +12,8 @@ import sys
 from rag.runtime.knowledge_deletion_parent_identity_lab import _creation_filetime
 from rag.runtime.knowledge_deletion_pipe_acl_inspection_dev import inspect_pipe_fd_acl_dev
 from rag.runtime.knowledge_deletion_pipe_ace_inventory_dev import inspect_pipe_allow_aces_read_only_dev
-from rag.runtime.knowledge_deletion_channel_mac_lab import (
-    issue_lab_secret, verify_lab_birth_response,
-)
+from rag.runtime.knowledge_deletion_channel_mac_lab import issue_lab_secret
+from rag.runtime.knowledge_deletion_pipe_receipt_mac_lab import verify_lab_stdio_receipts
 
 def scratch_mac_pipe_roundtrip(*,project_id="scratch",generation="lab",
                                timeout_seconds:float=5.0,entrypoint:str="synthetic")->dict:
@@ -81,7 +80,7 @@ def scratch_mac_pipe_roundtrip(*,project_id="scratch",generation="lab",
         if proc.returncode!=0 or stderr or len(stdout)>1024:
             raise RuntimeError("scratch child blocked")
         response=json.loads(stdout)
-        if not isinstance(response,dict) or set(response)!={"pid","mac","birth"}:
+        if not isinstance(response,dict) or set(response)!={"pid","mac","birth","stdio_receipts"}:
             raise RuntimeError("scratch response malformed")
         pid=response["pid"]
         if type(pid) is not int or pid<=0:
@@ -91,8 +90,19 @@ def scratch_mac_pipe_roundtrip(*,project_id="scratch",generation="lab",
         birth=response["birth"]
         if type(birth) is not int or birth != _creation_filetime(proc._handle):
             raise RuntimeError("scratch Win32 object birth mismatch")
-        if not verify_lab_birth_response(key,response["mac"],creation_filetime=birth,
-                **fields,child_pid=pid):
+        # Child descriptor digests must match the three observed parent ends.
+        # Equal SDDL is not proof that the underlying kernel object is identical.
+        received=response["stdio_receipts"]
+        if not isinstance(received,dict) or set(received)!={
+            "stdin","stdout","stderr"
+        }:
+            raise RuntimeError("scratch stdio receipt shape invalid")
+        expected=dict(zip(("stdin","stdout","stderr"),
+                           (item["descriptor_digest"] for item in pipe_evidence)))
+        if received!=expected:
+            raise RuntimeError("scratch child stdio descriptor mismatch")
+        if not verify_lab_stdio_receipts(key,response["mac"],creation_filetime=birth,
+                stdio_receipts=received,**fields,child_pid=pid):
             raise RuntimeError("scratch MAC mismatch")
         return {
             "state":"SCRATCH_MAC_PIPE_ROUNDTRIP_ONLY",
@@ -103,6 +113,7 @@ def scratch_mac_pipe_roundtrip(*,project_id="scratch",generation="lab",
             "parent_pipe_descriptors_observed":True,
             "parent_pipe_ends_not_inheritable":True,
             "parent_pipe_known_broad_aces_absent":True,
+            "child_parent_stdio_descriptors_matched":True,
             "os_process_identity_attested":False,
             "secure_handle_acl_attested":False,
             "activation_authorized":False,
