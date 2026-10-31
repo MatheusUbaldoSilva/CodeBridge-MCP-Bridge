@@ -56,3 +56,5 @@ RAG-DEL-01.04-DJ (DEV): novo inventario publico SQLite read-only sob production_
 RAG-DEL-01.04-DL (DEV): interface documents/codebridge usa inventario pinado DJ e preserva list[dict] sem fallback ao SQLite legado. Commit seletivo do ramo GUI (somente 8 linhas; diff preexistente intocado). Seis testes GUI scratch incluindo E2E com LockFileEx; teste smoke da quarta pagina corrigido segundo a base HEAD existente. Stable, indice real e exclusao sem alteracao.
 
 RAG-DEL-01.04-DM (DEV): helper NOVO e somente laboratorial para inventario privado com _catalog_mutex, fingerprint SQLite, bloqueio de journals e namespaces segregados; sete testes com subprocesso/mutex reais em TemporaryDirectory. Nenhuma integracao GUI privada ou exclusao real foi habilitada.
+
+RAG-DEL-01.04-DN (DEV): 3 testes Qt offscreen de erro de leitura com generation busy/catalago ocupado e isolamento na troca de projeto; publica nao libera selecao de exclusao. Sem alteracao adicional da GUI, Stable ou index real.
