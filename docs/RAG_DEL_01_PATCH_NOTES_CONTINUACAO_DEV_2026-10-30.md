@@ -68,3 +68,5 @@ RAG-DEL-01.04-DQ-C-A (DEV): sessao composta TEMP-only generation(shared)->semant
 RAG-DEL-01.04-DQ-C-B (DEV): testes dos servicos reais search_context/get_context com SQLite privado FTS5 temporario sob sessao composta DQ-C-A, isolamento de namespace e executor semantico sintetico sem segundo lock. 3 testes PASS; RAG-DEL 337 (333 PASS/4 SKIP), RAG-AUTO 241 (236 PASS/5 SKIP). Nenhuma integracao operacional.
 
 RAG-DEL-01.04-DQ-D-A (DEV): testes Windows multiprocessos TEMP comprovam que morte do leitor libera generation/semantic/catalog locks e journal pendente permanece como bloqueio de leitura; fixture SQLite fecha handle explicitamente. RAG-DEL 339 (335 PASS/4 SKIP), RAG-AUTO 241 (236 PASS/5 SKIP), zero falhas. Sem recovery operacional.
+
+RAG-DEL-01.04-DQ-D-B (DEV): concorrencia Win32 entre leitor privado pinado e writer fence real, CAS stale recusado, queue BEGIN IMMEDIATE bloqueia concorrencia, rollback idempotente de catalogo sintetico e pointer preservado. Journal historico continua bloqueando reader ate reconciliacao explicitamente auditada. RAG-DEL 342 (338 PASS/4 SKIP), RAG-AUTO 241 (236 PASS/5 SKIP), zero falhas. Nao operacional.
