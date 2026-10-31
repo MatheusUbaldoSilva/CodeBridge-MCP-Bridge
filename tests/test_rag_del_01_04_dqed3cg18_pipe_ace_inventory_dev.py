@@ -65,7 +65,13 @@ class NativePipeAceInventoryTests(TestCase):
         convert.restype=wintypes.BOOL
         for name,expected in (("S-1-1-0","EVERYONE"),
                               ("S-1-5-11","AUTHENTICATED_USERS"),
-                              ("S-1-5-32-545","BUILTIN_USERS")):
+                              ("S-1-5-32-545","BUILTIN_USERS"),
+                              ("S-1-5-4","INTERACTIVE"),
+                              ("S-1-5-6","SERVICE"),
+                              ("S-1-5-32-546","BUILTIN_GUESTS"),
+                              ("S-1-15-2-1","ALL_APPLICATION_PACKAGES"),
+                              ("S-1-15-2-2","ALL_RESTRICTED_APPLICATION_PACKAGES"),
+                              ("S-1-5-32-555","REMOTE_DESKTOP_USERS")):
             sid=ctypes.c_void_p()
             self.assertTrue(convert(name,ctypes.byref(sid)))
             try:
