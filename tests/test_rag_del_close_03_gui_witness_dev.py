@@ -42,6 +42,8 @@ class GuiWitnessDevTests(unittest.TestCase):
             self.assertEqual(result["observed_server_pid"],identity["pid"])
             self.assertTrue(result["challenge_bound"])
             self.assertTrue(result["installed_gui_loaded_code_observed"])
+            self.assertTrue(result["expected_loaded_code_matches"])
+            self.assertTrue(result["peer_accesscheck_observed"])
             self.assertEqual(len(result["loaded_code_receipts"]),2)
             self.assertFalse(result["activation_authorized"])
             self.assertFalse(result["installed_gui_operationally_attested"])

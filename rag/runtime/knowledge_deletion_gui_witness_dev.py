@@ -11,6 +11,8 @@ import marshal
 import os
 import re
 import sys
+import ctypes
+from ctypes import wintypes
 import threading
 import win32api
 import win32process
@@ -58,6 +60,21 @@ def _code_receipts():
 
 
 def _one_challenge(connection):
+    from rag.runtime.knowledge_deletion_scratch_peer_acl_dev import (
+        inspect_scratch_connected_peer_effective_access_dev,
+    )
+    from rag.runtime.knowledge_deletion_scratch_pipe_peer_identity_dev import (
+        _client_pid,
+    )
+    client_pid = wintypes.ULONG()
+    if not _client_pid(connection._handle, ctypes.byref(client_pid)):
+        raise RuntimeError("kernel client identity missing")
+    peer_access = inspect_scratch_connected_peer_effective_access_dev(
+        connection, expected_client_pid=client_pid.value,
+    )
+    if (peer_access["state"] != "SCRATCH_PEER_KERNEL_TOKEN_ACCESSCHECK_COMPLETE"
+        or peer_access["access_granted"] is not True):
+        raise PermissionError("peer kernel DACL AccessCheck rejected")
     raw = connection.receive()
     if len(raw) > 256:
         raise ValueError("oversized witness challenge")
@@ -70,6 +87,9 @@ def _one_challenge(connection):
         "pid": os.getpid(),
         "birth_us": gui_birth_us(),
         "code_receipts": _code_receipts(),
+        "observed_peer_pid": client_pid.value,
+        "peer_effective_read_access": peer_access["access_granted"],
+        "peer_accesscheck_completed": peer_access["access_check_completed"],
         "installed_gui_attested_for_operational_deletion": False,
         "activation_authorized": False,
         "operational_use_allowed": False,

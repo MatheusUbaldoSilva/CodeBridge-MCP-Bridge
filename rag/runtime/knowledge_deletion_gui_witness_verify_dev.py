@@ -1,4 +1,4 @@
-﻿"""Read-only external kernel-pinned verifier of the DEV GUI witness.
+"""Read-only external kernel-pinned verifier of the DEV GUI witness.
 
 Never authorizes RAG deletion; witnesses are not proof of per-request authorization.
 """
@@ -8,6 +8,8 @@ from ctypes import wintypes
 import hashlib
 import json
 import secrets
+import marshal
+import os
 
 import win32api
 import win32con
@@ -33,6 +35,7 @@ def verify_dev_gui_witness(*, expected_pid: int, expected_birth_us: int, timeout
         expected_pid=expected_pid, expected_birth_us=expected_birth_us,
         observed_server_pid=None, challenge_bound=False,
         loaded_code_receipts={}, blockers=[],
+        expected_loaded_code_matches=False, peer_accesscheck_observed=False,
         installed_gui_loaded_code_observed=False,
         installed_gui_operationally_attested=False,
         ipc_peer_effective_acl_attested=False,
@@ -83,6 +86,9 @@ def verify_dev_gui_witness(*, expected_pid: int, expected_birth_us: int, timeout
             or report.get("pid") != expected_pid
             or report.get("birth_us") != expected_birth_us
             or report.get("challenge") != challenge
+            or report.get("observed_peer_pid") != os.getpid()
+            or report.get("peer_effective_read_access") is not True
+            or report.get("peer_accesscheck_completed") is not True
             or report.get("activation_authorized") is not False
             or report.get("operational_use_allowed") is not False
             or report.get("installed_gui_attested_for_operational_deletion") is not False):
@@ -99,6 +105,28 @@ def verify_dev_gui_witness(*, expected_pid: int, expected_birth_us: int, timeout
         ):
             result["blockers"].append("LOADED_CODE_RECEIPTS_MISSING")
             return result
+        result["peer_accesscheck_observed"] = True
+        from rag_panel import RagPanel
+        from rag_deletion_review_panel import KnowledgeRemovalReviewPanel
+        expected = {
+            "rag_panel.review_authorization": (
+                RagPanel.review_authorization, Path(app_root)/"rag_panel.py"
+            ),
+            "rag_deletion_review_panel.review_selected": (
+                KnowledgeRemovalReviewPanel.review_selected,
+                Path(app_root)/"rag_deletion_review_panel.py"
+            ),
+        }
+        if set(receipts) != set(expected) or any(
+            receipts[key]["sha256"] != hashlib.sha256(
+                marshal.dumps(expected[key][0].__code__)
+            ).hexdigest()
+            or Path(receipts[key]["loaded_module_path"]).resolve() != expected[key][1].resolve()
+            for key in expected
+        ):
+            result["blockers"].append("INSTALLED_GUI_LOADED_CODE_MISMATCH")
+            return result
+        result["expected_loaded_code_matches"] = True
         result["loaded_code_receipts"] = receipts
         result["installed_gui_loaded_code_observed"] = True
         result["state"] = "GUI_LOADED_CODE_KERNEL_PINNED_READONLY"
