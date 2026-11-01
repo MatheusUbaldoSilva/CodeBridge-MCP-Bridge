@@ -128,6 +128,13 @@ class OperationalReconcileDevTests(unittest.TestCase):
             result = self._review()
         self.assertIn("OPERATIONAL_EVIDENCE_UNVERIFIED", result["blockers"])
         self.assertFalse(result["activation_authorized"])
+    def test_oversized_backup_fails_closed(self):
+        self._insert_pending()
+        backup = self._canary()
+        backup.write_bytes(b"x" * (1048576 + 1))
+        result = self._review()
+        self.assertIn("CANARY_CATALOG_INCONSISTENT", result["blockers"])
+        self.assertFalse(result["activation_authorized"])
     def test_missing_queue_is_blocked_without_creation(self):
         self.queue.unlink()
         result = self._review()

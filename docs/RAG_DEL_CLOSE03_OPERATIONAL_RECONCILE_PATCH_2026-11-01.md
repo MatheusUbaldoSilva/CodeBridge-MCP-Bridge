@@ -24,8 +24,8 @@ Observed real installation at test time:
 - Existing RAG-DEL deletion journals were clean.
 
 Testing:
-- Synthetic: 5 tests pass (quiet, pending+active, tampered backup, absent queue, changed job receipt with same count).
-- Whole RAG-DEL suite: 789 run, 783 pass, 6 skipped, zero failed.
+- Synthetic: 6 tests pass (quiet, pending+active, tampered backup, absent queue, changed job receipt with same count, oversized backup).
+- Whole RAG-DEL suite: 790 run, 784 pass, 6 skipped, zero failed.
 - Git restrictions: only these new files, docs and tests are scoped.
 - No installed GUI, GitHub, Stable, permission, queue, journal, canary,
   index or production data modifications.

@@ -15,12 +15,12 @@ Date: 2026-11-01. Branch: dev-local. The current code must not be promoted to St
   and private generation existence. It never authorizes deletion.
 
 ## Tested
-- Full RAG-DEL: 789 run / 783 pass / 6 skipped / 0 failures
+- Full RAG-DEL: 790 run / 784 pass / 6 skipped / 0 failures
 - RAG-AUTO non-MCP: 241 run / 236 pass / 5 skipped / 0 failures
 - RAG-AUTO MCP modules: 12 run / 12 pass / 0 failures (existing author_mcp venv)
 - Generation recovery: 94 run / 94 pass / 0 failures
-- Local targeted reconciliation: 5 run / 5 pass (including tampered backup
-  and changed queue receipt with same count)
+- Local targeted reconciliation: 6 run / 6 pass (including tampered backup
+  and changed queue receipt with same count, oversized backup)
 
 ## Actual observed installed state
 - CodeBridge API READY.

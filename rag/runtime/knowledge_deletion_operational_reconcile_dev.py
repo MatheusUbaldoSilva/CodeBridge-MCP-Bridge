@@ -107,6 +107,7 @@ def reconcile_operational_generation_read_only(
                 or record.get("catalog") != str(catalog_path)
                 or catalog_hash != record.get("new_sha256")
                 or not backup.is_file() or backup.is_symlink()
+                or backup.stat().st_size > 1048576
                 or hashlib.sha256(backup.read_bytes()).hexdigest() != record.get("old_sha256")
                 or not isinstance(project,dict)
                 or project.get("job_id") != job_id
