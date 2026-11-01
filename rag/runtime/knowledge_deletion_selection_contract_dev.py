@@ -10,6 +10,8 @@ import hashlib
 import json
 import unicodedata
 
+from rag.runtime.isolated_project_index import PROJECT_ID_PATTERN
+
 _MAX_FILES = 500
 _MAX_PATH_UTF8 = 4096
 _MAX_TOTAL_UTF8 = 65536
@@ -59,11 +61,11 @@ def review_explicit_deletion_paths_dev(
     normalization/NTFS semantics, or user approval. A valid lexical selection
     alone is not ready to delete.
     """
-    if (type(project_id) is not str or not project_id or project_id == "codebridge"
-        or len(project_id) > 128
-        or any(ord(c) < 33 or ord(c) > 126 for c in project_id)
-        or any(c in "/:" or c == chr(92) for c in project_id)):
-        raise ValueError("only explicit private project identifiers accepted")
+    # Source-of-truth namespace rule from the installed RAG isolated router:
+    # never permit lexical-review IDs the actual router would reject.
+    if (type(project_id) is not str or project_id == "codebridge"
+        or PROJECT_ID_PATTERN.fullmatch(project_id) is None):
+        raise ValueError("only routed private project identifiers accepted")
     if (type(selected_paths) is not list
         or not 1 <= len(selected_paths) <= _MAX_FILES):
         raise ValueError("selection size invalid")
