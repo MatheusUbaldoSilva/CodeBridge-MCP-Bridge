@@ -18,6 +18,9 @@ import win32process
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"app_rewrite"))
 from ipc_named_pipe import NamedPipeServer
+from rag.runtime.knowledge_deletion_scratch_peer_acl_dev import (
+    inspect_scratch_connected_peer_effective_access_dev,
+)
 from rag.runtime.knowledge_deletion_scratch_pipe_peer_identity_dev import (
     inspect_scratch_connected_peer_dev,
 )
@@ -56,9 +59,16 @@ class ScratchKernelPeerIdentityTests(unittest.TestCase):
                             connection,expected_client_pid=claimed,
                             expected_client_birth=birth
                         )
+                    acl=inspect_scratch_connected_peer_effective_access_dev(
+                        connection,expected_client_pid=claimed
+                    )
+                    birth_acl=inspect_scratch_connected_peer_effective_access_dev(
+                        connection,expected_client_pid=claimed,
+                        expected_client_birth=observation["observed_birth"]+1_000_000
+                    )
                     connection.send(b"CHECKED")
                     close=connection.receive()
-                    results.put((observation,second,close,claimed))
+                    results.put((observation,second,close,claimed,acl,birth_acl))
             except Exception as exc:
                 results.put(exc)
         thread=threading.Thread(target=serve,daemon=True)
@@ -76,18 +86,24 @@ class ScratchKernelPeerIdentityTests(unittest.TestCase):
                 raise answer
             self.assertEqual(child.returncode,0,err)
             self.assertEqual(answer[2],b"CLOSE")
-            return answer[0],answer[1],answer[3]
+            return answer[0],answer[1],answer[3],answer[4],answer[5]
         finally:
             if child.poll() is None:
                 child.kill()
                 child.wait(timeout=3)
 
     def test_real_distinct_process_kernel_peer_and_birth(self):
-        first,second,pid=self._exchange()
+        first,second,pid,acl,birth_acl=self._exchange()
         self.assertEqual(first["state"],"SCRATCH_KERNEL_PEER_PID_BIRTH_OBSERVED")
         self.assertEqual(first["observed_peer_pid"],pid)
         self.assertTrue(first["expected_pid_matches"])
         self.assertTrue(first["same_operator_user"])
+        self.assertEqual(acl["state"],"SCRATCH_PEER_KERNEL_TOKEN_ACCESSCHECK_COMPLETE",str(acl))
+        self.assertTrue(acl["access_check_completed"])
+        self.assertTrue(acl["access_granted"])
+        self.assertFalse(acl["activation_authorized"])
+        self.assertIn("KERNEL_PEER_IDENTITY_UNVERIFIED",birth_acl["blockers"])
+        self.assertFalse(birth_acl["access_check_completed"])
         self.assertGreater(first["observed_birth"],0)
         self.assertEqual(second["state"],"SCRATCH_KERNEL_PEER_PID_BIRTH_OBSERVED")
         self.assertFalse(second["installed_gui_attested"])
@@ -95,14 +111,16 @@ class ScratchKernelPeerIdentityTests(unittest.TestCase):
         self.assertFalse(second["operational_use_allowed"])
 
     def test_client_supplied_spoofed_pid_is_rejected(self):
-        first,second,pid=self._exchange(spoof=True)
+        first,second,pid,acl,birth_acl=self._exchange(spoof=True)
         self.assertEqual(first["observed_peer_pid"],pid-7)
         self.assertFalse(first["expected_pid_matches"])
         self.assertIn("PEER_PID_MISMATCH",first["blockers"])
+        self.assertIn("KERNEL_PEER_IDENTITY_UNVERIFIED",acl["blockers"])
+        self.assertFalse(acl["access_check_completed"])
         self.assertFalse(first["activation_authorized"])
 
     def test_mismatched_birth_receipt_is_rejected(self):
-        first,second,pid=self._exchange(birth_delta=1_000_000)
+        first,second,pid,acl,birth_acl=self._exchange(birth_delta=1_000_000)
         self.assertEqual(first["observed_peer_pid"],pid)
         self.assertEqual(first["state"],"SCRATCH_KERNEL_PEER_PID_BIRTH_OBSERVED")
         self.assertFalse(second["expected_birth_matches"])
