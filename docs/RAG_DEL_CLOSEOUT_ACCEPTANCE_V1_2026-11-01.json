@@ -1,0 +1,74 @@
+{
+  "schema": "RAG_DEL_CLOSEOUT_ACCEPTANCE_V1",
+  "date": "2026-11-01",
+  "project": "CodeBridge RAG-DEL",
+  "branch": "dev-local",
+  "scope": "Functional acceptance; not code-line percentage nor production readiness",
+  "gates": [
+    {
+      "id": "CLOSE-01",
+      "title": "Mapear bloqueios reais e congelar criterios de aceite",
+      "state": "COMPLETE_DEV",
+      "weight_points": 20,
+      "evidence": [
+        "Review-only GUI with no destructive controls",
+        "Installed GUI loaded-code/IPC identity not attested",
+        "Live operational queue/journal pending operator approval"
+      ]
+    },
+    {
+      "id": "CLOSE-02",
+      "title": "Exclusao candidata ponta a ponta em ambiente descartavel",
+      "state": "COMPLETE_LAB",
+      "weight_points": 20,
+      "evidence": [
+        "Actual read-only preview plus F16 selection binding",
+        "Actual SQLite/FTS and manifest staged with selected files absent",
+        "Surviving Qdrant vectors copied/read-back/verified in scratch store",
+        "Original SQLite and manifest SHA256 unchanged, public pointer untouched"
+      ]
+    },
+    {
+      "id": "CLOSE-03",
+      "title": "Homologar identidade instalada, IPC, fila e journal",
+      "state": "BLOCKED_REQUIRES_SEPARATE_APPROVAL",
+      "weight_points": 20,
+      "evidence": [
+        "No trusted in-process installed GUI attestation",
+        "Windows effective IPC AccessCheck and token not verified",
+        "G32 safeguard remains; bypass prohibited",
+        "No operator-approved operational queue/journal reconciliation"
+      ]
+    },
+    {
+      "id": "CLOSE-04",
+      "title": "Integrar exclusao na GUI com confirmacao e rollback",
+      "state": "NOT_STARTED",
+      "weight_points": 20,
+      "evidence": [
+        "Current GUI supports preview only",
+        "No operational delete action or confirmation wired",
+        "Requires CLOSE-03 gate and explicit pilot approval"
+      ]
+    },
+    {
+      "id": "CLOSE-05",
+      "title": "Piloto controlado, auditoria final e Stable",
+      "state": "NOT_STARTED",
+      "weight_points": 20,
+      "evidence": [
+        "No authorized installed pilot",
+        "No Stable rollout",
+        "No GitHub push"
+      ]
+    }
+  ],
+  "total_weight_points": 100,
+  "completed_weight_points": 40,
+  "acceptance_percent": 40,
+  "installed_operational_deletion_enabled": false,
+  "production_homologated": false,
+  "operator_pilot_approved": false,
+  "live_index_modified": false,
+  "original_dirty_paths_preserved": true
+}
