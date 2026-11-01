@@ -34,7 +34,7 @@ def review_gui_creation_order_dev(processes:list[dict],dev_root:Path)->dict:
     guis=[pid for pid,(parent,birth,command) in records.items()
           if _script_command(command,gui,(("--no-elevate",""),))]
     mcps=[pid for pid,(parent,birth,command) in records.items()
-          if _script_command(command,mcp,(("--port","8765"),))]
+          if _script_command(command,mcp,(("--host","127.0.0.1"),("--port","8765")))]
     def older_ancestor(descendant:int,ancestor:int)->bool:
         seen=set()
         current=descendant

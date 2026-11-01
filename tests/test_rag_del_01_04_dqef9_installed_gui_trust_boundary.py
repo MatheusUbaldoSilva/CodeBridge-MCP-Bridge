@@ -23,7 +23,7 @@ def topology():
                          str(ROOT/"app_rewrite"/"main.py")+'" --no-elevate'),
         dict(ProcessId=300,ParentProcessId=200,
              CommandLine='"C:/python/python.exe" "'+
-                         str(ROOT/"author_mcp"/"mcp_server.py")+'" --port 8765'),
+                         str(ROOT/"author_mcp"/"mcp_server.py")+'" --host 127.0.0.1 --port 8765'),
     ],ROOT)
 
 class InstalledGuiBoundaryReviewTests(TestCase):

@@ -30,7 +30,12 @@ def _windows_argv(line:str)->tuple[str,...]:
     finally:
         _LocalFree(ctypes.cast(buffer,ctypes.c_void_p))
 
-def _script_command(line:str,expected:str,flags:tuple[str,...]=())->bool:
+def _script_command(line:str,expected:str,flags:tuple[tuple[str,str],...]=())->bool:
+    """Require a minimal, unambiguous script argv, not just present flag text.
+
+    This is a read-only *process command-line observation*, not installed
+    process-code attestation or proof of what an application actually parsed.
+    """
     args=_windows_argv(line)
     if len(args)<2 or args[0].replace("/","\\").rsplit("\\",1)[-1].casefold() not in (
             "python.exe","pythonw.exe"):
@@ -39,11 +44,29 @@ def _script_command(line:str,expected:str,flags:tuple[str,...]=())->bool:
     if script!=expected:
         return False
     rest=args[2:]
-    return all(
-        flag in rest if not value else any(
-            rest[i:i+2]==(flag,value) for i in range(len(rest)-1))
-        for flag,value in flags
-    )
+    if "--" in rest:
+        return False
+    consumed=0
+    for flag,value in flags:
+        if not isinstance(flag,str) or not flag.startswith("--"):
+            return False
+        # Duplicates, conflicting values, and --flag=value shadows must
+        # fail closed even when one valid pair is also present.
+        if any(token.startswith(flag+"=") for token in rest):
+            return False
+        locations=[i for i,token in enumerate(rest) if token==flag]
+        if len(locations)!=1:
+            return False
+        index=locations[0]
+        if value:
+            if index+1>=len(rest) or rest[index+1]!=value:
+                return False
+            consumed+=2
+        else:
+            consumed+=1
+    # Reject unexpected/positional tokens, including flags that the target
+    # application might interpret differently than this observer.
+    return consumed==len(rest)
 
 def review_gui_process_topology_dev(processes:list[dict],dev_root:Path)->dict:
     if (not isinstance(processes,list) or not isinstance(dev_root,Path)
@@ -71,7 +94,7 @@ def review_gui_process_topology_dev(processes:list[dict],dev_root:Path)->dict:
     gui=[p for p in normalized if _script_command(
         p[2],app,(("--no-elevate",""),))]
     servers=[p for p in normalized if _script_command(
-        p[2],mcp,(("--port","8765"),))]
+        p[2],mcp,(("--host","127.0.0.1"),("--port","8765")))]
     ids={p[0]:p for p in normalized}
     def descended(pid,ancestor):
         observed=set()

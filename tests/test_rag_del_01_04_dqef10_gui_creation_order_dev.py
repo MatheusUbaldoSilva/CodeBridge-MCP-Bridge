@@ -15,7 +15,7 @@ def sample():
         dict(ProcessId=200,ParentProcessId=100,CreationEpochMs=1100,
              CommandLine='"C:/python/python.exe" "'+str(gui)+'" --no-elevate'),
         dict(ProcessId=300,ParentProcessId=200,CreationEpochMs=1200,
-             CommandLine='"C:/python/python.exe" "'+str(mcp)+'" --port 8765'),
+             CommandLine='"C:/python/python.exe" "'+str(mcp)+'" --host 127.0.0.1 --port 8765'),
     ]
 
 class GUIBirthOrderTests(TestCase):
@@ -51,3 +51,25 @@ class GUIBirthOrderTests(TestCase):
         x[0]["ParentProcessId"]=300
         x[2]["CreationEpochMs"]=100
         self.assertFalse(review(x,ROOT)["process_creation_order_observed"])
+
+    def test_f11_shadowed_port_breaks_birth_observation(self):
+        x=sample()
+        x[2]["CommandLine"]+=" --port 9999"
+        result=review(x,ROOT)
+        self.assertFalse(result["process_creation_order_observed"])
+        self.assertFalse(result["activation_authorized"])
+
+    def test_f11_nonloopback_host_breaks_birth_observation(self):
+        x=sample()
+        x[2]["CommandLine"]=x[2]["CommandLine"].replace(
+            "--host 127.0.0.1","--host 0.0.0.0")
+        self.assertFalse(review(x,ROOT)["process_creation_order_observed"])
+
+    def test_f11_reordered_exact_mcp_flags_still_observed(self):
+        x=sample()
+        x[2]["CommandLine"]=x[2]["CommandLine"].replace(
+            "--host 127.0.0.1 --port 8765",
+            "--port 8765 --host 127.0.0.1")
+        r=review(x,ROOT)
+        self.assertTrue(r["process_creation_order_observed"])
+        self.assertFalse(r["installed_gui_runtime_attested"])
