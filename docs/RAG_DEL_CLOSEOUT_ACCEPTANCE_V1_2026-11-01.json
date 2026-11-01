@@ -34,10 +34,11 @@
       "state": "BLOCKED_REQUIRES_SEPARATE_APPROVAL",
       "weight_points": 20,
       "evidence": [
-        "No trusted in-process installed GUI attestation",
-        "Windows effective IPC AccessCheck and token not verified",
-        "G32 safeguard remains; bypass prohibited",
-        "No operator-approved operational queue/journal reconciliation"
+        "DEV installed running GUI PID/birth and in-memory loaded code witnessed with kernel server PID and nonce challenge; hashes matched source",
+        "Native Windows peer token AccessCheck verified on the installed read-only diagnostic Named Pipe; deletion-command IPC is NOT implemented/attested",
+        "Real read-only queue, RAG-DEL journal and AUTO canary/catalog/public-pointer hash reconciliation completed",
+        "newworldpvp READY_FOR_REVIEW and CANARY_ACTIVE require explicit operator KEEP, ROLLBACK or RECONCILE decision; no automatic state change",
+        "G32 fail-closed; GUI operational deletion button disabled; no pilot authorization"
       ]
     },
     {
