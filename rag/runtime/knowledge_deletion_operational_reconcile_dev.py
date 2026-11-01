@@ -1,4 +1,4 @@
-﻿"""Read-only operational RAG-DEL queue/canary reconciliation for CLOSE-03.
+"""Read-only operational RAG-DEL queue/canary reconciliation for CLOSE-03.
 
 Reads real files when explicitly called, never updates queue, journal or
 catalog, and never authorizes operational deletion. Not a trusted GUI/IPC
@@ -45,6 +45,7 @@ def reconcile_operational_generation_read_only(
         "queue_pending_count": None,
         "canary_count": None,
         "canary_catalog_consistent": False,
+        "canary_rollback_preflight_consistent": False,
         "matched_canary_queue_job": False,
         "blockers": [],
     }
@@ -96,12 +97,17 @@ def reconcile_operational_generation_read_only(
         result["canary_count"] = len(journals)
         matched = []
         catalog_hash = hashlib.sha256(catalog_path.read_bytes()).hexdigest()
+        pointer_hash = hashlib.sha256((directory/"active-generation.json").read_bytes()).hexdigest()
         for path in journals:
             record = _json_object_read_only(path)
             backup = Path(record.get("backup",""))
             project_id,job_id = record.get("project_id"),record.get("job_id")
             project = projects.get(project_id) if isinstance(project_id,str) else None
+            expected_backup = directory / f"auto-canary-{job_id}.previous.json"
             if (record.get("state") != "CANARY_ACTIVE"
+                or record.get("schema_version") != 1
+                or record.get("public_pointer_sha256") != pointer_hash
+                or backup != expected_backup
                 or not isinstance(job_id,str) or len(job_id) != 32
                 or path.name != f"auto-canary-{job_id}.journal.json"
                 or record.get("catalog") != str(catalog_path)
@@ -116,6 +122,7 @@ def reconcile_operational_generation_read_only(
                 continue
             matched.append((job_id,project_id))
         result["canary_catalog_consistent"] = len(matched) == len(journals)
+        result["canary_rollback_preflight_consistent"] = bool(journals) and len(matched) == len(journals)
         for job_id,project_id,state,approved,candidate in pending:
             if not isinstance(job_id,str) or not isinstance(project_id,str):
                 blockers.append("MALFORMED_PENDING_QUEUE_JOB")

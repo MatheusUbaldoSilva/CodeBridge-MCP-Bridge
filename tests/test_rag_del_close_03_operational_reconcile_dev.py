@@ -1,4 +1,4 @@
-﻿"""Isolated tests for read-only operational queue/canary reconciliation."""
+"""Isolated tests for read-only operational queue/canary reconciliation."""
 from __future__ import annotations
 
 from contextlib import closing
@@ -63,6 +63,8 @@ class OperationalReconcileDevTests(unittest.TestCase):
             "job_id": self.job,
             "project_id": self.project,
             "state": "CANARY_ACTIVE",
+            "schema_version": 1,
+            "public_pointer_sha256": hashlib.sha256((self.catalog/"active-generation.json").read_bytes()).hexdigest(),
             "catalog": str(self.project_file),
             "backup": str(backup),
             "new_sha256": hashlib.sha256(self.project_file.read_bytes()).hexdigest(),
@@ -96,10 +98,21 @@ class OperationalReconcileDevTests(unittest.TestCase):
         after = [hashlib.sha256(p.read_bytes()).hexdigest() for p in tracked]
         self.assertEqual(before,after)
         self.assertTrue(result["canary_catalog_consistent"])
+        self.assertTrue(result["canary_rollback_preflight_consistent"])
         self.assertTrue(result["matched_canary_queue_job"])
         self.assertEqual(result["queue_pending_count"],1)
         self.assertIn("QUEUE_PENDING_OPERATOR_REVIEW_REQUIRED",result["blockers"])
         self.assertIn("ACTIVE_CANARY_OPERATOR_REVIEW_REQUIRED",result["blockers"])
+        self.assertFalse(result["activation_authorized"])
+
+    def test_public_pointer_changed_after_canary_blocks_preflight(self):
+        self._insert_pending()
+        self._canary()
+        _dump(self.catalog / "active-generation.json",
+              {"schema_version": 1, "generation": "unapproved-new-generation"})
+        result = self._review()
+        self.assertFalse(result["canary_rollback_preflight_consistent"])
+        self.assertIn("CANARY_CATALOG_INCONSISTENT", result["blockers"])
         self.assertFalse(result["activation_authorized"])
 
     def test_tampered_canary_backup_fails_closed(self):
