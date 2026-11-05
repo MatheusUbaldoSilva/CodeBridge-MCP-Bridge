@@ -1,4 +1,4 @@
-﻿import ctypes
+import ctypes
 import struct
 import time
 
@@ -677,7 +677,13 @@ def _write_all(
 
 def read_frame(
     handle,
+    *,
+    max_bytes=None,
 ):
+    if max_bytes is not None:
+        if (isinstance(max_bytes,bool) or not isinstance(max_bytes,int)
+                or max_bytes<=0 or max_bytes>MAX_MESSAGE_BYTES):
+            raise ValueError("Limite maximo de frame invalido")
     header = _read_exact(
         handle,
         FRAME_HEADER_SIZE,
@@ -691,6 +697,10 @@ def read_frame(
     _validate_frame_length(
         length
     )
+    if max_bytes is not None and length>max_bytes:
+        raise NamedPipeProtocolError(
+            "Frame excede o limite especifico do receptor"
+        )
 
     return _read_exact(
         handle,
@@ -750,6 +760,8 @@ class NamedPipeConnection:
 
     def receive(
         self,
+        *,
+        max_bytes=None,
     ):
         if self._handle is None:
             raise NamedPipeTransportError(
@@ -757,7 +769,8 @@ class NamedPipeConnection:
             )
 
         return read_frame(
-            self._handle
+            self._handle,
+            max_bytes=max_bytes,
         )
 
     def send(

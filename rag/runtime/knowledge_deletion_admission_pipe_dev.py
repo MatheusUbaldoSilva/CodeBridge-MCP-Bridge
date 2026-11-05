@@ -61,7 +61,7 @@ def serve_one_deletion_admission_precheck_dev(
             "challenge":challenge,
             "read_only":True,
         },sort_keys=True).encode("utf-8"))
-        raw=connection.receive()
+        raw=connection.receive(max_bytes=MAX_MESSAGE_BYTES)
         if len(raw)>MAX_MESSAGE_BYTES:
             raise ValueError("oversized request")
         try:
