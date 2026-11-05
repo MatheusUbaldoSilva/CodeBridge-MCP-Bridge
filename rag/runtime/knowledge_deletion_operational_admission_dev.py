@@ -94,6 +94,12 @@ def review_operational_deletion_admission(request:dict,*,gui_witness:dict,
           or target_conflicts.get("public_pointer_sha256")!=request.get("public_pointer_sha256")
           or target_conflicts.get("blockers")!=[]):
         blockers.append("TARGET_PROJECT_CONFLICT_OR_CAS_PIN_MISSING")
+    if (type(target_conflicts) is dict
+            and type(target_conflicts.get("unrelated_active_canaries")) is int
+            and target_conflicts.get("unrelated_active_canaries") > 0):
+        # Even an unrelated AUTO canary pins the SHA of the entire shared
+        # catalog. A concurrent catalog update breaks its rollback journal.
+        blockers.append("SHARED_CATALOG_CANARY_PIN_BLOCKS_ANY_WRITE")
     if request.get("operator_confirmation")!="RAG_DEL_REVIEW:"+project+":"+digest:
         blockers.append("PROJECT_AND_SELECTION_CONFIRMATION_MISSING")
     if not blockers:

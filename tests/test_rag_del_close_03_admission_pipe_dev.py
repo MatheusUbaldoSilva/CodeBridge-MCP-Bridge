@@ -136,7 +136,9 @@ class AdmissionPipeDevTests(unittest.TestCase):
         finally:
             del self.get_project_conflicts
         self.assertEqual(self.observed_projects,[self.project])
-        self.assertEqual(result["blockers"],["OPERATIONAL_IPC_NOT_ATTESTED"])
+        self.assertEqual(result["blockers"],[
+            "OPERATIONAL_IPC_NOT_ATTESTED",
+            "SHARED_CATALOG_CANARY_PIN_BLOCKS_ANY_WRITE"])
         self.assertFalse(result["activation_authorized"])
 
     def test_even_forged_positive_receipts_remain_non_operational(self):

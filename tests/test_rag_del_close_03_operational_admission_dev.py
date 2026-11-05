@@ -78,6 +78,7 @@ class AdmissionTests(unittest.TestCase):
                        target_conflicts=scope,now_epoch=120)
         self.assertNotIn("QUEUE_OR_CANARY_NOT_QUIET",receipt["blockers"])
         self.assertIn("OPERATIONAL_IPC_NOT_ATTESTED",receipt["blockers"])
+        self.assertIn("SHARED_CATALOG_CANARY_PIN_BLOCKS_ANY_WRITE",receipt["blockers"])
         self.assertFalse(receipt["activation_authorized"])
         scope["project_id"]="privatetwo"
         wrong=review(self.request,gui_witness=self.gui,

@@ -28,6 +28,11 @@ Date: 2026-11-05. Branch: dev-local.
   if target-specific scope passes and catalog/public-pointer digests match,
   treats an unrelated queue/canary as not blocking **read-only planning**.
   Does not change OPERATIONAL_IPC_NOT_ATTESTED veto or permit deletion.
+  Crucially, an unrelated active AUTO canary pins the SHA256 of the ENTIRE
+  shared catalog. Any catalog write would stale its rollback journal.
+  Therefore the admission precheck additionally returns
+  SHARED_CATALOG_CANARY_PIN_BLOCKS_ANY_WRITE until an explicitly approved
+  reconciliation or transactional design preserves that journal.
 - rag/runtime/knowledge_deletion_admission_pipe_dev.py:
   optionally invokes get_project_conflicts(project_id) on the server side
   only, never trusting GUI or project-state data supplied in the JSON.
@@ -37,7 +42,8 @@ Date: 2026-11-05. Branch: dev-local.
   active same-project job blocks, mutated public pointer blocks, tampered
   rollback backup blocks, overlapping generation dirs block, unknown target
   blocks, missing queue blocks.
-- Added 2 admission tests for scope mismatch and server-owned observer only.
+- Added 2 admission tests for scope mismatch and server-owned observer only;
+  they also assert the global shared-catalog journal pin write blocker.
 - Full CLOSE-03 DEV pattern: 44 PASS.
 - Full RAG-DEL: 819 run, 813 PASS, 6 SKIP, 0 FAIL.
 
@@ -50,4 +56,7 @@ Date: 2026-11-05. Branch: dev-local.
   BLOCKED, functional acceptance 40%.
 - Next implementation target is an isolated-project **atomic catalog CAS
   transaction** in a scratch store with preservation of unrelated projects
-  and recoverable rollback, before the real DEV GUI delete button is enabled.
+  and recoverable rollback. The existing RAG-AUTO journal pins the whole
+  catalog, so a CAS alone is NOT enough for a simultaneous active canary:
+  either reconcile it by explicit operator decision, or design and prove
+  compatible journal lineage. No real mutation before this is solved.
