@@ -59,8 +59,14 @@ AUTO-canary catalog journal global pin still block catalog writes.
 - CLOSE-03 DEV suite: 48 PASS before the additional review-binding test.
   The new GUI process SHA-mismatch regression also passes.
 - RAG-DEL 01.04 suites: 634 tests, 630 PASS and 4 SKIP.
-- Complete RAG-DEL regression after server-side review binding:
-  **837 run / 830 PASS / 7 SKIP / 0 FAIL**.
+- Admission Named Pipe transport suite now includes malformed request and
+  observer-failure cases: **9 PASS**. Malformed request bodies are rejected
+  before GUI, queue, project-conflict or server-review observers execute;
+  a failed GUI witness observer produces a structured fail-closed receipt.
+- Complete RAG-DEL regression after input-hardening:
+  **840 run / 833 PASS / 7 SKIP / 0 FAIL**.
+- Live queue/canary/journal read-only evidence is recorded separately in
+  \`RAG_DEL_CLOSE03_OPERATIONAL_RECONCILIATION_2026-11-05.md\`.
 - Qt's missing bundled-font warning remains nonfatal.
 
 ## Boundaries / next steps

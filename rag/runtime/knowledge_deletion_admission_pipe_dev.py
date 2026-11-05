@@ -79,30 +79,54 @@ def serve_one_deletion_admission_precheck_dev(
                         read_only=True,activation_authorized=False,
                         deletion_enabled=False,operational_use_allowed=False)
         else:
-            # The peer does not provide its own GUI or queue receipts.
+            # Reject malformed request bodies before consulting any observer.
+            # This avoids turning hostile JSON types into callback exceptions
+            # or unnecessary reads of the operational queue/catalog.
             request=message["request"]
-            scoped=None
-            if get_project_conflicts is not None and type(request) is dict:
-                # Independent server-side observer; never from JSON payload.
-                if not callable(get_project_conflicts):
-                    raise TypeError("invalid project conflict observer")
-                scoped=get_project_conflicts(request.get("project_id"))
-            source_review=None
-            if get_server_review is not None:
-                if not callable(get_server_review):
-                    raise TypeError("invalid server-side read-only review")
+            if type(request) is not dict:
+                result=dict(
+                    state="RAG_DEL_COMMAND_ADMISSION_BLOCKED",
+                    blockers=["INVALID_RECEIPTS"],read_only=True,
+                    activation_authorized=False,deletion_enabled=False,
+                    operational_use_allowed=False,
+                )
+            else:
+                # The peer does not provide its own GUI or queue receipts.
+                scoped=None
+                if get_project_conflicts is not None:
+                    if not callable(get_project_conflicts):
+                        raise TypeError("invalid project conflict observer")
+                    try:
+                        scoped=get_project_conflicts(request.get("project_id"))
+                    except (ValueError,OSError,RuntimeError,TypeError):
+                        scoped={"state":"PROJECT_CONFLICT_REVIEW_UNAVAILABLE",
+                                "blockers":["PROJECT_REVIEW_UNAVAILABLE"]}
+                source_review=None
+                if get_server_review is not None:
+                    if not callable(get_server_review):
+                        raise TypeError("invalid server-side read-only review")
+                    try:
+                        source_review=get_server_review(
+                            request.get("project_id"),request.get("selected_paths")
+                        )
+                    except (ValueError,OSError,RuntimeError,TypeError):
+                        source_review={"state":"SERVER_REVIEW_UNAVAILABLE"}
                 try:
-                    source_review=get_server_review(
-                        request.get("project_id"),request.get("selected_paths")
-                    )
+                    inventory=get_operational_inventory()
                 except (ValueError,OSError,RuntimeError,TypeError):
-                    source_review={"state":"SERVER_REVIEW_UNAVAILABLE"}
-            result=review_operational_deletion_admission(
-                request,gui_witness=get_gui_witness(),
-                operational_inventory=get_operational_inventory(),
-                target_conflicts=scoped,server_review=source_review,
-                now_epoch=now_epoch
-            )
+                    inventory={"read_only":True,"blockers":["OPERATIONAL_INVENTORY_UNAVAILABLE"]}
+                if not callable(get_gui_witness):
+                    raise TypeError("invalid GUI witness observer")
+                try:
+                    witness=get_gui_witness()
+                except (ValueError,OSError,RuntimeError,TypeError):
+                    witness={"state":"GUI_WITNESS_UNAVAILABLE"}
+                result=review_operational_deletion_admission(
+                    request,gui_witness=witness,
+                    operational_inventory=inventory,
+                    target_conflicts=scoped,server_review=source_review,
+                    now_epoch=now_epoch
+                )
         result["kernel_connected_client_pid"]=client_pid.value
         result["kernel_peer_accesscheck_complete"]=peer["access_check_completed"]
         result["activation_authorized"]=False

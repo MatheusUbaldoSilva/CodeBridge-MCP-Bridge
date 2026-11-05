@@ -42,9 +42,12 @@ class AdmissionPipeDevTests(unittest.TestCase):
         def serve():
             try:
                 messages.put(serve_one_deletion_admission_precheck_dev(
-                    pipe,get_gui_witness=lambda:self.gui,
-                    get_operational_inventory=lambda:self.inventory,
+                    pipe,
+                    get_gui_witness=getattr(self,"get_gui_witness",lambda:self.gui),
+                    get_operational_inventory=getattr(
+                        self,"get_operational_inventory",lambda:self.inventory),
                     get_project_conflicts=getattr(self,"get_project_conflicts",None),
+                    get_server_review=getattr(self,"get_server_review",None),
                     now_epoch=110))
             except Exception as error:
                 messages.put(error)
@@ -127,6 +130,29 @@ class AdmissionPipeDevTests(unittest.TestCase):
         self.assertIsInstance(outcome,ValueError)
         self.assertIn("mismatched admission challenge",str(outcome))
         self.assertEqual(observations,[])
+
+    def test_malformed_request_rejected_before_any_observer(self):
+        self.message["request"]=None
+        self.observed=[]
+        self.get_gui_witness=lambda:self.observed.append("gui")
+        self.get_operational_inventory=lambda:self.observed.append("inventory")
+        self.get_project_conflicts=lambda project:self.observed.append("project")
+        self.get_server_review=lambda project,paths:self.observed.append("review")
+        result=self._exchange()
+        self.assertEqual(result["blockers"],["INVALID_RECEIPTS"])
+        self.assertFalse(result["activation_authorized"])
+        self.assertFalse(result["deletion_enabled"])
+        self.assertEqual(self.observed,[])
+
+    def test_witness_observer_failure_returns_blocked_receipt(self):
+        def unavailable():
+            raise OSError("diagnostic unavailable")
+        self.get_gui_witness=unavailable
+        result=self._exchange()
+        self.assertIn("GUI_WITNESS_MISSING",result["blockers"])
+        self.assertIn("OPERATIONAL_IPC_NOT_ATTESTED",result["blockers"])
+        self.assertFalse(result["activation_authorized"])
+        self.assertFalse(result["deletion_enabled"])
 
     def test_real_cross_process_pipe_peer_checks_and_no_permission(self):
         r=self._exchange()
