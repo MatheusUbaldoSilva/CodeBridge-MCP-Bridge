@@ -10,6 +10,8 @@ import ctypes
 from ctypes import wintypes
 import json
 import re
+import secrets
+import hmac
 from pathlib import Path
 import sys
 
@@ -32,7 +34,8 @@ _PIPE_LEAF = re.compile(r'[0-9a-f]{32}\Z')
 
 def serve_one_deletion_admission_precheck_dev(
     pipe_name: str, *, get_gui_witness, get_operational_inventory,
-    get_project_conflicts=None, now_epoch: int | None = None,
+    get_project_conflicts=None, get_server_review=None,
+    now_epoch: int | None = None,
 ) -> dict:
     """One-shot scratch IPC handler. NOT installed in actual GUI."""
     if (not isinstance(pipe_name,str) or not pipe_name.startswith(_PIPE_PREFIX)
@@ -49,14 +52,29 @@ def serve_one_deletion_admission_precheck_dev(
         )
         if peer["state"]!="SCRATCH_PEER_KERNEL_TOKEN_ACCESSCHECK_COMPLETE" or peer["access_granted"] is not True:
             raise PermissionError("untrusted kernel connected peer")
+        # Native kernel token check is complete before issuing a challenge.
+        # A freshly generated one-time challenge binds this request to the
+        # current connection. Replayed client payloads are never accepted.
+        challenge=secrets.token_hex(32)
+        connection.send(json.dumps({
+            "schema":"RAG_DEL_ADMISSION_PRECHECK_CHALLENGE_V1",
+            "challenge":challenge,
+            "read_only":True,
+        },sort_keys=True).encode("utf-8"))
         raw=connection.receive()
         if len(raw)>MAX_MESSAGE_BYTES:
             raise ValueError("oversized request")
         try:
             message=json.loads(raw.decode("utf-8"))
-        except (UnicodeError,ValueError):
-            raise ValueError("invalid precheck request")
-        if type(message) is not dict or set(message)!={"operation","request"} or message["operation"]!="PRECHECK":
+        except (UnicodeError,ValueError) as exc:
+            raise ValueError("invalid precheck request") from exc
+        if (type(message) is not dict
+                or type(message.get("challenge")) is not str
+                or not hmac.compare_digest(message["challenge"],challenge)):
+            raise ValueError("stale or mismatched admission challenge")
+        if (set(message)!={"schema","challenge","operation","request"}
+                or message.get("schema")!="RAG_DEL_ADMISSION_PRECHECK_REQUEST_V1"
+                or message["operation"]!="PRECHECK"):
             result=dict(state="RAG_DEL_COMMAND_ADMISSION_BLOCKED",blockers=["UNSUPPORTED_OPERATION"],
                         read_only=True,activation_authorized=False,
                         deletion_enabled=False,operational_use_allowed=False)
@@ -69,10 +87,21 @@ def serve_one_deletion_admission_precheck_dev(
                 if not callable(get_project_conflicts):
                     raise TypeError("invalid project conflict observer")
                 scoped=get_project_conflicts(request.get("project_id"))
+            source_review=None
+            if get_server_review is not None:
+                if not callable(get_server_review):
+                    raise TypeError("invalid server-side read-only review")
+                try:
+                    source_review=get_server_review(
+                        request.get("project_id"),request.get("selected_paths")
+                    )
+                except (ValueError,OSError,RuntimeError,TypeError):
+                    source_review={"state":"SERVER_REVIEW_UNAVAILABLE"}
             result=review_operational_deletion_admission(
                 request,gui_witness=get_gui_witness(),
                 operational_inventory=get_operational_inventory(),
-                target_conflicts=scoped,now_epoch=now_epoch
+                target_conflicts=scoped,server_review=source_review,
+                now_epoch=now_epoch
             )
         result["kernel_connected_client_pid"]=client_pid.value
         result["kernel_peer_accesscheck_complete"]=peer["access_check_completed"]

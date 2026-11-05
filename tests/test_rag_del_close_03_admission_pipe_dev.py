@@ -55,7 +55,11 @@ class AdmissionPipeDevTests(unittest.TestCase):
             "sys.path.insert(0,sys.argv[2])\n"
             "from ipc_named_pipe import NamedPipeClient\n"
             "with NamedPipeClient.connect(sys.argv[1],timeout=5) as c:\n"
-            " c.send(sys.stdin.buffer.read())\n"
+            " claim=json.loads(sys.stdin.buffer.read().decode())\n"
+            " challenge=json.loads(c.receive().decode())\n"
+            " claim['schema']='RAG_DEL_ADMISSION_PRECHECK_REQUEST_V1'\n"
+            " claim['challenge']=challenge['challenge']\n"
+            " c.send(json.dumps(claim).encode())\n"
             " r=c.receive()\n"
             " c.send(b'CLOSE')\n"
             " print(r.decode('utf-8'),flush=True)\n"
@@ -89,6 +93,40 @@ class AdmissionPipeDevTests(unittest.TestCase):
                 serve_one_deletion_admission_precheck_dev(
                     name,get_gui_witness=lambda:self.gui,
                     get_operational_inventory=lambda:self.inventory)
+
+    def test_replayed_challenge_rejected_before_any_observer(self):
+        import threading, queue, uuid
+        name=r"\\.\pipe\CB.RAGDEL.ADMISSION.SCRATCH."+uuid.uuid4().hex
+        outcomes=queue.Queue()
+        observations=[]
+        def run_server():
+            try:
+                serve_one_deletion_admission_precheck_dev(
+                    name,get_gui_witness=lambda:observations.append("gui"),
+                    get_operational_inventory=lambda:observations.append("queue"),
+                    get_project_conflicts=lambda pid:observations.append("project"),
+                    now_epoch=100,
+                )
+                outcomes.put("UNEXPECTED_SUCCESS")
+            except Exception as exc:
+                outcomes.put(exc)
+        worker=threading.Thread(target=run_server,daemon=True)
+        worker.start()
+        from ipc_named_pipe import NamedPipeClient
+        with NamedPipeClient.connect(name,timeout=5) as connection:
+            challenge=json.loads(connection.receive().decode())
+            self.assertEqual(challenge["schema"],"RAG_DEL_ADMISSION_PRECHECK_CHALLENGE_V1")
+            self.assertEqual(len(challenge["challenge"]),64)
+            request=dict(self.message)
+            request["schema"]="RAG_DEL_ADMISSION_PRECHECK_REQUEST_V1"
+            request["challenge"]="0"*64 if challenge["challenge"]!="0"*64 else "1"*64
+            connection.send(json.dumps(request).encode())
+        worker.join(timeout=5)
+        self.assertFalse(worker.is_alive())
+        outcome=outcomes.get(timeout=1)
+        self.assertIsInstance(outcome,ValueError)
+        self.assertIn("mismatched admission challenge",str(outcome))
+        self.assertEqual(observations,[])
 
     def test_real_cross_process_pipe_peer_checks_and_no_permission(self):
         r=self._exchange()

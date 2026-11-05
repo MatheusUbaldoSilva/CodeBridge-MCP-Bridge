@@ -34,6 +34,7 @@ def selection_sha256(project_id: str, paths: list[str], generation: str) -> str:
 def review_operational_deletion_admission(request:dict,*,gui_witness:dict,
                                           operational_inventory:dict,
                                           target_conflicts:dict|None=None,
+                                          server_review:dict|None=None,
                                           now_epoch:int|None=None)->dict:
     result=dict(state="RAG_DEL_COMMAND_ADMISSION_BLOCKED",read_only=True,
                 activation_authorized=False,deletion_enabled=False,
@@ -100,6 +101,16 @@ def review_operational_deletion_admission(request:dict,*,gui_witness:dict,
         # Even an unrelated AUTO canary pins the SHA of the entire shared
         # catalog. A concurrent catalog update breaks its rollback journal.
         blockers.append("SHARED_CATALOG_CANARY_PIN_BLOCKS_ANY_WRITE")
+    if server_review is not None:
+        if (type(server_review) is not dict
+            or server_review.get("state") != "READ_ONLY_REVIEW"
+            or server_review.get("project_id") != project
+            or server_review.get("generation") != generation
+            or server_review.get("selected_paths") != request.get("selected_paths")
+            or server_review.get("review_sha256") != request.get("review_sha256")
+            or server_review.get("execution_enabled") is not False
+            or server_review.get("source_files_modified") is not False):
+            blockers.append("SERVER_READ_ONLY_REVIEW_MISMATCH")
     if request.get("operator_confirmation")!="RAG_DEL_REVIEW:"+project+":"+digest:
         blockers.append("PROJECT_AND_SELECTION_CONFIRMATION_MISSING")
     if not blockers:

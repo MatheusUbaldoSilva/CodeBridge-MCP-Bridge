@@ -768,4 +768,11 @@ def run_ui(runtime):
     # Read-only DEV GUI loaded-code witness; not an operational deletion path.
     from rag.runtime.knowledge_deletion_gui_witness_dev import start_dev_gui_witness
     window._rag_del_witness_pipe = start_dev_gui_witness()
+    # Opt-in, one-shot DEV diagnostic; NOT an operational delete service.
+    from rag.runtime.knowledge_deletion_gui_admission_dev import (
+        start_gui_admission_diagnostic_dev,
+    )
+    window._rag_del_admission_diagnostic_pipe = (
+        start_gui_admission_diagnostic_dev()
+    )
     return app.exec()
