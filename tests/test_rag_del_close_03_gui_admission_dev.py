@@ -9,6 +9,10 @@ import subprocess
 import sys
 import unittest
 
+import win32api
+import win32con
+import win32process
+
 from rag.runtime.knowledge_deletion_operational_admission_dev import selection_sha256
 
 APP_ROOT=Path(__file__).resolve().parents[1]/"app_rewrite"
@@ -21,7 +25,7 @@ _kernel.GetNamedPipeServerProcessId.restype=wintypes.BOOL
 
 class GuiAdmissionDiagnosticTests(unittest.TestCase):
     def _exchange(self, *,operation="PRECHECK", spoof_receipts=False,
-                  spoof_review=False):
+                  spoof_review=False, wrong_peer_pid=False, wrong_peer_birth=False):
         code=(
             "import json,os,sys,time\n"
             "from PySide6.QtWidgets import QApplication\n"
@@ -46,14 +50,26 @@ class GuiAdmissionDiagnosticTests(unittest.TestCase):
             "review_sha256=('f' if sys.argv[2]=='spoof' else 'a')*64,"
             "execution_enabled=False,"
             "source_files_modified=False)\n"
+            "expected=lambda:{'pid':int(os.environ['CB_EXPECTED_PEER_PID']),"
+            "'birth':int(os.environ['CB_EXPECTED_PEER_BIRTH'])}\n"
             "pipe=start_gui_admission_diagnostic_dev("
-            "inventory_reader=reader,project_reader=scope,review_reader=review)\n"
+            "inventory_reader=reader,project_reader=scope,review_reader=review,"
+            "expected_peer_identity_reader=expected)\n"
             "print(json.dumps({'pipe':pipe,'pid':os.getpid()}),flush=True)\n"
             "time.sleep(6)\n"
         )
         env=os.environ.copy()
         env["QT_QPA_PLATFORM"]="offscreen"
         env["CODEBRIDGE_RAGDEL_DEV_ADMISSION_DIAGNOSTIC"]="1"
+        own=win32api.OpenProcess(
+            win32con.PROCESS_QUERY_LIMITED_INFORMATION,False,os.getpid()
+        )
+        try:
+            birth=int(win32process.GetProcessTimes(own)["CreationTime"].timestamp()*1_000_000)
+        finally:
+            own.Close()
+        env["CB_EXPECTED_PEER_PID"]=str(os.getpid() + (1 if wrong_peer_pid else 0))
+        env["CB_EXPECTED_PEER_BIRTH"]=str(birth + (1_000_000 if wrong_peer_birth else 0))
         env["PYTHONPATH"]=str(APP_ROOT.parent)+os.pathsep+env.get("PYTHONPATH","")
         child=subprocess.Popen(
             [sys.executable,"-u","-c",code,str(APP_ROOT),
@@ -98,6 +114,7 @@ class GuiAdmissionDiagnosticTests(unittest.TestCase):
             self.assertFalse(report["operational_use_allowed"])
             self.assertFalse(report["deletion_enabled"])
             self.assertTrue(report["kernel_peer_accesscheck_complete"])
+            self.assertEqual(report["kernel_peer_identity_attested"],not (wrong_peer_pid or wrong_peer_birth))
             return report
         finally:
             if child.poll() is None:
@@ -122,6 +139,16 @@ class GuiAdmissionDiagnosticTests(unittest.TestCase):
     def test_gui_server_review_sha_mismatch_blocks(self):
         receipt=self._exchange(spoof_review=True)
         self.assertIn("SERVER_READ_ONLY_REVIEW_MISMATCH",receipt["blockers"])
+        self.assertFalse(receipt["activation_authorized"])
+
+    def test_wrong_expected_peer_pid_is_not_attested(self):
+        receipt=self._exchange(wrong_peer_pid=True)
+        self.assertIn("PEER_PID_MISMATCH",receipt["kernel_peer_identity"]["blockers"])
+        self.assertFalse(receipt["activation_authorized"])
+
+    def test_wrong_expected_peer_birth_is_not_attested(self):
+        receipt=self._exchange(wrong_peer_birth=True)
+        self.assertIn("PEER_BIRTH_MISMATCH",receipt["kernel_peer_identity"]["blockers"])
         self.assertFalse(receipt["activation_authorized"])
 
     def test_opt_in_required(self):

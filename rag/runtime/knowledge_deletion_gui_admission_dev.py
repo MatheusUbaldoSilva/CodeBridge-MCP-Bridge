@@ -17,7 +17,8 @@ OPT_IN_ENV = "CODEBRIDGE_RAGDEL_DEV_ADMISSION_DIAGNOSTIC"
 
 
 def start_gui_admission_diagnostic_dev(
-    *, inventory_reader=None, project_reader=None, review_reader=None
+    *, inventory_reader=None, project_reader=None, review_reader=None,
+    expected_peer_identity_reader=None,
 ) -> str | None:
     """Start one admission-only test connection, never a mutation listener.
 
@@ -73,6 +74,7 @@ def start_gui_admission_diagnostic_dev(
                 get_operational_inventory=inventory_reader,
                 get_project_conflicts=project_reader,
                 get_server_review=review_reader,
+                get_expected_peer_identity=expected_peer_identity_reader,
             )
         except Exception:
             # Diagnostic transport must not affect the GUI event loop.

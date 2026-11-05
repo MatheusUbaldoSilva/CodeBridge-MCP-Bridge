@@ -139,7 +139,7 @@ class AdmissionPipeDevTests(unittest.TestCase):
         self.get_project_conflicts=lambda project:self.observed.append("project")
         self.get_server_review=lambda project,paths:self.observed.append("review")
         result=self._exchange()
-        self.assertEqual(result["blockers"],["INVALID_RECEIPTS"])
+        self.assertEqual(result["blockers"],["INVALID_RECEIPTS","KERNEL_PEER_IDENTITY_NOT_PINNED"])
         self.assertFalse(result["activation_authorized"])
         self.assertFalse(result["deletion_enabled"])
         self.assertEqual(self.observed,[])
@@ -166,7 +166,7 @@ class AdmissionPipeDevTests(unittest.TestCase):
     def test_unknown_operation_cannot_become_deletion(self):
         self.message["operation"]="DELETE"
         r=self._exchange()
-        self.assertEqual(r["blockers"],["UNSUPPORTED_OPERATION"])
+        self.assertEqual(r["blockers"],["UNSUPPORTED_OPERATION","KERNEL_PEER_IDENTITY_NOT_PINNED"])
         self.assertFalse(r["deletion_enabled"])
 
     def test_client_cannot_supply_gui_or_queue_evidence(self):
@@ -176,7 +176,7 @@ class AdmissionPipeDevTests(unittest.TestCase):
         self.message["operational_inventory"] = dict(
             queue_pending_count=0, canary_count=0)
         r=self._exchange()
-        self.assertEqual(r["blockers"],["UNSUPPORTED_OPERATION"])
+        self.assertEqual(r["blockers"],["UNSUPPORTED_OPERATION","KERNEL_PEER_IDENTITY_NOT_PINNED"])
         self.assertFalse(r["operational_use_allowed"])
 
     def test_server_only_project_observer_not_client_payload(self):
@@ -202,7 +202,8 @@ class AdmissionPipeDevTests(unittest.TestCase):
         self.assertEqual(self.observed_projects,[self.project])
         self.assertEqual(result["blockers"],[
             "OPERATIONAL_IPC_NOT_ATTESTED",
-            "SHARED_CATALOG_CANARY_PIN_BLOCKS_ANY_WRITE"])
+            "SHARED_CATALOG_CANARY_PIN_BLOCKS_ANY_WRITE",
+            "KERNEL_PEER_IDENTITY_NOT_PINNED"])
         self.assertFalse(result["activation_authorized"])
 
     def test_even_forged_positive_receipts_remain_non_operational(self):

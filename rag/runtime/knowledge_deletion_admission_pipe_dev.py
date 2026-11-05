@@ -15,7 +15,9 @@ import hmac
 from pathlib import Path
 import sys
 
-from rag.runtime.knowledge_deletion_scratch_pipe_peer_identity_dev import _client_pid
+from rag.runtime.knowledge_deletion_scratch_pipe_peer_identity_dev import (
+    _client_pid, inspect_scratch_connected_peer_dev,
+)
 from rag.runtime.knowledge_deletion_scratch_peer_acl_dev import (
     inspect_scratch_connected_peer_effective_access_dev,
 )
@@ -35,7 +37,7 @@ _PIPE_LEAF = re.compile(r'[0-9a-f]{32}\Z')
 def serve_one_deletion_admission_precheck_dev(
     pipe_name: str, *, get_gui_witness, get_operational_inventory,
     get_project_conflicts=None, get_server_review=None,
-    now_epoch: int | None = None,
+    get_expected_peer_identity=None, now_epoch: int | None = None,
 ) -> dict:
     """One-shot scratch IPC handler. NOT installed in actual GUI."""
     if (not isinstance(pipe_name,str) or not pipe_name.startswith(_PIPE_PREFIX)
@@ -52,6 +54,26 @@ def serve_one_deletion_admission_precheck_dev(
         )
         if peer["state"]!="SCRATCH_PEER_KERNEL_TOKEN_ACCESSCHECK_COMPLETE" or peer["access_granted"] is not True:
             raise PermissionError("untrusted kernel connected peer")
+        # The kernel-reported PID is not, by itself, proof that this is the
+        # expected MCP peer. Pin it against an independently supplied DEV
+        # process snapshot when available; never accept identity from payload.
+        expected_peer = None
+        peer_identity = None
+        if get_expected_peer_identity is not None:
+            if not callable(get_expected_peer_identity):
+                raise TypeError("invalid expected peer identity observer")
+            expected_peer = get_expected_peer_identity()
+            if (type(expected_peer) is not dict
+                    or set(expected_peer) != {"pid", "birth"}
+                    or type(expected_peer.get("pid")) is not int
+                    or expected_peer["pid"] <= 0
+                    or type(expected_peer.get("birth")) is not int
+                    or expected_peer["birth"] <= 0):
+                raise ValueError("invalid expected peer identity")
+            peer_identity = inspect_scratch_connected_peer_dev(
+                connection, expected_client_pid=expected_peer["pid"],
+                expected_client_birth=expected_peer["birth"],
+            )
         # Native kernel token check is complete before issuing a challenge.
         # A freshly generated one-time challenge binds this request to the
         # current connection. Replayed client payloads are never accepted.
@@ -129,6 +151,18 @@ def serve_one_deletion_admission_precheck_dev(
                 )
         result["kernel_connected_client_pid"]=client_pid.value
         result["kernel_peer_accesscheck_complete"]=peer["access_check_completed"]
+        result["kernel_peer_identity_attested"] = bool(
+            peer_identity is not None
+            and peer_identity.get("state") == "SCRATCH_KERNEL_PEER_PID_BIRTH_OBSERVED"
+            and not peer_identity.get("blockers")
+        )
+        result["kernel_peer_identity"] = peer_identity or {
+            "state":"KERNEL_PEER_IDENTITY_NOT_PINNED", "read_only":True,
+            "observed_peer_pid":client_pid.value,
+            "activation_authorized":False, "operational_use_allowed":False,
+        }
+        if not result["kernel_peer_identity_attested"]:
+            result.setdefault("blockers", []).append("KERNEL_PEER_IDENTITY_NOT_PINNED")
         result["activation_authorized"]=False
         result["operational_use_allowed"]=False
         result["deletion_enabled"]=False
