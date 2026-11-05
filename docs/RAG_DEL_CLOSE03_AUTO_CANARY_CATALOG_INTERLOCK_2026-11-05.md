@@ -32,9 +32,24 @@ newworldpvp canary journal even if private generations do not overlap.
   switch/rollback success. Symlink test is skipped on Windows without
   symlink creation privilege.
 
+## Genuine cross-subsystem AUTO -> RAG-DEL lab flow
+- tests/test_rag_del_close_03_actual_auto_canary_integration_lab.py
+  reuses the existing RAG-AUTO generation/worker/queue fixture and calls
+  *real* activate_auto_canary and rollback_auto_canary on a separate
+  TemporaryDirectory catalog (NOT the real CodeBridge catalog).
+  It verifies: active AUTO canary blocks RAG-DEL before creating its journal;
+  exact AUTO rollback restores original catalog bytes; RAG-DEL then performs
+  its journaled swap and rollback, preserving the public pointer and previous
+  AUTO journal; finally the AUTO canary can be reactivated and rolled back.
+  Integrated test: 1 run, 1 pass, no skips/failures.
+- This demonstrates safe SERIALIZED rollback/recovery in the laboratory,
+  **not** safe simultaneous catalog mutations while an AUTO canary is active.
+  Those remain forbidden until separate lineage design and approval.
+
 ## Results
 - Scratch interlock module: 11 run, 10 pass, 1 skip, 0 fail.
-- RAG-DEL full regression: 830 run, 823 pass, 7 skip, 0 fail.
+- RAG-DEL full regression (after integrated AUTO test): 831 run,
+  824 pass, 7 skip, 0 fail.
 - Scope is ONLY catalog within the OS temp scratch path; _lab_paths still
   forbids non-temporary catalogs and the API requires explicit lab flags.
 - NO compatibility claim for catalog writes while a CANARY_ACTIVE journal
