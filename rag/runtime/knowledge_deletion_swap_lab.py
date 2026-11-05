@@ -17,6 +17,9 @@ from rag.runtime.auto_index_canary import (
 from rag.runtime.knowledge_deletion_catalog_plan import (
     plan_private_generation_replacement,
 )
+from rag.runtime.knowledge_deletion_auto_canary_interlock_lab import (
+    assert_no_auto_canary_catalog_pin_lab, AutoCanaryInterlockError,
+)
 
 class DeletionSwapError(RuntimeError):
     pass
@@ -78,6 +81,13 @@ def laboratory_swap(project_id: str, expected_revision: str, candidate: dict, *,
         raise PermissionError("explicit laboratory approval required")
     catalog,pointer=_lab_paths(catalog_file,public_pointer)
     with _catalog_mutex(catalog.parent):
+        # Existing RAG-AUTO rollback journals pin the entire shared catalog.
+        # Fail before creating RAG-DEL backup or journal if any is active,
+        # malformed, unresolved or orphaned (including an unrelated project).
+        try:
+            assert_no_auto_canary_catalog_pin_lab(catalog,pointer)
+        except AutoCanaryInterlockError as exc:
+            raise DeletionSwapError("AUTO canary catalog interlock: "+str(exc)) from exc
         # No new transition while any earlier journal is unresolved.
         for backup in catalog.parent.glob("rag-del-*.previous.json"):
             if (not backup.is_file() or backup.is_symlink()
@@ -123,6 +133,12 @@ def laboratory_swap(project_id: str, expected_revision: str, candidate: dict, *,
         target=(json.dumps(updated,sort_keys=True,indent=2,ensure_ascii=False)+"\n").encode()
         if _sha(target)!=plan["proposed_catalog_sha256"]:
             raise DeletionSwapError("candidate projection mismatch")
+        # A locked validation hook could have changed the scratch canary
+        # ledger; recheck right before the first durable RAG-DEL write.
+        try:
+            assert_no_auto_canary_catalog_pin_lab(catalog,pointer)
+        except AutoCanaryInterlockError as exc:
+            raise DeletionSwapError("AUTO canary catalog interlock: "+str(exc)) from exc
         transaction=uuid.uuid4().hex
         backup=catalog.parent/("rag-del-"+transaction+".previous.json")
         journal=catalog.parent/("rag-del-"+transaction+".journal.json")
