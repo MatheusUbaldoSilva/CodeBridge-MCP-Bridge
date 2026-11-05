@@ -43,7 +43,9 @@ class AdmissionPipeDevTests(unittest.TestCase):
             try:
                 messages.put(serve_one_deletion_admission_precheck_dev(
                     pipe,get_gui_witness=lambda:self.gui,
-                    get_operational_inventory=lambda:self.inventory,now_epoch=110))
+                    get_operational_inventory=lambda:self.inventory,
+                    get_project_conflicts=getattr(self,"get_project_conflicts",None),
+                    now_epoch=110))
             except Exception as error:
                 messages.put(error)
         thread=threading.Thread(target=serve,daemon=True)
@@ -112,6 +114,30 @@ class AdmissionPipeDevTests(unittest.TestCase):
         r=self._exchange()
         self.assertEqual(r["blockers"],["UNSUPPORTED_OPERATION"])
         self.assertFalse(r["operational_use_allowed"])
+
+    def test_server_only_project_observer_not_client_payload(self):
+        self.message["request"]["catalog_sha256"]="b"*64
+        self.message["request"]["public_pointer_sha256"]="c"*64
+        self.inventory["queue_pending_count"]=1
+        self.inventory["canary_count"]=1
+        self.inventory["blockers"]=["PENDING_REVIEW_JOBS_PRESENT"]
+        self.observed_projects=[]
+        self.get_project_conflicts=lambda pid:(
+            self.observed_projects.append(pid)
+            or dict(state="TARGET_CONFLICTS_CLEAR_FOR_READONLY_PLANNING",
+                    project_id=pid,read_only=True,target_isolation_proven=True,
+                    target_queue_jobs=0,target_active_canaries=0,
+                    unrelated_queue_jobs=1,unrelated_active_canaries=1,
+                    catalog_cas_required=True,catalog_sha256="b"*64,
+                    public_pointer_sha256="c"*64,blockers=[])
+        )
+        try:
+            result=self._exchange()
+        finally:
+            del self.get_project_conflicts
+        self.assertEqual(self.observed_projects,[self.project])
+        self.assertEqual(result["blockers"],["OPERATIONAL_IPC_NOT_ATTESTED"])
+        self.assertFalse(result["activation_authorized"])
 
     def test_even_forged_positive_receipts_remain_non_operational(self):
         self.message["request"]["operational_channel_attested"]=True

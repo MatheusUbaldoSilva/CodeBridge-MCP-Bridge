@@ -33,6 +33,7 @@ def selection_sha256(project_id: str, paths: list[str], generation: str) -> str:
 
 def review_operational_deletion_admission(request:dict,*,gui_witness:dict,
                                           operational_inventory:dict,
+                                          target_conflicts:dict|None=None,
                                           now_epoch:int|None=None)->dict:
     result=dict(state="RAG_DEL_COMMAND_ADMISSION_BLOCKED",read_only=True,
                 activation_authorized=False,deletion_enabled=False,
@@ -71,15 +72,28 @@ def review_operational_deletion_admission(request:dict,*,gui_witness:dict,
     # The client cannot attest itself. No operational deletion channel exists yet.
     # This admission helper is only a read-only protocol precursor.
     blockers.append("OPERATIONAL_IPC_NOT_ATTESTED")
-    if (operational_inventory.get("read_only") is not True
-        or type(operational_inventory.get("queue_pending_count")) is not int
-        or operational_inventory.get("queue_pending_count")!=0
-        or type(operational_inventory.get("canary_count")) is not int
-        or operational_inventory.get("canary_count")!=0
-        or operational_inventory.get("canary_catalog_consistent") is not True
-        or operational_inventory.get("public_generation")!=generation
-        or operational_inventory.get("blockers")!=[]):
-        blockers.append("QUEUE_OR_CANARY_NOT_QUIET")
+    if target_conflicts is None:
+        if (operational_inventory.get("read_only") is not True
+            or type(operational_inventory.get("queue_pending_count")) is not int
+            or operational_inventory.get("queue_pending_count")!=0
+            or type(operational_inventory.get("canary_count")) is not int
+            or operational_inventory.get("canary_count")!=0
+            or operational_inventory.get("canary_catalog_consistent") is not True
+            or operational_inventory.get("public_generation")!=generation
+            or operational_inventory.get("blockers")!=[]):
+            blockers.append("QUEUE_OR_CANARY_NOT_QUIET")
+    elif (type(target_conflicts) is not dict
+          or target_conflicts.get("state")!="TARGET_CONFLICTS_CLEAR_FOR_READONLY_PLANNING"
+          or target_conflicts.get("read_only") is not True
+          or target_conflicts.get("project_id")!=project
+          or target_conflicts.get("target_isolation_proven") is not True
+          or target_conflicts.get("catalog_cas_required") is not True
+          or target_conflicts.get("target_queue_jobs")!=0
+          or target_conflicts.get("target_active_canaries")!=0
+          or target_conflicts.get("catalog_sha256")!=request.get("catalog_sha256")
+          or target_conflicts.get("public_pointer_sha256")!=request.get("public_pointer_sha256")
+          or target_conflicts.get("blockers")!=[]):
+        blockers.append("TARGET_PROJECT_CONFLICT_OR_CAS_PIN_MISSING")
     if request.get("operator_confirmation")!="RAG_DEL_REVIEW:"+project+":"+digest:
         blockers.append("PROJECT_AND_SELECTION_CONFIRMATION_MISSING")
     if not blockers:

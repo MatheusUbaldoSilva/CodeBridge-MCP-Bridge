@@ -57,6 +57,40 @@ class AdmissionTests(unittest.TestCase):
         self.inventory["queue_pending_count"]=1
         self.assertIn("QUEUE_OR_CANARY_NOT_QUIET",self.run_review()["blockers"])
 
+    def test_independent_target_isolation_skips_unrelated_job_only_for_planning(self):
+        self.request["operational_channel_attested"]=True
+        self.inventory["queue_pending_count"]=1
+        self.inventory["canary_count"]=1
+        self.inventory["blockers"]=[
+            "QUEUE_PENDING_OPERATOR_REVIEW_REQUIRED",
+            "ACTIVE_CANARY_OPERATOR_REVIEW_REQUIRED",
+        ]
+        scope=dict(state="TARGET_CONFLICTS_CLEAR_FOR_READONLY_PLANNING",
+                   project_id=self.project,read_only=True,
+                   target_isolation_proven=True,target_queue_jobs=0,
+                   target_active_canaries=0,unrelated_queue_jobs=1,
+                   unrelated_active_canaries=1,catalog_cas_required=True,
+                   catalog_sha256=self.request["catalog_sha256"],
+                   public_pointer_sha256=self.request["public_pointer_sha256"],
+                   blockers=[])
+        receipt=review(self.request,gui_witness=self.gui,
+                       operational_inventory=self.inventory,
+                       target_conflicts=scope,now_epoch=120)
+        self.assertNotIn("QUEUE_OR_CANARY_NOT_QUIET",receipt["blockers"])
+        self.assertIn("OPERATIONAL_IPC_NOT_ATTESTED",receipt["blockers"])
+        self.assertFalse(receipt["activation_authorized"])
+        scope["project_id"]="privatetwo"
+        wrong=review(self.request,gui_witness=self.gui,
+                     operational_inventory=self.inventory,
+                     target_conflicts=scope,now_epoch=120)
+        self.assertIn("TARGET_PROJECT_CONFLICT_OR_CAS_PIN_MISSING",wrong["blockers"])
+        scope["project_id"]=self.project
+        scope["catalog_sha256"]="e"*64
+        stale=review(self.request,gui_witness=self.gui,
+                     operational_inventory=self.inventory,
+                     target_conflicts=scope,now_epoch=120)
+        self.assertIn("TARGET_PROJECT_CONFLICT_OR_CAS_PIN_MISSING",stale["blockers"])
+
     def test_wrong_gui_birth_or_challenge_blocks(self):
         self.request["operational_channel_attested"]=True
         self.gui["challenge_bound"]=False

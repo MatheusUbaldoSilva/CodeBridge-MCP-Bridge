@@ -32,7 +32,7 @@ _PIPE_LEAF = re.compile(r'[0-9a-f]{32}\Z')
 
 def serve_one_deletion_admission_precheck_dev(
     pipe_name: str, *, get_gui_witness, get_operational_inventory,
-    now_epoch: int | None = None,
+    get_project_conflicts=None, now_epoch: int | None = None,
 ) -> dict:
     """One-shot scratch IPC handler. NOT installed in actual GUI."""
     if (not isinstance(pipe_name,str) or not pipe_name.startswith(_PIPE_PREFIX)
@@ -62,9 +62,17 @@ def serve_one_deletion_admission_precheck_dev(
                         deletion_enabled=False,operational_use_allowed=False)
         else:
             # The peer does not provide its own GUI or queue receipts.
+            request=message["request"]
+            scoped=None
+            if get_project_conflicts is not None and type(request) is dict:
+                # Independent server-side observer; never from JSON payload.
+                if not callable(get_project_conflicts):
+                    raise TypeError("invalid project conflict observer")
+                scoped=get_project_conflicts(request.get("project_id"))
             result=review_operational_deletion_admission(
-                message["request"],gui_witness=get_gui_witness(),
-                operational_inventory=get_operational_inventory(),now_epoch=now_epoch
+                request,gui_witness=get_gui_witness(),
+                operational_inventory=get_operational_inventory(),
+                target_conflicts=scoped,now_epoch=now_epoch
             )
         result["kernel_connected_client_pid"]=client_pid.value
         result["kernel_peer_accesscheck_complete"]=peer["access_check_completed"]
