@@ -1,4 +1,4 @@
-"""Offscreen independent-process challenge of DEV GUI witness; never real GUI."""
+"""Offscreen independent-process challenge with instantiated DEV Qt panels; never installed Stable GUI."""
 import json
 import os
 from pathlib import Path
@@ -18,7 +18,12 @@ class GuiWitnessDevTests(unittest.TestCase):
         code=(
             "import os,sys,json,time\n"
             "sys.path.insert(0,sys.argv[1])\n"
+            "from PySide6.QtWidgets import QApplication\n"
+            "app=QApplication([])\n"
             "import rag_panel,rag_deletion_review_panel\n"
+            "main=rag_panel.RagPanel()\n"
+            "review=rag_deletion_review_panel.KnowledgeRemovalReviewPanel()\n"
+            "main.show(); review.show()\n"
             "from rag.runtime.knowledge_deletion_gui_witness_dev "
             "import start_dev_gui_witness,gui_birth_us\n"
             "start_dev_gui_witness()\n"
