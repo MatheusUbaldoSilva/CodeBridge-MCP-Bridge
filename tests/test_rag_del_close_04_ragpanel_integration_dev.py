@@ -1,4 +1,4 @@
-﻿"""CLOSE-04 source GUI integration tests: locked delete inside actual RagPanel."""
+"""CLOSE-04 source GUI integration tests: locked delete inside actual RagPanel."""
 import os
 import sys
 from pathlib import Path
@@ -29,7 +29,7 @@ class IntegratedLockedDeleteTests(TestCase):
         self.assertIs(self.gui.deletion_review_panel.selector.parent(),
                       self.gui.deletion_review_panel)
         self.assertFalse(self.delete.isEnabled())
-        self.assertIn("CLOSE-03", self.delete.toolTip())
+        self.assertIn("origem", self.delete.toolTip())
 
     def test_project_change_cannot_unlock_delete(self):
         self.gui.deletion_review_panel.set_project_files("private", ["alpha.py"])
@@ -46,4 +46,4 @@ class IntegratedLockedDeleteTests(TestCase):
         }):
             panel.review_selected(["alpha.py"])
         self.assertFalse(self.delete.isEnabled())
-        self.assertIn("Review preview", panel.details.toPlainText())
+        self.assertIn("Prévia bloqueada", panel.details.toPlainText())

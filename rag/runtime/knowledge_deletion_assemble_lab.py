@@ -23,10 +23,19 @@ def assemble_lab_deletion_generation(stage:Path,source_snapshot:Path,
                                     transaction_id:str,preview:dict,bundle:dict,
                                     *,laboratory_mode:bool=False) -> dict:
     if laboratory_mode is not True: raise PermissionError("laboratory-only API")
+    return _assemble_deletion_generation(
+        stage,source_snapshot,project_id,source_revision,transaction_id,
+        preview,bundle,allowed_root=Path(tempfile.gettempdir()).resolve(strict=True))
+
+
+def _assemble_deletion_generation(stage:Path,source_snapshot:Path,project_id:str,
+                                  source_revision:str,transaction_id:str,
+                                  preview:dict,bundle:dict,*,allowed_root:Path) -> dict:
+    """Shared receipt assembly confined to allowed_root."""
     stage=Path(stage)
     snapshot=Path(source_snapshot)
     tid=transaction_id
-    root=Path(tempfile.gettempdir()).resolve(strict=True)
+    root=Path(allowed_root).resolve(strict=True)
     if (not stage.is_dir() or not snapshot.is_dir() or
             not stage.is_absolute() or not snapshot.is_absolute() or
             not stage.resolve(strict=True).is_relative_to(root) or

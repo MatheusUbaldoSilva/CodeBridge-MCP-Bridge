@@ -80,6 +80,14 @@ def laboratory_swap(project_id: str, expected_revision: str, candidate: dict, *,
     if operator_approved is not True or laboratory_mode is not True:
         raise PermissionError("explicit laboratory approval required")
     catalog,pointer=_lab_paths(catalog_file,public_pointer)
+    return _transactional_swap(catalog,pointer,project_id,expected_revision,candidate,
+                               _fail_at=_fail_at,_locked_validation=_locked_validation)
+
+
+def _transactional_swap(catalog: Path, pointer: Path, project_id: str,
+                        expected_revision: str, candidate: dict, *,
+                        _fail_at: str|None=None, _locked_validation=None) -> dict:
+    """Shared journaled catalog switch; callers must validate the paths."""
     with _catalog_mutex(catalog.parent):
         # Existing RAG-AUTO rollback journals pin the entire shared catalog.
         # Fail before creating RAG-DEL backup or journal if any is active,
@@ -112,12 +120,12 @@ def laboratory_swap(project_id: str, expected_revision: str, candidate: dict, *,
                     or prior.get("transaction")!=tid
                     or prior.get("catalog")!=str(catalog)
                     or prior.get("backup")!=str(backup)
-                    or prior.get("state") not in ("PREPARED", "ACTIVE", "ROLLED_BACK")
+                    or prior.get("state") not in ("PREPARED", "ACTIVE", "ROLLED_BACK", "COMMITTED")
                     or not backup.is_file() or backup.is_symlink()
                     or (hasattr(backup, "is_junction") and backup.is_junction())
                     or _sha(backup.read_bytes())!=prior.get("old_sha256")):
                 raise DeletionSwapError("invalid prior transaction or backup")
-            if prior["state"]!="ROLLED_BACK":
+            if prior["state"] not in ("ROLLED_BACK", "COMMITTED"):
                 raise DeletionSwapError("unresolved prior transaction; reconcile first")
         plan=plan_private_generation_replacement(catalog,pointer,project_id,expected_revision,candidate)
         if _locked_validation is not None:
@@ -170,6 +178,13 @@ def laboratory_rollback(transaction: str, *,catalog_file: Path,public_pointer: P
     if len(transaction)!=32 or any(ch not in "0123456789abcdef" for ch in transaction):
         raise DeletionSwapError("invalid transaction")
     catalog,pointer=_lab_paths(catalog_file,public_pointer)
+    return _transactional_rollback(transaction,catalog,pointer)
+
+
+def _transactional_rollback(transaction: str, catalog: Path, pointer: Path) -> dict:
+    """Shared journaled rollback; callers must validate the paths."""
+    if len(transaction)!=32 or any(ch not in "0123456789abcdef" for ch in transaction):
+        raise DeletionSwapError("invalid transaction")
     journal=catalog.parent/("rag-del-"+transaction+".journal.json")
     expected_backup=catalog.parent/("rag-del-"+transaction+".previous.json")
     with _catalog_mutex(catalog.parent):
@@ -197,3 +212,28 @@ def laboratory_rollback(transaction: str, *,catalog_file: Path,public_pointer: P
         data["state"]="ROLLED_BACK"
         _atomic_write(journal,_journal_payload(data))
         return {"state":state,"public_pointer_updated":False,"operational_use_allowed":False}
+
+
+def _transactional_commit(transaction: str, catalog: Path) -> dict:
+    """Mark an ACTIVE switch as COMMITTED (no longer undoable) so a later
+    transaction may start. Only the switch that produced the current
+    catalog can be committed."""
+    if len(transaction)!=32 or any(ch not in "0123456789abcdef" for ch in transaction):
+        raise DeletionSwapError("invalid transaction")
+    journal=catalog.parent/("rag-del-"+transaction+".journal.json")
+    with _catalog_mutex(catalog.parent):
+        if not journal.is_file() or journal.is_symlink():
+            raise DeletionSwapError("missing transaction journal")
+        data=json.loads(journal.read_text(encoding="utf-8"))
+        _validate_journal(data)
+        if data.get("transaction")!=transaction or data.get("catalog")!=str(catalog):
+            raise DeletionSwapError("journal mismatch")
+        if data.get("state")=="COMMITTED":
+            return {"state":"ALREADY_COMMITTED","transaction":transaction}
+        if data.get("state")!="ACTIVE":
+            raise DeletionSwapError("only an ACTIVE transaction can be committed")
+        if _sha(_catalog_bytes(catalog))!=data.get("new_sha256"):
+            raise DeletionSwapError("catalog modified by another transaction")
+        data["state"]="COMMITTED"
+        _atomic_write(journal,_journal_payload(data))
+        return {"state":"COMMITTED","transaction":transaction}

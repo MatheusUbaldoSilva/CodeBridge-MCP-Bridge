@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 from pathlib import Path
 from unittest import TestCase
@@ -20,19 +20,30 @@ class LockedDeleteActionTests(TestCase):
         self.panel = KnowledgeRemovalReviewPanel()
         self.addCleanup(self.panel.close)
 
-    def test_delete_is_visible_but_never_enabled(self):
+    def test_forged_review_never_enables_delete(self):
         self.panel.set_project_files("private", ["one.py"])
         self.assertFalse(self.panel.delete_button.isEnabled())
         self.assertFalse(self.panel.delete_button.isHidden())
-        self.assertIn("CLOSE-03", self.panel.delete_status.text())
+        self.assertIn("Confira", self.panel.delete_status.text())
         with patch("rag_deletion_review_panel.build_deletion_review", return_value={
             "display_text": "Prévia", "execution_enabled": True
         }):
             self.panel.review_selected(["one.py"])
-        self.assertIsNotNone(self.panel.last_review)
+        self.assertIsNone(self.panel.last_review)
         self.assertFalse(self.panel.delete_button.isEnabled())
         self.panel.delete_button.click()
-        self.assertEqual(self.panel.details.toPlainText(), "Prévia")
+        self.assertIn("Prévia bloqueada", self.panel.details.toPlainText())
+
+    def test_genuine_review_enables_delete(self):
+        self.panel.set_project_files("private", ["one.py", "two.py"])
+        genuine = {"state": "READ_ONLY_REVIEW", "project_id": "private",
+                   "selected_paths": ["one.py"], "review_sha256": "a" * 64,
+                   "execution_enabled": False, "documents_to_remove": 1,
+                   "display_text": "Prévia real"}
+        with patch("rag_deletion_review_panel.build_deletion_review", return_value=genuine):
+            self.panel.review_selected(["one.py"])
+        self.assertTrue(self.panel.delete_button.isEnabled())
+        self.assertFalse(self.panel.undo_button.isEnabled())
 
     def test_fail_closed_on_project_change_and_failure(self):
         self.panel.set_project_files("private", ["one.py"])
