@@ -158,6 +158,34 @@ class ClaudeDesktopWatcherTests(unittest.TestCase):
         watcher.consume(["IDLE", "NO_APP", "", "IDLE"])
         self.assertEqual(calls, [])
 
+    @unittest.skipUnless(sys.platform == "win32", "vigia so roda no Windows")
+    def test_start_passes_three_second_idle_confirmation(self):
+        captured = {}
+
+        class FakeProc:
+            stdout = iter(())
+
+            def poll(self):
+                return None
+
+            def terminate(self):
+                pass
+
+            def wait(self, timeout=None):
+                return 0
+
+        def fake_popen(command, **kwargs):
+            captured["command"] = command
+            return FakeProc()
+
+        watcher = ClaudeDesktopWatcher(lambda: None, popen=fake_popen)
+        self.assertTrue(watcher.start())
+        watcher.stop()
+        command = captured["command"]
+        polls = int(command[command.index("-IdleConfirm") + 1])
+        interval = int(command[command.index("-IntervalMs") + 1])
+        self.assertGreaterEqual(polls * interval, 3000)
+
     def test_callback_error_does_not_stop_watcher(self):
         def boom():
             raise RuntimeError("x")

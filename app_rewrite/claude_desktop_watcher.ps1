@@ -5,7 +5,9 @@
 param(
     [int]$ParentPid = 0,
     [int]$IntervalMs = 300,
-    [int]$IdleConfirm = 3
+    # Polls seguidos sem o botao antes de reportar IDLE (10 x 300 ms = 3 s):
+    # trocar de conversa tira o botao da tela por ~1-2 s.
+    [int]$IdleConfirm = 10
 )
 
 $ErrorActionPreference = 'Stop'

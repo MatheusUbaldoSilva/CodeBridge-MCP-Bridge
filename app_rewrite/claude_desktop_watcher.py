@@ -14,6 +14,14 @@ from pathlib import Path
 SCRIPT_PATH = Path(__file__).resolve().with_name(
     "claude_desktop_watcher.ps1"
 )
+POLL_INTERVAL_MS = 300
+# Trocar de conversa no app tira o botao da tela por ~1-2 s; so considera a
+# resposta encerrada depois de o botao ficar ausente por este tempo.
+IDLE_CONFIRM_SECONDS = 3.0
+IDLE_CONFIRM_POLLS = max(
+    1,
+    int(round(IDLE_CONFIRM_SECONDS * 1000 / POLL_INTERVAL_MS)),
+)
 
 
 class ClaudeDesktopWatcher:
@@ -72,6 +80,10 @@ class ClaudeDesktopWatcher:
                 str(self._script),
                 "-ParentPid",
                 str(os.getpid()),
+                "-IntervalMs",
+                str(POLL_INTERVAL_MS),
+                "-IdleConfirm",
+                str(IDLE_CONFIRM_POLLS),
             ]
             try:
                 proc = self._popen(
