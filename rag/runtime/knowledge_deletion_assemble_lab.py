@@ -43,7 +43,7 @@ def _assemble_deletion_generation(stage:Path,source_snapshot:Path,project_id:str
             stage.name!="del_"+tid or stage.parent.name!="generations" or
             snapshot.parent.name!="snapshots" or snapshot.name!="source_"+tid or
             not re.fullmatch(r"[a-f0-9]{32}",tid) or
-            not re.fullmatch(r"[a-f0-9]{64}",source_revision) or
+            not re.fullmatch(r"[a-f0-9]{40}(?:[a-f0-9]{24})?",source_revision) or
             not re.fullmatch(r"[a-z][a-z0-9_-]{1,63}",project_id)):
         raise DeletionGenerationAssemblyError("unsafe laboratory layout")
     if ((stage/"progress.json").exists() or

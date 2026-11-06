@@ -48,7 +48,10 @@ def _sha(path: Path) -> str:
 
 
 class Close04OperationalRemovalTests(TestCase):
+    LEGACY = False
+
     def setUp(self):
+        self.revision = ("d" * 40) if self.LEGACY else REVISION
         temp = TemporaryDirectory(prefix="rag_del_close4_")
         self.addCleanup(temp.cleanup)
         root = Path(temp.name)
@@ -59,7 +62,7 @@ class Close04OperationalRemovalTests(TestCase):
         self.rag = local / "CodeBridge" / "rag"
         self.rag.mkdir(parents=True)
         project = home / "CodeBridge-RAG-Workspace" / PROJECT
-        self.generation = project / "generations" / ("auto_" + JOB)
+        self.generation = project / "generations" / (("legacy-" + PROJECT) if self.LEGACY else ("auto_" + JOB))
         self.source = project / "snapshots" / ("source_" + JOB)
         self.generation.mkdir(parents=True)
         self.source.mkdir(parents=True)
@@ -97,20 +100,20 @@ class Close04OperationalRemovalTests(TestCase):
         finally:
             close_qdrant_local(client)
         (self.generation / "progress.json").write_text(json.dumps({
-            "project_id": PROJECT, "source_revision": REVISION, "job_id": JOB,
+            "project_id": PROJECT, "source_revision": self.revision, "job_id": JOB,
             "state": "INDEXING_NOT_PUBLISHED", "total_vectors_done": 3,
-            "expected_chunks": 3, "last_batch_result": "COMPLETE", "published": False,
+            "expected_chunks": 3, "last_batch_result": "PASS" if self.LEGACY else "COMPLETE", "published": False,
         }), encoding="utf-8")
         receipt = self.generation / "auto-generation-receipt.json"
         receipt.write_text(json.dumps({
             "job_id": JOB, "project_id": PROJECT, "source_snapshot": str(self.source.resolve()),
-            "source_revision": REVISION, "state": "VERIFIED_NOT_REGISTERED",
+            "source_revision": self.revision, "state": "VERIFIED_NOT_REGISTERED",
             "published_publicly": False,
         }), encoding="utf-8")
         self.catalog = self.rag / "project-indexes.json"
         self.catalog.write_text(json.dumps({"schema_version": 1, "projects": {PROJECT: {
-            "project_id": PROJECT, "enabled": True, "index_family": "RAG_AUTO_03",
-            "job_id": JOB, "source_revision": REVISION,
+            "project_id": PROJECT, "enabled": True, "index_family": None if self.LEGACY else "RAG_AUTO_03",
+            "job_id": JOB, "source_revision": self.revision,
             "generation_directory": str(self.generation.resolve()),
             "source_directory": str(self.source.resolve()),
             "generation_receipt_sha256": _sha(receipt),
@@ -130,7 +133,7 @@ class Close04OperationalRemovalTests(TestCase):
             return sorted(r[0] for r in con.execute("SELECT path FROM rag_documents"))
 
     def test_removes_selected_knowledge_and_switches_project(self):
-        self.assertEqual(resolve_isolated_project(PROJECT).generation, "auto_" + JOB)
+        self.assertEqual(resolve_isolated_project(PROJECT).generation, self.generation.name)
         result = execute_knowledge_removal(PROJECT, ["alpha.py"], self._sha_for(["alpha.py"]), PROJECT)
         self.assertEqual(result["state"], "REMOVED")
         current = resolve_isolated_project(PROJECT)
@@ -147,7 +150,7 @@ class Close04OperationalRemovalTests(TestCase):
         undo = rollback_knowledge_removal(result["transaction"])
         self.assertEqual(undo["state"], "LAB_ROLLBACK_COMPLETE")
         current = resolve_isolated_project(PROJECT)
-        self.assertEqual(current.generation, "auto_" + JOB)
+        self.assertEqual(current.generation, self.generation.name)
         self.assertEqual(self._paths(current), ["alpha.py", "bravo.py", "charlie.py"])
         self.assertIsNone(pending_removal(PROJECT))
 
@@ -191,3 +194,7 @@ class Close04OperationalRemovalTests(TestCase):
         with self.assertRaises(Exception):
             execute_knowledge_removal(PROJECT, ["alpha.py"], self._sha_for(["alpha.py"]), PROJECT)
         self._assert_nothing_changed(before)
+
+class Close04LegacyRevisionTests(Close04OperationalRemovalTests):
+    """Same scenarios for a legacy project pinned to a 40-hex git revision."""
+    LEGACY = True

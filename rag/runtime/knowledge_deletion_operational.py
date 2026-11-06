@@ -45,7 +45,7 @@ from rag.runtime.knowledge_deletion_verify import validate_deletion_candidate
 PUBLIC_PROJECT = "codebridge"
 POINTER_NAME = "active-generation.json"
 _HEX32 = re.compile(r"[0-9a-f]{32}\Z")
-_HEX64 = re.compile(r"[0-9a-f]{64}\Z")
+_REVISION = re.compile(r"[0-9a-f]{40}(?:[0-9a-f]{24})?\Z")
 _LOCK = threading.RLock()
 
 
@@ -130,9 +130,9 @@ def execute_knowledge_removal(project_id: str, selected_paths: list[str],
         index = resolve_isolated_project(project_id)
         if index is None or index.generation != preview["generation"]:
             raise KnowledgeRemovalError("a geracao do projeto mudou; confira de novo")
-        if not _HEX64.fullmatch(index.source_revision or ""):
+        if not _REVISION.fullmatch(index.source_revision or ""):
             raise KnowledgeRemovalError(
-                "projeto com revisao de 40 caracteres ainda nao suportado pela exclusao")
+                "revisao do projeto invalida para a exclusao")
 
         transaction_id = uuid.uuid4().hex
         generations = Path(index.sqlite).parent.parent

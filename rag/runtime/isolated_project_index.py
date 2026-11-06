@@ -103,7 +103,11 @@ def resolve_isolated_project(project_id: str) -> IsolatedProjectIndex | None:
     is_delete=family=="RAG_DEL_01"
     if family not in (None, "RAG_AUTO_03", "RAG_DEL_01"):
         raise IsolatedProjectUnavailable("unsupported private index family")
-    revision_pattern=r"[0-9a-f]{64}" if (is_auto or is_delete) else r"[0-9a-f]{40}"
+    # RAG_DEL_01 keeps the revision of the project it was derived from:
+    # 64-hex (RAG_AUTO_03) or a 40-hex git revision (legacy project).
+    revision_pattern=(r"[0-9a-f]{64}" if is_auto
+                      else r"[0-9a-f]{40}(?:[0-9a-f]{24})?" if is_delete
+                      else r"[0-9a-f]{40}")
     if not isinstance(revision, str) or not re.fullmatch(revision_pattern, revision):
         raise IsolatedProjectUnavailable("invalid pinned source revision")
     if is_auto:

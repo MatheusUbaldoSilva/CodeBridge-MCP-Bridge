@@ -1,4 +1,4 @@
-﻿"""Strict read-only RAG_DEL_01 generation contract validator."""
+"""Strict read-only RAG_DEL_01 generation contract validator."""
 from __future__ import annotations
 from hashlib import sha256
 import json
@@ -7,6 +7,7 @@ import re
 
 HEX64=re.compile(r"[0-9a-f]{64}\Z")
 HEX32=re.compile(r"[0-9a-f]{32}\Z")
+REVISION=re.compile(r"[0-9a-f]{40}(?:[0-9a-f]{24})?\Z")
 
 class DeletionGenerationUnavailable(RuntimeError):
     pass
@@ -26,7 +27,7 @@ def verify_deletion_generation(row:dict,project_id:str,generation:Path,source_ro
         raise fail("invalid deletion transaction id")
     if generation.name!="del_"+tid or generation.parent.name!="generations":
         raise fail("deletion generation layout mismatch")
-    if not isinstance(revision,str) or not HEX64.fullmatch(revision):
+    if not isinstance(revision,str) or not REVISION.fullmatch(revision):
         raise fail("invalid deletion source revision")
     if not isinstance(row.get("generation_receipt_sha256"),str) or not HEX64.fullmatch(row["generation_receipt_sha256"]):
         raise fail("missing pinned receipt digest")
