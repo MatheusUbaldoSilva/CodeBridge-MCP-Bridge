@@ -6,6 +6,17 @@ import threading
 from constants import CONFIG_FILE
 
 
+TURN_TIMER_MODES = ("CHATGPT", "CLAUDE", "DISABLED")
+DEFAULT_TURN_TIMER_MODE = "CHATGPT"
+
+
+def normalize_turn_timer_mode(mode):
+    value = str(mode or "").strip().upper()
+    if value not in TURN_TIMER_MODES:
+        raise ValueError("modo do cronometro invalido: " + str(mode))
+    return value
+
+
 class ConfigStore:
     def __init__(self, path=None):
         self.path = Path(path) if path else CONFIG_FILE
@@ -81,6 +92,23 @@ class ConfigStore:
             ] = bool(enabled)
             self._write(data)
             return bool(enabled)
+
+    def load_turn_timer_mode(self):
+        data = self._read()
+        try:
+            return normalize_turn_timer_mode(
+                data.get("turn_timer_mode", DEFAULT_TURN_TIMER_MODE)
+            )
+        except ValueError:
+            return DEFAULT_TURN_TIMER_MODE
+
+    def save_turn_timer_mode(self, mode):
+        mode = normalize_turn_timer_mode(mode)
+        with self._lock:
+            data = self._read()
+            data["turn_timer_mode"] = mode
+            self._write(data)
+            return mode
 
     @staticmethod
     def _profile_name_for(tunnel_id):

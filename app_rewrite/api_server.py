@@ -40,6 +40,12 @@ class BridgeAPI:
                 return data
 
             def _send(self, status, payload):
+                if getattr(self, "_cb_turn_activity", False):
+                    self._cb_turn_activity = False
+                    try:
+                        bridge.runtime.end_chatgpt_activity()
+                    except Exception:
+                        pass
                 body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -59,8 +65,10 @@ class BridgeAPI:
                 path = urlparse(self.path).path
                 try:
                     bridge.runtime.ensure_chatgpt_turn(
-                        reason=path
+                        reason=path,
+                        track_activity=True,
                     )
+                    self._cb_turn_activity = True
                     if path == "/v1/status":
                         return self._send(200, {"ok": True, "status": bridge.runtime.snapshot()})
                     if path == "/v1/ssh/config":
@@ -124,8 +132,10 @@ class BridgeAPI:
                 try:
                     body = self._json_body()
                     bridge.runtime.ensure_chatgpt_turn(
-                        reason=path
+                        reason=path,
+                        track_activity=True,
                     )
+                    self._cb_turn_activity = True
                     if path == "/v1/read-only/batch":
                         result = bridge.runtime.read_only_batch(
                             body.get("operations")
