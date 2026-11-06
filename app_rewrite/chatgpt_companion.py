@@ -294,7 +294,7 @@ class ChatGPTTimerState:
                 "timer": self._snapshot_locked(),
             }
 
-    def _finish(self, request_id, state):
+    def _finish(self, request_id, state, notify=True):
         request_id = str(request_id or "").strip()
 
         if state not in ("FINISHED", "CANCELLED"):
@@ -322,6 +322,7 @@ class ChatGPTTimerState:
             timer = self._snapshot_locked()
             should_notify = bool(
                 state == "FINISHED"
+                and notify
                 and callable(self._on_finished)
             )
             finished_request_id = self._request_id
@@ -340,10 +341,11 @@ class ChatGPTTimerState:
             "timer": timer,
         }
 
-    def finish(self, request_id=None):
+    def finish(self, request_id=None, notify=True):
         return self._finish(
             request_id,
             "FINISHED",
+            notify=notify,
         )
 
     def cancel(self, request_id=None):

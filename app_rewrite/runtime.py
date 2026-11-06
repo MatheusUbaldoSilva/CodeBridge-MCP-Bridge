@@ -9,6 +9,8 @@ from api_server import BridgeAPI
 from author_mcp_manager import AuthorMCPManager
 from secure_tunnel_manager import SecureTunnelManager
 from chatgpt_companion import ChatGPTCompanionServer, ChatGPTTimerState
+from claude_desktop_watcher import ClaudeDesktopWatcher
+from config_store import DEFAULT_TURN_TIMER_MODE, normalize_turn_timer_mode
 from completion_sound import CompletionSound
 from constants import APP_NAME, APP_VERSION, DATA_DIR, DEFAULT_HOST, RUNTIME_FILE
 from executor import ExecutionEngine
@@ -19,6 +21,12 @@ from job_store import JobStore
 from migration import migrate_legacy_ssh_once
 from read_only_batch import execute_read_only_batch
 from terminal_manager import TerminalManager
+
+# Fecha o turno do contador quando o cliente (Claude, ChatGPT...) fica
+# este tempo sem chamar o CodeBridge: a resposta anterior terminou.
+CHATGPT_TURN_IDLE_GAP_SECONDS = 90.0
+# Se uma requisicao nunca encerrar a atividade, nao trava o contador.
+CHATGPT_TURN_INFLIGHT_STALE_SECONDS = 600.0
 
 
 class BridgeRuntime:
@@ -58,11 +66,20 @@ class BridgeRuntime:
         )
         self.author_mcp = AuthorMCPManager()
         self.secure_tunnel = SecureTunnelManager()
+        self._turn_activity_lock = threading.RLock()
+        self._turn_inflight = 0
+        self._turn_last_activity = None
         self.chatgpt_timer = ChatGPTTimerState(
             on_finished=self._on_chatgpt_timer_finished
         )
         self.chatgpt_companion = ChatGPTCompanionServer(
             self.chatgpt_timer
+        )
+        self.turn_timer_mode = (
+            self.terminals.config.load_turn_timer_mode()
+        )
+        self.claude_watcher = ClaudeDesktopWatcher(
+            on_response_finished=self._on_claude_response_finished
         )
         self.token = secrets.token_urlsafe(32)
         self.api = BridgeAPI(self, host=DEFAULT_HOST, port=0, token=self.token)
@@ -119,6 +136,7 @@ class BridgeRuntime:
         self.started_at = time.time()
         self._started = True
         self._write_runtime_file()
+        self._sync_claude_watcher()
         self.author_mcp.start()
         self.secure_tunnel.start()
         self._invalidate_availability_cache()
@@ -153,35 +171,144 @@ class BridgeRuntime:
     def toggle_completion_sound(self):
         return self.completion_sound.toggle()
 
+    def _chatgpt_turn_activity_lock(self):
+        lock = getattr(self, "_turn_activity_lock", None)
+        if lock is None:
+            lock = threading.RLock()
+            self._turn_activity_lock = lock
+        return lock
+
     def ensure_chatgpt_turn(
         self,
         reason="codebridge_call",
+        track_activity=False,
+        now=None,
     ):
-        snapshot = self.chatgpt_timer.snapshot()
+        with self._chatgpt_turn_activity_lock():
+            now = time.monotonic() if now is None else float(now)
+            inflight = int(getattr(self, "_turn_inflight", 0) or 0)
+            last_activity = getattr(self, "_turn_last_activity", None)
+            snapshot = self.chatgpt_timer.snapshot()
+            idle_closed_request_id = None
+            mode = getattr(
+                self, "turn_timer_mode", DEFAULT_TURN_TIMER_MODE
+            )
 
-        if snapshot.get("state") == "RUNNING":
+            if mode == "DISABLED":
+                return {
+                    "started": False,
+                    "timer": snapshot,
+                    "disabled": True,
+                }
+
+            if snapshot.get("state") == "RUNNING":
+                gap = (
+                    None
+                    if last_activity is None
+                    else now - last_activity
+                )
+                idle = mode == "CLAUDE" and gap is not None and (
+                    (
+                        inflight == 0
+                        and gap >= CHATGPT_TURN_IDLE_GAP_SECONDS
+                    )
+                    or gap >= CHATGPT_TURN_INFLIGHT_STALE_SECONDS
+                )
+                if not idle:
+                    self._turn_last_activity = now
+                    if track_activity:
+                        self._turn_inflight = inflight + 1
+                    return {
+                        "started": False,
+                        "timer": snapshot,
+                    }
+
+                idle_closed_request_id = snapshot.get("request_id")
+                self.chatgpt_timer.finish(
+                    idle_closed_request_id,
+                    notify=False,
+                )
+                inflight = 0
+
+            request_id = (
+                "codebridge_"
+                + secrets.token_hex(8)
+            )
+            self.chatgpt_timer.start(
+                request_id,
+                resume_manual=True,
+            )
+            self.chatgpt_timer.claim(
+                reason=reason,
+                request_id=request_id,
+            )
+            self._turn_last_activity = now
+            self._turn_inflight = (
+                inflight + 1 if track_activity else inflight
+            )
+
             return {
-                "started": False,
-                "timer": snapshot,
+                "started": True,
+                "timer": self.chatgpt_timer.snapshot(),
+                "idle_closed_request_id": idle_closed_request_id,
             }
 
-        request_id = (
-            "codebridge_"
-            + secrets.token_hex(8)
+    def _sync_claude_watcher(self):
+        watcher = getattr(self, "claude_watcher", None)
+        if watcher is None:
+            return False
+        should_run = bool(getattr(self, "_started", False)) and (
+            getattr(self, "turn_timer_mode", DEFAULT_TURN_TIMER_MODE)
+            == "CLAUDE"
         )
-        self.chatgpt_timer.start(
-            request_id,
-            resume_manual=True,
-        )
-        self.chatgpt_timer.claim(
-            reason=reason,
-            request_id=request_id,
-        )
+        try:
+            if should_run:
+                watcher.start()
+            else:
+                watcher.stop()
+        except Exception:
+            return False
+        return should_run
 
-        return {
-            "started": True,
-            "timer": self.chatgpt_timer.snapshot(),
-        }
+    def set_turn_timer_mode(self, mode):
+        mode = normalize_turn_timer_mode(mode)
+        with self._chatgpt_turn_activity_lock():
+            previous = getattr(
+                self, "turn_timer_mode", DEFAULT_TURN_TIMER_MODE
+            )
+            self.terminals.config.save_turn_timer_mode(mode)
+            self.turn_timer_mode = mode
+            if mode != previous:
+                self.chatgpt_timer.reset()
+                self._turn_last_activity = None
+        self._sync_claude_watcher()
+        return mode
+
+    def _on_claude_response_finished(self):
+        with self._chatgpt_turn_activity_lock():
+            mode = getattr(
+                self, "turn_timer_mode", DEFAULT_TURN_TIMER_MODE
+            )
+            if mode != "CLAUDE":
+                return False
+            snapshot = self.chatgpt_timer.snapshot()
+            if (
+                snapshot.get("state") != "RUNNING"
+                or not snapshot.get("claimed_by_codebridge")
+            ):
+                return False
+            result = self.chatgpt_timer.finish(
+                snapshot.get("request_id")
+            )
+            self._turn_last_activity = None
+            return bool(result.get("applied"))
+
+    def end_chatgpt_activity(self, now=None):
+        with self._chatgpt_turn_activity_lock():
+            now = time.monotonic() if now is None else float(now)
+            inflight = int(getattr(self, "_turn_inflight", 0) or 0)
+            self._turn_inflight = max(0, inflight - 1)
+            self._turn_last_activity = now
 
     def _on_chatgpt_timer_finished(
         self,
@@ -1071,6 +1198,10 @@ class BridgeRuntime:
             ),
             "chatgpt_timer": self.chatgpt_timer.snapshot(),
             "turn_control": self.chatgpt_timer.turn_control(),
+            "turn_timer_mode": getattr(
+                self, "turn_timer_mode", DEFAULT_TURN_TIMER_MODE
+            ),
+            "claude_watcher": self.claude_watcher.status(),
             "chatgpt_companion": {
                 "online": self.chatgpt_companion.running,
                 "host": self.chatgpt_companion.host,
@@ -1083,6 +1214,10 @@ class BridgeRuntime:
             return True
 
         self._invalidate_availability_cache()
+        try:
+            self.claude_watcher.stop()
+        except Exception:
+            pass
         try:
             self.secure_tunnel.stop()
         finally:

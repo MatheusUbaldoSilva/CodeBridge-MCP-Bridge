@@ -4,7 +4,8 @@ import threading
 
 from PySide6.QtGui import QIcon, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
-    QApplication, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
+    QApplication, QButtonGroup, QFormLayout, QFrame, QHBoxLayout, QLabel,
+    QLineEdit,
     QMainWindow, QMessageBox, QPushButton, QSizePolicy, QSpinBox,
     QStackedWidget, QTabWidget, QVBoxLayout, QWidget,
 )
@@ -108,7 +109,7 @@ class MainWindow(QMainWindow):
         self.chatgpt_timer_box.setObjectName("chatgptTimerBox")
         self.chatgpt_timer_box.setMinimumWidth(420)
         self.chatgpt_timer_box.setMaximumWidth(620)
-        self.chatgpt_timer_box.setFixedHeight(145)
+        self.chatgpt_timer_box.setFixedHeight(185)
         self.chatgpt_timer_box.setStyleSheet(
             "QFrame#chatgptTimerBox{"
             "background:#0a1015;"
@@ -119,6 +120,47 @@ class MainWindow(QMainWindow):
         timer_layout = QVBoxLayout(self.chatgpt_timer_box)
         timer_layout.setContentsMargins(20, 12, 20, 12)
         timer_layout.setSpacing(2)
+
+        self.turn_mode_buttons = {}
+        self.turn_mode_group = QButtonGroup(self)
+        self.turn_mode_group.setExclusive(True)
+        mode_row = QHBoxLayout()
+        mode_row.setContentsMargins(0, 0, 0, 0)
+        mode_row.setSpacing(0)
+        mode_row.addStretch(1)
+        for mode, text, tip in (
+            (
+                "CHATGPT",
+                "ChatGPT",
+                "Encerra o turno pelo botao Parar do ChatGPT "
+                "(extensao do navegador).",
+            ),
+            (
+                "CLAUDE",
+                "Claude",
+                "Encerra o turno pelo botao Interromper resposta do app "
+                "Claude (UI Automation) ou apos 90 s sem chamadas.",
+            ),
+            (
+                "DISABLED",
+                "Desabilitado",
+                "Sem cronometro e sem limite de 17 min por turno.",
+            ),
+        ):
+            button = QPushButton(text)
+            button.setCheckable(True)
+            button.setToolTip(tip)
+            button.setCursor(Qt.PointingHandCursor)
+            button.clicked.connect(
+                lambda checked=False, value=mode: self.set_turn_timer_mode(
+                    value
+                )
+            )
+            self.turn_mode_group.addButton(button)
+            self.turn_mode_buttons[mode] = button
+            mode_row.addWidget(button)
+        mode_row.addStretch(1)
+        timer_layout.addLayout(mode_row)
 
         self.chatgpt_timer_label = QLabel("00:00")
         self.chatgpt_timer_label.setAlignment(Qt.AlignCenter)
@@ -257,6 +299,7 @@ class MainWindow(QMainWindow):
         self.stop_shortcut.activated.connect(self.stop_active)
         self._update_auto_button()
         self._update_sound_button()
+        self._update_turn_mode_buttons()
         self._load_ssh_settings()
         self.live_timer = QTimer(self)
         self.live_timer.timeout.connect(self.refresh_live)
@@ -307,6 +350,60 @@ class MainWindow(QMainWindow):
 
         auto_size = self.auto_button.sizeHint()
         self.sound_button.setFixedSize(auto_size)
+
+    def _update_turn_mode_buttons(self):
+        current = getattr(self.runtime, "turn_timer_mode", "CHATGPT")
+        colors = {
+            "CHATGPT": "#10a37f",
+            "CLAUDE": "#d97757",
+            "DISABLED": "#5b6670",
+        }
+        order = ("CHATGPT", "CLAUDE", "DISABLED")
+        for index, mode in enumerate(order):
+            button = self.turn_mode_buttons[mode]
+            checked = mode == current
+            if button.isChecked() != checked:
+                button.setChecked(checked)
+            if index == 0:
+                radius = (
+                    "border-top-left-radius:6px;"
+                    "border-bottom-left-radius:6px;"
+                )
+            elif index == len(order) - 1:
+                radius = (
+                    "border-top-right-radius:6px;"
+                    "border-bottom-right-radius:6px;"
+                )
+            else:
+                radius = ""
+            style = (
+                "QPushButton{"
+                + "background:" + (colors[mode] if checked else "#1b242c") + ";"
+                + "color:" + ("white" if checked else "#9fb0bd") + ";"
+                + "border:1px solid #33414d;"
+                + "border-radius:0px;"
+                + radius
+                + "padding:3px 14px;"
+                + "font-size:12px;"
+                + "font-weight:" + ("700" if checked else "500") + ";"
+                + "}"
+            )
+            if button.styleSheet() != style:
+                button.setStyleSheet(style)
+
+    def set_turn_timer_mode(self, mode):
+        try:
+            self.runtime.set_turn_timer_mode(mode)
+        except Exception as exc:
+            QMessageBox.warning(
+                self,
+                APP_NAME,
+                "Nao foi possivel trocar o modo do cronometro: "
+                + str(exc),
+            )
+        self._last_chatgpt_timer_state = None
+        self._update_turn_mode_buttons()
+        self._refresh_chatgpt_timer()
 
     def toggle_completion_sound(self):
         self.runtime.toggle_completion_sound()
@@ -436,6 +533,21 @@ class MainWindow(QMainWindow):
         )
 
     def _refresh_chatgpt_timer(self):
+        mode = getattr(self.runtime, "turn_timer_mode", "CHATGPT")
+        if mode == "DISABLED":
+            self.chatgpt_timer_label.setText("--:--")
+            if self._last_chatgpt_timer_state != "DISABLED":
+                self._last_chatgpt_timer_state = "DISABLED"
+                self.chatgpt_timer_status.setText("DESABILITADO")
+                self.chatgpt_timer_status.setStyleSheet(
+                    "color:#5b6670;"
+                    "font-size:13px;"
+                    "font-weight:600;"
+                    "letter-spacing:1px;"
+                    "background:transparent;"
+                    "border:0;"
+                )
+            return
         timer = self.runtime.chatgpt_timer.snapshot()
         control = self.runtime.chatgpt_timer.turn_control()
         claimed = bool(
@@ -467,10 +579,19 @@ class MainWindow(QMainWindow):
             elif control_stage == "WRAP_UP_NOW":
                 visual_state = "WRAP_UP_NOW"
 
-        if visual_state == self._last_chatgpt_timer_state:
+        watcher_ok = True
+        if mode == "CLAUDE":
+            try:
+                watcher_ok = bool(
+                    self.runtime.claude_watcher.status().get("running")
+                )
+            except Exception:
+                watcher_ok = False
+        state_key = (mode, visual_state, watcher_ok)
+        if state_key == self._last_chatgpt_timer_state:
             return
 
-        self._last_chatgpt_timer_state = visual_state
+        self._last_chatgpt_timer_state = state_key
 
         labels = {
             "IDLE": (
@@ -505,6 +626,8 @@ class MainWindow(QMainWindow):
                 "#7f93a3",
             ),
         )
+        if not watcher_ok:
+            text = text + " \u00b7 VIGIA CLAUDE OFFLINE"
         self.chatgpt_timer_status.setText(
             text
         )
@@ -568,6 +691,7 @@ class MainWindow(QMainWindow):
         s = self.runtime.snapshot()
         self._update_auto_button()
         self._update_sound_button()
+        self._update_turn_mode_buttons()
         t = s["terminals"]
         self._auto_swap_terminal_tab(t)
         author_mcp = s.get("author_mcp") or {}
