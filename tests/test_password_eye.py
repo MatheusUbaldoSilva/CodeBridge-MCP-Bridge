@@ -38,6 +38,14 @@ class PasswordEyeTests(unittest.TestCase):
         self.assertEqual(edit.text(), "")
         self.assertTrue(eye.visible)
 
+    def test_conceal_after_showing(self):
+        edit = QLineEdit()
+        eye = PasswordEye(edit)
+        edit.setText("x")
+        eye.toggle()
+        eye.conceal()
+        self.assertFalse(eye.visible)
+
 
 if __name__ == "__main__":
     unittest.main()

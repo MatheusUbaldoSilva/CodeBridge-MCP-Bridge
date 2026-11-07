@@ -44,11 +44,14 @@ class PasswordEye:
     def visible(self):
         return self.edit.echoMode() == QLineEdit.Normal
 
+    def conceal(self):
+        self.edit.setEchoMode(QLineEdit.Password)
+        self.action.setIcon(eye_icon(True))
+        self.action.setToolTip("Mostrar senha")
+
     def toggle(self):
         if self.visible:
-            self.edit.setEchoMode(QLineEdit.Password)
-            self.action.setIcon(eye_icon(True))
-            self.action.setToolTip("Mostrar senha")
+            self.conceal()
             return
         if not self.edit.text() and self._load_saved is not None:
             try:

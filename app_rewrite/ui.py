@@ -464,10 +464,20 @@ class MainWindow(QMainWindow):
         self.ssh_user.setText(settings.get("username", ""))
         if settings.get("password_saved"):
             self.ssh_password.setPlaceholderText("Senha salva no Windows")
+            self._show_saved_password()
         state = "ONLINE" if settings.get("online") else "OFFLINE"
         self.ssh_config_status.setText(f"SSH: {state}")
         if settings.get("host"):
             QTimer.singleShot(0, self.probe_ssh_hostkey)
+
+    def _show_saved_password(self):
+        """Campo ja abre com a senha salva, escondida por pontinhos."""
+        try:
+            saved = self._saved_ssh_password()
+        except Exception:
+            saved = ""
+        self.ssh_password.setText(saved)
+        self.ssh_password_eye.conceal()
 
     def _saved_ssh_password(self):
         credentials = self.runtime.terminals.credentials.load() or {}
@@ -625,8 +635,8 @@ class MainWindow(QMainWindow):
                 if ok:
                     self._refresh_transfer_panel()
             elif ok:
-                self.ssh_password.clear()
                 self.ssh_password.setPlaceholderText("Senha salva no Windows")
+                self._show_saved_password()
                 self.ssh_config_status.setText("SSH salvo e ONLINE")
                 self._refresh_transfer_panel()
             else:
