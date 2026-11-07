@@ -67,7 +67,16 @@ def _verified_job_generation(job_id: str) -> dict:
     return verify_prepared_auto_generation(default_queue_path(), job_id)
 
 
-def _plan(project_id: str, job_id: str):
+def _removal_list(remove_paths) -> list[str]:
+    if remove_paths is None:
+        return []
+    if (not isinstance(remove_paths, (list, tuple)) or any(not isinstance(p, str) or not p for p in remove_paths)
+            or len(set(remove_paths)) != len(remove_paths)):
+        raise KnowledgeMergeError("lista de arquivos a remover invalida")
+    return sorted(remove_paths)
+
+
+def _plan(project_id: str, job_id: str, remove_paths=None):
     if not isinstance(project_id, str) or not project_id or project_id == PUBLIC_PROJECT:
         raise KnowledgeMergeError("o indice publico nao pode receber arquivos por aqui")
     if not isinstance(job_id, str) or not _HEX32.fullmatch(job_id):
@@ -98,8 +107,13 @@ def _plan(project_id: str, job_id: str):
             raise KnowledgeMergeError(
                 "modelo de embeddings diferente do projeto (" + _kind(entry) + "); reindexe o projeto inteiro")
     chosen = set(new_paths)
-    keep_entries = [e for e in base.entries if e.path not in chosen]
     base_paths = {e.path for e in base.entries}
+    removed = _removal_list(remove_paths)
+    if not set(removed) <= base_paths:
+        raise KnowledgeMergeError("arquivo a remover nao esta no projeto")
+    if set(removed) & chosen:
+        raise KnowledgeMergeError("arquivo nao pode ser trocado e removido ao mesmo tempo")
+    keep_entries = [e for e in base.entries if e.path not in chosen and e.path not in set(removed)]
     payload = {
         "project_id": project_id, "job_id": job_id,
         "base_generation": index.generation, "base_source_revision": index.source_revision,
@@ -114,15 +128,17 @@ def _plan(project_id: str, job_id: str):
                          + sum(len(e.chunk_ids) for e in new_entries)),
         "chunks_added": sum(len(e.chunk_ids) for e in new_entries),
     }
+    if removed:
+        payload["removed_paths"] = removed
     digest = sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
     review = {**payload, "state": "READ_ONLY_REVIEW", "execution_enabled": False,
               "review_sha256": digest}
     return review, index, job, keep_entries, new_entries
 
 
-def preview_knowledge_merge(project_id: str, job_id: str) -> dict:
+def preview_knowledge_merge(project_id: str, job_id: str, remove_paths=None) -> dict:
     """Read-only summary of what joining the job to the project would do."""
-    return _plan(project_id, job_id)[0]
+    return _plan(project_id, job_id, remove_paths)[0]
 
 
 def _columns(con, schema: str, table: str) -> list[str]:
@@ -130,7 +146,7 @@ def _columns(con, schema: str, table: str) -> list[str]:
 
 
 def _merge_sqlite(base: Path, job: Path, target: Path, project_id: str,
-                  new_paths: list[str], revision: str) -> tuple[int, int]:
+                  new_paths: list[str], revision: str, remove_paths=()) -> tuple[int, int]:
     with closing(sqlite3.connect(Path(base).as_uri() + "?mode=ro", uri=True)) as src, \
             closing(sqlite3.connect(str(target))) as dst:
         src.backup(dst)
@@ -147,7 +163,8 @@ def _merge_sqlite(base: Path, job: Path, target: Path, project_id: str,
         if job_paths != sorted(new_paths):
             raise KnowledgeMergeError("banco do trabalho nao confere com o manifesto")
         con.execute("CREATE TEMP TABLE merge_paths(path TEXT PRIMARY KEY)")
-        con.executemany("INSERT INTO merge_paths(path) VALUES(?)", [(p,) for p in new_paths])
+        con.executemany("INSERT INTO merge_paths(path) VALUES(?)",
+                        [(p,) for p in sorted(set(new_paths) | set(remove_paths))])
         con.execute(
             "DELETE FROM rag_chunk_symbols WHERE chunk_id IN (SELECT chunk_id FROM rag_chunks "
             "WHERE project_id=? AND path IN (SELECT path FROM merge_paths))", (project_id,))
@@ -225,9 +242,17 @@ def _merge_vectors(base_q: Path, job_q: Path, target_q: Path, project_id: str,
     return totals
 
 
-def _snapshot(base_root: Path, job_root: Path, snapshot: Path, new_paths: list[str]) -> None:
+def _snapshot(base_root: Path, job_root: Path, snapshot: Path, new_paths: list[str],
+              remove_paths=()) -> None:
     temp = snapshot.with_name(snapshot.name + ".copying")
     shutil.copytree(base_root, temp, symlinks=False)
+    inside = temp.resolve()
+    for relative in remove_paths:
+        target = (temp / relative).resolve()
+        if not target.is_relative_to(inside):
+            raise KnowledgeMergeError("arquivo a remover fora da copia: " + relative)
+        if target.is_file():
+            target.unlink()
     job_root = Path(job_root).resolve(strict=True)
     for relative in new_paths:
         origin = (job_root / relative).resolve(strict=True)
@@ -249,7 +274,7 @@ def _paths_present(sqlite_path: Path, project_id: str, paths: list[str]) -> int:
 
 
 def execute_knowledge_merge(project_id: str, job_id: str, expected_review_sha256: str,
-                            confirmation: str, *, progress=None) -> dict:
+                            confirmation: str, *, progress=None, remove_paths=None) -> dict:
     """Join the job's indexed files to the existing project (undoable)."""
     def step(message: str):
         if callable(progress):
@@ -260,7 +285,8 @@ def execute_knowledge_merge(project_id: str, job_id: str, expected_review_sha256
     with _LOCK:
         catalog, pointer = _operational_paths()
         step("Conferindo a previa")
-        review, index, job, keep_entries, new_entries = _plan(project_id, job_id)
+        review, index, job, keep_entries, new_entries = _plan(project_id, job_id, remove_paths)
+        removed = list(review.get("removed_paths") or [])
         if review["review_sha256"] != expected_review_sha256:
             raise KnowledgeMergeError("a previa mudou desde a revisao; confira de novo")
         new_paths = sorted(e.path for e in new_entries)
@@ -277,7 +303,8 @@ def execute_knowledge_merge(project_id: str, job_id: str, expected_review_sha256
             stage.mkdir(parents=False)
             step("Juntando o banco de dados")
             documents, chunks = _merge_sqlite(index.sqlite, job_generation / "rag_index.sqlite3",
-                                              stage / "rag_index.sqlite3", project_id, new_paths, revision)
+                                              stage / "rag_index.sqlite3", project_id, new_paths, revision,
+                                              removed)
             step("Juntando o manifesto")
             entries = sorted(list(keep_entries) + list(new_entries), key=lambda e: (e.path, _kind(e)))
             save_index_manifest(stage / "rag-index-manifest.json", IndexManifest(tuple(entries)))
@@ -298,7 +325,7 @@ def execute_knowledge_merge(project_id: str, job_id: str, expected_review_sha256
             }, indent=2, sort_keys=True) + "\n", encoding="utf-8")
             step("Copiando os arquivos de origem")
             snapshots.mkdir(parents=False, exist_ok=True)
-            _snapshot(Path(index.source_root), Path(job["source_snapshot"]), snapshot, new_paths)
+            _snapshot(Path(index.source_root), Path(job["source_snapshot"]), snapshot, new_paths, removed)
             artifacts = {name: _sha_file(stage / name)
                          for name in ("rag_index.sqlite3", "rag-index-manifest.json", "progress.json")}
             receipt = stage / RECEIPT_NAME
@@ -310,6 +337,7 @@ def execute_knowledge_merge(project_id: str, job_id: str, expected_review_sha256
                 "job_id": job_id, "job_generation": str(job_generation),
                 "job_source_revision": job["source_revision"],
                 "added_paths": review["added_paths"], "replaced_paths": review["replaced_paths"],
+                "removed_paths": removed,
                 "counts": {"documents": documents, "chunks": chunks, "text_vectors": text,
                            "code_vectors": code, "chunks_added": review["chunks_added"]},
                 "artifact_sha256": artifacts, "published_publicly": False,
@@ -342,6 +370,8 @@ def execute_knowledge_merge(project_id: str, job_id: str, expected_review_sha256
                 raise KnowledgeMergeError("projeto nao resolve a nova geracao")
             if _paths_present(current.sqlite, project_id, new_paths) != len(new_paths):
                 raise KnowledgeMergeError("arquivos novos ausentes depois da troca")
+            if removed and _paths_present(current.sqlite, project_id, removed) != 0:
+                raise KnowledgeMergeError("arquivos removidos ainda presentes depois da troca")
         except Exception as exc:
             _transactional_rollback(swap["transaction"], catalog, pointer)
             raise KnowledgeMergeError("verificacao apos a troca falhou; alteracao desfeita: " + str(exc)) from exc
@@ -349,7 +379,7 @@ def execute_knowledge_merge(project_id: str, job_id: str, expected_review_sha256
         return {
             "state": "MERGED", "transaction": swap["transaction"], "project_id": project_id,
             "job_id": job_id, "added_files": review["added_paths"],
-            "replaced_files": review["replaced_paths"],
+            "replaced_files": review["replaced_paths"], "removed_files": removed,
             "documents": documents, "chunks": chunks, "chunks_added": review["chunks_added"],
             "previous_generation": index.generation, "generation": stage.name,
             "committed_previous": committed, "source_files_modified": False,

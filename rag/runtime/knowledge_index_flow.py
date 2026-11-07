@@ -95,13 +95,13 @@ def _ensure_prepared(project_id: str, job_id: str) -> dict:
     return verify_prepared_auto_generation(_queue(), job_id)
 
 
-def activation_review(project_id: str, job_id: str) -> dict:
+def activation_review(project_id: str, job_id: str, remove_paths=None) -> dict:
     """Prepare the finished job (if needed) and describe the activation."""
     from rag.runtime.isolated_project_index import resolve_isolated_project
     prepared = _ensure_prepared(project_id, job_id)
     if resolve_isolated_project(project_id) is not None:
         from rag.runtime.knowledge_merge_operational import preview_knowledge_merge
-        return {"mode": "MERGE", **preview_knowledge_merge(project_id, job_id)}
+        return {"mode": "MERGE", **preview_knowledge_merge(project_id, job_id, remove_paths)}
     counts = prepared.get("counts") or {}
     return {"mode": "NEW", "project_id": project_id, "job_id": job_id,
             "documents_after": counts.get("sources"), "chunks_after": counts.get("chunks"),
@@ -114,7 +114,8 @@ def activate(project_id: str, job_id: str, review: dict, confirmation: str, *, p
     if review.get("mode") == "MERGE":
         from rag.runtime.knowledge_merge_operational import execute_knowledge_merge
         result = execute_knowledge_merge(project_id, job_id, review["review_sha256"],
-                                         confirmation, progress=progress)
+                                         confirmation, progress=progress,
+                                         remove_paths=review.get("removed_paths") or None)
         entry = {"mode": "MERGE", "transaction": result["transaction"]}
     else:
         from rag.runtime.auto_index_promotion import enable_auto_canary

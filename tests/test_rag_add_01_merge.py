@@ -147,6 +147,43 @@ class MergeIntoExistingProjectTests(Close04OperationalRemovalTests):
         self.assertNotIn("delta.py", self._contents(index))
         self.assertEqual(self._contents(index)["bravo.py"], "BRAVO_NOVO")
 
+    def test_merge_can_also_remove_files(self):
+        review = merge.preview_knowledge_merge(PROJECT, JOB2, ["alpha.py"])
+        self.assertEqual(review["removed_paths"], ["alpha.py"])
+        self.assertEqual((review["documents_before"], review["documents_after"]), (3, 3))
+        self.assertEqual(review["chunks_after"], 3)
+        result = merge.execute_knowledge_merge(PROJECT, JOB2, review["review_sha256"], PROJECT,
+                                               remove_paths=["alpha.py"])
+        self.assertEqual(result["removed_files"], ["alpha.py"])
+        index = resolve_isolated_project(PROJECT)
+        self.assertEqual(self._contents(index), {
+            "bravo.py": "BRAVO_NOVO", "charlie.py": "CHARLIE_KEEP", "delta.py": "DELTA_NOVO"})
+        self.assertEqual(self._fts(index, "ALPHA_REMOVE"), [])
+        self.assertFalse((index.source_root / "alpha.py").exists())
+        self.assertEqual((self.source / "alpha.py").read_text(encoding="utf-8"), "ALPHA_REMOVE")
+        client = open_qdrant_local(index.qdrant)
+        try:
+            self.assertEqual(client.count("code", exact=True).count, 3)
+        finally:
+            close_qdrant_local(client)
+        rollback_knowledge_removal(result["transaction"])
+        self.assertIn("alpha.py", self._contents(resolve_isolated_project(PROJECT)))
+
+    def test_remove_list_is_checked(self):
+        with self.assertRaises(merge.KnowledgeMergeError):
+            merge.preview_knowledge_merge(PROJECT, JOB2, ["nao-existe.py"])
+        with self.assertRaises(merge.KnowledgeMergeError):
+            merge.preview_knowledge_merge(PROJECT, JOB2, ["bravo.py"])
+        with self.assertRaises(merge.KnowledgeMergeError):
+            merge.preview_knowledge_merge(PROJECT, JOB2, ["alpha.py", "alpha.py"])
+        plain = merge.preview_knowledge_merge(PROJECT, JOB2)
+        self.assertNotIn("removed_paths", plain)
+        with_removal = merge.preview_knowledge_merge(PROJECT, JOB2, ["alpha.py"])
+        self.assertNotEqual(plain["review_sha256"], with_removal["review_sha256"])
+        with self.assertRaises(merge.KnowledgeMergeError):
+            merge.execute_knowledge_merge(PROJECT, JOB2, plain["review_sha256"], PROJECT,
+                                          remove_paths=["alpha.py"])
+
     def test_refusals_leave_catalog_untouched(self):
         catalog = self.catalog.read_bytes()
         good = self._review()["review_sha256"]
