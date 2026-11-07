@@ -40,4 +40,4 @@ O comando prepara o instalador NSIS; não constitui autorização para implantar
 
 ## Repositório
 
-Branch principal: `rag-017-optimized-inference-after-candidate`. O comportamento de cada revisão deve ser confirmado em seus módulos de código e testes, e a disponibilidade operacional pelo status do MCP.
+Branch principal: O comportamento de cada revisão deve ser confirmado em seus módulos de código e testes, e a disponibilidade operacional pelo status do MCP.
