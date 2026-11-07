@@ -288,10 +288,10 @@ class AuthorMCPManager:
 
     def _spawn(self, script_name, args, log_name):
         if not self.python.is_file():
-            raise FileNotFoundError(f"Python do MCP autoral nao encontrado: {self.python}")
+            raise FileNotFoundError(f"Python do servidor MCP nao encontrado: {self.python}")
         script = self.author_dir / script_name
         if not script.is_file():
-            raise FileNotFoundError(f"Script do MCP autoral nao encontrado: {script}")
+            raise FileNotFoundError(f"Script do servidor MCP nao encontrado: {script}")
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
         creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -332,7 +332,7 @@ class AuthorMCPManager:
             if not self._wait_for(
                 lambda: self.probe.status().get("adapter_online"), timeout=6.0
             ):
-                raise RuntimeError("adapter MCP autoral nao ficou ONLINE")
+                raise RuntimeError("adaptador do servidor MCP nao ficou ONLINE")
             self._mcp_process = self._spawn(
                 "mcp_server.py",
                 ["--host", "127.0.0.1", "--port", str(self.MCP_PORT)],
@@ -341,7 +341,7 @@ class AuthorMCPManager:
             if not self._wait_for(
                 lambda: self.probe.status().get("mcp_online"), timeout=8.0
             ):
-                raise RuntimeError("servidor MCP autoral nao ficou ONLINE")
+                raise RuntimeError("servidor MCP nao ficou ONLINE")
             self._managed = True
             self._last_error = None
             return self.status()

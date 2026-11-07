@@ -43,6 +43,8 @@ class BridgeRuntime:
         self._phase5b_lock = threading.RLock()
         self._phase5b_workers = {}
         self._phase5b_active_execution_id = None
+        # Texto do comando em execucao, so em memoria (nao vai para o disco).
+        self._phase5b_active_command = None
         self._execution_signal_condition = threading.Condition(
             threading.RLock()
         )
@@ -581,6 +583,7 @@ class BridgeRuntime:
                     return
                 self.execution_ledger.transition(execution_id, "RUNNING", runtime_instance=self.instance_id)
                 self._phase5b_active_execution_id = execution_id
+                self._phase5b_active_command = (execution_id, str(command or "")[:20000], time.time())
             def capture_output(text):
                 self.execution_ledger.append_output(
                     execution_id,
@@ -626,6 +629,8 @@ class BridgeRuntime:
                 self._phase5b_workers.pop(execution_id, None)
                 if self._phase5b_active_execution_id == execution_id:
                     self._phase5b_active_execution_id = None
+                if (getattr(self, "_phase5b_active_command", None) or (None,))[0] == execution_id:
+                    self._phase5b_active_command = None
 
     def phase5c_execution_status(self, execution_id):
         execution_id = str(execution_id or "").strip()
@@ -1189,6 +1194,9 @@ class BridgeRuntime:
                 if v2_active_execution_id
                 else None
             )
+            v2_command = getattr(self, "_phase5b_active_command", None)
+            if not v2_command or v2_command[0] != v2_active_execution_id:
+                v2_command = None
 
         return {
             "app": APP_NAME,
@@ -1218,6 +1226,8 @@ class BridgeRuntime:
                     "execution_id": v2_active["execution_id"],
                     "state": v2_active["state"],
                     "target": v2_active["target"],
+                    "command": v2_command[1] if v2_command else None,
+                    "started_at": v2_command[2] if v2_command else None,
                 }
                 if v2_active is not None
                 else None

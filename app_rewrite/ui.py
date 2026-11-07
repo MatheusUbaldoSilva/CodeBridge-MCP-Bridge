@@ -18,6 +18,7 @@ from telemetry_widget import TelemetryPanel
 from rag_panel import RagPanel
 from ssh_hostkey_box import HostKeyBox
 from password_eye import PasswordEye
+import status_text
 from ssh_transfer import SshFileChannel
 from ssh_transfer_panel import SshTransferPanel
 from theme import apply_dark_theme
@@ -80,6 +81,7 @@ class MainWindow(QMainWindow):
         self.secure_tunnel = QLabel()
         self.api = QLabel()
         self.active = QLabel()
+        self.active.setTextFormat(Qt.RichText)
         for widget in (
             self.overall, self.author_mcp, self.secure_tunnel, self.api, self.active
         ):
@@ -869,13 +871,14 @@ class MainWindow(QMainWindow):
         self._auto_swap_terminal_tab(t)
         author_mcp = s.get("author_mcp") or {}
         secure_tunnel = s.get("secure_tunnel") or {}
-        self.overall.setText(f"Estado geral: {s['overall']}")
-        managed = "  gerenciado pelo CodeBridge" if author_mcp.get("managed_by_codebridge") else ""
-        error = f"  erro: {author_mcp.get('last_error')}" if author_mcp.get("last_error") else ""
-        self.author_mcp.setText(
-            "MCP Autoral: " + str(author_mcp.get("state") or "OFFLINE") + managed +
-            (f"  PID {author_mcp.get('adapter_pid')}" if author_mcp.get("adapter_pid") else "") + error
-        )
+        self.overall.setText(status_text.overall_text(s.get("overall")))
+        self.author_mcp.setText(status_text.service_text(
+            status_text.MCP_TITLE, str(author_mcp.get("state") or "OFFLINE"),
+            pid=author_mcp.get("adapter_pid"),
+            note=(None if author_mcp.get("managed_by_codebridge")
+                  or str(author_mcp.get("state") or "").upper() != "ONLINE" else "externo"),
+            error=author_mcp.get("last_error"),
+        ))
         tunnel_state = str(
             secure_tunnel.get("state") or "OFFLINE"
         )
@@ -899,22 +902,13 @@ class MainWindow(QMainWindow):
             secure_tunnel.get("managed_pid")
             or secure_tunnel.get("external_pid")
         )
-        self.secure_tunnel.setText(
-            "Secure Tunnel: "
-            + tunnel_state
-            + (
-                f"  PID {tunnel_pid}"
-                if tunnel_pid
-                else ""
-            )
-            + tunnel_note
-            + tunnel_managed
-            + tunnel_error
-        )
-        self.api.setText(
-            f"API local: {'ONLINE' if s['api']['online'] else 'OFFLINE'}  "
-            f"{s['api']['host']}:{s['api']['port']}"
-        )
+        self.secure_tunnel.setText(status_text.service_text(
+            status_text.TUNNEL_TITLE, tunnel_state, pid=tunnel_pid,
+            note="processo externo" if secure_tunnel.get("external_process") else None,
+            error=tunnel_error.replace("  erro: ", "", 1) or None,
+        ))
+        self.api.setText(status_text.api_text(
+            s["api"]["online"], s["api"]["host"], s["api"]["port"]))
         active_execution = s.get("active_execution")
         active_id = s["executor"]["active_job_id"]
         turn_control = s.get("turn_control") or {}
@@ -940,25 +934,28 @@ class MainWindow(QMainWindow):
             )
         )
 
+        stop_flag = bool(manual_stop_requested and active_command)
         if active_execution:
-            self.active.setText(
-                "Job ativo: "
-                + str(active_execution["state"])
-                + " | "
-                + str(active_execution["target"])
-                + " | "
-                + str(active_execution["execution_id"])
-            )
+            rich, tip = status_text.active_text(
+                active_execution.get("target"), active_execution.get("state"),
+                active_execution.get("command"), active_execution.get("started_at"),
+                stop_requested=stop_flag, internal_id=active_execution.get("execution_id"))
         elif active_id:
             try:
-                job = self.runtime.store.get(active_id)
-                self.active.setText(
-                    f"Job ativo: {job['state']} | {job['target']} | {job['command']}"
-                )
+                job = dict(self.runtime.store.get(active_id))
+                rich, tip = status_text.active_text(
+                    job.get("target"), job.get("state"), job.get("command"),
+                    stop_requested=stop_flag, internal_id=active_id)
             except Exception:
-                self.active.setText(f"Job ativo: {active_id}")
+                rich, tip = status_text.active_text(
+                    "?", "RUNNING", stop_requested=stop_flag, internal_id=active_id)
+        elif t.get("prepared_target"):
+            rich, tip = status_text.active_text(
+                t.get("prepared_target"), "PREPARED", stop_requested=stop_flag)
         else:
-            self.active.setText("Job ativo: nenhum")
+            rich, tip = status_text.active_text()
+        self.active.setText(rich)
+        self.active.setToolTip(tip)
 
         if manual_stop_requested:
             if active_command:
@@ -967,10 +964,6 @@ class MainWindow(QMainWindow):
                 )
                 self.stop_button.setEnabled(
                     True
-                )
-                self.active.setText(
-                    self.active.text()
-                    + " | PARADA SOLICITADA"
                 )
             else:
                 self.stop_button.setText(
