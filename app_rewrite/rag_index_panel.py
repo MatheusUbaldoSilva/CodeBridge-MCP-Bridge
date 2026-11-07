@@ -417,6 +417,7 @@ class KnowledgeIndexPanel(QWidget):
         self.root = ""
         self.folder.clear()
         self.selector.set_files([])
+        self.details.clear()
 
     def _handle(self, kind, ok, payload):
         if not ok:
