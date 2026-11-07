@@ -38,10 +38,10 @@ class MainWindowRagAutoTests(unittest.TestCase):
             try:
                 self.assertGreaterEqual(main.tabs.count(),5)
                 self.assertEqual(main.tabs.tabText(main.tabs.indexOf(main.rag_tab)),"Central RAG")
-                self.assertEqual(main.rag_tab.pages.count(),4)
+                self.assertEqual(main.rag_tab.pages.count(),5)
                 self.assertEqual(
-                    main.rag_tab.nav_buttons[3].text(),
-                    "Indexação automática"
+                    main.rag_tab.nav_buttons[2].text(),
+                    "Indexar"
                 )
                 self.assertIsNotNone(main.rag_tab.auto_card)
                 card=main.rag_tab.auto_card

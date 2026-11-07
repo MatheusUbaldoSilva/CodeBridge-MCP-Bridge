@@ -51,8 +51,10 @@ class RagAutoPanelIntegrationTests(unittest.TestCase):
         self.panel._run=run_synchronously
 
     def test_new_tab_and_empty_dashboard(self):
-        self.assertEqual(self.panel.pages.count(),4)
-        self.assertEqual(self.panel.nav_buttons[3].text(),"Indexação automática")
+        # Adicionar e Indexacao automatica viraram a aba unica Indexar (pagina 2);
+        # as paginas antigas seguem montadas, sem botao, e set_page(3) cai em Indexar.
+        self.assertEqual(self.panel.pages.count(),5)
+        self.assertEqual(self.panel.nav_buttons[2].text(),"Indexar")
         self.panel.set_page(3)
         self.assertEqual(self.panel.auto_card.percent.text(),"--%")
         self.assertFalse(self.db.exists())
@@ -69,7 +71,7 @@ class RagAutoPanelIntegrationTests(unittest.TestCase):
         jobs=list_jobs(self.db,project_id="integration-project")
         self.assertEqual(len(jobs),1)
         self.assertEqual(jobs[0]["state"],"QUEUED")
-        self.assertEqual(self.panel.pages.currentIndex(),3)
+        self.assertEqual(self.panel.pages.currentIndex(),2)
         self.assertEqual(self.panel.auto_card.status.text(),"Aguardando executor")
         self.assertEqual(self.panel.auto_card.percent.text(),"--%")
         self.panel.auto_card.pause_button.click()
