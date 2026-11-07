@@ -10,6 +10,7 @@ from rag_auto_job_card import RagAutoJobCard
 from rag_deletion_review_panel import KnowledgeRemovalReviewPanel
 from rag_index_panel import KnowledgeIndexPanel
 from rag_search_panel import KnowledgeSearchPanel
+from rag_sync_bar import KnowledgeSyncBar
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
     QPlainTextEdit, QListWidget, QListWidgetItem, QStackedWidget,
@@ -147,6 +148,9 @@ class RagPanel(QWidget):
         heading.addWidget(self.summary, 1)
         heading.addWidget(self.refresh_btn)
         outer.addLayout(heading)
+        self.sync_bar = KnowledgeSyncBar(self)
+        self.sync_bar.knowledge_changed.connect(self._knowledge_changed)
+        outer.addWidget(self.sync_bar)
         self.rag_status = QLabel("RAG: VERIFICANDO...")
         outer.addWidget(self.rag_status)
         project_row = QHBoxLayout()
@@ -344,6 +348,7 @@ class RagPanel(QWidget):
         self.auto_card.set_project(name)
         self.index_panel.set_project(name)
         self.search_panel.set_project(name)
+        self.sync_bar.set_project(name)
         self._selected_paths = None
         self.files.clear()
         self._documents = []
@@ -676,6 +681,8 @@ class RagPanel(QWidget):
                 self.index_panel.set_project(self.project_id)
             if self.search_panel.project_id != self.project_id:
                 self.search_panel.set_project(self.project_id)
+            if self.sync_bar.project_id != self.project_id:
+                self.sync_bar.set_project(self.project_id)
             self.project_picker.setCurrentText(self.project_id)
             self.project_picker.blockSignals(False)
             self._run("documents", {"project": self.project_id})
