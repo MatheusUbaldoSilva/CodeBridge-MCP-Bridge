@@ -9,6 +9,7 @@ from rag_projects import list_projects, create_project, validate_preview_folder
 from rag_auto_job_card import RagAutoJobCard
 from rag_deletion_review_panel import KnowledgeRemovalReviewPanel
 from rag_index_panel import KnowledgeIndexPanel
+from rag_search_panel import KnowledgeSearchPanel
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
     QPlainTextEdit, QListWidget, QListWidgetItem, QStackedWidget,
@@ -213,6 +214,10 @@ class RagPanel(QWidget):
         self.preview.setReadOnly(True)
         self.preview.setPlaceholderText("Selecione um resultado para ler o trecho encontrado.")
         search_layout.addWidget(self.preview, 1)
+        for legacy in (self.query, self.search_btn, self.results, self.preview):
+            legacy.hide()
+        self.search_panel = KnowledgeSearchPanel(search_page)
+        search_layout.addWidget(self.search_panel, 1)
         self.pages.addWidget(search_page)
 
         add_page = QWidget()
@@ -338,6 +343,7 @@ class RagPanel(QWidget):
         self.project_id = name
         self.auto_card.set_project(name)
         self.index_panel.set_project(name)
+        self.search_panel.set_project(name)
         self._selected_paths = None
         self.files.clear()
         self._documents = []
@@ -668,6 +674,8 @@ class RagPanel(QWidget):
             self.auto_card.set_project(self.project_id)
             if self.index_panel.project_id != self.project_id:
                 self.index_panel.set_project(self.project_id)
+            if self.search_panel.project_id != self.project_id:
+                self.search_panel.set_project(self.project_id)
             self.project_picker.setCurrentText(self.project_id)
             self.project_picker.blockSignals(False)
             self._run("documents", {"project": self.project_id})
