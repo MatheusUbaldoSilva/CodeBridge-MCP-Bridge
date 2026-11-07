@@ -257,6 +257,7 @@ class KnowledgeRemovalReviewPanel(QWidget):
         super().__init__(parent)
         self.project_id = ""
         self._files: list[str] = []
+        self._types: dict[str, str] = {}
         self._busy = False
         self._events: queue.Queue = queue.Queue()
         self._undo_transaction = None
@@ -361,6 +362,7 @@ class KnowledgeRemovalReviewPanel(QWidget):
         for item in documents or []:
             if isinstance(item, dict) and item.get("path"):
                 types[str(item["path"])] = item.get("type", "")
+        self._types = types
         metadata = {} if project_id == "codebridge" or not filenames else _index_metadata(project_id)
         self.selector.set_files(list(filenames), metadata, types)
         self._undo_transaction = None
@@ -514,4 +516,4 @@ class KnowledgeRemovalReviewPanel(QWidget):
 
     def set_files_after_change(self):
         metadata = _index_metadata(self.project_id)
-        self.selector.set_files(list(self._files), metadata, {})
+        self.selector.set_files(list(self._files), metadata, self._types)

@@ -97,6 +97,16 @@ class UnifiedCentralRagTests(TestCase):
         self.assertIn("removido", self.panel.banner_text.text())
         self.assertTrue(self.panel.undo_button.isEnabled())
 
+    def test_type_column_survives_removal_and_undo(self):
+        self.assertEqual(self.panel.selector._leaves["src/a.py"].text(1), "CODE")
+        self.panel._removed_last = ["src/b.py"]
+        self.panel._files = [f for f in self.panel._files if f != "src/b.py"]
+        self.panel.set_files_after_change()
+        self.assertEqual(self.panel.selector._leaves["src/a.py"].text(1), "CODE")
+        self.panel._files = sorted(set(self.panel._files) | {"src/b.py"})
+        self.panel.set_files_after_change()
+        self.assertEqual(self.panel.selector._leaves["src/a.py"].text(1), "CODE")
+
     def test_public_project_never_enables_delete(self):
         self.panel.set_project_files("codebridge", ["README.md"])
         self.panel.selector.set_checked("README.md")
