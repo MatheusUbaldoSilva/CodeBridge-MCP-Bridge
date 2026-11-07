@@ -1,3 +1,4 @@
+import repo_path  # noqa: F401 - must run before any rag import
 from pathlib import Path
 import queue
 import threading
