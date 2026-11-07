@@ -78,6 +78,7 @@ class KnowledgeIndexPanel(QWidget):
         self.project_id = ""
         self.root = ""
         self.preview = None
+        self.preview_paths = None
         self.job = None
         self.status = None
         self.undo_info = None
@@ -284,6 +285,7 @@ class KnowledgeIndexPanel(QWidget):
         self.root = str(Path(root))
         self.folder.setText(self.root)
         self.preview = None
+        self.preview_paths = list(paths) if paths else None
         self.selector.set_files([])
         self._start("preview", self.flow.preview, self.project_id, self.root, paths)
 
@@ -294,7 +296,8 @@ class KnowledgeIndexPanel(QWidget):
         state = self._state()
         if self.job is None and self.preview is None:
             if self.root:
-                self._start("preview", self.flow.preview, self.project_id, self.root, None)
+                self._start("preview", self.flow.preview, self.project_id, self.root,
+                            self.preview_paths)
         elif self.job is None:
             self.request_index()
         elif state == "QUEUED":
@@ -315,8 +318,10 @@ class KnowledgeIndexPanel(QWidget):
         dialog = ConfirmByNameDialog("Indexar arquivos", html, self.project_id, "Indexar", parent=self)
         if dialog.exec() != QDialog.Accepted or dialog.confirmation() != self.project_id:
             return
+        # A aprovacao precisa da MESMA lista usada na previa (pasta inteira
+        # ou os arquivos escolhidos); outra lista muda o SHA e e recusada.
         self._start("queue", self._queue_and_start, self.project_id, self.root,
-                    None if everything else chosen,
+                    self.preview_paths if everything else chosen,
                     self.preview["review_sha256"] if everything else None)
 
     def _queue_and_start(self, project_id, root, paths, review_sha256):

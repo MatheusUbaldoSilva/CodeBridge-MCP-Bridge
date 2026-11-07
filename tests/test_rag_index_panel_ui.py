@@ -130,6 +130,14 @@ class IndexPanelTests(TestCase):
         self.assertIn(("preview", ["src/a.py"]), self.flow.calls)
         self.assertIn(("queue", ["src/a.py"], "r" * 64), self.flow.calls)
 
+    def test_chosen_files_are_approved_with_the_same_list(self):
+        self._run(lambda: self.panel.set_root("C:/pasta", ["src/a.py"]))
+        self.assertEqual(self.panel.selector.leaf_count(), 1)
+        dialog, name = self._confirm()
+        with dialog, name:
+            self._run(self.panel.primary_action)
+        self.assertIn(("queue", ["src/a.py"], "r" * 64), self.flow.calls)
+
     def test_cancelled_dialog_queues_nothing(self):
         self._run(lambda: self.panel.set_root("C:/pasta"))
         dialog, name = self._confirm(accept=False)
