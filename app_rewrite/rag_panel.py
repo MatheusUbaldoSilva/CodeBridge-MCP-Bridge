@@ -338,7 +338,9 @@ class RagPanel(QWidget):
     def _knowledge_changed(self, project):
         """Indexar ativou ou desfez: recarrega a lista de Meus arquivos."""
         if project == self.project_id:
+            self._status_after_documents = True
             self._run("documents", {"project": project})
+            self.sync_bar.reload()
 
     def change_project(self, name):
         if not name or name == self.project_id:
@@ -726,6 +728,10 @@ class RagPanel(QWidget):
             if operation!="auto_prepare_generation":
                 self.refresh()
         elif operation == "documents":
+            if getattr(self, "_status_after_documents", False):
+                self._status_after_documents = False
+                from PySide6.QtCore import QTimer
+                QTimer.singleShot(0, self.refresh)
             self._documents = list(data)
             self.files.clear()
             for item in self._documents:

@@ -184,6 +184,11 @@ class KnowledgeSyncBar(QWidget):
             self._run("load", self._load, project_id)
         self._render()
 
+    def reload(self):
+        """Rele o projeto atual (por exemplo depois de uma ativacao) sem perder o estado."""
+        if self.project_id and self._busy is None:
+            self._run("load", self._load, self.project_id)
+
     def _load(self, project_id):
         return {"project_id": project_id, "supported": self.sync.supported(project_id),
                 "settings": self.sync.settings(project_id), "undo": self.sync.can_undo(project_id)}

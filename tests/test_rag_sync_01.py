@@ -187,6 +187,16 @@ class SyncBarTests(unittest.TestCase):
         self.assertIn("pr" + chr(0xF3) + "prio", bar.status.text())
         self.assertFalse(bar.check())
 
+    def test_reload_unlocks_after_project_is_activated(self):
+        fake = FakeSync(supported=False)
+        bar, _ = self.make(fake)
+        self.assertFalse(bar.buttons["MANUAL"].isEnabled())
+        fake.ok = True
+        bar.reload()
+        self.assertTrue(bar.supported)
+        self.assertTrue(bar.buttons["MANUAL"].isEnabled())
+        self.assertIn("Desligado", bar.status.text())
+
     def test_tooltips_explain_each_mode(self):
         bar, _ = self.make(FakeSync())
         self.assertIn("sozinho", bar.buttons["AUTO"].toolTip())
