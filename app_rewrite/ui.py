@@ -286,6 +286,10 @@ class MainWindow(QMainWindow):
         self.ssh_save_button.clicked.connect(self.save_ssh)
         ssh_buttons.addWidget(self.ssh_test_button)
         ssh_buttons.addWidget(self.ssh_save_button)
+        self.ssh_hostkey_button = QPushButton("Conferir chave")
+        self.ssh_hostkey_button.setToolTip("Mostra a impressao digital (fingerprint) da chave do servidor e se ela e confiavel.")
+        self.ssh_hostkey_button.clicked.connect(self.probe_ssh_hostkey)
+        ssh_buttons.addWidget(self.ssh_hostkey_button)
         ssh_buttons.addStretch(1)
         ssh_layout.addLayout(ssh_buttons)
         self.ssh_config_status = QLabel()
@@ -460,6 +464,8 @@ class MainWindow(QMainWindow):
             self.ssh_password.setPlaceholderText("Senha salva no Windows")
         state = "ONLINE" if settings.get("online") else "OFFLINE"
         self.ssh_config_status.setText(f"SSH: {state}")
+        if settings.get("host"):
+            QTimer.singleShot(0, self.probe_ssh_hostkey)
 
     def _resolved_password(self):
         password = self.ssh_password.text()
@@ -503,6 +509,20 @@ class MainWindow(QMainWindow):
             return True
         self._ui_events.put(("ssh_hostkey", False, {"info": info, "action": action, "values": values}))
         return False
+
+    def probe_ssh_hostkey(self):
+        host = self.ssh_host.text().strip()
+        if not host or not hasattr(self.runtime.terminals, "ssh_host_key"):
+            return
+        port = int(self.ssh_port.value())
+        threading.Thread(target=self._ssh_probe_worker, args=(host, port), daemon=True).start()
+
+    def _ssh_probe_worker(self, host, port):
+        try:
+            info = self.runtime.terminals.ssh_host_key(host, port)
+            self._ui_events.put(("ssh_hostkey_probe", True, info))
+        except Exception as exc:
+            self._ui_events.put(("ssh_hostkey_probe", False, f"{type(exc).__name__}: {exc}"))
 
     def trust_ssh_hostkey(self, info, replace=False):
         self._set_ssh_busy(True)
@@ -567,6 +587,12 @@ class MainWindow(QMainWindow):
                 kind, ok, payload = self._ui_events.get_nowait()
             except queue.Empty:
                 break
+            if kind == "ssh_hostkey_probe":
+                if ok:
+                    self.ssh_hostkey_box.show_info(payload)
+                else:
+                    self.ssh_config_status.setText("Nao consegui ler a chave do servidor: " + payload)
+                continue
             if kind != "ssh_hostkey_ok":
                 self._set_ssh_busy(False)
             if kind == "ssh_hostkey_ok":
