@@ -64,6 +64,14 @@ class SearchHelpersTest(TestCase):
         self.assertEqual(groups[0]["kind"], "CODE")
         self.assertEqual(groups[1]["kind"], "DOC")
 
+    def test_groups_follow_score_not_arrival_order(self):
+        hits = [hit("a.py", "CODE", "x", score=0.010), hit("b.md", "DOC", "y", score=0.020),
+                hit("a.py", "CODE", "z", score=0.030), hit("c.md", "DOC", "w", score=0.015)]
+        groups = module.group_hits(hits)
+        self.assertEqual([g["path"] for g in groups], ["a.py", "b.md", "c.md"])
+        self.assertEqual([module.hit_text(h) for _, h in groups[0]["hits"]], ["z", "x"])
+        self.assertEqual([r for _, r in [(0, g["hits"][0][0]) for g in groups]], [1, 2, 3])
+
     def test_labels(self):
         self.assertEqual(module.modes_label(RESULTS[0]), "palavras + significado")
         self.assertEqual(module.modes_label({"retrieval_modes": ["lexical"]}), "por palavras")

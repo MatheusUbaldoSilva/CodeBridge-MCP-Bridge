@@ -169,9 +169,23 @@ def snippet_lines(text, terms, count=3, width=140):
     return [_clip(lines[i].strip(), terms, width) for i in filled[low:low + count]]
 
 
+def hit_score(hit):
+    score = hit.get("score")
+    if isinstance(score, (int, float)) and not isinstance(score, bool):
+        return float(score)
+    return None
+
+
+def order_hits(hits):
+    """Do mais relevante para o menos: pontuacao maior primeiro; empate fica na ordem recebida."""
+    numbered = list(enumerate(hits, 1))
+    numbered.sort(key=lambda item: (-(hit_score(item[1]) or 0.0), item[0]))
+    return [hit for _, hit in numbered]
+
+
 def group_hits(hits):
     groups, index = [], {}
-    for rank, hit in enumerate(hits, 1):
+    for rank, hit in enumerate(order_hits(hits), 1):
         path = hit_path(hit)
         if path not in index:
             index[path] = len(groups)
@@ -487,6 +501,7 @@ class KnowledgeSearchPanel(QWidget):
             return
         data = data if isinstance(data, dict) else {}
         self.hits = [h for h in (data.get("results") or []) if isinstance(h, dict)]
+        self.hits = order_hits(self.hits)
         self.groups = group_hits(self.hits)
         self._relevance = relevance_scale(self.hits)
         self.fallback = str(data.get("fallback_reason") or "")
