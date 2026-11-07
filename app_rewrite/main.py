@@ -4,6 +4,13 @@ import json
 import os
 import sys
 import time
+from pathlib import Path
+
+# The launcher starts main.py from app_rewrite/, while RAG is a sibling package.
+# Add the DEV repository root before importing the UI's RAG components.
+_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 from runtime import BridgeRuntime
 from single_instance import SingleInstance

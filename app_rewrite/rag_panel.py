@@ -244,35 +244,45 @@ class RagPanel(QWidget):
         self.plan_btn = QPushButton("Ver arquivos que podem ser adicionados")
         self.plan_btn.clicked.connect(self.plan)
         add_layout.addWidget(self.plan_btn)
+        self.plan_btn.setVisible(False)
         self.plan_summary = QLabel("Selecione uma pasta para conferir os arquivos.")
         self.plan_summary.setWordWrap(True)
         add_layout.addWidget(self.plan_summary)
         self.candidates = QListWidget()
         add_layout.addWidget(self.candidates, 1)
+        self.candidates.setVisible(False)
         self.confirm_preview_btn = QPushButton("Conferir previa (sem publicar)")
         self.confirm_preview_btn.setEnabled(False)
         self.confirm_preview_btn.clicked.connect(self.confirm_preview)
         add_layout.addWidget(self.confirm_preview_btn)
+        self.confirm_preview_btn.setVisible(False)
         self.review_auth_btn = QPushButton("Revisar autorizacao (simulacao)")
         self.review_auth_btn.setEnabled(False)
         self.review_auth_btn.clicked.connect(self.review_authorization)
         add_layout.addWidget(self.review_auth_btn)
+        self.review_auth_btn.setVisible(False)
         self.cancel_preview_btn = QPushButton("Cancelar previa")
         self.cancel_preview_btn.clicked.connect(self.cancel_preview)
         add_layout.addWidget(self.cancel_preview_btn)
+        self.cancel_preview_btn.setVisible(False)
         self.index_btn = QPushButton("Adicionar ao conhecimento (em preparacao)")
         self.index_btn.setEnabled(False)
         self.index_btn.setToolTip("A atualizacao incremental ainda nao foi validada.")
         add_layout.addWidget(self.index_btn)
-        add_layout.addWidget(QLabel(
-            "A inclusao real ainda nao esta disponivel. A previa nao altera seus conhecimentos."))
+        self.index_btn.setVisible(False)
         self.auto_prepare_btn = QPushButton("Preparar fila automática (sem indexar)")
         self.auto_prepare_btn.clicked.connect(self.prepare_auto_job)
         add_layout.addWidget(self.auto_prepare_btn)
+        self.auto_prepare_btn.setVisible(False)
         self.auto_authorize_btn = QPushButton("Autorizar arquivos e criar trabalho")
         self.auto_authorize_btn.setEnabled(False)
         self.auto_authorize_btn.clicked.connect(self.authorize_auto_job)
         add_layout.addWidget(self.auto_authorize_btn)
+        self.auto_authorize_btn.setVisible(False)
+        self.simple_add_btn = QPushButton("Adicionar ao conhecimento")
+        self.simple_add_btn.clicked.connect(self.start_simple_add)
+        add_layout.addWidget(self.simple_add_btn)
+        self._simple_add_pending = False
         self.auto_info = QLabel("Sem aprovação: nenhum worker ou modelo é iniciado.")
         self.auto_info.setWordWrap(True)
         add_layout.addWidget(self.auto_info)
@@ -422,6 +432,7 @@ class RagPanel(QWidget):
         self._run("plan", {"project": self.project_id, "root": path, "paths": self._selected_paths})
 
     def cancel_preview(self):
+        self._simple_add_pending = False
         self._preview_revision += 1
         self._plan_request = None
         self._auto_request = None
@@ -533,6 +544,16 @@ class RagPanel(QWidget):
             "RAG_AUTO_CANARY_ROLLBACK:"+job_id,
         )
 
+    def start_simple_add(self):
+        """One visible action: fingerprint preview, then explicit operator confirmation."""
+        if self._busy or self._simple_add_pending:
+            return
+        self._simple_add_pending = True
+        self.prepare_auto_job()
+        # Validation failures in prepare_auto_job do not dispatch a worker.
+        if not self._busy:
+            self._simple_add_pending = False
+
     def prepare_auto_job(self):
         """Compute a fingerprinted preview; no persistent queue is created."""
         if self.project_id=="codebridge":
@@ -610,6 +631,7 @@ class RagPanel(QWidget):
             self.refresh_btn,self.search_btn,self.plan_btn,
             self.project_picker,self.new_project_btn,self.browse_btn,
             self.browse_files_btn,self.auto_prepare_btn,self.auto_authorize_btn,
+            self.simple_add_btn,
         ):
             button.setEnabled(False)
         def work():
@@ -630,7 +652,7 @@ class RagPanel(QWidget):
         for button in (
             self.refresh_btn,self.search_btn,self.plan_btn,
             self.project_picker,self.new_project_btn,self.browse_btn,
-            self.browse_files_btn,self.auto_prepare_btn,
+            self.browse_files_btn,self.auto_prepare_btn,self.simple_add_btn,
         ):
             button.setEnabled(True)
         self.auto_authorize_btn.setEnabled(self._auto_manifest is not None)
@@ -652,6 +674,7 @@ class RagPanel(QWidget):
                 self._last_status = None
                 self.rag_status.setText("RAG: OFFLINE")
             if operation in ("auto_preview","auto_approve"):
+                self._simple_add_pending = False
                 self._auto_manifest = None
                 self._auto_request = None
                 self.auto_authorize_btn.setEnabled(False)
@@ -708,7 +731,11 @@ class RagPanel(QWidget):
                 f"SHA-256: {data['review_sha256'][:16]}… · "
                 "Nenhuma fila criada."
             )
+            if self._simple_add_pending:
+                self._simple_add_pending = False
+                self.authorize_auto_job()
         elif operation == "auto_approve":
+            self._simple_add_pending = False
             self._auto_manifest=None
             self._auto_request=None
             self.auto_authorize_btn.setEnabled(False)
