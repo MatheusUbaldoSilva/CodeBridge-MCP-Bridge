@@ -11,6 +11,7 @@ from rag_deletion_review_panel import KnowledgeRemovalReviewPanel
 from rag_index_panel import KnowledgeIndexPanel
 from rag_search_panel import KnowledgeSearchPanel
 from rag_sync_bar import KnowledgeSyncBar
+from rag_project_list import visible_projects, status_text
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
     QPlainTextEdit, QListWidget, QListWidgetItem, QStackedWidget,
@@ -140,6 +141,7 @@ class RagPanel(QWidget):
         self._preview_revision = 0
         self._plan_request = None
         self.project_id = "codebridge"
+        self._last_status = None
         outer = QVBoxLayout(self)
         heading = QHBoxLayout()
         self.summary = QLabel("Meus conhecimentos")
@@ -347,6 +349,7 @@ class RagPanel(QWidget):
             return
         self.cancel_preview()
         self.project_id = name
+        self.rag_status.setText(status_text(self._last_status, name))
         self.auto_card.set_project(name)
         self.index_panel.set_project(name)
         self.search_panel.set_project(name)
@@ -646,6 +649,7 @@ class RagPanel(QWidget):
                                                 self.project_id, self.folder.text().strip()):
                     return
             if operation == "status":
+                self._last_status = None
                 self.rag_status.setText("RAG: OFFLINE")
             if operation in ("auto_preview","auto_approve"):
                 self._auto_manifest = None
@@ -656,8 +660,7 @@ class RagPanel(QWidget):
             return
         self.notice.setText("")
         if operation == "status":
-            ready = str((data.get("index") or {}).get("state") or "").upper() == "READY"
-            self.rag_status.setText("RAG: ONLINE" if ready else "RAG: OFFLINE")
+            self._last_status = data
             projects = data.get("projects") or []
             isolated = [
                 p for p in (data.get("isolated_project_indexes") or [])
@@ -668,10 +671,8 @@ class RagPanel(QWidget):
                 + sum(int(p.get("document_count") or 0) for p in isolated)
             )
             self.summary.setText(f"Meus conhecimentos — {count} documentos")
-            names = sorted(set(["codebridge"] +
-                               [str(p.get("project_id")) for p in projects if p.get("project_id")] +
-                               [str(p.get("project_id")) for p in isolated if p.get("project_id")] +
-                               list_projects()))
+            # "codebridge" (base principal herdada) so aparece se tiver documentos.
+            names = visible_projects(data, list_projects())
             self.project_picker.blockSignals(True)
             self.project_picker.clear()
             self.project_picker.addItems(names)
@@ -687,6 +688,7 @@ class RagPanel(QWidget):
                 self.sync_bar.set_project(self.project_id)
             self.project_picker.setCurrentText(self.project_id)
             self.project_picker.blockSignals(False)
+            self.rag_status.setText(status_text(self._last_status, self.project_id))
             self._run("documents", {"project": self.project_id})
         elif operation == "auto_preview":
             expected=self._auto_request

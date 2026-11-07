@@ -83,8 +83,9 @@ class RagPanelSmokeTests(unittest.TestCase):
     def test_online_indicator(self):
         panel = self.make_panel()
         with patch.object(panel, "_run"):
-            panel._complete("status", {"index": {"state": "READY"}, "projects": []}, "")
-        self.assertEqual(panel.rag_status.text(), "RAG: ONLINE")
+            panel._complete("status", {"index": {"state": "READY"}, "projects": [
+                {"project_id": "codebridge", "document_count": 3}]}, "")
+        self.assertTrue(panel.rag_status.text().startswith("RAG: ONLINE"))
         panel._complete("status", {}, "unavailable")
         self.assertEqual(panel.rag_status.text(), "RAG: OFFLINE")
         panel.close()
