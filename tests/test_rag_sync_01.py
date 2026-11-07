@@ -215,7 +215,8 @@ class SyncBarTests(unittest.TestCase):
         bar.apply_now()
         self.assertEqual(len(fake.applied), 1)
         self.assertEqual(changed, ["proj"])
-        self.assertTrue(bar.undo_button.isVisibleTo(bar))
+        # Desfazer saiu da barra: fica so no aviso da aba Meus arquivos.
+        self.assertFalse(bar.undo_button.isVisibleTo(bar))
         self.assertFalse(bar.apply_button.isVisibleTo(bar))
 
     def test_auto_needs_confirmation_then_applies_alone(self):

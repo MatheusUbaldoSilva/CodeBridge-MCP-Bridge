@@ -22,6 +22,7 @@ import shutil
 import sqlite3
 import threading
 import uuid
+from datetime import datetime, timezone
 
 from rag.index.qdrant_local import (
     close_qdrant_local, ensure_vector_collections, open_qdrant_local,
@@ -73,15 +74,91 @@ def _journals(catalog: Path) -> list[dict]:
     return records
 
 
+def _note_path(catalog: Path, transaction: str) -> Path:
+    return catalog.parent / ("rag-del-" + str(transaction) + ".note.json")
+
+
+def _write_note(catalog: Path, transaction: str, data: dict) -> None:
+    """Contexto legivel da troca (o que saiu, quando, quem pediu). Opcional."""
+    try:
+        _note_path(catalog, transaction).write_text(
+            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _read_note(catalog: Path, transaction: str) -> dict:
+    try:
+        data = json.loads(_note_path(catalog, transaction).read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _pending_kind(project_id: str) -> str | None:
+    try:
+        current = resolve_isolated_project(project_id)
+    except Exception:
+        return None
+    name = str(getattr(current, "generation", "") or "")
+    if name.startswith("del_"):
+        return "REMOVE"
+    if name.startswith("add_"):
+        return "ADD"
+    return None
+
+
 def pending_removal(project_id: str | None = None) -> dict | None:
     """The ACTIVE (still undoable) removal, if any."""
     catalog, _ = _operational_paths()
     for record in _journals(catalog):
         if record.get("state") == "ACTIVE" and (
                 project_id is None or record.get("project_id") == project_id):
-            return {"transaction": record.get("transaction"),
-                    "project_id": record.get("project_id")}
+            transaction = record.get("transaction")
+            info = {"transaction": transaction, "project_id": record.get("project_id")}
+            note = _read_note(catalog, transaction)
+            for key in ("kind", "removed_files", "origin", "at", "documents_removed"):
+                if note.get(key) is not None:
+                    info[key] = note[key]
+            if not info.get("kind"):
+                kind = _pending_kind(str(record.get("project_id") or ""))
+                if kind:
+                    info["kind"] = kind
+            if not info.get("at"):
+                try:
+                    stamp = (catalog.parent / ("rag-del-" + str(transaction) + ".journal.json")).stat().st_mtime
+                    info["at"] = datetime.fromtimestamp(stamp, timezone.utc).isoformat()
+                except OSError:
+                    pass
+            return info
     return None
+
+
+def keep_knowledge_removal(transaction: str) -> dict:
+    """Torna definitiva a troca ACTIVE (nao da mais para desfazer)."""
+    if not isinstance(transaction, str) or not _HEX32.fullmatch(transaction):
+        raise KnowledgeRemovalError("transacao invalida")
+    with _LOCK:
+        catalog, _ = _operational_paths()
+        return _transactional_commit(transaction, catalog)
+
+
+def commit_pending_changes() -> list[str]:
+    """Ao fechar o CodeBridge: tudo que ainda dava para desfazer vira definitivo."""
+    with _LOCK:
+        try:
+            catalog, _ = _operational_paths()
+        except KnowledgeRemovalError:
+            return []
+        committed = []
+        for record in _journals(catalog):
+            if record.get("state") == "ACTIVE":
+                try:
+                    _transactional_commit(record["transaction"], catalog)
+                    committed.append(record["transaction"])
+                except Exception:
+                    continue
+        return committed
 
 
 def _reconcile_auto_canaries(catalog: Path, pointer: Path) -> list[dict]:
@@ -112,7 +189,7 @@ def _remaining_selected(sqlite_path: Path, project_id: str, selected: list[str])
 
 def execute_knowledge_removal(project_id: str, selected_paths: list[str],
                               expected_review_sha256: str, confirmation: str,
-                              *, progress=None) -> dict:
+                              *, progress=None, origin: str = "TELA") -> dict:
     """Remove the selected files' indexed knowledge from a private project."""
     def step(message: str):
         if callable(progress):
@@ -213,6 +290,12 @@ def execute_knowledge_removal(project_id: str, selected_paths: list[str],
             raise KnowledgeRemovalError(
                 "verificacao apos a troca falhou; exclusao desfeita: " + str(exc)) from exc
 
+        _write_note(catalog, swap["transaction"], {
+            "kind": "REMOVE", "project_id": project_id, "removed_files": selected,
+            "documents_removed": preview["documents_to_remove"],
+            "origin": str(origin or "TELA").upper(),
+            "at": datetime.now(timezone.utc).isoformat(),
+        })
         return {
             "state": "REMOVED",
             "transaction": swap["transaction"],

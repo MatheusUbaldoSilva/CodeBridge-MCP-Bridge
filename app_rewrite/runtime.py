@@ -1246,11 +1246,24 @@ class BridgeRuntime:
             },
         }
 
+    def _commit_pending_rag_changes(self):
+        """Exclusoes/ativacoes do RAG que ainda davam para desfazer viram definitivas."""
+        try:
+            import sys
+            root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            if root not in sys.path:
+                sys.path.insert(0, root)
+            from rag.runtime.knowledge_deletion_operational import commit_pending_changes
+            return commit_pending_changes()
+        except Exception:
+            return []
+
     def stop(self):
         if not self._started:
             return True
 
         self._invalidate_availability_cache()
+        self._commit_pending_rag_changes()
         try:
             self.claude_watcher.stop()
         except Exception:

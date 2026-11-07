@@ -164,6 +164,30 @@ class Close04OperationalRemovalTests(TestCase):
         rollback_knowledge_removal(second["transaction"])
         self.assertEqual(self._paths(resolve_isolated_project(PROJECT)), ["bravo.py", "charlie.py"])
 
+    def test_note_then_keep_makes_removal_final(self):
+        from rag.runtime.knowledge_deletion_operational import (
+            commit_pending_changes, keep_knowledge_removal)
+        result = execute_knowledge_removal(PROJECT, ["alpha.py"], self._sha_for(["alpha.py"]),
+                                           PROJECT, origin="AUTO")
+        pend = pending_removal(PROJECT)
+        self.assertEqual((pend["kind"], pend["removed_files"], pend["origin"]),
+                         ("REMOVE", ["alpha.py"], "AUTO"))
+        self.assertTrue(pend["at"])
+        self.assertEqual(keep_knowledge_removal(result["transaction"])["state"], "COMMITTED")
+        self.assertIsNone(pending_removal(PROJECT))
+        with self.assertRaises(Exception):
+            rollback_knowledge_removal(result["transaction"])
+        self.assertEqual(commit_pending_changes(), [])
+        self.assertEqual(self._paths(resolve_isolated_project(PROJECT)), ["bravo.py", "charlie.py"])
+
+    def test_commit_pending_changes_on_close(self):
+        from rag.runtime.knowledge_deletion_operational import commit_pending_changes
+        result = execute_knowledge_removal(PROJECT, ["alpha.py"], self._sha_for(["alpha.py"]), PROJECT)
+        self.assertEqual(pending_removal(PROJECT)["origin"], "TELA")
+        self.assertEqual(commit_pending_changes(), [result["transaction"]])
+        self.assertIsNone(pending_removal(PROJECT))
+        self.assertEqual(self._paths(resolve_isolated_project(PROJECT)), ["bravo.py", "charlie.py"])
+
     def _assert_nothing_changed(self, catalog_before):
         self.assertEqual(self.catalog.read_bytes(), catalog_before)
         leftovers = [p.name for p in self.generation.parent.iterdir() if p.name.startswith("del_")]

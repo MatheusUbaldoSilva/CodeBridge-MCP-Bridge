@@ -125,7 +125,7 @@ def _remove_only(project_id: str, removed: list[str], step) -> dict:
     step(f"Tirando {len(removed)} arquivo(s) apagado(s) da pasta")
     review = preview_knowledge_removal(project_id, removed)
     result = execute_knowledge_removal(project_id, removed, review["review_sha256"], project_id,
-                                       progress=step)
+                                       progress=step, origin="AUTO")
     transaction = result.get("transaction") or (pending_removal(project_id) or {}).get("transaction")
     return {"mode": "REMOVE", "transaction": transaction, "documents": result.get("documents")}
 

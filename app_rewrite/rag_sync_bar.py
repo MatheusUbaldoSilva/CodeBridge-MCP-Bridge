@@ -238,7 +238,20 @@ class KnowledgeSyncBar(QWidget):
             self.error = str(exc)
 
     # ----- verificacao periodica -----------------------------------------
+    def _refresh_mode(self):
+        """Outro painel pode ter mudado para Manual (ex.: Desfazer no aviso)."""
+        if not self.project_id or self._busy is not None or self.mode != "AUTO":
+            return
+        try:
+            mode = (self.sync.settings(self.project_id) or {}).get("mode")
+        except Exception:
+            return
+        if mode == "MANUAL":
+            self.mode = "MANUAL"
+            self._render()
+
     def check(self):
+        self._refresh_mode()
         if (self._busy is not None or not self.supported or self.mode == "OFF"
                 or not self.folder):
             return False
@@ -377,7 +390,8 @@ class KnowledgeSyncBar(QWidget):
         self.folder_button.setEnabled(idle)
         self.apply_button.setVisible(bool(idle and self.supported and self.mode != "OFF"
                                           and self.changes and self.changes.get("total")))
-        self.undo_button.setVisible(bool(idle and self.can_undo))
+        # Desfazer fica so no aviso da aba Meus arquivos.
+        self.undo_button.setVisible(False)
 
     # ----- dialogos -------------------------------------------------------
     def _default_ask_folder(self, project_id):

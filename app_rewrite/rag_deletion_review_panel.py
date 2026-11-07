@@ -34,6 +34,61 @@ def _rollback(transaction):
     return rollback_knowledge_removal(transaction)
 
 
+def _keep(transaction):
+    from rag.runtime.knowledge_deletion_operational import keep_knowledge_removal
+    return keep_knowledge_removal(transaction)
+
+
+def _sync_module():
+    import importlib
+    return importlib.import_module("rag.runtime.knowledge_sync")
+
+
+def _sync_last(project_id):
+    try:
+        return (_sync_module().settings(project_id) or {}).get("last") or {}
+    except Exception:
+        return {}
+
+
+def _hhmm(stamp):
+    try:
+        from datetime import datetime
+        return datetime.fromisoformat(str(stamp)).astimezone().strftime("%H:%M")
+    except (TypeError, ValueError):
+        return ""
+
+
+def pending_banner_text(pending, last=None):
+    """Texto do aviso: o que saiu, quem pediu e quando."""
+    last = last or {}
+    files = [str(f) for f in (pending.get("removed_files") or [])]
+    origin = pending.get("origin")
+    stamp = pending.get("at")
+    count = len(files)
+    if last.get("transaction") and last.get("transaction") == pending.get("transaction"):
+        origin = origin or "AUTO"
+        stamp = last.get("at") or stamp
+        count = count or int(last.get("removed") or 0)
+    who = {"AUTO": " pela atualiza" + chr(0xE7) + chr(0xE3) + "o autom" + chr(0xE1) + "tica",
+           "TELA": " por voc" + chr(0xEA)}.get(str(origin or "").upper(), "")
+    if count == 1:
+        head = "1 arquivo removido do conhecimento" + who
+    elif count:
+        head = f"{count} arquivos removidos do conhecimento" + who
+    else:
+        head = "Exclus" + chr(0xE3) + "o recente" + who
+    when = _hhmm(stamp) if stamp else ""
+    if when:
+        head += " " + chr(0xE0) + "s " + when
+    if files:
+        names = ", ".join(Path(f).name for f in files[:3])
+        if len(files) > 3:
+            names += f" e mais {len(files) - 3}"
+        head += ": " + names
+    return head + ". D" + chr(0xE1) + " para desfazer at" + chr(0xE9) + " fechar o CodeBridge."
+
+
 def _pending(project_id):
     from rag.runtime.knowledge_deletion_operational import pending_removal
     return pending_removal(project_id)
@@ -285,9 +340,19 @@ class KnowledgeRemovalReviewPanel(QWidget):
             "text-decoration:underline;}QPushButton:disabled{color:#5b6670;}")
         self.undo_button.setEnabled(False)
         self.undo_button.clicked.connect(self.request_undo)
+        self.keep_button = QPushButton("Manter exclus" + chr(0xE3) + "o", self.banner)
+        self.keep_button.setObjectName("ragDeletionKeep")
+        self.keep_button.setCursor(Qt.PointingHandCursor)
+        self.keep_button.setToolTip("Torna a exclus" + chr(0xE3) + "o definitiva e tira este aviso.")
+        self.keep_button.setStyleSheet(self.undo_button.styleSheet())
+        self.keep_button.setEnabled(False)
+        self.keep_button.hide()
+        self.keep_button.clicked.connect(self.request_keep)
         banner_row.addWidget(self.banner_text, 1)
         banner_row.addWidget(self.progress)
         banner_row.addWidget(self.undo_button)
+        banner_row.addSpacing(10)
+        banner_row.addWidget(self.keep_button)
         self.banner.hide()
         root.addWidget(self.banner)
 
@@ -338,6 +403,8 @@ class KnowledgeRemovalReviewPanel(QWidget):
             not self._busy and not public and (bool(selected) or self.last_review is not None))
         self.clear_button.setEnabled(not self._busy and bool(selected))
         self.undo_button.setEnabled(not self._busy and self._undo_transaction is not None)
+        self.keep_button.setEnabled(not self._busy and self._undo_transaction is not None)
+        self.keep_button.setVisible(self._undo_transaction is not None)
         self.selector.setEnabled(not self._busy)
 
     def _selection_changed(self):
@@ -374,10 +441,9 @@ class KnowledgeRemovalReviewPanel(QWidget):
                 pending = _pending(project_id)
             except Exception:
                 pending = None
-            if pending:
+            if pending and pending.get("kind") != "ADD":
                 self._undo_transaction = pending["transaction"]
-                self._show_banner("Há uma exclusão recente neste projeto que ainda pode ser desfeita.",
-                                  progress=False)
+                self._show_banner(pending_banner_text(pending, _sync_last(project_id)), progress=False)
         self._selection_changed()
 
     def _show_detail(self, item, _previous=None):
@@ -456,6 +522,30 @@ class KnowledgeRemovalReviewPanel(QWidget):
         self._start("remove", _execute, self.project_id, list(review["selected_paths"]),
                     review["review_sha256"], dialog.confirmation(), progress=self._progress)
 
+    def request_keep(self):
+        if self._undo_transaction is None or self._busy:
+            return
+        self._start("keep", _keep, self._undo_transaction)
+
+    def _after_undo_sync(self, transaction):
+        """Se era a ultima atualizacao automatica, passa para Manual."""
+        try:
+            sync = _sync_module()
+            cfg = sync.settings(self.project_id) or {}
+            last = cfg.get("last") or {}
+            if not transaction or last.get("transaction") != transaction:
+                return ""
+            changes = {"last": None}
+            text = ""
+            if cfg.get("mode") == "AUTO":
+                changes["mode"] = "MANUAL"
+                text = (" A atualiza" + chr(0xE7) + chr(0xE3) + "o foi para Manual para n" + chr(0xE3)
+                        + "o excluir de novo sozinha.")
+            sync.update_settings(self.project_id, **changes)
+            return text
+        except Exception:
+            return ""
+
     def request_undo(self):
         if self._undo_transaction is None or self._busy:
             return
@@ -468,7 +558,8 @@ class KnowledgeRemovalReviewPanel(QWidget):
     def _start(self, kind, function, *args, **kwargs):
         self._busy = True
         self._refresh_buttons()
-        self._show_banner("Excluindo\u2026" if kind == "remove" else "Desfazendo\u2026", progress=True)
+        labels = {"remove": "Excluindo", "undo": "Desfazendo", "keep": "Confirmando"}
+        self._show_banner(labels.get(kind, "Trabalhando") + chr(0x2026), progress=True)
 
         def worker():
             try:
@@ -503,11 +594,19 @@ class KnowledgeRemovalReviewPanel(QWidget):
                     f"Geração anterior: {payload['previous_generation']}" + DOT
                     + f"nova: {payload['generation']}")
             elif kind == "undo" and ok:
+                undone = self._undo_transaction
                 self._files = sorted(set(self._files) | set(self._removed_last))
                 self._removed_last = []
                 self._undo_transaction = None
                 self.set_files_after_change()
-                self._show_banner("Exclusão desfeita: a geração anterior foi restaurada.", progress=False)
+                self._show_banner("Exclus" + chr(0xE3) + "o desfeita: a gera" + chr(0xE7) + chr(0xE3)
+                                  + "o anterior foi restaurada." + self._after_undo_sync(undone),
+                                  progress=False)
+            elif kind == "keep" and ok:
+                self._undo_transaction = None
+                self._removed_last = []
+                self._show_banner("Exclus" + chr(0xE3) + "o mantida: agora " + chr(0xE9) + " definitiva.",
+                                  progress=False)
             else:
                 label = "Exclusão falhou" if kind == "remove" else "Desfazer falhou"
                 self._show_banner(label + ". Nada foi alterado sem verificação.", progress=False)
