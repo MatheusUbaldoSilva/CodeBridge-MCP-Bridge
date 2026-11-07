@@ -27,7 +27,7 @@ from rag.index.qdrant_local import (
 from rag.index.vector_ids import deterministic_vector_point_id
 from rag.runtime.isolated_project_index import resolve_isolated_project
 from rag.runtime.knowledge_deletion_operational import (
-    PUBLIC_PROJECT, _LOCK, _commit_active, _operational_paths,
+    PUBLIC_PROJECT, _LOCK, _commit_active, _operational_paths, _reconcile_auto_canaries,
 )
 from rag.runtime.knowledge_deletion_swap_lab import _transactional_rollback, _transactional_swap
 from rag.runtime.knowledge_deletion_vector_copy import _same_vector
@@ -324,6 +324,7 @@ def execute_knowledge_merge(project_id: str, job_id: str, expected_review_sha256
                 "manifest_sha256": artifacts["rag-index-manifest.json"],
                 "generation_receipt_sha256": _sha_file(receipt),
             }
+            _reconcile_auto_canaries(catalog, pointer)
             committed = _commit_active(catalog)
             step("Ativando a nova geracao do projeto")
             swap = _transactional_swap(catalog, pointer, project_id, index.source_revision, candidate)

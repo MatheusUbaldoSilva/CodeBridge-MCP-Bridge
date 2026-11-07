@@ -84,6 +84,14 @@ def pending_removal(project_id: str | None = None) -> dict | None:
     return None
 
 
+def _reconcile_auto_canaries(catalog: Path, pointer: Path) -> list[dict]:
+    """Operator-driven change: keep (archive) AUTO canaries that no longer pin."""
+    from rag.runtime.auto_canary_reconcile import archive_reconciled_auto_canaries
+    from rag.runtime.knowledge_deletion_swap_lab import _catalog_mutex
+    with _catalog_mutex(catalog.parent):
+        return archive_reconciled_auto_canaries(catalog, pointer)
+
+
 def _commit_active(catalog: Path) -> list[str]:
     committed = []
     for record in _journals(catalog):
@@ -180,6 +188,7 @@ def execute_knowledge_removal(project_id: str, selected_paths: list[str],
                 transaction_id, preview, bundle, allowed_root=_workspace_root(),
             )
             candidate["python_executable"] = str(index.python_executable)
+            _reconcile_auto_canaries(catalog, pointer)
             committed = _commit_active(catalog)
             step("Ativando a nova geracao do projeto")
             swap = _transactional_swap(
