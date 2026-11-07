@@ -131,6 +131,9 @@ class BridgeAPI:
                 path = urlparse(self.path).path
                 try:
                     body = self._json_body()
+                    if path == "/v1/rag/query-event":
+                        counts = bridge.runtime.record_rag_query(body.get("source"))
+                        return self._send(200, {"ok": True, "rag_queries": counts})
                     bridge.runtime.ensure_chatgpt_turn(
                         reason=path,
                         track_activity=True,

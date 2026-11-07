@@ -11,6 +11,7 @@ from secure_tunnel_manager import SecureTunnelManager
 from chatgpt_companion import ChatGPTCompanionServer, ChatGPTTimerState
 from claude_desktop_watcher import ClaudeDesktopWatcher
 from config_store import DEFAULT_TURN_TIMER_MODE, normalize_turn_timer_mode
+from rag_query_counter import RagQueryCounter
 from completion_sound import CompletionSound
 from constants import APP_NAME, APP_VERSION, DATA_DIR, DEFAULT_HOST, RUNTIME_FILE
 from executor import ExecutionEngine
@@ -75,6 +76,7 @@ class BridgeRuntime:
         self.chatgpt_companion = ChatGPTCompanionServer(
             self.chatgpt_timer
         )
+        self.rag_queries = RagQueryCounter()
         self.turn_timer_mode = (
             self.terminals.config.load_turn_timer_mode()
         )
@@ -269,6 +271,30 @@ class BridgeRuntime:
         except Exception:
             return False
         return should_run
+
+    def _rag_counter(self):
+        counter = getattr(self, "rag_queries", None)
+        if counter is None:
+            counter = self.rag_queries = RagQueryCounter()
+        return counter
+
+    def _rag_timer_enabled(self):
+        mode = getattr(self, "turn_timer_mode", DEFAULT_TURN_TIMER_MODE)
+        return str(mode or "").upper() != "DISABLED"
+
+    def record_rag_query(self, source="MCP"):
+        key = None
+        if self._rag_timer_enabled():
+            timer = self.chatgpt_timer.snapshot()
+            if str(timer.get("state") or "").upper() == "RUNNING":
+                key = timer.get("request_id")
+        return self._rag_counter().record(source, key)
+
+    def rag_query_counts(self):
+        key = None
+        if self._rag_timer_enabled():
+            key = self.chatgpt_timer.snapshot().get("request_id")
+        return self._rag_counter().snapshot(key)
 
     def set_turn_timer_mode(self, mode):
         mode = normalize_turn_timer_mode(mode)
@@ -1197,6 +1223,7 @@ class BridgeRuntime:
                 else None
             ),
             "chatgpt_timer": self.chatgpt_timer.snapshot(),
+            "rag_queries": self.rag_query_counts(),
             "turn_control": self.chatgpt_timer.turn_control(),
             "turn_timer_mode": getattr(
                 self, "turn_timer_mode", DEFAULT_TURN_TIMER_MODE

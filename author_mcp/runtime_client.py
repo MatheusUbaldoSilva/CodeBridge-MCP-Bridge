@@ -367,3 +367,12 @@ def codebridge_stop():
     url = f"http://{runtime['host']}:{int(runtime['port'])}/v1/stop"
     payload = _post_json(url, runtime["token"], {})
     return {"cancelled": bool(payload.get("cancelled"))}
+
+def codebridge_record_rag_query(source="MCP"):
+    runtime = _load_runtime()
+    url = (
+        f"http://{runtime['host']}:"
+        f"{int(runtime['port'])}/v1/rag/query-event"
+    )
+    payload = _post_json(url, runtime["token"], {"source": source}, timeout=2.0)
+    return payload.get("rag_queries") or {}

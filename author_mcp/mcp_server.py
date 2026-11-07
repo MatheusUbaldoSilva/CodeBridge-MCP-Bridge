@@ -1,6 +1,7 @@
 import argparse
 import base64
 import importlib
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -1124,6 +1125,15 @@ def codebridge_rag_index(
     )
 
 
+def _note_rag_query():
+    def notify():
+        try:
+            importlib.import_module("runtime_client").codebridge_record_rag_query("MCP")
+        except Exception:
+            pass
+    threading.Thread(target=notify, name="CodeBridgeRagQueryNote", daemon=True).start()
+
+
 @mcp.tool(
     name="codebridge_search_context",
     description=(
@@ -1145,6 +1155,7 @@ def codebridge_search_context(
     path_filter: str | None = None,
     branch: str | None = None,
 ) -> RagSearchContextResult:
+    _note_rag_query()
     try:
         bridge = importlib.import_module("rag_bridge")
         payload = bridge.search_rag_context(

@@ -186,6 +186,12 @@ class MainWindow(QMainWindow):
         timer_layout.addStretch(1)
         timer_layout.addWidget(self.chatgpt_timer_label)
         timer_layout.addWidget(self.chatgpt_timer_status)
+        self.rag_query_label = QLabel("")
+        self.rag_query_label.setAlignment(Qt.AlignCenter)
+        self.rag_query_label.setStyleSheet(
+            "color:#7f93a3;font-size:12px;background:transparent;border:0;"
+        )
+        timer_layout.addWidget(self.rag_query_label)
         timer_layout.addStretch(1)
 
         header.addWidget(
@@ -283,6 +289,11 @@ class MainWindow(QMainWindow):
         ssh_layout.addWidget(self.ssh_config_status)
         ssh_layout.addStretch(1)
         self.rag_tab = RagPanel(self.tabs)
+        search_panel = getattr(self.rag_tab, "search_panel", None)
+        if search_panel is not None and hasattr(search_panel, "searched"):
+            search_panel.searched.connect(
+                lambda _query: self._note_ui_rag_query()
+            )
         self.tabs.addTab(self.rag_tab, "Central RAG")
         self.tabs.addTab(self.ssh_tab, "Configuracao SSH")
         self.tabs.currentChanged.connect(
@@ -641,9 +652,46 @@ class MainWindow(QMainWindow):
             "border:0;"
         )
 
+    def _note_ui_rag_query(self):
+        try:
+            self.runtime.record_rag_query("TELA")
+        except Exception:
+            pass
+        self._refresh_rag_queries()
+
+    def _refresh_rag_queries(self):
+        label = getattr(self, "rag_query_label", None)
+        if label is None:
+            return
+        try:
+            counts = self.runtime.rag_query_counts()
+        except Exception:
+            return
+        import time as _time
+        mode = str(getattr(self.runtime, "turn_timer_mode", "CHATGPT") or "").upper()
+        disabled = mode == "DISABLED"
+        total = int(counts.get("session_total" if disabled else "cycle_total") or 0)
+        noun = "consulta" if total == 1 else "consultas"
+        where = "desde a abertura" if disabled else "neste ciclo"
+        text = f"RAG · {total} {noun} {where}"
+        cyc = counts.get("cycle_by_source") or {}
+        ses = counts.get("session_by_source") or {}
+        opened = _time.strftime("%H:%M", _time.localtime(counts.get("opened_at") or _time.time()))
+        tip = (
+            f"Neste ciclo: {counts.get('cycle_total', 0)} "
+            f"(IA {cyc.get('MCP', 0)}, tela {cyc.get('TELA', 0)})\n"
+            f"Desde a abertura ({opened}): {counts.get('session_total', 0)} "
+            f"(IA {ses.get('MCP', 0)}, tela {ses.get('TELA', 0)})"
+        )
+        if (text, tip) != getattr(self, "_last_rag_query_text", None):
+            self._last_rag_query_text = (text, tip)
+            label.setText(text)
+            label.setToolTip(tip)
+
     def refresh_live(self):
         self._drain_ui_events()
         self._refresh_chatgpt_timer()
+        self._refresh_rag_queries()
         for target in ("POWERSHELL5.1", "CMD", "SSH"):
             self._update_terminal_view(target)
 

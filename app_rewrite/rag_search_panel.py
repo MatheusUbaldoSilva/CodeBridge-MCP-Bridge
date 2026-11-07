@@ -280,6 +280,7 @@ class KnowledgeSearchPanel(QWidget):
     """Pesquisa no projeto selecionado; resultado em cartoes por arquivo."""
 
     result_selected = Signal(str)
+    searched = Signal(str)
 
     def __init__(self, parent=None, search_fn=None):
         super().__init__(parent)
@@ -451,6 +452,7 @@ class KnowledgeSearchPanel(QWidget):
         self.terms = query_terms(text)
         self._started = time.monotonic()
         self._set_busy(True)
+        self.searched.emit(text)
 
         def worker():
             try:
