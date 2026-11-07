@@ -123,12 +123,8 @@ def active_text(target=None, state=None, command=None, started_at=None,
     line1 = f"{ACTIVE_TITLE}: " + DOT.join(head)
     if stop_requested:
         line1 += DOT + "parada solicitada"
-    preview, extra = command_preview(command)
+    # O texto do comando fica so no balao do mouse (pedido do usuario).
     rich = html.escape(line1)
-    if preview:
-        more = f"  (+{extra} linhas)" if extra > 1 else ("  (+1 linha)" if extra == 1 else "")
-        rich += ("<br><span style='color:#8a94a6; font-family: Consolas, monospace;'>"
-                 + "&nbsp;&nbsp;" + html.escape(preview) + html.escape(more) + "</span>")
     tooltip = command_tooltip(command) if command else ""
     if internal_id:
         tooltip = (tooltip + "\n\n" if tooltip else "") + f"ID interno: {internal_id}"
