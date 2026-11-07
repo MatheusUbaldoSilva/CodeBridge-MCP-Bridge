@@ -17,6 +17,7 @@ from telemetry import TelemetryService
 from telemetry_widget import TelemetryPanel
 from rag_panel import RagPanel
 from ssh_hostkey_box import HostKeyBox
+from password_eye import PasswordEye
 from ssh_transfer import SshFileChannel
 from ssh_transfer_panel import SshTransferPanel
 from theme import apply_dark_theme
@@ -273,6 +274,7 @@ class MainWindow(QMainWindow):
         self.ssh_user = QLineEdit()
         self.ssh_password = QLineEdit()
         self.ssh_password.setEchoMode(QLineEdit.Password)
+        self.ssh_password_eye = PasswordEye(self.ssh_password, self._saved_ssh_password)
         form.addRow("IP / Host:", self.ssh_host)
         form.addRow("Porta:", self.ssh_port)
         form.addRow("Login:", self.ssh_user)
@@ -466,6 +468,12 @@ class MainWindow(QMainWindow):
         self.ssh_config_status.setText(f"SSH: {state}")
         if settings.get("host"):
             QTimer.singleShot(0, self.probe_ssh_hostkey)
+
+    def _saved_ssh_password(self):
+        credentials = self.runtime.terminals.credentials.load() or {}
+        if credentials.get("username") == self.ssh_user.text().strip():
+            return credentials.get("password", "")
+        return ""
 
     def _resolved_password(self):
         password = self.ssh_password.text()
