@@ -34,6 +34,10 @@ MUTED = "color:#8b9aa7;background:transparent;border:0;"
 
 
 def _sync():
+    import sys
+    root = str(Path(__file__).resolve().parent.parent)
+    if root not in sys.path:
+        sys.path.insert(0, root)
     from rag.runtime import knowledge_sync
     return knowledge_sync
 
@@ -326,6 +330,8 @@ class KnowledgeSyncBar(QWidget):
     def status_text(self):
         if not self.project_id:
             return ""
+        if self.error and not self.supported:
+            return "N" + A_TILDE + "o consegui ler o projeto: " + self.error
         if not self.supported:
             return ("Dispon" + chr(0xED) + "vel para projetos com " + chr(0xED) + "ndice pr"
                     + O_ACUTE + "prio (criados pela aba Indexar).")
