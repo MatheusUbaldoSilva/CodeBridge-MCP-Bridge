@@ -9,6 +9,33 @@ from rag.runtime.auto_index_incremental_read import read_reusable_vectors
 from rag.runtime.auto_index_incremental_stage_write import import_verified_reuse_batch
 from rag.runtime.auto_index_incremental_plan import IncrementalPlanError
 
+import math
+
+# Qdrant (distancia cosseno) renormaliza o vetor ao gravar; um vetor ja
+# normalizado volta com diferencas de 1 ULP em float32 (~1.5e-8). Tolerancia
+# muito abaixo de qualquer efeito na busca, mas que ainda pega corrupcao real.
+VECTOR_READBACK_TOLERANCE = 1e-6
+
+
+def _same_vector(original, persisted, tolerance=VECTOR_READBACK_TOLERANCE) -> bool:
+    if isinstance(original, dict) or isinstance(persisted, dict):
+        if not isinstance(original, dict) or not isinstance(persisted, dict):
+            return False
+        if set(original) != set(persisted):
+            return False
+        return all(_same_vector(original[k], persisted[k], tolerance) for k in original)
+    if not isinstance(original, (list, tuple)) or not isinstance(persisted, (list, tuple)):
+        return False
+    if len(original) != len(persisted) or not original:
+        return False
+    for a, b in zip(original, persisted):
+        if (isinstance(a, bool) or isinstance(b, bool)
+                or not isinstance(a, (int, float)) or not isinstance(b, (int, float))):
+            return False
+        if not (math.isfinite(a) and math.isfinite(b)) or abs(a - b) > tolerance:
+            return False
+    return True
+
 
 def copy_survivor_batch(source_client, staging_client, plan: dict, batch_index: int,
                         *, verified_source: bool = False,
@@ -49,7 +76,7 @@ def copy_survivor_batch(source_client, staging_client, plan: dict, batch_index: 
         for point_id,original in before.items():
             persisted=after[point_id]
             if (persisted["payload"]!=original["payload"]
-                    or persisted["vector"]!=original["vector"]):
+                    or not _same_vector(original["vector"], persisted["vector"])):
                 raise IncrementalPlanError("post-write vector/payload mismatch; discard stage")
     return {"state":"SURVIVOR_BATCH_READBACK_VERIFIED",
             "batch_index":batch_index,"vectors_verified":written,
