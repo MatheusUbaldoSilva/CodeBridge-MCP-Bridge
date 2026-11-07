@@ -8,6 +8,7 @@ from PySide6.QtCore import QObject, Signal
 from rag_projects import list_projects, create_project, validate_preview_folder
 from rag_auto_job_card import RagAutoJobCard
 from rag_deletion_review_panel import KnowledgeRemovalReviewPanel
+from rag_index_panel import KnowledgeIndexPanel
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit,
     QPlainTextEdit, QListWidget, QListWidgetItem, QStackedWidget,
@@ -161,7 +162,7 @@ class RagPanel(QWidget):
         navigation = QHBoxLayout()
         self.nav_buttons = []
         self.pages = QStackedWidget()
-        for index, title in enumerate(("Meus arquivos", "Pesquisar", "Adicionar", "Indexação automática")):
+        for index, title in enumerate(("Meus arquivos", "Pesquisar", "Indexar")):
             button = QPushButton(title)
             button.setCheckable(True)
             button.clicked.connect(lambda checked=False, i=index: self.set_page(i))
@@ -275,6 +276,14 @@ class RagPanel(QWidget):
         auto_layout.addWidget(self.auto_card)
         auto_layout.addStretch(1)
         self.pages.addWidget(auto_page)
+        # Aba unica "Indexar": substitui Adicionar + Indexacao automatica.
+        # As paginas antigas continuam criadas (compatibilidade), sem botao.
+        index_page = QWidget()
+        index_layout = QVBoxLayout(index_page)
+        self.index_panel = KnowledgeIndexPanel(index_page)
+        self.index_panel.knowledge_changed.connect(self._knowledge_changed)
+        index_layout.addWidget(self.index_panel)
+        self.pages.insertWidget(2, index_page)
 
         self.notice = QLabel("")
         self.notice.setWordWrap(True)
@@ -311,9 +320,16 @@ class RagPanel(QWidget):
         return requested
 
     def set_page(self, index):
+        if index >= len(self.nav_buttons):
+            index = len(self.nav_buttons) - 1  # paginas antigas -> Indexar
         self.pages.setCurrentIndex(index)
         for number, button in enumerate(self.nav_buttons):
             button.setChecked(number == index)
+
+    def _knowledge_changed(self, project):
+        """Indexar ativou ou desfez: recarrega a lista de Meus arquivos."""
+        if project == self.project_id:
+            self._run("documents", {"project": project})
 
     def change_project(self, name):
         if not name or name == self.project_id:
@@ -321,6 +337,7 @@ class RagPanel(QWidget):
         self.cancel_preview()
         self.project_id = name
         self.auto_card.set_project(name)
+        self.index_panel.set_project(name)
         self._selected_paths = None
         self.files.clear()
         self._documents = []
@@ -649,6 +666,8 @@ class RagPanel(QWidget):
                 self.project_id = names[0]
                 self._selected_paths = None
             self.auto_card.set_project(self.project_id)
+            if self.index_panel.project_id != self.project_id:
+                self.index_panel.set_project(self.project_id)
             self.project_picker.setCurrentText(self.project_id)
             self.project_picker.blockSignals(False)
             self._run("documents", {"project": self.project_id})

@@ -23,13 +23,17 @@ class RagPanelSmokeTests(unittest.TestCase):
 
     def test_four_pages_and_protected_indexing(self):
         panel = self.make_panel()
-        self.assertEqual(panel.pages.count(), 4)
+        # Indexar substitui Adicionar + Indexacao automatica (paginas antigas
+        # continuam criadas, sem botao; set_page antigo cai em Indexar).
+        self.assertEqual(panel.pages.count(), 5)
         self.assertEqual([x.text() for x in panel.nav_buttons],
-                         ["Meus arquivos", "Pesquisar", "Adicionar",
-                          "Indexação automática"])
+                         ["Meus arquivos", "Pesquisar", "Indexar"])
+        self.assertIs(panel.pages.widget(2), panel.index_panel.parent())
         self.assertFalse(panel.index_btn.isEnabled())
         self.assertTrue(panel.folder.isReadOnly())
         panel.set_page(2)
+        self.assertEqual(panel.pages.currentIndex(), 2)
+        panel.set_page(3)
         self.assertEqual(panel.pages.currentIndex(), 2)
         panel.close()
 
