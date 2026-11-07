@@ -271,7 +271,10 @@ class TelemetryService:
         if not config or not creds:
             raise RuntimeError("SSH nao configurado para telemetria")
         client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        # Mesma regra do terminal SSH: so conecta em servidor com chave
+        # ja conferida no known_hosts (aceite feito na aba Configuracao SSH).
+        client.load_system_host_keys()
+        client.set_missing_host_key_policy(paramiko.RejectPolicy())
         client.connect(
             config["host"], port=int(config["port"]),
             username=creds["username"], password=creds["password"],

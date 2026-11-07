@@ -368,6 +368,33 @@ def codebridge_stop():
     payload = _post_json(url, runtime["token"], {})
     return {"cancelled": bool(payload.get("cancelled"))}
 
+def _api_url(runtime, path):
+    return f"http://{runtime['host']}:{int(runtime['port'])}{path}"
+
+
+def codebridge_ssh_files(path=None, side="LINUX"):
+    runtime = _load_runtime()
+    payload = _post_json(_api_url(runtime, "/v1/ssh/files/list"), runtime["token"],
+                         {"path": path, "side": side}, timeout=30.0)
+    return payload.get("files") or {}
+
+
+def codebridge_ssh_transfer(direction, sources, destination, overwrite=False):
+    runtime = _load_runtime()
+    payload = _post_json(_api_url(runtime, "/v1/ssh/transfer"), runtime["token"], {
+        "direction": direction, "sources": list(sources or []),
+        "destination": destination, "overwrite": bool(overwrite),
+    }, timeout=15.0)
+    return payload.get("transfer") or {}
+
+
+def codebridge_ssh_transfer_status(transfer_id, cancel=False):
+    runtime = _load_runtime()
+    payload = _post_json(_api_url(runtime, "/v1/ssh/transfer/status"), runtime["token"],
+                         {"transfer_id": transfer_id, "cancel": bool(cancel)}, timeout=10.0)
+    return payload.get("transfer") or {}
+
+
 def codebridge_record_rag_query(source="MCP"):
     runtime = _load_runtime()
     url = (

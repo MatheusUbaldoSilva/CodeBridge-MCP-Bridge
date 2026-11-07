@@ -1869,6 +1869,121 @@ def build_security(port: int) -> TransportSecuritySettings:
 
 
 
+class SshFilesResult(ProtocolOutcome):
+    side: str | None = None
+    path: str | None = None
+    items: list[dict[str, Any]] = Field(default_factory=list)
+    truncated: bool = False
+    total: int = 0
+
+
+class SshTransferResult(ProtocolOutcome):
+    transfer: dict[str, Any] | None = None
+
+
+def _ssh_client():
+    return importlib.import_module("runtime_client")
+
+
+def _ssh_wait(client, status, wait_seconds):
+    deadline = time.monotonic() + max(0, min(int(wait_seconds or 0), 120))
+    while status.get("state") == "RUNNING" and time.monotonic() < deadline:
+        time.sleep(0.5)
+        status = client.codebridge_ssh_transfer_status(status.get("id"))
+    return status
+
+
+@mcp.tool(
+    name="codebridge_ssh_files",
+    description=(
+        "Lista uma pasta do Linux (pela conexao SSH salva, via SFTP) ou do Windows, "
+        "para preparar transferencias. side=LINUX ou WINDOWS; path vazio abre a pasta inicial."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        idempotent_hint=True,
+        open_world_hint=False,
+    ),
+    structured_output=True,
+)
+def codebridge_ssh_files(path: str | None = None, side: str = "LINUX") -> SshFilesResult:
+    try:
+        data = _ssh_client().codebridge_ssh_files(path, side)
+    except Exception as exc:
+        return SshFilesResult(operation_ok=False, operation_error_type=type(exc).__name__,
+                              operation_error_message=str(exc))
+    return SshFilesResult(
+        side=data.get("side"), path=data.get("path"), items=list(data.get("items") or []),
+        truncated=bool(data.get("truncated")), total=int(data.get("total") or 0),
+    )
+
+
+@mcp.tool(
+    name="codebridge_ssh_transfer",
+    description=(
+        "Transfere arquivos ou pastas entre Windows e Linux pela conexao SSH salva (SFTP). "
+        "direction=UPLOAD (Windows para Linux) ou DOWNLOAD (Linux para Windows); "
+        "sources=lista de caminhos de origem; destination=pasta de destino do outro lado. "
+        "Nao sobrescreve sem overwrite=true: o estado CONFLICT lista o que ja existe. "
+        "Aguarda ate wait_seconds (max 120) e devolve o estado; acompanhe com "
+        "codebridge_ssh_transfer_status."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=False,
+        open_world_hint=False,
+    ),
+    structured_output=True,
+)
+def codebridge_ssh_transfer(
+    direction: str,
+    sources: list[str],
+    destination: str,
+    overwrite: bool = False,
+    wait_seconds: int = 30,
+) -> SshTransferResult:
+    client = _ssh_client()
+    try:
+        status = client.codebridge_ssh_transfer(direction, sources, destination, overwrite)
+        status = _ssh_wait(client, status, wait_seconds)
+    except Exception as exc:
+        return SshTransferResult(operation_ok=False, operation_error_type=type(exc).__name__,
+                                 operation_error_message=str(exc))
+    return SshTransferResult(transfer=status)
+
+
+@mcp.tool(
+    name="codebridge_ssh_transfer_status",
+    description=(
+        "Estado de uma transferencia SSH iniciada por codebridge_ssh_transfer "
+        "(RUNNING, DONE, CONFLICT, CANCELLED, FAILED) com progresso. cancel=true "
+        "interrompe; o que ja chegou inteiro e mantido."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    ),
+    structured_output=True,
+)
+def codebridge_ssh_transfer_status(
+    transfer_id: str,
+    cancel: bool = False,
+    wait_seconds: int = 0,
+) -> SshTransferResult:
+    client = _ssh_client()
+    try:
+        status = client.codebridge_ssh_transfer_status(transfer_id, cancel)
+        status = _ssh_wait(client, status, wait_seconds)
+    except Exception as exc:
+        return SshTransferResult(operation_ok=False, operation_error_type=type(exc).__name__,
+                                 operation_error_message=str(exc))
+    return SshTransferResult(transfer=status)
+
+
+
 def main():
     parser = argparse.ArgumentParser(description="CodeBridge MCP autoral")
     parser.add_argument("--host", default="127.0.0.1")

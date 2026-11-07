@@ -4,6 +4,28 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 
+SSH_LIST_LIMIT = 500
+
+
+def _ssh_list(bridge, body):
+    from ssh_transfer import SshFileChannel, list_local
+    side = str(body.get("side") or "LINUX").strip().upper()
+    if side == "WINDOWS":
+        import os
+        target = str(body.get("path") or os.path.expanduser("~"))
+        items = list_local(target)
+    elif side == "LINUX":
+        channel = SshFileChannel(bridge.runtime.terminals.open_sftp)
+        try:
+            target, items = channel.list_remote(body.get("path") or channel.home())
+        finally:
+            channel.close()
+    else:
+        raise ValueError("side deve ser LINUX ou WINDOWS")
+    return {"side": side, "path": target, "items": items[:SSH_LIST_LIMIT],
+            "truncated": len(items) > SSH_LIST_LIMIT, "total": len(items)}
+
+
 class BridgeAPI:
     def __init__(self, runtime, host="127.0.0.1", port=0, token=None):
         self.runtime = runtime
@@ -210,6 +232,24 @@ class BridgeAPI:
                             body.get("username"), body.get("password"),
                         )
                         return self._send(200, {"ok": True, "ssh": ssh})
+                    if path == "/v1/ssh/files/list":
+                        return self._send(200, {"ok": True, "files": _ssh_list(bridge, body)})
+                    if path == "/v1/ssh/transfer":
+                        status = bridge.runtime.terminals.transfers.start(
+                            body.get("direction"), body.get("sources"), body.get("destination"),
+                            overwrite=bool(body.get("overwrite")), origin="IA",
+                        )
+                        return self._send(200, {"ok": True, "transfer": status})
+                    if path == "/v1/ssh/transfer/status":
+                        transfers = bridge.runtime.terminals.transfers
+                        transfer_id = str(body.get("transfer_id") or "")
+                        try:
+                            if body.get("cancel"):
+                                transfers.cancel(transfer_id)
+                            status = transfers.status(transfer_id)
+                        except KeyError:
+                            return self._send(404, {"ok": False, "error": "transfer_not_found"})
+                        return self._send(200, {"ok": True, "transfer": status})
                     self._send(404, {"ok": False, "error": "not_found"})
                 except KeyError:
                     error = "execution_not_found" if path.startswith("/v1/phase5d/executions/") else "job_not_found"

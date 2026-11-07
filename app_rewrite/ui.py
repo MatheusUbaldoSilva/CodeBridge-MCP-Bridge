@@ -16,6 +16,9 @@ from terminal_widget import TerminalWidget
 from telemetry import TelemetryService
 from telemetry_widget import TelemetryPanel
 from rag_panel import RagPanel
+from ssh_hostkey_box import HostKeyBox
+from ssh_transfer import SshFileChannel
+from ssh_transfer_panel import SshTransferPanel
 from theme import apply_dark_theme
 
 
@@ -287,7 +290,21 @@ class MainWindow(QMainWindow):
         ssh_layout.addLayout(ssh_buttons)
         self.ssh_config_status = QLabel()
         ssh_layout.addWidget(self.ssh_config_status)
-        ssh_layout.addStretch(1)
+        self.ssh_hostkey_box = HostKeyBox(self.ssh_tab)
+        self.ssh_hostkey_box.accept_requested.connect(self.trust_ssh_hostkey)
+        ssh_layout.addWidget(self.ssh_hostkey_box)
+        self._pending_ssh_action = None
+        self.ssh_transfer_panel = None
+        terminals = self.runtime.terminals
+        if getattr(terminals, "transfers", None) is not None and hasattr(terminals, "open_sftp"):
+            self.ssh_transfer_panel = SshTransferPanel(
+                terminals.transfers,
+                lambda: SshFileChannel(terminals.open_sftp),
+                self.ssh_tab,
+            )
+            ssh_layout.addWidget(self.ssh_transfer_panel, 1)
+        else:
+            ssh_layout.addStretch(1)
         self.rag_tab = RagPanel(self.tabs)
         search_panel = getattr(self.rag_tab, "search_panel", None)
         if search_panel is not None and hasattr(search_panel, "searched"):
@@ -476,8 +493,49 @@ class MainWindow(QMainWindow):
             target=self._ssh_test_worker,
             args=(host, port, user, password), daemon=True,
         ).start()
+    def _ssh_hostkey_ready(self, host, port, action, values):
+        checker = getattr(self.runtime.terminals, "ssh_host_key", None)
+        if checker is None:
+            return True
+        info = checker(host, port)
+        if info.get("state") == "TRUSTED":
+            self._ui_events.put(("ssh_hostkey_ok", True, info))
+            return True
+        self._ui_events.put(("ssh_hostkey", False, {"info": info, "action": action, "values": values}))
+        return False
+
+    def trust_ssh_hostkey(self, info, replace=False):
+        self._set_ssh_busy(True)
+        self.ssh_config_status.setText("Salvando a chave do servidor...")
+        threading.Thread(
+            target=self._ssh_trust_worker, args=(dict(info), bool(replace)), daemon=True,
+        ).start()
+
+    def _ssh_trust_worker(self, info, replace):
+        try:
+            result = self.runtime.terminals.trust_ssh_host_key(
+                info["host"], info["port"], info["fingerprint"], replace=replace)
+            self._ui_events.put(("ssh_trust", True, result))
+        except Exception as exc:
+            self._ui_events.put(("ssh_trust", False, f"{type(exc).__name__}: {exc}"))
+
+    def _resume_pending_ssh_action(self):
+        pending, self._pending_ssh_action = self._pending_ssh_action, None
+        if not pending:
+            return
+        action, values = pending
+        worker = self._ssh_save_worker if action == "save" else self._ssh_test_worker
+        self._set_ssh_busy(True)
+        threading.Thread(target=worker, args=tuple(values), daemon=True).start()
+
+    def _refresh_transfer_panel(self):
+        if self.ssh_transfer_panel is not None:
+            self.ssh_transfer_panel.reconnect()
+
     def _ssh_test_worker(self, host, port, user, password):
         try:
+            if not self._ssh_hostkey_ready(host, port, "test", (host, port, user, password)):
+                return
             ok = self.runtime.terminals.test_ssh(host, port, user, password)
             self._ui_events.put(("ssh_test", True, "Conexao SSH OK" if ok else "Falha no teste SSH"))
         except Exception as exc:
@@ -496,6 +554,8 @@ class MainWindow(QMainWindow):
 
     def _ssh_save_worker(self, host, port, user, password):
         try:
+            if not self._ssh_hostkey_ready(host, port, "save", (host, port, user, password)):
+                return
             result = self.runtime.terminals.configure_ssh(host, port, user, password)
             self._ui_events.put(("ssh_save", True, result))
         except Exception as exc:
@@ -507,13 +567,34 @@ class MainWindow(QMainWindow):
                 kind, ok, payload = self._ui_events.get_nowait()
             except queue.Empty:
                 break
-            self._set_ssh_busy(False)
-            if kind == "ssh_test":
+            if kind != "ssh_hostkey_ok":
+                self._set_ssh_busy(False)
+            if kind == "ssh_hostkey_ok":
+                self.ssh_hostkey_box.show_info(payload)
+            elif kind == "ssh_hostkey":
+                self._pending_ssh_action = (payload["action"], payload["values"])
+                self.ssh_hostkey_box.show_info(payload["info"])
+                if payload["info"].get("state") == "CHANGED":
+                    self.ssh_config_status.setText("Conexao bloqueada: a chave do servidor mudou.")
+                else:
+                    self.ssh_config_status.setText("Confira a chave do servidor abaixo antes de conectar.")
+            elif kind == "ssh_trust":
+                self.ssh_hostkey_box.set_busy(False)
+                if ok:
+                    self.ssh_hostkey_box.show_info(payload)
+                    self.ssh_config_status.setText("Chave salva. Conectando...")
+                    self._resume_pending_ssh_action()
+                else:
+                    self.ssh_config_status.setText(payload)
+            elif kind == "ssh_test":
                 self.ssh_config_status.setText(payload)
+                if ok:
+                    self._refresh_transfer_panel()
             elif ok:
                 self.ssh_password.clear()
                 self.ssh_password.setPlaceholderText("Senha salva no Windows")
                 self.ssh_config_status.setText("SSH salvo e ONLINE")
+                self._refresh_transfer_panel()
             else:
                 self.ssh_config_status.setText(payload)
     def _update_terminal_view(self, target):

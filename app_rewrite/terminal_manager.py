@@ -9,6 +9,8 @@ from credential_store import WindowsCredentialStore
 from linux_terminal_session import LinuxTerminalSession
 from windows_terminal_session import WindowsTerminalSession
 from constants import TERMINAL_ALIASES
+import ssh_host_trust
+from ssh_transfer import TransferRegistry, connect_sftp
 
 
 class TerminalManager:
@@ -20,6 +22,7 @@ class TerminalManager:
         self.cmd = CmdTerminalSession()
         self.ssh = None
         self.ssh_last_error = None
+        self.transfers = TransferRegistry(self.open_sftp)
         self.active_target = None
         self._prepared_target = None
         self._execution_generation = 0
@@ -137,6 +140,20 @@ class TerminalManager:
             "online": bool(ssh is not None and ssh.is_running),
             "last_error": self.ssh_last_error,
         }
+
+    def open_sftp(self):
+        config = self.config.load_ssh()
+        credentials = self.credentials.load()
+        if not config or not credentials:
+            raise RuntimeError("SSH nao configurado: salve host, login e senha na aba Configuracao SSH")
+        return connect_sftp(config["host"], config["port"],
+                            credentials["username"], credentials["password"])
+
+    def ssh_host_key(self, host, port=22):
+        return ssh_host_trust.check(host, port)
+
+    def trust_ssh_host_key(self, host, port, fingerprint, replace=False):
+        return ssh_host_trust.accept(host, port, fingerprint, replace=replace)
 
     def test_ssh(self, host, port, username, password):
         candidate = self._new_ssh_session(host, port, username, password)
