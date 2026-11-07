@@ -25,7 +25,7 @@ class IntegratedLockedDeleteTests(TestCase):
         self.delete = self.gui.deletion_review_panel.delete_button
 
     def test_visible_in_real_files_page_but_disabled(self):
-        self.assertEqual(self.delete.text(), "Excluir conhecimentos")
+        self.assertEqual(self.delete.text(), "Excluir do conhecimento\u2026")
         self.assertIs(self.gui.deletion_review_panel.selector.parent(),
                       self.gui.deletion_review_panel)
         self.assertFalse(self.delete.isEnabled())

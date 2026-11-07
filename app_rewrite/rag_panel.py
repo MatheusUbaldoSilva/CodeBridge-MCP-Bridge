@@ -167,19 +167,29 @@ class RagPanel(QWidget):
             button.clicked.connect(lambda checked=False, i=index: self.set_page(i))
             self.nav_buttons.append(button)
             navigation.addWidget(button)
+        navigation.setSpacing(0)
+        for position, button in enumerate(self.nav_buttons):
+            radius = ("border-top-left-radius:6px;border-bottom-left-radius:6px;" if position == 0
+                      else "border-top-right-radius:6px;border-bottom-right-radius:6px;"
+                      if position == len(self.nav_buttons) - 1 else "")
+            button.setStyleSheet(
+                "QPushButton{background:#111b23;color:#c9d4dc;border:1px solid #33414d;"
+                "border-radius:0;padding:7px 14px;" + radius + "}"
+                "QPushButton:checked{background:#1d4e74;color:white;font-weight:700;"
+                "border-color:#2b6cb0;}")
         outer.addLayout(navigation)
         outer.addWidget(self.pages, 1)
 
         files_page = QWidget()
         files_layout = QVBoxLayout(files_page)
-        files_layout.addWidget(QLabel("Arquivos que o CodeBridge conhece"))
-        self.files = QListWidget()
+        # Lista unica: arvore com selecao, filtro, detalhe e exclusao.
+        # self.files/file_details ficam fora do layout (compatibilidade).
+        self.files = QListWidget(files_page)
         self.files.currentRowChanged.connect(self._show_file)
-        files_layout.addWidget(self.files, 2)
-        self.file_details = QPlainTextEdit()
+        self.files.hide()
+        self.file_details = QPlainTextEdit(files_page)
         self.file_details.setReadOnly(True)
-        self.file_details.setPlaceholderText("Selecione um arquivo.")
-        files_layout.addWidget(self.file_details, 1)
+        self.file_details.hide()
         self.deletion_review_panel = KnowledgeRemovalReviewPanel(files_page)
         files_layout.addWidget(self.deletion_review_panel, 1)
         self.pages.addWidget(files_page)
@@ -691,7 +701,7 @@ class RagPanel(QWidget):
                 if self.project_id != "codebridge" else []
             )
             self.deletion_review_panel.set_project_files(
-                self.project_id, private_paths,
+                self.project_id, private_paths, self._documents,
             )
             if not self._documents:
                 self.file_details.setPlainText("Nenhum arquivo encontrado.")

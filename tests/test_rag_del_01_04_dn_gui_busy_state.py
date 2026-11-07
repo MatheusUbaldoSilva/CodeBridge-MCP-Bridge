@@ -32,7 +32,7 @@ class DocumentFailureQtTests(TestCase):
         self.assertEqual(self.panel._documents,before)
         self.assertEqual(self.panel.files.count(),1)
         self.assertIn("generation busy",self.panel.notice.text())
-        self.assertFalse(self.panel.deletion_review_panel.selector.preview_button.isEnabled())
+        self.assertFalse(self.panel.deletion_review_panel.delete_button.isEnabled())
 
     def test_private_project_switch_clears_public_files_before_request(self):
         self.panel.project_id="codebridge"
@@ -47,11 +47,11 @@ class DocumentFailureQtTests(TestCase):
         dispatch.assert_called_once_with("documents",{"project":"private-demo"})
         self.panel._complete("documents",{},"catalog busy")
         self.assertEqual(self.panel.files.count(),0)
-        self.assertFalse(self.panel.deletion_review_panel.selector.preview_button.isEnabled())
+        self.assertFalse(self.panel.deletion_review_panel.delete_button.isEnabled())
         self.assertIn("catalog busy",self.panel.notice.text())
 
     def test_public_failed_request_does_not_set_delete_selection(self):
         self.panel.project_id="codebridge"
         self.panel._complete("documents",{}, "public generation transition pending")
         self.assertEqual(self.panel.deletion_review_panel.selector.selected_paths(),[])
-        self.assertFalse(self.panel.deletion_review_panel.selector.preview_button.isEnabled())
+        self.assertFalse(self.panel.deletion_review_panel.delete_button.isEnabled())

@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 from pathlib import Path
 from unittest import TestCase
@@ -20,14 +20,16 @@ class ReviewPanelTests(TestCase):
     @patch("rag_deletion_review_panel.build_deletion_review")
     def test_shows_preview_only(self, service):
         service.return_value={"display_text":"SIMULAÇÃO: nenhum removido","review_sha256":"x","execution_enabled":False}
-        self.panel.selector.items.item(0).setCheckState(Qt.CheckState.Checked)
-        self.panel.selector.preview_button.click()
+        self.panel.selector.set_checked("a.cpp")
+        self.assertTrue(self.panel.delete_button.isEnabled())
+        self.panel.review_selected(self.panel.selector.selected_paths())
+        self.assertIsNone(self.panel.last_review)
         self.assertIn("SIMULAÇÃO",self.panel.details.toPlainText())
         service.assert_called_once_with("demo",["a.cpp"])
     @patch("rag_deletion_review_panel.build_deletion_review")
     def test_public_project_blocked(self, service):
         self.panel.set_project_files("codebridge",["a.cpp"])
-        self.assertFalse(self.panel.selector.preview_button.isEnabled())
+        self.assertFalse(self.panel.delete_button.isEnabled())
         self.panel.review_selected(["a.cpp"])
         service.assert_not_called()
     @patch("rag_deletion_review_panel.build_deletion_review")
@@ -40,4 +42,4 @@ class ReviewPanelTests(TestCase):
         self.panel.last_review={"some":"old"}
         self.panel.set_project_files("other",["c.cpp"])
         self.assertIsNone(self.panel.last_review)
-        self.assertFalse(self.panel.selector.preview_button.isEnabled())
+        self.assertFalse(self.panel.delete_button.isEnabled())

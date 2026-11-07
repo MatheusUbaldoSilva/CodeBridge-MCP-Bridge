@@ -122,7 +122,7 @@ class PinnedGuiDocumentTests(TestCase):
             self.assertEqual(panel.files.count(),1)
             self.assertEqual(panel.files.item(0).text(),"README.md")
             self.assertFalse(
-                panel.deletion_review_panel.selector.preview_button.isEnabled()
+                panel.deletion_review_panel.delete_button.isEnabled()
             )
         finally:
             panel.close()
