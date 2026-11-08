@@ -619,6 +619,12 @@ class ServerTest(unittest.TestCase):
         server.stop()
 
     def test_refuses_to_start_without_memory(self):
+        from unittest import mock
+        # o modelo de teste e minusculo: simula um .gguf do tamanho do 7B
+        sized = mock.patch.object(server_mod, "requirements_for", lambda model: (
+            server_mod.REQUIRED_FREE_VRAM_MB, server_mod.REQUIRED_FREE_RAM_CPU_MB))
+        sized.start()
+        self.addCleanup(sized.stop)
         self.memory["vram_used_mb"] = 2000
         server = self.make()
         self.assertFalse(server.start())

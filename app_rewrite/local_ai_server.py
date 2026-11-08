@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import secrets
 import socket
 import subprocess
@@ -18,8 +19,30 @@ import urllib.request
 from pathlib import Path
 
 AI_DIR = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "CodeBridge" / "ai"
-MODEL_NAME = "Qwen2.5-Coder 7B"
-MODEL_FILE = AI_DIR / "models" / "qwen2.5-coder-7b-instruct-q4_k_m.gguf"
+DEFAULT_MODEL_FILE = AI_DIR / "models" / "qwen2.5-coder-7b-instruct-q4_k_m.gguf"
+# Modelo escolhido pelo instalador das IAs (ai_setup.py) conforme a memoria da maquina.
+MODEL_CHOICE_FILE = AI_DIR / "model.json"
+
+
+def model_name_for(path) -> str:
+    """'qwen2.5-coder-3b-instruct-q4_k_m.gguf' -> 'Qwen2.5-Coder 3B'."""
+    match = re.search(r"coder-(\d+(?:\.\d+)?)b", Path(path).name.lower())
+    return "Qwen2.5-Coder %sB" % match.group(1) if match else Path(path).stem
+
+
+def selected_model(choice=None, default=None) -> Path:
+    """O .gguf gravado em model.json pelo instalador das IAs; sem escolha, o Qwen 7B."""
+    default = Path(default or DEFAULT_MODEL_FILE)
+    try:
+        data = json.loads(Path(choice or MODEL_CHOICE_FILE).read_text(encoding="utf-8"))
+        chosen = Path(str(data["file"]))
+    except (OSError, ValueError, KeyError, TypeError):
+        return default
+    return chosen if chosen.is_absolute() else default.parent / chosen
+
+
+MODEL_FILE = selected_model()
+MODEL_NAME = model_name_for(MODEL_FILE)
 try:  # uma copia so do llama-server para todas as IAs (rag/llama_binary.py)
     from rag.llama_binary import llama_server_path as _shared_llama_server
 except Exception:  # pragma: no cover - rag fora do caminho
@@ -51,6 +74,9 @@ REQUIRED_FREE_VRAM_MB = 5000
 REQUIRED_FREE_RAM_MB = 800
 # No processador o modelo inteiro fica na RAM (pesos + contexto + folga).
 REQUIRED_FREE_RAM_CPU_MB = 6000
+# Outros tamanhos do Qwen: tamanho do .gguf + a mesma folga (7B: 5000 e 6000 MB).
+VRAM_OVERHEAD_MB = 534
+CPU_OVERHEAD_MB = 1534
 
 # Chave CPU/GPU/Automatico do card "IAs" (mesmo arquivo de rag/models/compute_preference.py).
 COMPUTE_MODES = ("AUTO", "GPU", "CPU")
@@ -141,40 +167,46 @@ def _free(memory: dict, kind: str):
     return None if total is None or used is None else total - used
 
 
-def choose_device(compute: str, memory: dict) -> tuple[str, str | None]:
-    """("GPU"|"CPU", motivo para nao ligar ou None) conforme a chave do card IAs."""
+def choose_device(compute: str, memory: dict, *, need=None) -> tuple[str, str | None]:
+    """("GPU"|"CPU", motivo para nao ligar ou None) conforme a chave do card IAs.
+
+    need = (VRAM livre, RAM livre para o processador) em MB que o modelo escolhido
+    precisa (requirements_for); sem need vale o Qwen 7B.
+    """
     compute = str(compute or "AUTO").upper()
+    vram_need, cpu_need = need or (REQUIRED_FREE_VRAM_MB, REQUIRED_FREE_RAM_CPU_MB)
     vram, ram = _free(memory, "vram"), _free(memory, "ram")
     if compute == "CPU":
-        if ram is not None and ram < REQUIRED_FREE_RAM_CPU_MB:
+        if ram is not None and ram < cpu_need:
             return "CPU", ("Memória insuficiente para rodar no processador: livre %s de RAM, precisa %s. "
-                           "Feche programas." % (_gb(ram), _gb(REQUIRED_FREE_RAM_CPU_MB)))
+                           "Feche programas." % (_gb(ram), _gb(cpu_need)))
         return "CPU", None
     if compute == "GPU":
         if vram is None:
             return "GPU", ("Modo só GPU: nenhuma placa de vídeo NVIDIA encontrada. "
                            "Escolha CPU ou Automático no card IAs.")
-        return "GPU", start_blocker(memory)
-    if vram is not None and vram >= REQUIRED_FREE_VRAM_MB:
-        return "GPU", start_blocker(memory)
-    if ram is not None and ram < REQUIRED_FREE_RAM_CPU_MB:
-        gpu = ("livre %s na placa de vídeo (precisa %s)" % (_gb(vram), _gb(REQUIRED_FREE_VRAM_MB))
+        return "GPU", start_blocker(memory, vram_need=vram_need)
+    if vram is not None and vram >= vram_need:
+        return "GPU", start_blocker(memory, vram_need=vram_need)
+    if ram is not None and ram < cpu_need:
+        gpu = ("livre %s na placa de vídeo (precisa %s)" % (_gb(vram), _gb(vram_need))
                if vram is not None else "sem placa de vídeo NVIDIA")
         return "CPU", ("Memória insuficiente: %s e %s de RAM para o processador (precisa %s). "
-                       "Feche programas." % (gpu, _gb(ram), _gb(REQUIRED_FREE_RAM_CPU_MB)))
+                       "Feche programas." % (gpu, _gb(ram), _gb(cpu_need)))
     return "CPU", None
 
 
-def start_blocker(memory: dict, *, model_loaded: bool = False) -> str | None:
+def start_blocker(memory: dict, *, model_loaded: bool = False,
+                  vram_need: int = REQUIRED_FREE_VRAM_MB) -> str | None:
     """Motivo em portugues para nao ligar na placa de video, ou None se ha memoria."""
     if model_loaded:
         return None
     total, used = memory.get("vram_total_mb"), memory.get("vram_used_mb")
     if total is not None and used is not None:
         free = total - used
-        if free < REQUIRED_FREE_VRAM_MB:
+        if free < vram_need:
             return ("Memória insuficiente na placa de vídeo: livre %s, precisa %s. "
-                    "Feche programas que usam a placa." % (_gb(free), _gb(REQUIRED_FREE_VRAM_MB)))
+                    "Feche programas que usam a placa." % (_gb(free), _gb(vram_need)))
     total, used = memory.get("ram_total_mb"), memory.get("ram_used_mb")
     if total is not None and used is not None:
         free = total - used
@@ -182,6 +214,15 @@ def start_blocker(memory: dict, *, model_loaded: bool = False) -> str | None:
             return ("Memória insuficiente: livre %s de RAM, precisa %s. "
                     "Feche programas ou pause o RAG." % (_gb(free), _gb(REQUIRED_FREE_RAM_MB)))
     return None
+
+
+def requirements_for(model) -> tuple[int, int]:
+    """(VRAM livre, RAM livre para o processador) em MB: pesos do .gguf + contexto + folga."""
+    try:
+        size_mb = Path(model).stat().st_size / 1048576
+    except OSError:
+        return REQUIRED_FREE_VRAM_MB, REQUIRED_FREE_RAM_CPU_MB
+    return int(size_mb + VRAM_OVERHEAD_MB), int(size_mb + CPU_OVERHEAD_MB)
 
 
 def _gb(mb) -> str:
@@ -258,6 +299,15 @@ class LocalAiServer:
             elif mode == "ON":
                 self.start()
 
+    def reload_paths(self) -> None:
+        """Depois do instalador das IAs: usa o llama-server e o modelo que ele escolheu."""
+        with self._lock:
+            if self.is_running():
+                self.stop()
+            self.exe, self.model = resolve_server_exe(), selected_model()
+            if self.state == STATE_ERROR:
+                self.state, self.error = STATE_OFF, ""
+
     def touch(self) -> None:
         self._last_used = self._clock()
 
@@ -267,9 +317,10 @@ class LocalAiServer:
             if self.is_running():
                 return True
             if not self.is_installed():
-                self.state, self.error = STATE_ERROR, "Modelo não instalado em " + str(AI_DIR)
+                self.state, self.error = STATE_ERROR, "Modelo não instalado. Clique em Verificar / Reparar IAs."
                 return False
-            device, blocker = choose_device(load_compute(compute_file(self.settings)), self._memory())
+            device, blocker = choose_device(load_compute(compute_file(self.settings)), self._memory(),
+                                            need=requirements_for(self.model))
             if blocker:
                 self.state, self.error = STATE_ERROR, blocker
                 return False

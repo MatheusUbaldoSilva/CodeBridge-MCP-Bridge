@@ -104,16 +104,58 @@ class LocalAiPanel(QWidget):
         self._memory_results: queue.Queue = queue.Queue()
         self._memory_busy = False
         self._memory_at = 0.0
+        self._setup_proc = None
         self._build()
         self._render_mode()
         if not self.server.is_installed():
-            self._add("error", "Modelo não instalado. Esperado em: " + str(srv.AI_DIR))
+            self._add("error", "Modelo não instalado. Clique em Verificar / Reparar IAs para instalar.")
         elif self.server.mode == "ON":
             self.server.start()
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._tick)
         self.timer.start(150)
         self._tick()
+
+    # ---- instalador das IAs (ai_setup.py) ---------------------------------
+    def repair_ais(self):
+        """Abre o instalador das IAs e recarrega a IA Local quando ele termina."""
+        if self._setup_proc is not None and self._setup_proc.poll() is None:
+            return
+        try:
+            self.server.stop()  # o instalador testa a IA Local e precisa da memoria
+        except Exception:
+            pass
+        try:
+            import ai_setup
+            self._setup_proc = ai_setup.launch_detached()
+        except Exception as exc:
+            self._add("error", "Não foi possível abrir o instalador das IAs: " + str(exc))
+            return
+        self.repair_button.setEnabled(False)
+        self.repair_button.setText("Configurando IAs…")
+        self._setup_timer = QTimer(self)
+        self._setup_timer.timeout.connect(self._poll_setup)
+        self._setup_timer.start(1000)
+
+    def _poll_setup(self):
+        proc = self._setup_proc
+        if proc is None or proc.poll() is None:
+            return
+        self._setup_timer.stop()
+        self._setup_proc = None
+        self.repair_button.setEnabled(True)
+        self.repair_button.setText("Verificar / Reparar IAs")
+        reload_paths = getattr(self.server, "reload_paths", None)
+        if reload_paths is not None:
+            reload_paths()
+        self.title.setText("IA Local — " + srv.model_name_for(getattr(self.server, "model", srv.MODEL_FILE)))
+        if proc.returncode == 0:
+            self._add("info", "IAs verificadas: prontas para usar.")
+        elif proc.returncode == 4:
+            self._add("info", "IAs instaladas, mas um teste não passou. Veja a janela do instalador.")
+        else:
+            self._add("error", "O instalador das IAs terminou sem concluir (código %s)." % proc.returncode)
+        self._dirty = True
 
     def _counted_search(self, search):
         """Toda consulta da IA Local a Central RAG entra no contador abaixo do cronometro."""
@@ -135,9 +177,15 @@ class LocalAiPanel(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(8)
 
-        title = QLabel("IA Local — " + srv.MODEL_NAME)
+        header = QHBoxLayout()
+        self.title = title = QLabel("IA Local — " + srv.model_name_for(getattr(self.server, "model", srv.MODEL_FILE)))
         title.setStyleSheet("font-size:14px;font-weight:bold;")
-        layout.addWidget(title)
+        header.addWidget(title, 1)
+        self.repair_button = QPushButton("Verificar / Reparar IAs")
+        self.repair_button.setToolTip("Confere e instala o llama-server, a IA Local e os modelos do RAG")
+        self.repair_button.clicked.connect(self.repair_ais)
+        header.addWidget(self.repair_button)
+        layout.addLayout(header)
         self.folder_label = QLabel()
         self.folder_label.setStyleSheet(MUTED + "font-size:11px;")
         self.folder_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -306,7 +354,7 @@ class LocalAiPanel(QWidget):
         if not text or self.agent.running:
             return
         if not self.server.is_installed():
-            self._add("error", "Modelo não instalado. Esperado em: " + str(srv.AI_DIR))
+            self._add("error", "Modelo não instalado. Clique em Verificar / Reparar IAs para instalar.")
             return
         if self.server.mode == "OFF":
             self._add("error", "A IA está desligada. Escolha Ligada ou Sob demanda.")

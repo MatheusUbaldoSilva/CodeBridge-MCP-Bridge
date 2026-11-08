@@ -17,8 +17,21 @@ import local_ai_server as srv  # noqa: E402
 
 class SharedBinaryTest(unittest.TestCase):
     def test_default_and_env_override(self):
-        with patch.dict(os.environ, {llama_binary.ENV_VAR: ""}):
-            self.assertEqual(llama_binary.llama_server_path(), Path(r"C:\llama\llama-server.exe"))
+        with tempfile.TemporaryDirectory() as tmp:
+            user_dir = Path(tmp) / "CodeBridge" / "llama"
+            legacy = Path(tmp) / "legacy" / "llama-server.exe"
+            with patch.object(llama_binary, "USER_LLAMA_DIR", user_dir), \
+                    patch.object(llama_binary, "LEGACY_LLAMA_SERVER", legacy), \
+                    patch.dict(os.environ, {llama_binary.ENV_VAR: ""}):
+                # nada instalado: onde o instalador das IAs vai colocar
+                self.assertEqual(llama_binary.llama_server_path(), user_dir / "llama-server.exe")
+                legacy.parent.mkdir(parents=True)
+                legacy.write_text("x")  # so a copia antiga C:\llama
+                self.assertEqual(llama_binary.llama_server_path(), legacy)
+                user_dir.mkdir(parents=True)
+                (user_dir / "llama-server.exe").write_text("x")  # a do instalador vale mais
+                self.assertEqual(llama_binary.llama_server_path(), user_dir / "llama-server.exe")
+        self.assertEqual(llama_binary.LEGACY_LLAMA_SERVER, Path(r"C:\llama\llama-server.exe"))
         with patch.dict(os.environ, {llama_binary.ENV_VAR: r"D:\outra\llama-server.exe"}):
             self.assertEqual(llama_binary.llama_server_path(), Path(r"D:\outra\llama-server.exe"))
 

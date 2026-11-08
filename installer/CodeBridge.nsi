@@ -280,6 +280,7 @@ Section "CodeBridge" SEC_MAIN
     CreateShortcut "$SMPROGRAMS\CodeBridge\Extensão ChatGPT Timer.lnk" "$INSTDIR\runtime\python\pythonw.exe" '"$INSTDIR\installer\extension_setup.py"' "$INSTDIR\assets\codebridge.ico" 0 SW_SHOWNORMAL "" "Configurar extensão ChatGPT Timer"
     CreateShortcut "$SMPROGRAMS\CodeBridge\Atualizar CodeBridge.lnk" "$INSTDIR\runtime\python\pythonw.exe" '"$INSTDIR\installer\updater.py"' "$INSTDIR\assets\codebridge.ico" 0 SW_SHOWNORMAL "" "Atualizar CodeBridge"
     CreateShortcut "$DESKTOP\CodeBridge 2.0 - MCP Bridge.lnk" "$INSTDIR\runtime\python\pythonw.exe" '"$INSTDIR\app_rewrite\main.py"' "$INSTDIR\assets\codebridge.ico" 0 SW_SHOWNORMAL "" "CodeBridge MCP Bridge"
+    CreateShortcut "$SMPROGRAMS\CodeBridge\Configurar IAs.lnk" "$INSTDIR\runtime\python\pythonw.exe" '"$INSTDIR\app_rewrite\ai_setup.py"' "$INSTDIR\assets\codebridge.ico" 0 SW_SHOWNORMAL "" "Instalar, verificar ou reparar as IAs do CodeBridge"
     FileOpen $1 "$INSTDIR\shortcuts.created" w
     FileWrite $1 "created"
     FileClose $1
@@ -290,6 +291,20 @@ Section "CodeBridge" SEC_MAIN
     ExecWait '"$INSTDIR\runtime\python\pythonw.exe" "$INSTDIR\installer\company_setup.py"'
   config_done:
 
+  ; IAs (llama-server, IA Local e modelos do RAG): baixa so o que falta, configura e
+  ; testa. Pasta CodeBridge-IAs ao lado do instalador = pacote offline. Em instalacao
+  ; silenciosa fica para o atalho "Configurar IAs" ou o botao da aba IA Local.
+  IfSilent ai_done
+    DetailPrint "Configurando as IAs do CodeBridge (llama-server, IA Local e RAG)..."
+    IfFileExists "$EXEDIR\CodeBridge-IAs\*.*" 0 ai_online
+      ExecWait '"$INSTDIR\runtime\python\pythonw.exe" "$INSTDIR\app_rewrite\ai_setup.py" --if-needed --installer --from "$EXEDIR\CodeBridge-IAs"' $0
+      Goto ai_result
+    ai_online:
+      ExecWait '"$INSTDIR\runtime\python\pythonw.exe" "$INSTDIR\app_rewrite\ai_setup.py" --if-needed --installer' $0
+    ai_result:
+    StrCmp $0 "0" ai_done
+      DetailPrint "IAs não concluídas (código $0). Use o atalho Configurar IAs ou o botão Verificar / Reparar IAs."
+  ai_done:
   ; Garante que o CodeBridge esteja aberto antes de testar Companion/extensão/MCP.
   ; Em atualização com o app já aberto, o helper apenas confirma o Companion.
   DetailPrint "Iniciando CodeBridge e aguardando serviços locais..."

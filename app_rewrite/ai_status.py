@@ -6,6 +6,7 @@ servidor e os modelos da Central RAG pelos processos llama-server em execucao
 """
 from __future__ import annotations
 
+import re
 import threading
 from pathlib import Path
 
@@ -16,7 +17,7 @@ from PySide6.QtWidgets import (
 
 # (chave, nome na tela, modelo na tela, trecho do nome do arquivo .gguf)
 MODELS = (
-    ("LOCAL", "IA Local", "Qwen 7B", "qwen2.5-coder-7b"),
+    ("LOCAL", "IA Local", "Qwen 7B", "qwen2.5-coder-"),
     ("RAG_TEXT", "RAG texto", "Jina v5", "v5-small-retrieval"),
     ("RAG_CODE", "RAG código", "Jina Code", "jina-code-embeddings"),
 )
@@ -94,11 +95,19 @@ def _device_of(processes, needle):
     return None
 
 
+def local_label(model) -> str | None:
+    """'qwen2.5-coder-3b-instruct-q4_k_m.gguf' -> 'Qwen 3B' (tamanho escolhido pelo instalador)."""
+    match = re.search(r"coder-(\d+(?:\.\d+)?)b", Path(str(model or "")).name.lower())
+    return "Qwen %sB" % match.group(1) if match else None
+
+
 def describe(local_server, processes) -> list:
     """Linhas do card: dicts com key, name, model, text, color e active."""
     rows = []
     for key, name, model, needle in MODELS:
         device = _device_of(processes, needle)
+        if key == "LOCAL" and local_server is not None:
+            model = local_label(getattr(local_server, "model", None)) or model
         if key == "LOCAL":
             if local_server is None:
                 text, color, active = "—", GRAY, False
@@ -184,7 +193,7 @@ class AiStatusCard(QFrame):
         grid.setHorizontalSpacing(8)
         grid.setVerticalSpacing(1)
         grid.setColumnStretch(2, 1)
-        self.dots, self.states = {}, {}
+        self.dots, self.states, self.models = {}, {}, {}
         for row, (key, name, model, _needle) in enumerate(MODELS):
             dot, label, small, state = QLabel("●"), QLabel(name), QLabel(model), QLabel()
             label.setStyleSheet(NAME_STYLE)
@@ -194,7 +203,7 @@ class AiStatusCard(QFrame):
             grid.addWidget(label, row, 1)
             grid.addWidget(small, row, 2)
             grid.addWidget(state, row, 3)
-            self.dots[key], self.states[key] = dot, state
+            self.dots[key], self.states[key], self.models[key] = dot, state, small
         box.addLayout(grid)
         self.refresh_now()
 
@@ -237,6 +246,7 @@ class AiStatusCard(QFrame):
                 "color:%s;font-size:10px;background:transparent;border:0;" % color)
             state = self.states[row["key"]]
             state.setText(row["text"])
+            self.models[row["key"]].setText(row["model"])
             state.setStyleSheet("color:%s;font-size:12px;background:transparent;border:0;"
                                 % (color if row["active"] else "#7f93a3"))
         return rows
