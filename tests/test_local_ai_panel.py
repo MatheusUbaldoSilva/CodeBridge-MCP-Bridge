@@ -175,6 +175,24 @@ class LocalAiPanelTest(unittest.TestCase):
         self.assertEqual(panel.blocks, [])
         self.assertEqual(panel.agent.history, [])
 
+    def test_unchecked_rag_is_never_searched(self):
+        searches = []
+        self.server = FakeServer()
+        client = ScriptedClient([{"content": "Python 3.13."}])
+        panel = panel_mod.LocalAiPanel(
+            None, project_id=lambda: "codebridge", project_root=lambda: None,
+            search_fn=lambda q, p, k: searches.append(q) or {"results": []},
+            server=self.server, runner=Runner(), client_factory=lambda: client)
+        self.addCleanup(panel.shutdown)
+        panel.use_rag.setChecked(False)
+        panel.input.setPlainText("Qual a versão do Python instalada?")
+        panel.send()
+        self.assertTrue(pump(panel, lambda: not panel.agent.running))
+        self.assertEqual(searches, [])
+        self.assertNotIn("consultou a Central RAG", panel.chat.toHtml())
+        schema = client.decide_requests[0][1]
+        self.assertNotIn("buscar_central_rag", schema["properties"]["acao"]["enum"])
+
     def test_not_installed_message(self):
         panel = self.make([], installed=False)
         self.assertIn("não instalado", panel.chat.toHtml())
