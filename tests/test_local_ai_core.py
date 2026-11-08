@@ -238,6 +238,23 @@ class AgentTest(unittest.TestCase):
                             for k, d in events))
         self.assertIn("NÃO existe", self.client.requests[0][-1]["content"])
 
+    def test_listing_request_lists_real_folder(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        Path(tmp.name, "tests").mkdir()
+        for name in ("test_a.py", "test_b.py"):
+            Path(tmp.name, "tests", name).write_text("x")
+        agent = self.make([{"content": "Lista."}, {"content": "Ok."}], root=tmp.name)
+        agent.send("Liste os arquivos da pasta tests.", rag_enabled=False)
+        events = drain(agent)
+        sent = self.client.requests[0][-1]["content"]
+        self.assertIn("test_a.py", sent)
+        self.assertIn("Conteúdo real da pasta", sent)
+        self.assertTrue(any(k == "note" and d == "listou a pasta tests" for k, d in events))
+        agent.send("Como funciona um teste?", rag_enabled=False)
+        drain(agent)
+        self.assertNotIn("Conteúdo real da pasta", self.client.requests[1][-1]["content"])
+
     def test_not_ready_reports_error(self):
         agent = self.make([], ready=(False, "Memória insuficiente"))
         agent.send("oi")

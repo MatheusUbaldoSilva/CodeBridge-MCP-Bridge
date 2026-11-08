@@ -24,6 +24,8 @@ COMMAND_TIMEOUT_SECONDS = 600
 
 MENTIONED_FILE = re.compile(r"[\w./\\-]+\.[A-Za-z0-9]{1,8}")
 MAX_MENTIONED_FILES = 2
+LIST_INTENT = re.compile(r"\b(list\w*|pasta|diret\w*|quais\s+arquivos|conte\u00fado\s+d[ao])\b", re.I)
+MENTIONED_DIR = re.compile(r"[\w./\\-]+")
 CODE_EXTENSIONS = {".py", ".md", ".txt", ".json", ".js", ".ts", ".ps1", ".bat", ".cmd", ".sh",
                    ".yaml", ".yml", ".toml", ".ini", ".cfg", ".html", ".css", ".qss", ".nsi", ".sql"}
 MENTIONED_FILE_LINES = 200
@@ -54,6 +56,7 @@ Regras:
 - Nunca escreva JSON de ferramenta nem nomes de ferramentas na resposta, e não explique como as ferramentas funcionam.
 - Use executar_comando só quando o usuário pedir para rodar, ver ou verificar algo no computador. Para perguntas de "como fazer", responda com o código num bloco ```, sem executar.
 - Quando o usuário pedir para ler, ver, listar ou rodar algo, use a ferramenta certa em vez de dizer que não consegue.
+- Nunca invente nomes de arquivos, listas de pastas ou conteúdo que não esteja no contexto. Os trechos da Central RAG são só referência e podem estar desatualizados.
 - Leia o arquivo antes de afirmar detalhes sobre o código e diga de qual arquivo veio a informação.
 - Comandos: só o necessário e seguros; nunca apague, mova ou sobrescreva arquivos sem o usuário pedir. Se ele recusar um comando, não insista.
 - Se realmente não souber algo, diga isso."""
@@ -198,7 +201,8 @@ class LocalAiAgent:
             if not ok:
                 self._emit("error", error or "A IA não está ligada.")
                 return
-            parts = [self._file_context(text), self._rag_context(text) if rag_enabled else ""]
+            parts = [self._file_context(text), self._dir_context(text),
+                     self._rag_context(text) if rag_enabled else ""]
             context = "\n\n".join(part for part in parts if part)
             self.history.append({"role": "user", "content": text})
             self._loop(context, rag_enabled)
@@ -252,6 +256,28 @@ class LocalAiAgent:
                 continue
             self._emit("note", note)
             blocks.append("[Conteúdo do arquivo citado]\n" + content)
+        return tools.clip("\n\n".join(blocks), 7000) if blocks else ""
+
+    def _dir_context(self, text: str) -> str:
+        """Pedido para listar uma pasta do projeto: lista na hora (o 7B inventava a lista)."""
+        root = self.project_root()
+        if not root or not LIST_INTENT.search(text):
+            return ""
+        blocks, seen = [], set()
+        for match in MENTIONED_DIR.finditer(text):
+            candidate = match.group(0).strip(".,;:!?)('\"`/\\")
+            if not candidate or candidate.lower() in seen or len(blocks) >= MAX_MENTIONED_FILES:
+                continue
+            seen.add(candidate.lower())
+            try:
+                path, _rel = tools.resolve_in_project(root, candidate)
+                if not path.is_dir() or path == Path(root).resolve():
+                    continue
+                listing, note = tools.list_dir(root, candidate)
+            except (tools.ToolError, OSError, ValueError):
+                continue
+            self._emit("note", note)
+            blocks.append("[Conteúdo real da pasta citada \u2014 use exatamente esta lista]\n" + listing)
         return tools.clip("\n\n".join(blocks), 7000) if blocks else ""
 
     def _request_messages(self, context: str, rag_enabled: bool) -> list:
