@@ -227,6 +227,16 @@ class AgentTest(unittest.TestCase):
         self.assertEqual(agent.history[0]["content"],
                          "Leia app/repo_path.py e o .env, e veja inexistente.py.")
 
+    def test_missing_mentioned_file_is_reported_not_invented(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        agent = self.make([{"content": "Não encontrei."}], root=tmp.name)
+        agent.send("Leia app_rewrite/repo_path.py e explique.", rag_enabled=False)
+        events = drain(agent)
+        self.assertTrue(any(k == "note" and "não encontrei app_rewrite/repo_path.py" in d
+                            for k, d in events))
+        self.assertIn("NÃO existe", self.client.requests[0][-1]["content"])
+
     def test_not_ready_reports_error(self):
         agent = self.make([], ready=(False, "Memória insuficiente"))
         agent.send("oi")
@@ -276,6 +286,17 @@ class ClientParsingTest(unittest.TestCase):
             self.assertEqual(calls[0]["function"]["name"], "executar_comando")
         cleaned, calls = client_mod.parse_text_tool_calls('Exemplo: {"a": 1}')
         self.assertEqual((cleaned, calls), ('Exemplo: {"a": 1}', []))
+
+    def test_repetition_is_cut(self):
+        block = "### Funcao x\nEsta funcao faz muitas coisas importantes no projeto inteiro.\n" * 2
+        lines = ['data: {"choices":[{"delta":{"content":%s}}]}' % json.dumps("Inicio. ")]
+        lines += ['data: {"choices":[{"delta":{"content":%s}}]}' % json.dumps(block)] * 12
+        lines += ["data: [DONE]"]
+        result = client_mod.LocalAiClient._read_stream(
+            [(l + "\n").encode() for l in lines], None, lambda: False)
+        self.assertTrue(result["content"].endswith(client_mod.LOOP_NOTE))
+        self.assertLess(len(result["content"]), len(block) * 4)
+        self.assertIsNone(client_mod.repetition_cut("texto normal " * 5))
 
     def test_stream_deltas_are_merged(self):
         lines = [

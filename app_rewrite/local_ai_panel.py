@@ -131,6 +131,10 @@ class LocalAiPanel(QWidget):
         title = QLabel("IA Local — " + srv.MODEL_NAME)
         title.setStyleSheet("font-size:14px;font-weight:bold;")
         layout.addWidget(title)
+        self.folder_label = QLabel()
+        self.folder_label.setStyleSheet(MUTED + "font-size:11px;")
+        self.folder_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        layout.addWidget(self.folder_label)
 
         modes = QHBoxLayout()
         label = QLabel("Modo:")
@@ -376,6 +380,7 @@ class LocalAiPanel(QWidget):
                 break
         now = time.monotonic()
         if not self._memory_busy and now - self._memory_at >= 2.0:
+            self._refresh_folder()
             self._memory_busy, self._memory_at = True, now
             threading.Thread(target=lambda: self._memory_results.put(srv.memory_snapshot()),
                              name="LocalAiMemory", daemon=True).start()
@@ -383,6 +388,15 @@ class LocalAiPanel(QWidget):
                         self._memory.get("vram_total_mb"))
         self._set_meter(self.ram_meter, "RAM", self._memory.get("ram_used_mb"),
                         self._memory.get("ram_total_mb"))
+
+    def _refresh_folder(self):
+        try:
+            root = self.agent.project_root()
+        except Exception:
+            root = None
+        self.folder_label.setText(
+            "Pasta do projeto: " + str(root) if root
+            else "Pasta do projeto: nenhuma (escolha na Central RAG)")
 
     @staticmethod
     def _set_meter(meter, name, used, total):

@@ -10,6 +10,25 @@ import json
 import re
 import uuid
 
+# Parametros recomendados pela Qwen para o Qwen2.5-Coder; com temperatura baixa o 7B entra em laco.
+SAMPLING = {"temperature": 0.7, "top_p": 0.8, "top_k": 20, "repeat_penalty": 1.05,
+            "dry_multiplier": 0.8}
+LOOP_WINDOW = 160
+LOOP_REPEATS = 3
+LOOP_NOTE = "\n\n[resposta cortada: a IA come\u00e7ou a se repetir]"
+
+
+def repetition_cut(text: str, window: int = LOOP_WINDOW, repeats: int = LOOP_REPEATS):
+    """Se o fim do texto ja apareceu varias vezes, devolve o texto ate a 2a copia; senao None."""
+    if len(text) < window * repeats:
+        return None
+    tail = text[-window:]
+    if text.count(tail) < repeats:
+        return None
+    first = text.find(tail)
+    return text[:text.find(tail, first + 1)].rstrip()
+
+
 TOOL_CALL_TEXT = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.S)
 
 
@@ -86,10 +105,11 @@ class LocalAiClient:
         self.port, self.api_key, self.timeout = port, api_key, timeout
 
     def chat(self, messages, tools=None, *, on_text=None, cancelled=None,
-             temperature: float = 0.2, max_tokens: int = 1500) -> dict:
+             max_tokens: int = 1500, **sampling) -> dict:
         """Envia a conversa e devolve {"content": str, "tool_calls": list}."""
-        body = {"messages": messages, "stream": True,
-                "temperature": temperature, "max_tokens": max_tokens}
+        body = {"messages": messages, "stream": True, "max_tokens": max_tokens}
+        body.update(SAMPLING)
+        body.update(sampling)
         if tools:
             body["tools"] = tools
         connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=self.timeout)
@@ -114,8 +134,10 @@ class LocalAiClient:
 
     @staticmethod
     def _read_stream(response, on_text, cancelled) -> dict:
-        text_parts, calls = [], {}
+        text, calls, checked, looped = "", {}, 0, False
         for raw in response:
+            if looped:
+                break
             if cancelled is not None and cancelled():
                 raise LocalAiCancelled()
             line = raw.decode("utf-8", "replace").strip()
@@ -132,11 +154,17 @@ class LocalAiClient:
                 delta = choice.get("delta") or {}
                 piece = delta.get("content")
                 if piece:
-                    text_parts.append(piece)
+                    text += piece
                     if on_text is not None:
                         on_text(piece)
+                    if len(text) - checked >= 120:
+                        checked = len(text)
+                        cut = repetition_cut(text)
+                        if cut is not None:
+                            text, looped = cut + LOOP_NOTE, True
+                            break
                 merge_tool_call_deltas(calls, delta.get("tool_calls"))
-        content = "".join(text_parts)
+        content = text
         tool_calls = [calls[i] for i in sorted(calls) if calls[i]["function"]["name"]]
         for call in tool_calls:
             if not call["id"]:

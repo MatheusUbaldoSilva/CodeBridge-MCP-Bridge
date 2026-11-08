@@ -121,6 +121,7 @@ class LocalAiPanelTest(unittest.TestCase):
         self.assertIn("git status", html_text)
         self.assertIn("consultou a Central RAG", html_text)
         self.assertIn("desliga em 9 min", panel.status.text())
+        self.assertIn("nenhuma", panel.folder_label.text())
 
     def test_approval_card_edit_and_run(self):
         call = {"id": "c1", "type": "function", "function": {

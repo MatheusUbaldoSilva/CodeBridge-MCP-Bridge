@@ -12,6 +12,8 @@ import threading
 import time
 import uuid
 
+from pathlib import Path
+
 import local_ai_tools as tools
 from local_ai_client import LocalAiCancelled
 
@@ -22,7 +24,13 @@ COMMAND_TIMEOUT_SECONDS = 600
 
 MENTIONED_FILE = re.compile(r"[\w./\\-]+\.[A-Za-z0-9]{1,8}")
 MAX_MENTIONED_FILES = 2
+CODE_EXTENSIONS = {".py", ".md", ".txt", ".json", ".js", ".ts", ".ps1", ".bat", ".cmd", ".sh",
+                   ".yaml", ".yml", ".toml", ".ini", ".cfg", ".html", ".css", ".qss", ".nsi", ".sql"}
 MENTIONED_FILE_LINES = 200
+
+MISSING_FILE_HINT = ("[Aviso do sistema] O arquivo %s NÃO existe na pasta do projeto (%s). "
+                     "Não invente o conteúdo: diga ao usuário que não encontrou o arquivo e que ele "
+                     "pode conferir o projeto selecionado na Central RAG.")
 
 TERMINAL_NAMES = {"POWERSHELL5.1": "PowerShell", "CMD": "CMD", "SSH": "SSH"}
 
@@ -216,16 +224,28 @@ class LocalAiAgent:
     def _file_context(self, text: str) -> str:
         """Le na hora os arquivos do projeto citados na mensagem (o 7B costuma nao pedir)."""
         root, blocks, seen = self.project_root(), [], set()
-        if not root:
-            return ""
         for match in MENTIONED_FILE.finditer(text):
             candidate = match.group(0).strip(".,;:!?)('\"`")
             if candidate in seen or len(blocks) >= MAX_MENTIONED_FILES:
                 continue
             seen.add(candidate)
+            looks_like_file = ("/" in candidate or "\\" in candidate
+                               or Path(candidate).suffix.lower() in CODE_EXTENSIONS)
+            if not root:
+                if looks_like_file:
+                    self._emit("note", "não li %s: nenhuma pasta de projeto na Central RAG" % candidate)
+                    blocks.append(MISSING_FILE_HINT % (candidate, "(nenhuma)"))
+                continue
             try:
                 content, note = tools.read_file(root, candidate, 1, MENTIONED_FILE_LINES)
-            except (tools.ToolError, OSError, ValueError):
+            except tools.ToolError as exc:
+                if "protegido" in str(exc):
+                    self._emit("note", "não li %s: arquivo protegido" % candidate)
+                elif looks_like_file:
+                    self._emit("note", "não encontrei %s na pasta %s" % (candidate, root))
+                    blocks.append(MISSING_FILE_HINT % (candidate, root))
+                continue
+            except (OSError, ValueError):
                 continue
             self._emit("note", note)
             blocks.append("[Conteúdo do arquivo citado]\n" + content)
