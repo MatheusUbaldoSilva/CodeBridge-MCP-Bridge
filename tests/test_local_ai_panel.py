@@ -126,6 +126,8 @@ class LocalAiPanelTest(unittest.TestCase):
 
     def test_on_demand_starts_on_first_message_and_answers(self):
         panel = self.make([{"content": "Use `git status`."}])
+        self.assertFalse(panel.use_rag.isChecked())  # padrao: desmarcada
+        panel.use_rag.setChecked(True)
         panel.input.setPlainText("como vejo mudancas?")
         panel.send()
         self.assertTrue(pump(panel, lambda: not panel.agent.running))

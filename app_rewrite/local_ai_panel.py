@@ -221,7 +221,8 @@ class LocalAiPanel(QWidget):
         layout.addWidget(self.card)
 
         self.use_rag = QCheckBox("Consultar Central RAG")
-        self.use_rag.setChecked(True)
+        self.use_rag.setChecked(False)  # liga so quando precisar dos conhecimentos do projeto
+        self.use_rag.setToolTip("Marque quando a pergunta depender dos conhecimentos do projeto")
         layout.addWidget(self.use_rag)
 
         bottom = QHBoxLayout()
