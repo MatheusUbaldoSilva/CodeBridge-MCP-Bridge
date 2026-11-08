@@ -29,6 +29,7 @@ from rag.retrieval.hybrid_text import search_text_vector
 from rag.retrieval.hybrid_code import search_code_vector
 from rag.runtime.query_classifier import QueryRoute
 from rag.runtime.resident_models import resident_pool
+from rag.llama_binary import llama_server_path
 from rag.runtime.experimental_scope_guard import validate_scoped_results
 from rag.runtime.status import build_rag_status, resolve_rag_sqlite_path
 from rag.runtime.generation_search_paths import isolated_generation_search_paths
@@ -85,7 +86,7 @@ def search_persistent_semantic(
     query: SearchQuery,
     route: QueryRoute,
     *,
-    llama_server: Path = Path(r"C:\llama\llama-server.exe"),
+    llama_server: Path = llama_server_path(),  # mesma copia de todas as IAs
     experimental_cross_route: bool = False,
     experimental_resident_models: bool = False,
     experimental_generation_root: Path | None = None,

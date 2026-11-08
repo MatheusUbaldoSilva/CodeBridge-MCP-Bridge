@@ -20,7 +20,23 @@ from pathlib import Path
 AI_DIR = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "CodeBridge" / "ai"
 MODEL_NAME = "Qwen2.5-Coder 7B"
 MODEL_FILE = AI_DIR / "models" / "qwen2.5-coder-7b-instruct-q4_k_m.gguf"
-SERVER_EXE = AI_DIR / "bin" / "llama-server.exe"
+try:  # uma copia so do llama-server para todas as IAs (rag/llama_binary.py)
+    from rag.llama_binary import llama_server_path as _shared_llama_server
+except Exception:  # pragma: no cover - rag fora do caminho
+    _shared_llama_server = None
+OWN_SERVER_EXE = AI_DIR / "bin" / "llama-server.exe"  # so se a copia compartilhada faltar
+
+
+def resolve_server_exe() -> Path:
+    """A copia compartilhada (a mesma da Central RAG); a propria so como reserva."""
+    if _shared_llama_server is not None:
+        shared = Path(_shared_llama_server())
+        if shared.is_file():
+            return shared
+    return OWN_SERVER_EXE
+
+
+SERVER_EXE = resolve_server_exe()
 SETTINGS_FILE = AI_DIR / "settings.json"
 LOG_FILE = AI_DIR / "logs" / "llama-server.log"
 PID_FILE = AI_DIR / "llama-server.pid"

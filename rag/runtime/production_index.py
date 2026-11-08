@@ -160,7 +160,8 @@ def _write_vectors(path: Path, project_id: str, text_rows, code_rows, *, text_cp
     from rag.models.compute_preference import load_compute
 
     client=open_qdrant_local(path)
-    llama=Path(r"C:\llama\llama-server.exe")
+    from rag.llama_binary import llama_server_path
+    llama=llama_server_path()  # mesma copia de todas as IAs
     try:
         ensure_vector_collections(client)
         for rows,collection in ((text_rows,TEXT_VECTOR_COLLECTION),(code_rows,CODE_VECTOR_COLLECTION)):
