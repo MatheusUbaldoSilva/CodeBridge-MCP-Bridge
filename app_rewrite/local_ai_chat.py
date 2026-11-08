@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget,
 )
 
-from local_ai_format import format_message, format_plain
+from local_ai_format import format_message, format_plain, output_block
 
 BUBBLE_MAX_RATIO = 0.78
 BUBBLE_PADDING = 12 * 2 + 2 + 6  # padding do USER_STYLE + borda + folga de arredondamento
@@ -160,7 +160,7 @@ class _Output(QLabel):
 
 
 def output_html(text) -> str:
-    return format_message("```\n" + str(text or "").rstrip("\n") + "\n```")
+    return output_block(text)
 
 
 class _Notice(QLabel):

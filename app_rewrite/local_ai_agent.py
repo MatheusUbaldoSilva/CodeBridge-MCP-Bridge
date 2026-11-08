@@ -16,6 +16,7 @@ from pathlib import Path
 
 import local_ai_tools as tools
 from local_ai_client import LocalAiCancelled
+from local_ai_format import strip_ansi
 
 MAX_STEPS = 8
 HISTORY_CHAR_BUDGET = 14000
@@ -532,7 +533,7 @@ class LocalAiAgent:
             "" if code is None else ", código %s" % code))
         raw_output = result.get("output") or "(sem saída)"
         self._emit("output", tools.clip(raw_output, DISPLAY_OUTPUT_CHARS))  # saida real, sem passar pelo modelo
-        output = tools.clip(raw_output, COMMAND_OUTPUT_CHARS)
+        output = tools.clip(strip_ansi(raw_output), COMMAND_OUTPUT_CHARS)  # modelo recebe sem codigos de cor
         edited_note = "" if command == request["command"] else "O usuário editou o comando antes de rodar.\n"
         return "%sComando: %s\nEstado: %s  Código: %s\nSaída:\n%s" % (
             edited_note, command, state, code, output)

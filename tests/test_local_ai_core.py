@@ -448,6 +448,43 @@ class DecisionTest(unittest.TestCase):
         self.assertTrue(all(set(m) == {"role", "content"} for m in plain))
 
 
+class AnsiOutputTest(unittest.TestCase):
+    # caso real: "ls -la" no SSH vem com cores ANSI; a conversa mostrava "\x1b[01;34m"
+    LS = ("drwx------ 9 root root 4096 Nov  8 06:00 \x1b[0m\x1b[01;34m.\x1b[0m\r\n"
+          "-rw-r--r-- 1 root root 16120 Aug 9 17:52 \x1b[01;31mmetin.zip\x1b[0m\r\n")
+
+    def test_colors_become_html_and_codes_disappear(self):
+        import local_ai_format as fmt
+        out = fmt.output_block(self.LS)
+        self.assertNotIn("\x1b", out)
+        self.assertNotIn("[01;34m", out)
+        self.assertIn('<span style="color:#539bf5;">.</span>', out)
+        self.assertIn('<span style="color:#e5534b;">metin.zip</span>', out)
+        self.assertEqual(fmt.strip_ansi("\x1b]0;titulo\x07a\x1b[1;32mb\x1b[0m\r\n"), "ab\n")
+
+    def test_model_gets_output_without_codes(self):
+        ls = self.LS
+
+        class AnsiRunner:
+            def run(self, terminal, command, cancelled):
+                return {"state": "FINISHED", "exit_code": 0, "output": ls}
+
+        client = FakeClient([
+            {"content": "", "tool_calls": [call("executar_comando", terminal="SSH", comando="ls -la", motivo="x")]},
+            {"content": "Ok."},
+        ])
+        agent = agent_mod.LocalAiAgent(
+            client_factory=lambda: client, ensure_ready=lambda cancelled, status: (True, ""),
+            runner=AnsiRunner(), search_fn=lambda q, p, k: {"results": []})
+        agent.send("ls no ssh", rag_enabled=False)
+        events = drain(agent, on_event=lambda k, d: agent.approve() if k == "approval" else None)
+        tool_msg = [m for m in agent.history if m["role"] == "tool"][0]
+        self.assertNotIn("\x1b", tool_msg["content"])
+        self.assertIn("metin.zip", tool_msg["content"])
+        shown = [d for k, d in events if k == "output"][0]
+        self.assertIn("\x1b[01;34m", shown)  # a tela recebe as cores e desenha
+
+
 class ClientParsingTest(unittest.TestCase):
     def test_text_tool_call_fallback(self):
         content = 'Vou ler.\n<tool_call>{"name": "ler_arquivo", "arguments": {"caminho": "a.py"}}</tool_call>'
