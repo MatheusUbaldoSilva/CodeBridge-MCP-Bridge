@@ -195,6 +195,46 @@ class LocalAiPanelTest(unittest.TestCase):
         schema = client.decide_requests[0][1]
         self.assertNotIn("buscar_central_rag", schema["properties"]["acao"]["enum"])
 
+    def test_chat_looks_like_claude_app(self):
+        import local_ai_chat as chat_mod
+        call = {"id": "c1", "type": "function", "function": {
+            "name": "executar_comando",
+            "arguments": json.dumps({"terminal": "CMD", "comando": "dir", "motivo": "listar"})}}
+        panel = self.make([{"content": "", "tool_calls": [call]}, {"content": "Pronto."}])
+        panel.input.setPlainText("rode dir")
+        panel.send()
+        self.assertTrue(pump(panel, lambda: not panel.card.isHidden()))
+        panel.approve_command()
+        self.assertTrue(pump(panel, lambda: not panel.agent.running))
+        self.assertEqual([b[0] for b in panel.blocks], ["user", "activity", "assistant"])
+        text = panel.chat.toHtml()
+        self.assertNotIn("Você:", text)
+        self.assertNotIn("IA:", text)
+        widgets = [w for _sig, w in panel.chat.items]
+        bubble, activity, answer = widgets
+        self.assertIsInstance(bubble, chat_mod._UserBubble)
+        self.assertEqual(bubble.layout().itemAt(0).spacerItem() is not None, True)  # balao a direita
+        self.assertIn("Usou o CodeBridge", activity.header.text())
+        self.assertIn("executou 1 comando", activity.header.text())
+        self.assertFalse(activity.expanded)  # fechado por padrao
+        activity.header.click()
+        self.assertTrue(activity.expanded)
+        self.assertIn("executando no CMD: dir", activity.details.text())
+        self.assertIn("Pronto.", answer.text())
+        panel.clear()
+        panel._tick()
+        self.assertEqual(panel.chat.items, [])
+
+    def test_activity_summary_texts(self):
+        import local_ai_chat as chat_mod
+        notes = ["leu app/a.py, linhas 1–10", "leu app/b.py, linhas 1–5", "listou a pasta tests",
+                 "consultou a Central RAG (3 trechos): x", "executando no PowerShell: dir",
+                 "comando terminou (concluído, código 0)"]
+        self.assertEqual(chat_mod.activity_summary(notes),
+                         "Usou o CodeBridge · leu 2 arquivos · listou 1 pasta · "
+                         "consultou a Central RAG · executou 1 comando")
+        self.assertIn("comando recusado", chat_mod.activity_summary(["você recusou o comando"]))
+
     def test_not_installed_message(self):
         panel = self.make([], installed=False)
         self.assertIn("não instalado", panel.chat.toHtml())

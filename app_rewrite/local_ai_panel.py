@@ -5,19 +5,19 @@ linhas de acao em cinza e cartao de aprovacao para cada comando.
 """
 from __future__ import annotations
 
-import html
 import queue
-import re
 import threading
 import time
 
 from PySide6.QtCore import QEvent, Qt, QTimer
 from PySide6.QtWidgets import (
     QButtonGroup, QCheckBox, QFrame, QHBoxLayout, QLabel, QPlainTextEdit,
-    QProgressBar, QPushButton, QTextBrowser, QVBoxLayout, QWidget,
+    QProgressBar, QPushButton, QVBoxLayout, QWidget,
 )
 
 import local_ai_server as srv
+from local_ai_chat import ChatView
+from local_ai_format import format_message, format_plain  # noqa: F401 - usados pelos testes
 from local_ai_agent import LocalAiAgent, RuntimeCommandRunner, terminal_label
 from local_ai_client import LocalAiClient
 
@@ -33,46 +33,8 @@ BUTTON_OFF_STYLE = ("QPushButton{background:#1b2229;color:#c9d4dd;border:1px sol
 METER_STYLE = ("QProgressBar{background:#1b2229;border:1px solid #33414d;border-radius:4px;"
                "color:#dfe7ee;text-align:center;font-size:11px;}"
                "QProgressBar::chunk{background:%s;border-radius:3px;}")
-CODE_FENCE = re.compile(r"```[^\n`]*\n?(.*?)(?:```|$)", re.S)
-INLINE_CODE = re.compile(r"`([^`\n]+)`")
-
-
 def _gb(mb) -> str:
     return ("%.1f" % (mb / 1024)).replace(".", ",")
-
-
-def format_message(text: str) -> str:
-    """Texto do modelo -> HTML simples: blocos ``` viram <pre>, `x` vira <code>."""
-    out, last = [], 0
-    for match in CODE_FENCE.finditer(text or ""):
-        out.append(_format_plain(text[last:match.start()].strip("\n")))
-        out.append('<pre style="background:#0a1015;border:1px solid #33414d;margin:6px 0;'
-                   'padding:6px;color:#dfe7ee;white-space:pre-wrap;">%s</pre>'
-                   % html.escape(match.group(1).strip("\n").rstrip()))
-        last = match.end()
-    out.append(_format_plain((text or "")[last:].strip("\n")))
-    return "".join(out)
-
-
-HEADING = re.compile(r"^#{1,6}\s+(.*)$")
-BULLET = re.compile(r"^(\s*)[-*]\s+(.*)$")
-BOLD = re.compile(r"\*\*(.+?)\*\*")
-
-
-def _format_plain(text: str) -> str:
-    """Markdown simples do modelo: titulos, **negrito**, listas e `codigo`."""
-    lines = []
-    for line in html.escape(text).split("\n"):
-        heading = HEADING.match(line)
-        if heading:
-            line = '<b style="color:#dfe7ee;">%s</b>' % heading.group(1)
-        else:
-            bullet = BULLET.match(line)
-            if bullet:
-                line = "%s\u2022 %s" % ("&nbsp;" * 2 * len(bullet.group(1)), bullet.group(2))
-        line = BOLD.sub(r"<b>\1</b>", line)
-        lines.append(INLINE_CODE.sub(r'<code style="background:#0a1015;">\1</code>', line))
-    return "<br>".join(lines)
 
 
 def status_line(server, agent_status: str = "") -> tuple[str, str]:
@@ -183,9 +145,7 @@ class LocalAiPanel(QWidget):
         line.setStyleSheet("color:#33414d;")
         layout.addWidget(line)
 
-        self.chat = QTextBrowser()
-        self.chat.setOpenExternalLinks(False)
-        self.chat.setStyleSheet("QTextBrowser{background:#0f151b;border:1px solid #33414d;}")
+        self.chat = ChatView(self)
         layout.addWidget(self.chat, 1)
 
         self.card = QFrame()
@@ -377,7 +337,13 @@ class LocalAiPanel(QWidget):
                         self.blocks.pop()
                     self._dirty = True
             elif kind == "note":
-                self._add("note", data)
+                if data == "interrompido":
+                    self._add("info", "Interrompido")
+                elif self.blocks and self.blocks[-1][0] == "activity":
+                    self.blocks[-1][1].append(data)
+                    self._dirty = True
+                else:
+                    self._add("activity", [data])
             elif kind == "error":
                 self._add("error", data)
             elif kind == "approval":
@@ -433,26 +399,12 @@ class LocalAiPanel(QWidget):
                 "QPushButton{background:%s;color:white;font-weight:bold;border:1px solid %s;"
                 "padding:4px 12px;}" % (color, color) if active else BUTTON_OFF_STYLE)
 
-    def _add(self, kind, text):
-        self.blocks.append([kind, text or ""])
+    def _add(self, kind, payload):
+        self.blocks.append([kind, payload if kind == "activity" else (payload or "")])
         self._dirty = True
 
     def _render_chat(self):
-        parts = []
-        for kind, text in self.blocks:
-            if kind == "user":
-                parts.append('<p><b style="color:#7fb3e0;">Você:</b> %s</p>' % _format_plain(text))
-            elif kind == "assistant":
-                body = format_message(text) if text else '<span style="color:#7f93a3;">…</span>'
-                parts.append('<div style="margin:6px 0;"><b style="color:#8fd19e;">IA:</b> %s</div>' % body)
-            elif kind == "note":
-                parts.append('<p style="color:#7f93a3;font-size:11px;margin:0 0 0 24px;">· %s</p>'
-                             % html.escape(text))
-            elif kind == "error":
-                parts.append('<p style="color:#e07a7a;">%s</p>' % html.escape(text))
-        self.chat.setHtml("".join(parts))
-        bar = self.chat.verticalScrollBar()
-        bar.setValue(bar.maximum())
+        self.chat.sync(self.blocks)
         self._dirty = False
 
     def _open_card(self, request):
