@@ -60,7 +60,7 @@ Escolha a PRÓXIMA ação para atender o último pedido do usuário. Responda s�
 - "executar_comando": o usuário quer ver, verificar, testar ou rodar algo no computador (disco, memória, processos, rede, git, versões, testes). Use "terminal": "POWERSHELL5.1" e um comando do Windows PowerShell 5.1, salvo se ele pedir CMD ou SSH. Se o comando depender da pasta do projeto, comece com: Set-Location '{root}';
 - "ler_arquivo": precisa ler um arquivo do projeto que ainda não está na conversa ("caminho" relativo à pasta do projeto).
 - "listar_pasta": precisa ver uma pasta do projeto que ainda não está na conversa ("caminho" relativo).
-{rag_option}Não repita uma ação cujo resultado já está na conversa. Se o usuário recusou um comando, escolha "responder".
+{rag_option}Não repita uma ação cujo resultado já está na conversa depois do último pedido do usuário.
 Exemplos:
 "quanto espaço livre tem no disco C?" -> {{"acao": "executar_comando", "terminal": "POWERSHELL5.1", "comando": "Get-PSDrive -Name C | Select-Object Used,Free", "motivo": "ver o espaço livre do disco C"}}
 "como faço um loop no PowerShell?" -> {{"acao": "responder", "motivo": "pergunta de como fazer"}}
@@ -126,11 +126,29 @@ def describe_call(call: dict) -> str:
     return name
 
 
-def plain_history(history: list) -> list:
-    """Historico em texto simples (sem formato nativo de ferramentas): vale para qualquer modelo."""
+def last_user_index(history: list) -> int:
+    for index in range(len(history) - 1, -1, -1):
+        if history[index].get("role") == "user":
+            return index
+    return -1
+
+
+def plain_history(history: list, context: str = "") -> list:
+    """Historico em texto simples (sem formato nativo de ferramentas): vale para qualquer modelo.
+
+    Acoes de pedidos anteriores ficam de fora (so perguntas e respostas), para nao
+    confundir o modelo; o contexto extra vai junto do ultimo pedido do usuario.
+    """
+    current = last_user_index(history)
     out = []
-    for message in history:
+    for index, message in enumerate(history):
         role = message.get("role")
+        is_action = role == "tool" or (role == "assistant" and message.get("tool_calls"))
+        if is_action and index < current:
+            continue
+        if index == current and context:
+            out.append({"role": "user", "content": str(message.get("content") or "") + "\n\n" + context})
+            continue
         if role == "tool":
             out.append({"role": "user", "content": "[Resultado da ação]\n" + str(message.get("content") or "")})
         elif role == "assistant" and message.get("tool_calls"):
@@ -360,13 +378,7 @@ class LocalAiAgent:
     def _answer_messages(self, context: str) -> list:
         system = SYSTEM_PROMPT.format(root=self.project_root() or "(nenhuma)",
                                       project=self.project_id() or "(nenhum)")
-        messages = plain_history(self.history)
-        if context:
-            for index in range(len(self.history) - 1, -1, -1):
-                if self.history[index].get("role") == "user":
-                    messages[index]["content"] += "\n\n" + context
-                    break
-        return [{"role": "system", "content": system}] + messages
+        return [{"role": "system", "content": system}] + plain_history(self.history, context)
 
     def _decision_messages(self, context: str, rag_enabled: bool) -> list:
         instruction = DECISION_INSTRUCTION.format(root=self.project_root() or "(nenhuma)",
@@ -460,7 +472,7 @@ class LocalAiAgent:
             raise LocalAiCancelled()
         if kind == "reject":
             self._emit("note", "você recusou o comando")
-            return "O usuário recusou este comando. Não rode de novo; pergunte o que ele prefere."
+            return "O usuário recusou o comando; ele não foi executado."
         command = (edited or request["command"]).strip()
         terminal = request["terminal"]
         name = terminal_label(terminal)

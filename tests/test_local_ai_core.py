@@ -200,6 +200,22 @@ class AgentTest(unittest.TestCase):
         self.assertEqual(self.runner.calls, [])
         tool_msg = [m for m in agent.history if m["role"] == "tool"][0]
         self.assertIn("recusou", tool_msg["content"])
+        self.assertNotIn("Não rode", tool_msg["content"])
+
+    def test_reject_only_affects_current_request(self):
+        run1 = {"content": "", "tool_calls": [call("executar_comando", terminal="CMD", comando="dir", motivo="x")]}
+        run2 = {"content": "", "tool_calls": [call("executar_comando", terminal="POWERSHELL5.1",
+                                                   comando="python --version", motivo="y")]}
+        agent = self.make([run1, {"content": "Ok, não rodei."}, run2, {"content": "Python 3.13."}])
+        agent.send("lista", rag_enabled=False)
+        drain(agent, on_event=lambda k, d: agent.reject() if k == "approval" else None)
+        agent.send("versao do python?", rag_enabled=False)
+        drain(agent, on_event=lambda k, d: agent.approve() if k == "approval" else None)
+        self.assertEqual(self.runner.calls, [("POWERSHELL5.1", "python --version")])
+        # na 2a pergunta, o modelo nao ve mais a acao recusada da 1a
+        second_decision = self.client.decide_requests[-1][0]
+        self.assertFalse(any("recusou" in m["content"] for m in second_decision if m["role"] != "system"))
+        self.assertNotIn("recusou", agent.history[-1]["content"])
 
     def test_cancel_while_waiting_for_approval_rolls_back(self):
         agent = self.make([
