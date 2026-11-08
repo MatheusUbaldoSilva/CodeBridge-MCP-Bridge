@@ -421,6 +421,8 @@ class LocalAiPanel(QWidget):
                     self._dirty = True
                 else:
                     self._add("activity", [data])
+            elif kind == "output":
+                self._add("output", data)
             elif kind == "error":
                 self._add("error", data)
             elif kind == "approval":

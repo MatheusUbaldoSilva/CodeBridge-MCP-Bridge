@@ -212,6 +212,19 @@ class AgentTest(unittest.TestCase):
         self.assertEqual(schema["properties"]["terminal"]["enum"], ["SSH"])
         self.assertIn("comando Linux", messages[-1]["content"])
 
+    def test_command_output_is_shown_as_is(self):
+        # o 7B redigitava a saida e cortava ("root r..."); agora a saida real vai direto para a tela
+        agent = self.make([
+            {"content": "", "tool_calls": [call("executar_comando", terminal="SSH", comando="ls", motivo="x")]},
+            {"content": "São os arquivos da pasta."},
+        ])
+        agent.send("ls no ssh", rag_enabled=False)
+        events = drain(agent, on_event=lambda k, d: agent.approve() if k == "approval" else None)
+        self.assertIn(("output", "OK SAIDA"), events)
+        kinds = [k for k, _d in events]
+        self.assertLess(kinds.index("output"), kinds.index("assistant_start"))
+        self.assertIn("Não repita a saída", self.client.requests[-1][0]["content"])
+
     def test_requested_terminal_words(self):
         self.assertEqual(agent_mod.requested_terminal("rode ls no SSH"), "SSH")
         self.assertEqual(agent_mod.requested_terminal("no cmd rode dir"), "CMD")

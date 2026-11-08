@@ -144,6 +144,25 @@ class _Activity(QWidget):
         self.header.setText(activity_summary(self.notes) + (CHEVRON_OPEN if self.expanded else CHEVRON_CLOSED))
 
 
+class _Output(QLabel):
+    """Saida real do comando, mostrada direto do terminal (o modelo nao redigita)."""
+
+    def __init__(self, text: str):
+        super().__init__()
+        self.setWordWrap(True)
+        self.setTextFormat(Qt.RichText)
+        self.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.setStyleSheet(ANSWER_STYLE)
+        self.update_payload(text)
+
+    def update_payload(self, text):
+        self.setText(output_html(text))
+
+
+def output_html(text) -> str:
+    return format_message("```\n" + str(text or "").rstrip("\n") + "\n```")
+
+
 class _Notice(QLabel):
     def __init__(self, text: str, style: str):
         super().__init__()
@@ -163,6 +182,8 @@ def _make(kind, payload):
         return _Answer(payload)
     if kind == "activity":
         return _Activity(payload)
+    if kind == "output":
+        return _Output(payload)
     return _Notice(payload, ERROR_STYLE if kind == "error" else INFO_STYLE)
 
 
@@ -252,6 +273,8 @@ class ChatView(QScrollArea):
             elif kind == "activity":
                 out.append(html.escape(activity_summary(payload)))
                 out.extend("· " + html.escape(n) for n in payload)
+            elif kind == "output":
+                out.append(output_html(payload))
             else:
                 out.append(html.escape(payload))
         return "\n".join(out)

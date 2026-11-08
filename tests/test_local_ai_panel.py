@@ -206,12 +206,14 @@ class LocalAiPanelTest(unittest.TestCase):
         self.assertTrue(pump(panel, lambda: not panel.card.isHidden()))
         panel.approve_command()
         self.assertTrue(pump(panel, lambda: not panel.agent.running))
-        self.assertEqual([b[0] for b in panel.blocks], ["user", "activity", "assistant"])
+        self.assertEqual([b[0] for b in panel.blocks], ["user", "activity", "output", "assistant"])
         text = panel.chat.toHtml()
         self.assertNotIn("Você:", text)
         self.assertNotIn("IA:", text)
         widgets = [w for _sig, w in panel.chat.items]
-        bubble, activity, answer = widgets
+        bubble, activity, output, answer = widgets
+        self.assertIsInstance(output, chat_mod._Output)
+        self.assertIn("saida ok", output.text())  # saida real do terminal, inteira
         self.assertIsInstance(bubble, chat_mod._UserBubble)
         self.assertEqual(bubble.layout().itemAt(0).spacerItem() is not None, True)  # balao a direita
         self.assertIn("Usou o CodeBridge", activity.header.text())

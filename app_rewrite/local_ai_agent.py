@@ -20,6 +20,7 @@ from local_ai_client import LocalAiCancelled
 MAX_STEPS = 8
 HISTORY_CHAR_BUDGET = 14000
 COMMAND_OUTPUT_CHARS = 4000
+DISPLAY_OUTPUT_CHARS = 20000  # o que aparece na conversa; o modelo recebe COMMAND_OUTPUT_CHARS
 COMMAND_TIMEOUT_SECONDS = 600
 
 MENTIONED_FILE = re.compile(r"[\w./\\-]+\.[A-Za-z0-9]{1,8}")
@@ -80,7 +81,7 @@ Regras:
 - Para perguntas de "como fazer", responda com o código num bloco ```.
 - Se o usuário recusou um comando, não insista; pergunte o que ele prefere.
 - Se realmente não souber algo, diga isso.
-- Não copie o bloco [Resultado da ação] inteiro: diga em uma frase o que aconteceu e mostre só a saída que interessa num bloco ```."""
+- A saída completa dos comandos já aparece para o usuário logo acima da sua resposta. Não repita a saída: comente em poucas frases o que ela mostra (o que é importante, se deu erro)."""
 
 DECISION_INSTRUCTION = """[Planejador interno — esta mensagem não é do usuário]
 Escolha a PRÓXIMA ação para atender o último pedido do usuário. Responda só com o JSON.
@@ -529,7 +530,9 @@ class LocalAiAgent:
         self._emit("note", "comando terminou (%s%s)" % (
             STATE_LABELS.get(str(state).upper(), str(state).lower()),
             "" if code is None else ", código %s" % code))
-        output = tools.clip(result.get("output") or "(sem saída)", COMMAND_OUTPUT_CHARS)
+        raw_output = result.get("output") or "(sem saída)"
+        self._emit("output", tools.clip(raw_output, DISPLAY_OUTPUT_CHARS))  # saida real, sem passar pelo modelo
+        output = tools.clip(raw_output, COMMAND_OUTPUT_CHARS)
         edited_note = "" if command == request["command"] else "O usuário editou o comando antes de rodar.\n"
         return "%sComando: %s\nEstado: %s  Código: %s\nSaída:\n%s" % (
             edited_note, command, state, code, output)
