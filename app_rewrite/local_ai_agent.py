@@ -40,7 +40,7 @@ MISSING_FILE_HINT = ("[Aviso do sistema] O arquivo %s NÃO existe na pasta do pr
 TERMINAL_NAMES = {"POWERSHELL5.1": "PowerShell", "CMD": "CMD", "SSH": "SSH"}
 
 SYSTEM_PROMPT = """Você é a IA Local do CodeBridge: um assistente de programação experiente que roda no computador do usuário (Windows).
-Responda em português do Brasil, de forma clara e objetiva. Use seu conhecimento geral de programação à vontade.
+Responda em português do Brasil, de forma clara e objetiva, falando diretamente com o usuário ("você"), nunca em terceira pessoa. Use seu conhecimento geral de programação à vontade.
 Pasta do projeto atual: {root}
 Projeto na Central RAG: {project}
 
