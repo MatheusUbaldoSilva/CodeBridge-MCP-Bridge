@@ -39,7 +39,32 @@ def parse_text_tool_calls(content: str):
             "function": {"name": name, "arguments": json.dumps(arguments, ensure_ascii=False)},
         })
     cleaned = TOOL_CALL_TEXT.sub("", content or "").strip()
+    if not calls:
+        raw_call = _raw_json_call(cleaned)
+        if raw_call is not None:
+            return "", [raw_call]
     return cleaned, calls
+
+
+def _raw_json_call(text: str):
+    """O Qwen2.5-Coder as vezes responde so com o JSON da chamada, sem <tool_call>."""
+    body = (text or "").strip()
+    fence = re.match(r"^```(?:json)?\s*(.*?)\s*```$", body, re.S)
+    if fence:
+        body = fence.group(1).strip()
+    if not (body.startswith("{") and body.endswith("}")):
+        return None
+    try:
+        data = json.loads(body)
+    except ValueError:
+        return None
+    name, arguments = data.get("name"), data.get("arguments", {})
+    if not isinstance(name, str) or not isinstance(arguments, (dict, str)):
+        return None
+    if isinstance(arguments, dict):
+        arguments = json.dumps(arguments, ensure_ascii=False)
+    return {"id": "call_" + uuid.uuid4().hex[:12], "type": "function",
+            "function": {"name": name, "arguments": arguments}}
 
 
 def merge_tool_call_deltas(calls: dict, deltas) -> None:
@@ -116,6 +141,6 @@ class LocalAiClient:
         for call in tool_calls:
             if not call["id"]:
                 call["id"] = "call_" + uuid.uuid4().hex[:12]
-        if not tool_calls and "<tool_call>" in content:
+        if not tool_calls and ("<tool_call>" in content or content.strip().endswith(("}", "```"))):
             content, tool_calls = parse_text_tool_calls(content)
         return {"content": content, "tool_calls": tool_calls}

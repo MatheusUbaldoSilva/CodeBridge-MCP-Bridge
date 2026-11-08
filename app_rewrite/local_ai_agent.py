@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import queue
+import re
 import threading
 import time
 import uuid
@@ -19,24 +20,34 @@ HISTORY_CHAR_BUDGET = 14000
 COMMAND_OUTPUT_CHARS = 4000
 COMMAND_TIMEOUT_SECONDS = 600
 
+MENTIONED_FILE = re.compile(r"[\w./\\-]+\.[A-Za-z0-9]{1,8}")
+MAX_MENTIONED_FILES = 2
+MENTIONED_FILE_LINES = 200
+
 TERMINAL_NAMES = {"POWERSHELL5.1": "PowerShell", "CMD": "CMD", "SSH": "SSH"}
 
-SYSTEM_PROMPT = """Você é a IA Local do CodeBridge, um assistente de programação que roda no computador do usuário (Windows).
-Responda sempre em português do Brasil, de forma curta e direta.
+SYSTEM_PROMPT = """Você é a IA Local do CodeBridge: um assistente de programação experiente que roda no computador do usuário (Windows).
+Responda em português do Brasil, de forma clara e objetiva. Use seu conhecimento geral de programação à vontade.
 Pasta do projeto atual: {root}
 Projeto na Central RAG: {project}
 
-Ferramentas:
+Você TEM acesso ao projeto por estas ferramentas:
 - {rag_line}
-- ler_arquivo: lê um arquivo do projeto (somente leitura, até 300 linhas por vez). Leia antes de afirmar algo sobre o código.
+- ler_arquivo: lê um arquivo do projeto (caminho relativo à pasta do projeto, até 300 linhas por vez).
 - listar_pasta: mostra o conteúdo de uma pasta do projeto.
-- executar_comando: pede para rodar um comando em PowerShell 5.1, CMD ou SSH. O usuário aprova antes; se ele recusar, não insista no mesmo comando.
+- executar_comando: roda um comando em POWERSHELL5.1, CMD ou SSH depois que o usuário aprovar.
+
+Para usar uma ferramenta, responda APENAS com a chamada, neste formato exato:
+<tool_call>
+{{"name": "ler_arquivo", "arguments": {{"caminho": "app_rewrite/main.py"}}}}
+</tool_call>
+Depois você recebe o resultado e continua a resposta.
 
 Regras:
-- Use as ferramentas só quando precisar; para perguntas gerais, responda direto.
-- Comandos devem ser seguros e somente o necessário. Nunca apague, mova ou sobrescreva arquivos sem o usuário pedir.
-- Quando usar informação de um arquivo ou trecho, diga de qual arquivo veio.
-- Se não souber, diga que não sabe."""
+- Quando o usuário pedir para ler, ver, listar ou rodar algo, use a ferramenta certa em vez de dizer que não consegue.
+- Leia o arquivo antes de afirmar detalhes sobre o código e diga de qual arquivo veio a informação.
+- Comandos: só o necessário e seguros; nunca apague, mova ou sobrescreva arquivos sem o usuário pedir. Se ele recusar um comando, não insista.
+- Se realmente não souber algo, diga isso."""
 
 def terminal_label(terminal: str) -> str:
     return TERMINAL_NAMES.get(terminal, terminal)
@@ -158,7 +169,8 @@ class LocalAiAgent:
             if not ok:
                 self._emit("error", error or "A IA não está ligada.")
                 return
-            context = self._rag_context(text) if rag_enabled else ""
+            parts = [self._file_context(text), self._rag_context(text) if rag_enabled else ""]
+            context = "\n\n".join(part for part in parts if part)
             self.history.append({"role": "user", "content": text})
             self._loop(context, rag_enabled)
         except LocalAiCancelled:
@@ -181,7 +193,25 @@ class LocalAiAgent:
             self._emit("note", "Central RAG indisponível: " + str(exc))
             return ""
         self._emit("note", note + (": " + ", ".join(paths[:4]) if paths else ""))
-        return "" if not paths else result
+        return "" if not paths else "[Trechos da Central RAG — use se forem relevantes]\n" + result
+
+    def _file_context(self, text: str) -> str:
+        """Le na hora os arquivos do projeto citados na mensagem (o 7B costuma nao pedir)."""
+        root, blocks, seen = self.project_root(), [], set()
+        if not root:
+            return ""
+        for match in MENTIONED_FILE.finditer(text):
+            candidate = match.group(0).strip(".,;:!?)('\"`")
+            if candidate in seen or len(blocks) >= MAX_MENTIONED_FILES:
+                continue
+            seen.add(candidate)
+            try:
+                content, note = tools.read_file(root, candidate, 1, MENTIONED_FILE_LINES)
+            except (tools.ToolError, OSError, ValueError):
+                continue
+            self._emit("note", note)
+            blocks.append("[Conteúdo do arquivo citado]\n" + content)
+        return tools.clip("\n\n".join(blocks), 7000) if blocks else ""
 
     def _request_messages(self, context: str, rag_enabled: bool) -> list:
         system = SYSTEM_PROMPT.format(
@@ -192,9 +222,7 @@ class LocalAiAgent:
         if context:
             for message in reversed(messages):
                 if message["role"] == "user":
-                    message["content"] = (
-                        message["content"] + "\n\n[Trechos da Central RAG — use se forem relevantes]\n"
-                        + context)
+                    message["content"] = message["content"] + "\n\n" + context
                     break
         return messages
 

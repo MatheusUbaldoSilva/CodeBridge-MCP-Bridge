@@ -123,7 +123,7 @@ def build_command(exe: Path, model: Path, port: int, api_key: str) -> list[str]:
         "--host", "127.0.0.1", "--port", str(port),
         "--api-key", api_key,
         "-ngl", "99", "-c", str(CONTEXT_TOKENS), "--parallel", "1",
-        "--jinja",
+        "--jinja", "--load-mode", "none",
     ]
 
 

@@ -206,6 +206,22 @@ class AgentTest(unittest.TestCase):
         self.assertIn("ola", results[0])
         self.assertTrue(results[1].startswith("ERRO:"))
 
+    def test_mentioned_files_are_read_automatically(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        Path(tmp.name, "app").mkdir()
+        Path(tmp.name, "app", "repo_path.py").write_text("import sys\nRAIZ = 1\n")
+        Path(tmp.name, ".env").write_text("SENHA=1")
+        agent = self.make([{"content": "Explicado."}], root=tmp.name)
+        agent.send("Leia app/repo_path.py e o .env, e veja inexistente.py.", rag_enabled=False)
+        events = drain(agent)
+        sent_user = self.client.requests[0][-1]["content"]
+        self.assertIn("RAIZ = 1", sent_user)
+        self.assertNotIn("SENHA", sent_user)
+        self.assertTrue(any(k == "note" and "leu app/repo_path.py" in d for k, d in events))
+        self.assertEqual(agent.history[0]["content"],
+                         "Leia app/repo_path.py e o .env, e veja inexistente.py.")
+
     def test_not_ready_reports_error(self):
         agent = self.make([], ready=(False, "Memória insuficiente"))
         agent.send("oi")
@@ -240,6 +256,15 @@ class ClientParsingTest(unittest.TestCase):
         self.assertEqual(cleaned, "Vou ler.")
         self.assertEqual(calls[0]["function"]["name"], "ler_arquivo")
         self.assertEqual(json.loads(calls[0]["function"]["arguments"]), {"caminho": "a.py"})
+
+    def test_raw_json_tool_call_fallback(self):
+        raw = '{\n  "name": "executar_comando",\n  "arguments": {"terminal": "CMD", "comando": "dir", "motivo": "x"}\n}'
+        for content in (raw, "```json\n" + raw + "\n```"):
+            cleaned, calls = client_mod.parse_text_tool_calls(content)
+            self.assertEqual(cleaned, "")
+            self.assertEqual(calls[0]["function"]["name"], "executar_comando")
+        cleaned, calls = client_mod.parse_text_tool_calls('Exemplo: {"a": 1}')
+        self.assertEqual((cleaned, calls), ('Exemplo: {"a": 1}', []))
 
     def test_stream_deltas_are_merged(self):
         lines = [
