@@ -247,6 +247,18 @@ class LocalAiPanelTest(unittest.TestCase):
         self.assertFalse(panel.send_button.isHidden())
         self.assertEqual(panel.input.height(), one_line)  # volta para 1 linha
 
+    def test_short_bubble_stays_on_one_line(self):
+        import local_ai_chat as chat_mod
+        short = chat_mod._UserBubble("executar ls no terminal ssh")
+        short.fit(800)
+        limit = int(800 * chat_mod.BUBBLE_MAX_RATIO)
+        text_width = short.label.fontMetrics().horizontalAdvance("executar ls no terminal ssh")
+        self.assertLess(short.label.maximumWidth(), limit)  # nao estica ate o limite
+        self.assertGreaterEqual(short.label.maximumWidth(), text_width + 24)  # cabe numa linha com o padding
+        long = chat_mod._UserBubble("palavra " * 80)
+        long.fit(800)
+        self.assertEqual(long.label.maximumWidth(), limit)  # texto longo quebra no limite
+
     def test_activity_summary_texts(self):
         import local_ai_chat as chat_mod
         notes = ["leu app/a.py, linhas 1–10", "leu app/b.py, linhas 1–5", "listou a pasta tests",

@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 from local_ai_format import format_message, format_plain
 
 BUBBLE_MAX_RATIO = 0.78
+BUBBLE_PADDING = 12 * 2 + 2 + 6  # padding do USER_STYLE + borda + folga de arredondamento
 CHEVRON_CLOSED = "  ›"
 CHEVRON_OPEN = "  ⌄"
 
@@ -75,10 +76,21 @@ class _UserBubble(QWidget):
         self.update_payload(text)
 
     def update_payload(self, text):
-        self.label.setText(format_plain(text))
+        self.text = str(text or "")
+        self.label.setText(format_plain(self.text))
+        self.fit(getattr(self, "_width", 0) or 600)
 
     def fit(self, width: int):
-        self.label.setMaximumWidth(max(160, int(width * BUBBLE_MAX_RATIO)))
+        """Largura do balao = largura do texto (poucas palavras ficam numa linha so),
+        no maximo 78% da conversa; acima disso quebra a linha."""
+        self._width = width
+        limit = max(160, int(width * BUBBLE_MAX_RATIO))
+        self.label.ensurePolished()
+        metrics = self.label.fontMetrics()
+        lines = self.text.splitlines() or [""]
+        natural = max(metrics.horizontalAdvance(line) for line in lines) + BUBBLE_PADDING
+        self.label.setFixedWidth(min(natural, limit))
+
 
 
 class _Answer(QLabel):
