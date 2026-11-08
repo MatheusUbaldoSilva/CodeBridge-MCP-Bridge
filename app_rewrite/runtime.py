@@ -339,6 +339,36 @@ class BridgeRuntime:
             self._turn_inflight = max(0, inflight - 1)
             self._turn_last_activity = now
 
+    def begin_local_ai_turn(self):
+        """Um pedido da IA Local conta no cronometro de turno (modo ChatGPT ou Claude).
+
+        Desabilitado: nao conta (None). Se Claude/ChatGPT ja esta num turno ativo,
+        a IA Local soma nele ("") em vez de abrir outro. Se abriu um turno novo,
+        devolve o request_id dele, para fechar em end_local_ai_turn.
+        """
+        result = self.ensure_chatgpt_turn(reason="local_ai", track_activity=True)
+        if result.get("disabled"):
+            return None
+        if result.get("started"):
+            return str((result.get("timer") or {}).get("request_id") or "")
+        return ""
+
+    def end_local_ai_turn(self, request_id, cancelled=False):
+        """Fecha o turno aberto pela IA Local (Parar vira cancelado)."""
+        if request_id is None:
+            return False
+        with self._chatgpt_turn_activity_lock():
+            self.end_chatgpt_activity()
+            if not request_id:
+                return False
+            if cancelled:
+                result = self.chatgpt_timer.cancel(request_id)
+            else:
+                result = self.chatgpt_timer.finish(request_id, notify=False)
+            if result.get("applied"):
+                self._turn_last_activity = None
+            return bool(result.get("applied"))
+
     def _on_chatgpt_timer_finished(
         self,
         request_id,

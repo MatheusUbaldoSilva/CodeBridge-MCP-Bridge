@@ -354,6 +354,24 @@ class LocalAiPanel(QWidget):
     def _set_busy(self, busy):
         self.server.busy = bool(busy)
         self.server.touch()
+        self._count_on_turn_timer(busy)
+
+    def _count_on_turn_timer(self, busy):
+        """Cada pedido da IA Local conta no cronometro de turno (ChatGPT ou Claude);
+        com o cronometro Desabilitado nao conta."""
+        begin = getattr(self.runtime, "begin_local_ai_turn", None)
+        end = getattr(self.runtime, "end_local_ai_turn", None)
+        if begin is None or end is None:
+            return
+        try:
+            if busy:
+                self._turn_request = begin()
+            else:
+                request, self._turn_request = getattr(self, "_turn_request", None), None
+                if request is not None:
+                    end(request, cancelled=self.agent.cancelled())
+        except Exception:
+            self._turn_request = None
 
     # ---- atualizacao periodica ------------------------------------------
     def _tick(self):
