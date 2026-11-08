@@ -88,6 +88,20 @@ class ToolsTest(unittest.TestCase):
 class FakeClient:
     def __init__(self, replies):
         self.replies, self.requests = list(replies), []
+        self.decide_requests, self.pending = [], []
+
+    def decide(self, messages, schema):
+        """Le os scripts antigos: resposta com tool_calls vira decisao; texto vira 'responder'."""
+        self.decide_requests.append((messages, schema))
+        if not self.pending and self.replies and self.replies[0].get("tool_calls"):
+            for item in self.replies.pop(0)["tool_calls"]:
+                args = json.loads(item["function"]["arguments"])
+                args["acao"] = item["function"]["name"]
+                args.setdefault("motivo", "teste")
+                self.pending.append(args)
+        if self.pending:
+            return self.pending.pop(0)
+        return {"acao": "responder", "motivo": "teste"}
 
     def chat(self, messages, schemas, on_text=None, cancelled=None):
         self.requests.append(messages)
@@ -263,13 +277,44 @@ class AgentTest(unittest.TestCase):
         self.assertEqual(agent.history, [])
 
     def test_steps_are_limited(self):
-        loop = {"content": "", "tool_calls": [call("listar_pasta", caminho=".")]}
+        steps = [{"content": "", "tool_calls": [call("listar_pasta", caminho="d%d" % i)]}
+                 for i in range(agent_mod.MAX_STEPS)]
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
-        agent = self.make([loop] * agent_mod.MAX_STEPS, root=tmp.name)
+        agent = self.make(steps + [{"content": "Fim."}], root=tmp.name)
         agent.send("x", rag_enabled=False)
         events = drain(agent)
-        self.assertTrue(any(k == "note" and "passos" in d for k, d in events))
+        self.assertTrue(any(k == "note" and "parei após" in d for k, d in events))
+        self.assertIn(("assistant_done", "Fim."), events)
+
+    def test_repeated_decision_stops_and_answers(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        same = {"content": "", "tool_calls": [call("listar_pasta", caminho=".")]}
+        agent = self.make([same, same, {"content": "Ok."}], root=tmp.name)
+        agent.send("x", rag_enabled=False)
+        drain(agent)
+        self.assertEqual(len([m for m in agent.history if m["role"] == "tool"]), 1)
+
+    def test_decision_failure_still_answers(self):
+        agent = self.make([{"content": "Direto."}])
+        def broken(messages, schema):
+            raise RuntimeError("sem json_schema")
+        self.client.decide = broken
+        agent.send("oi", rag_enabled=False)
+        events = drain(agent)
+        self.assertTrue(any(k == "note" and "não consegui decidir" in d for k, d in events))
+        self.assertIn(("assistant_done", "Direto."), events)
+
+    def test_decision_prompt_is_last_and_answer_has_no_tools(self):
+        agent = self.make([{"content": "Ok."}])
+        agent.send("quanto espaço no disco?", rag_enabled=True)
+        drain(agent)
+        messages, schema = self.client.decide_requests[0]
+        self.assertIn("Planejador interno", messages[-1]["content"])
+        self.assertIn("buscar_central_rag", schema["properties"]["acao"]["enum"])
+        # mesma conversa como prefixo (cache do llama-server)
+        self.assertEqual(messages[:-1], self.client.requests[0])
 
     def test_strip_tool_json_from_answer(self):
         text = ('Use isto:\n\n{"terminal":"POWERSHELL5.1","comando":"dir","motivo":"x"}\n\n'
@@ -286,6 +331,29 @@ class AgentTest(unittest.TestCase):
         self.assertEqual(trimmed[0]["role"], "user")
         self.assertTrue(trimmed[-1]["content"].startswith("r9"))
         self.assertLessEqual(sum(agent_mod.message_chars(m) for m in trimmed), 10000)
+
+
+class DecisionTest(unittest.TestCase):
+    def test_schema_and_mapping(self):
+        self.assertNotIn("buscar_central_rag", agent_mod.decision_schema(False)["properties"]["acao"]["enum"])
+        run = agent_mod.decision_to_call({"acao": "executar_comando", "comando": "dir", "motivo": "m"}, False)
+        self.assertEqual(json.loads(run["function"]["arguments"])["terminal"], "POWERSHELL5.1")
+        self.assertIsNone(agent_mod.decision_to_call({"acao": "responder"}, True))
+        self.assertIsNone(agent_mod.decision_to_call({"acao": "executar_comando", "comando": " "}, True))
+        self.assertIsNone(agent_mod.decision_to_call({"acao": "buscar_central_rag", "consulta": "x"}, False))
+        self.assertIsNone(agent_mod.decision_to_call("lixo", True))
+
+    def test_plain_history_has_no_native_tool_format(self):
+        c = agent_mod.decision_to_call({"acao": "ler_arquivo", "caminho": "a.py", "motivo": "m"}, False)
+        plain = agent_mod.plain_history([
+            {"role": "user", "content": "leia a.py"},
+            {"role": "assistant", "content": "", "tool_calls": [c]},
+            {"role": "tool", "tool_call_id": c["id"], "content": "conteudo"},
+        ])
+        self.assertEqual([m["role"] for m in plain], ["user", "assistant", "user"])
+        self.assertEqual(plain[1]["content"], "(li o arquivo a.py)")
+        self.assertTrue(plain[2]["content"].startswith("[Resultado da ação]"))
+        self.assertTrue(all(set(m) == {"role", "content"} for m in plain))
 
 
 class ClientParsingTest(unittest.TestCase):

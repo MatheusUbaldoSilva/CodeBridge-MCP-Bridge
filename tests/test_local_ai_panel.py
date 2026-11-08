@@ -58,6 +58,20 @@ class FakeServer:
 class ScriptedClient:
     def __init__(self, replies):
         self.replies = replies
+        self.decide_requests, self.pending = [], []
+
+    def decide(self, messages, schema):
+        """Le os scripts antigos: resposta com tool_calls vira decisao; texto vira 'responder'."""
+        self.decide_requests.append((messages, schema))
+        if not self.pending and self.replies and self.replies[0].get("tool_calls"):
+            for item in self.replies.pop(0)["tool_calls"]:
+                args = json.loads(item["function"]["arguments"])
+                args["acao"] = item["function"]["name"]
+                args.setdefault("motivo", "teste")
+                self.pending.append(args)
+        if self.pending:
+            return self.pending.pop(0)
+        return {"acao": "responder", "motivo": "teste"}
 
     def chat(self, messages, schemas, on_text=None, cancelled=None):
         reply = self.replies.pop(0)

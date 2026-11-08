@@ -132,6 +132,37 @@ class LocalAiClient:
         finally:
             connection.close()
 
+    def decide(self, messages, schema, *, max_tokens: int = 300) -> dict:
+        """Pedido curto com saida obrigatoria no formato JSON do schema (decisao forcada)."""
+        body = {"messages": messages, "stream": False, "max_tokens": max_tokens,
+                "temperature": 0.1, "top_p": 0.9,
+                "response_format": {"type": "json_schema",
+                                    "json_schema": {"name": "decisao", "schema": schema}}}
+        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=self.timeout)
+        try:
+            connection.request(
+                "POST", "/v1/chat/completions",
+                body=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+                headers={"Content-Type": "application/json",
+                         "Authorization": "Bearer " + self.api_key},
+            )
+            response = connection.getresponse()
+            raw = response.read().decode("utf-8", "replace")
+            if response.status != 200:
+                raise LocalAiError("Servidor da IA respondeu %s: %s" % (response.status, raw[:500]))
+        except (OSError, http.client.HTTPException) as exc:
+            raise LocalAiError("Falha ao falar com a IA: " + str(exc)) from exc
+        finally:
+            connection.close()
+        try:
+            content = json.loads(raw)["choices"][0]["message"].get("content") or ""
+            decision = json.loads(content)
+        except (ValueError, KeyError, IndexError, TypeError) as exc:
+            raise LocalAiError("decisão em formato inválido") from exc
+        if not isinstance(decision, dict):
+            raise LocalAiError("decisão em formato inválido")
+        return decision
+
     @staticmethod
     def _read_stream(response, on_text, cancelled) -> dict:
         text, calls, checked, looped = "", {}, 0, False

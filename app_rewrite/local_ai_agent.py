@@ -44,22 +44,103 @@ Responda em português do Brasil, de forma clara e objetiva. Use seu conheciment
 Pasta do projeto atual: {root}
 Projeto na Central RAG: {project}
 
-Você TEM acesso ao projeto por estas ferramentas:
-- {rag_line}
-- ler_arquivo: lê um arquivo do projeto (caminho relativo à pasta do projeto, até 300 linhas por vez).
-- listar_pasta: mostra o conteúdo de uma pasta do projeto.
-- executar_comando: roda um comando em POWERSHELL5.1, CMD ou SSH depois que o usuário aprovar.
-
-As ferramentas são chamadas pelo sistema; o usuário não as vê.
+O sistema executa ações por você (ler arquivos, listar pastas, buscar na Central RAG e rodar comandos que o usuário aprova) e coloca os resultados na conversa como [Resultado da ação]. Responda com base nesses resultados.
 
 Regras:
-- Nunca escreva JSON de ferramenta nem nomes de ferramentas na resposta, e não explique como as ferramentas funcionam.
-- Use executar_comando só quando o usuário pedir para rodar, ver ou verificar algo no computador. Para perguntas de "como fazer", responda com o código num bloco ```, sem executar.
-- Quando o usuário pedir para ler, ver, listar ou rodar algo, use a ferramenta certa em vez de dizer que não consegue.
-- Nunca invente nomes de arquivos, listas de pastas ou conteúdo que não esteja no contexto. Os trechos da Central RAG são só referência e podem estar desatualizados.
-- Leia o arquivo antes de afirmar detalhes sobre o código e diga de qual arquivo veio a informação.
-- Comandos: só o necessário e seguros; nunca apague, mova ou sobrescreva arquivos sem o usuário pedir. Se ele recusar um comando, não insista.
+- Nunca escreva JSON nem fale de ferramentas na resposta.
+- Nunca invente nomes de arquivos, listas de pastas, saídas de comando ou conteúdo que não esteja na conversa. Os trechos da Central RAG são só referência e podem estar desatualizados.
+- Diga de qual arquivo ou comando veio a informação.
+- Para perguntas de "como fazer", responda com o código num bloco ```.
+- Se o usuário recusou um comando, não insista; pergunte o que ele prefere.
 - Se realmente não souber algo, diga isso."""
+
+DECISION_INSTRUCTION = """[Planejador interno — esta mensagem não é do usuário]
+Escolha a PRÓXIMA ação para atender o último pedido do usuário. Responda só com o JSON.
+- "responder": já dá para responder com o que está na conversa (resultados de ações, arquivos, trechos), ou é uma pergunta geral ou de "como fazer".
+- "executar_comando": o usuário quer ver, verificar, testar ou rodar algo no computador (disco, memória, processos, rede, git, versões, testes). Use "terminal": "POWERSHELL5.1" e um comando do Windows PowerShell 5.1, salvo se ele pedir CMD ou SSH. Se o comando depender da pasta do projeto, comece com: Set-Location '{root}';
+- "ler_arquivo": precisa ler um arquivo do projeto que ainda não está na conversa ("caminho" relativo à pasta do projeto).
+- "listar_pasta": precisa ver uma pasta do projeto que ainda não está na conversa ("caminho" relativo).
+{rag_option}Não repita uma ação cujo resultado já está na conversa. Se o usuário recusou um comando, escolha "responder".
+Exemplos:
+"quanto espaço livre tem no disco C?" -> {{"acao": "executar_comando", "terminal": "POWERSHELL5.1", "comando": "Get-PSDrive -Name C | Select-Object Used,Free", "motivo": "ver o espaço livre do disco C"}}
+"como faço um loop no PowerShell?" -> {{"acao": "responder", "motivo": "pergunta de como fazer"}}
+"o que faz o arquivo app/main.py?" (ainda não lido) -> {{"acao": "ler_arquivo", "caminho": "app/main.py", "motivo": "ler o arquivo pedido"}}"""
+
+RAG_OPTION = '- "buscar_central_rag": precisa procurar algo nos conhecimentos do projeto ("consulta").\n'
+REJECTED_PREFIX = "O usuário recusou"
+ANSWER = "responder"
+
+
+def decision_schema(rag_enabled: bool) -> dict:
+    actions = [ANSWER, tools.TOOL_RUN, tools.TOOL_READ, tools.TOOL_LIST]
+    if rag_enabled:
+        actions.append(tools.TOOL_RAG)
+    return {"type": "object", "properties": {
+        "acao": {"type": "string", "enum": actions},
+        "terminal": {"type": "string", "enum": list(tools.TERMINALS)},
+        "comando": {"type": "string"},
+        "caminho": {"type": "string"},
+        "consulta": {"type": "string"},
+        "motivo": {"type": "string"},
+    }, "required": ["acao", "motivo"]}
+
+
+def decision_to_call(decision, rag_enabled: bool):
+    """JSON do planejador -> chamada de ferramenta, ou None para responder."""
+    if not isinstance(decision, dict):
+        return None
+    action = decision.get("acao")
+    if action == tools.TOOL_RUN:
+        args = {"terminal": decision.get("terminal") or "POWERSHELL5.1",
+                "comando": decision.get("comando") or "", "motivo": decision.get("motivo") or ""}
+        if not args["comando"].strip():
+            return None
+    elif action in (tools.TOOL_READ, tools.TOOL_LIST):
+        args = {"caminho": decision.get("caminho") or ("." if action == tools.TOOL_LIST else "")}
+        if not args["caminho"].strip():
+            return None
+    elif action == tools.TOOL_RAG and rag_enabled:
+        args = {"consulta": decision.get("consulta") or ""}
+        if not args["consulta"].strip():
+            return None
+    else:
+        return None
+    return {"id": "call_" + uuid.uuid4().hex[:12], "type": "function",
+            "function": {"name": action, "arguments": json.dumps(args, ensure_ascii=False)}}
+
+
+def describe_call(call: dict) -> str:
+    name = call["function"]["name"]
+    try:
+        args = json.loads(call["function"].get("arguments") or "{}")
+    except ValueError:
+        args = {}
+    if name == tools.TOOL_RUN:
+        return "rodei no %s: %s" % (terminal_label(str(args.get("terminal", ""))), args.get("comando", ""))
+    if name == tools.TOOL_READ:
+        return "li o arquivo %s" % args.get("caminho", "")
+    if name == tools.TOOL_LIST:
+        return "listei a pasta %s" % args.get("caminho", ".")
+    if name == tools.TOOL_RAG:
+        return "busquei na Central RAG: %s" % args.get("consulta", "")
+    return name
+
+
+def plain_history(history: list) -> list:
+    """Historico em texto simples (sem formato nativo de ferramentas): vale para qualquer modelo."""
+    out = []
+    for message in history:
+        role = message.get("role")
+        if role == "tool":
+            out.append({"role": "user", "content": "[Resultado da ação]\n" + str(message.get("content") or "")})
+        elif role == "assistant" and message.get("tool_calls"):
+            text = str(message.get("content") or "").strip()
+            actions = "; ".join(describe_call(c) for c in message["tool_calls"])
+            out.append({"role": "assistant", "content": (text + "\n" if text else "") + "(" + actions + ")"})
+        else:
+            out.append({"role": role, "content": str(message.get("content") or "")})
+    return out
+
 
 TOOL_ARG_KEYS = {"name", "arguments", "terminal", "comando", "motivo", "caminho", "consulta",
                  "linha_inicial", "quantidade"}
@@ -83,10 +164,6 @@ def strip_tool_json(text: str) -> str:
 
 def terminal_label(terminal: str) -> str:
     return TERMINAL_NAMES.get(terminal, terminal)
-
-
-RAG_LINE_ON = "buscar_central_rag: busca trechos nos conhecimentos do projeto."
-RAG_LINE_OFF = "(Central RAG desligada nesta conversa.)"
 
 
 def message_chars(message: dict) -> int:
@@ -280,44 +357,72 @@ class LocalAiAgent:
             blocks.append("[Conteúdo real da pasta citada \u2014 use exatamente esta lista]\n" + listing)
         return tools.clip("\n\n".join(blocks), 7000) if blocks else ""
 
-    def _request_messages(self, context: str, rag_enabled: bool) -> list:
-        system = SYSTEM_PROMPT.format(
-            root=self.project_root() or "(nenhuma)", project=self.project_id() or "(nenhum)",
-            rag_line=RAG_LINE_ON if rag_enabled else RAG_LINE_OFF,
-        )
-        messages = [{"role": "system", "content": system}] + [dict(m) for m in self.history]
+    def _answer_messages(self, context: str) -> list:
+        system = SYSTEM_PROMPT.format(root=self.project_root() or "(nenhuma)",
+                                      project=self.project_id() or "(nenhum)")
+        messages = plain_history(self.history)
         if context:
-            for message in reversed(messages):
-                if message["role"] == "user":
-                    message["content"] = message["content"] + "\n\n" + context
+            for index in range(len(self.history) - 1, -1, -1):
+                if self.history[index].get("role") == "user":
+                    messages[index]["content"] += "\n\n" + context
                     break
-        return messages
+        return [{"role": "system", "content": system}] + messages
+
+    def _decision_messages(self, context: str, rag_enabled: bool) -> list:
+        instruction = DECISION_INSTRUCTION.format(root=self.project_root() or "(nenhuma)",
+                                                  rag_option=RAG_OPTION if rag_enabled else "")
+        return self._answer_messages(context) + [{"role": "user", "content": instruction}]
+
+    def _decide(self, context: str, rag_enabled: bool):
+        self._emit("status", "Decidindo o próximo passo\u2026")
+        try:
+            return self.client_factory().decide(self._decision_messages(context, rag_enabled),
+                                                decision_schema(rag_enabled))
+        except LocalAiCancelled:
+            raise
+        except Exception as exc:
+            self._emit("note", "não consegui decidir a próxima ação (%s); respondendo direto" % exc)
+            return None
 
     def _loop(self, context: str, rag_enabled: bool) -> None:
-        schemas = tools.tool_schemas(rag_enabled)
+        """Decisao forcada: a cada passo o modelo escolhe uma acao num JSON obrigatorio."""
+        done = set()
         for _ in range(MAX_STEPS):
             if self.cancelled():
                 raise LocalAiCancelled()
-            self._emit("status", "Pensando…")
-            self._emit("assistant_start")
-            reply = self.client_factory().chat(
-                self._request_messages(context, rag_enabled), schemas,
-                on_text=lambda piece: self._emit("text", piece), cancelled=self.cancelled,
-            )
-            reply["content"] = strip_tool_json(reply["content"])
-            self._emit("assistant_done", reply["content"])
-            calls = reply["tool_calls"]
-            message = {"role": "assistant", "content": reply["content"]}
-            if calls:
-                message["tool_calls"] = calls
-            self.history.append(message)
-            if not calls:
-                return
-            for call in calls:
-                result = self._run_tool(call)
-                self.history.append({"role": "tool", "tool_call_id": call["id"],
-                                     "content": tools.clip(result)})
-        self._emit("note", "parei após %d passos; peça para continuar se quiser" % MAX_STEPS)
+            call = decision_to_call(self._decide(context, rag_enabled), rag_enabled)
+            if self.cancelled():
+                raise LocalAiCancelled()
+            if call is None:
+                break
+            key = (call["function"]["name"], call["function"]["arguments"])
+            if key in done:
+                break
+            done.add(key)
+            self.history.append({"role": "assistant", "content": "", "tool_calls": [call]})
+            result = self._run_tool(call)
+            self.history.append({"role": "tool", "tool_call_id": call["id"],
+                                 "content": tools.clip(result)})
+            if result.startswith(REJECTED_PREFIX):
+                break
+        else:
+            self._emit("note", "parei após %d ações; peça para continuar se quiser" % MAX_STEPS)
+        self._answer(context)
+
+    def _answer(self, context: str) -> None:
+        if self.cancelled():
+            raise LocalAiCancelled()
+        self._emit("status", "Pensando\u2026")
+        self._emit("assistant_start")
+        reply = self.client_factory().chat(
+            self._answer_messages(context), None,
+            on_text=lambda piece: self._emit("text", piece), cancelled=self.cancelled,
+        )
+        content = strip_tool_json(reply["content"])
+        if not content:
+            content = "(a IA não escreveu uma resposta; tente perguntar de outro jeito)"
+        self._emit("assistant_done", content)
+        self.history.append({"role": "assistant", "content": content})
 
     # ---- ferramentas -----------------------------------------------------
     def _run_tool(self, call: dict) -> str:
