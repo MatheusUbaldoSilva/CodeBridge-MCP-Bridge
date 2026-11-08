@@ -10,7 +10,7 @@ from __future__ import annotations
 import threading
 import time
 
-SOURCES = ("MCP", "TELA")
+SOURCES = ("MCP", "TELA", "IA_LOCAL")  # IA_LOCAL: consultas da aba IA Local
 
 
 def _source(value):

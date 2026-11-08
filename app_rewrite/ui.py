@@ -849,9 +849,9 @@ class MainWindow(QMainWindow):
         opened = _time.strftime("%H:%M", _time.localtime(counts.get("opened_at") or _time.time()))
         tip = (
             f"Neste ciclo: {counts.get('cycle_total', 0)} "
-            f"(IA {cyc.get('MCP', 0)}, tela {cyc.get('TELA', 0)})\n"
+            f"(IA {cyc.get('MCP', 0)}, IA Local {cyc.get('IA_LOCAL', 0)}, tela {cyc.get('TELA', 0)})\n"
             f"Desde a abertura ({opened}): {counts.get('session_total', 0)} "
-            f"(IA {ses.get('MCP', 0)}, tela {ses.get('TELA', 0)})"
+            f"(IA {ses.get('MCP', 0)}, IA Local {ses.get('IA_LOCAL', 0)}, tela {ses.get('TELA', 0)})"
         )
         if (text, tip) != getattr(self, "_last_rag_query_text", None):
             self._last_rag_query_text = (text, tip)

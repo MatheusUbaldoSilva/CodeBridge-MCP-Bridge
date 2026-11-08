@@ -93,7 +93,7 @@ class LocalAiPanel(QWidget):
             client_factory=client_factory or (lambda: LocalAiClient(self.server.port, self.server.api_key)),
             ensure_ready=self._ensure_ready,
             runner=runner or RuntimeCommandRunner(runtime),
-            search_fn=search_fn or _default_search,
+            search_fn=self._counted_search(search_fn or _default_search),
             project_id=project_id, project_root=project_root,
             on_activity=self._set_busy,
         )
@@ -114,6 +114,20 @@ class LocalAiPanel(QWidget):
         self.timer.timeout.connect(self._tick)
         self.timer.start(150)
         self._tick()
+
+    def _counted_search(self, search):
+        """Toda consulta da IA Local a Central RAG entra no contador abaixo do cronometro."""
+        def counted(query, project_id, top_k):
+            try:
+                return search(query, project_id, top_k)
+            finally:
+                record = getattr(self.runtime, "record_rag_query", None)
+                if record is not None:
+                    try:
+                        record("IA_LOCAL")
+                    except Exception:
+                        pass
+        return counted
 
     # ---- montagem ---------------------------------------------------------
     def _build(self):

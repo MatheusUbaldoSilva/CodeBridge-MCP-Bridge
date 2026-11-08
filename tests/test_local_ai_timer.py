@@ -92,6 +92,29 @@ class PanelTurnTimerTest(unittest.TestCase):
         self.assertEqual(seen, ["RUNNING"])
         self.assertEqual(runtime.chatgpt_timer.snapshot()["state"], "FINISHED")
 
+    def test_rag_query_counts_under_the_timer(self):
+        # caso real: a IA Local consultou a Central RAG e o contador do cronometro ficou em 0
+        from PySide6.QtWidgets import QApplication
+        import local_ai_panel as panel_mod
+        from test_local_ai_panel import FakeServer, Runner, ScriptedClient, pump
+
+        QApplication.instance() or QApplication([])
+        runtime = make_runtime("CLAUDE")
+        panel = panel_mod.LocalAiPanel(
+            runtime, project_id=lambda: "codebridge", project_root=lambda: None,
+            search_fn=lambda q, p, k: {"results": [{"path": "doc.md", "snippet": "x"}]},
+            server=FakeServer(), runner=Runner(),
+            client_factory=lambda: ScriptedClient([{"content": "Oi."}]))
+        self.addCleanup(panel.shutdown)
+        panel.use_rag.setChecked(True)
+        panel.input.setPlainText("como funciona o RAG?")
+        panel.send()
+        self.assertTrue(pump(panel, lambda: not panel.agent.running))
+        counts = runtime.rag_query_counts()
+        self.assertEqual(counts["cycle_total"], 1)
+        self.assertEqual(counts["cycle_by_source"]["IA_LOCAL"], 1)
+        self.assertEqual(counts["cycle_by_source"]["MCP"], 0)
+
     def test_disabled_timer_is_left_alone(self):
         from PySide6.QtWidgets import QApplication
         import local_ai_panel as panel_mod

@@ -23,7 +23,7 @@ class CounterTest(unittest.TestCase):
         counter.record("TELA", "c1")
         snap = counter.snapshot("c1")
         self.assertEqual(snap["cycle_total"], 3)
-        self.assertEqual(snap["cycle_by_source"], {"MCP": 2, "TELA": 1})
+        self.assertEqual(snap["cycle_by_source"], {"MCP": 2, "TELA": 1, "IA_LOCAL": 0})
         self.assertEqual(snap["session_total"], 3)
 
     def test_new_cycle_starts_from_zero_and_session_keeps_going(self):
