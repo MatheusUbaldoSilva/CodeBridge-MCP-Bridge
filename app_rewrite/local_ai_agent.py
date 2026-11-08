@@ -37,17 +37,35 @@ Você TEM acesso ao projeto por estas ferramentas:
 - listar_pasta: mostra o conteúdo de uma pasta do projeto.
 - executar_comando: roda um comando em POWERSHELL5.1, CMD ou SSH depois que o usuário aprovar.
 
-Para usar uma ferramenta, responda APENAS com a chamada, neste formato exato:
-<tool_call>
-{{"name": "ler_arquivo", "arguments": {{"caminho": "app_rewrite/main.py"}}}}
-</tool_call>
-Depois você recebe o resultado e continua a resposta.
+As ferramentas são chamadas pelo sistema; o usuário não as vê.
 
 Regras:
+- Nunca escreva JSON de ferramenta nem nomes de ferramentas na resposta, e não explique como as ferramentas funcionam.
+- Use executar_comando só quando o usuário pedir para rodar, ver ou verificar algo no computador. Para perguntas de "como fazer", responda com o código num bloco ```, sem executar.
 - Quando o usuário pedir para ler, ver, listar ou rodar algo, use a ferramenta certa em vez de dizer que não consegue.
 - Leia o arquivo antes de afirmar detalhes sobre o código e diga de qual arquivo veio a informação.
 - Comandos: só o necessário e seguros; nunca apague, mova ou sobrescreva arquivos sem o usuário pedir. Se ele recusar um comando, não insista.
 - Se realmente não souber algo, diga isso."""
+
+TOOL_ARG_KEYS = {"name", "arguments", "terminal", "comando", "motivo", "caminho", "consulta",
+                 "linha_inicial", "quantidade"}
+
+
+def strip_tool_json(text: str) -> str:
+    """Remove linhas que sao so o JSON de uma chamada de ferramenta (o 7B as vezes mostra)."""
+    kept = []
+    for line in str(text or "").splitlines():
+        body = line.strip().strip("`")
+        if body.startswith("{") and body.endswith("}"):
+            try:
+                data = json.loads(body)
+            except ValueError:
+                data = None
+            if isinstance(data, dict) and data and set(data) <= TOOL_ARG_KEYS:
+                continue
+        kept.append(line)
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(kept)).strip()
+
 
 def terminal_label(terminal: str) -> str:
     return TERMINAL_NAMES.get(terminal, terminal)
@@ -237,6 +255,7 @@ class LocalAiAgent:
                 self._request_messages(context, rag_enabled), schemas,
                 on_text=lambda piece: self._emit("text", piece), cancelled=self.cancelled,
             )
+            reply["content"] = strip_tool_json(reply["content"])
             self._emit("assistant_done", reply["content"])
             calls = reply["tool_calls"]
             message = {"role": "assistant", "content": reply["content"]}

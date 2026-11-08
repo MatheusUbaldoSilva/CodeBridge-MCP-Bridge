@@ -45,11 +45,12 @@ def format_message(text: str) -> str:
     """Texto do modelo -> HTML simples: blocos ``` viram <pre>, `x` vira <code>."""
     out, last = [], 0
     for match in CODE_FENCE.finditer(text or ""):
-        out.append(_format_plain(text[last:match.start()]))
-        out.append('<pre style="background:#0a1015;border:1px solid #33414d;'
-                   'padding:6px;color:#dfe7ee;">%s</pre>' % html.escape(match.group(1).rstrip()))
+        out.append(_format_plain(text[last:match.start()].strip("\n")))
+        out.append('<pre style="background:#0a1015;border:1px solid #33414d;margin:6px 0;'
+                   'padding:6px;color:#dfe7ee;white-space:pre-wrap;">%s</pre>'
+                   % html.escape(match.group(1).strip("\n").rstrip()))
         last = match.end()
-    out.append(_format_plain((text or "")[last:]))
+    out.append(_format_plain((text or "")[last:].strip("\n")))
     return "".join(out)
 
 
@@ -413,7 +414,7 @@ class LocalAiPanel(QWidget):
                 parts.append('<p><b style="color:#7fb3e0;">Você:</b> %s</p>' % _format_plain(text))
             elif kind == "assistant":
                 body = format_message(text) if text else '<span style="color:#7f93a3;">…</span>'
-                parts.append('<p><b style="color:#8fd19e;">IA:</b> %s</p>' % body)
+                parts.append('<div style="margin:6px 0;"><b style="color:#8fd19e;">IA:</b> %s</div>' % body)
             elif kind == "note":
                 parts.append('<p style="color:#7f93a3;font-size:11px;margin:0 0 0 24px;">· %s</p>'
                              % html.escape(text))

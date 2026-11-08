@@ -169,6 +169,8 @@ class LocalAiPanelTest(unittest.TestCase):
         self.assertIn("<pre", out)
         self.assertIn("Get-Date &lt;x&gt;", out)
         self.assertIn("<code", out)
+        self.assertIn("pre-wrap", out)
+        self.assertNotIn("<br><pre", out)
 
 
 if __name__ == "__main__":

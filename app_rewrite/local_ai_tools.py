@@ -174,7 +174,9 @@ def rag_search(search_fn, project_id: str, consulta: str, top_k: int = RAG_TOP_K
     hits = [h for h in (data.get("results") or []) if isinstance(h, dict)][:top_k]
     paths, blocks = [], []
     for number, hit in enumerate(hits, 1):
-        path = str(hit.get("path") or hit.get("source_path") or hit.get("document_path") or "?")
+        meta = hit.get("metadata") if isinstance(hit.get("metadata"), dict) else {}
+        path = str(hit.get("path") or hit.get("source_path") or meta.get("path")
+                   or meta.get("source_path") or hit.get("document_path") or "?")
         text = str(hit.get("snippet") or hit.get("text") or hit.get("content") or "").strip()
         if path not in paths:
             paths.append(path)

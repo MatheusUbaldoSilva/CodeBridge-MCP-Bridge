@@ -66,6 +66,11 @@ class ToolsTest(unittest.TestCase):
         self.assertEqual(paths, ["a.py", "b.md"])
         self.assertEqual(note, "consultou a Central RAG (2 trechos)")
 
+    def test_rag_path_from_metadata(self):
+        fake = lambda q, p, k: {"results": [{"content": "x", "metadata": {"path": "rag/a.py"}}]}
+        _text, _note, paths = tools.rag_search(fake, "codebridge", "q")
+        self.assertEqual(paths, ["rag/a.py"])
+
     def test_rag_tool_only_offered_when_enabled(self):
         names = lambda enabled: [t["function"]["name"] for t in tools.tool_schemas(enabled)]
         self.assertIn(tools.TOOL_RAG, names(True))
@@ -237,6 +242,12 @@ class AgentTest(unittest.TestCase):
         agent.send("x", rag_enabled=False)
         events = drain(agent)
         self.assertTrue(any(k == "note" and "passos" in d for k, d in events))
+
+    def test_strip_tool_json_from_answer(self):
+        text = ('Use isto:\n\n{"terminal":"POWERSHELL5.1","comando":"dir","motivo":"x"}\n\n'
+                'Fim. {"a": 1} fica.\n{"chave": 2}')
+        self.assertEqual(agent_mod.strip_tool_json(text),
+                         'Use isto:\n\nFim. {"a": 1} fica.\n{"chave": 2}')
 
     def test_trim_history_drops_oldest_whole_turns(self):
         history = []
