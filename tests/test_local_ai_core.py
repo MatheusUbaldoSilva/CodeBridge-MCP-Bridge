@@ -190,6 +190,48 @@ class AgentTest(unittest.TestCase):
         self.assertTrue(any(k == "note" and "concluído, código 0" in str(d) for k, d in self.events))
         self.assertIn("editou", tool_msg["content"])
 
+    def test_named_terminal_is_enforced(self):
+        # o modelo escolheu PowerShell mesmo com o pedido "no terminal ssh" (caso real)
+        agent = self.make([
+            {"content": "", "tool_calls": [call("executar_comando", terminal="POWERSHELL5.1",
+                                                 comando="ls", motivo="listar")]},
+            {"content": "Pronto."},
+        ])
+        agent.send("mandar um ls no terminal ssh e me mostrar o resultado", rag_enabled=False)
+        approvals = []
+
+        def on_event(kind, data):
+            if kind == "approval":
+                approvals.append(data)
+                agent.approve()
+
+        drain(agent, on_event=on_event)
+        self.assertEqual(approvals[0]["terminal"], "SSH")
+        self.assertEqual(self.runner.calls, [("SSH", "ls")])
+        messages, schema = self.client.decide_requests[0]
+        self.assertEqual(schema["properties"]["terminal"]["enum"], ["SSH"])
+        self.assertIn("comando Linux", messages[-1]["content"])
+
+    def test_requested_terminal_words(self):
+        self.assertEqual(agent_mod.requested_terminal("rode ls no SSH"), "SSH")
+        self.assertEqual(agent_mod.requested_terminal("no cmd rode dir"), "CMD")
+        self.assertEqual(agent_mod.requested_terminal("no PowerShell rode ssh user@host"), "POWERSHELL5.1")
+        self.assertIsNone(agent_mod.requested_terminal("quanto espaço livre no disco C?"))
+        self.assertIsNone(agent_mod.requested_terminal("o que faz o sshd_config?"))
+        agent = self.make([{"content": "ok"}])
+        agent.send("oi", rag_enabled=False)
+        drain(agent)
+        schema = self.client.decide_requests[0][1]
+        self.assertEqual(schema["properties"]["terminal"]["enum"], ["POWERSHELL5.1", "CMD", "SSH"])
+
+    def test_result_header_is_not_echoed(self):
+        agent = self.make([{"content": "[Resultado da ação]\nComando: ls\nSaída:\nok"}])
+        agent.send("oi", rag_enabled=False)
+        events = drain(agent)
+        done = [d for k, d in events if k == "assistant_done"][0]
+        self.assertNotIn("[Resultado da ação]", done)
+        self.assertIn("Saída:", done)
+
     def test_rejected_command_is_reported_to_model(self):
         agent = self.make([
             {"content": "", "tool_calls": [call("executar_comando", terminal="CMD", comando="dir", motivo="x")]},

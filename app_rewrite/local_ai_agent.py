@@ -39,6 +39,33 @@ MISSING_FILE_HINT = ("[Aviso do sistema] O arquivo %s NÃO existe na pasta do pr
 
 TERMINAL_NAMES = {"POWERSHELL5.1": "PowerShell", "CMD": "CMD", "SSH": "SSH"}
 
+# Terminal que o usuario pediu pelo nome. O 7B ignorava "no terminal ssh" e usava PowerShell,
+# entao o pedido explicito vira regra: so esse terminal fica no schema da decisao.
+TERMINAL_WORDS = (
+    ("SSH", re.compile(r"\bssh\b", re.I)),
+    ("CMD", re.compile(r"\b(cmd|prompt de comando)\b", re.I)),
+    ("POWERSHELL5.1", re.compile(r"\b(power\s?shell|pwsh)\b", re.I)),
+)
+TERMINAL_HINTS = {
+    "SSH": ('O usuário pediu o terminal SSH (servidor Linux remoto, já conectado no CodeBridge): '
+            'use "terminal": "SSH" e um comando Linux/bash, como ls -la, pwd, df -h ou cat arquivo. '
+            'Não use comandos do PowerShell, caminhos do Windows nem Set-Location.'),
+    "CMD": ('O usuário pediu o CMD: use "terminal": "CMD" e um comando do cmd.exe, '
+            'como dir, type ou echo.'),
+    "POWERSHELL5.1": 'O usuário pediu o PowerShell: use "terminal": "POWERSHELL5.1".',
+}
+RESULT_HEADER = "[Resultado da ação]"
+
+
+def requested_terminal(text: str):
+    """Terminal citado pelo nome no pedido (o primeiro que aparece), ou None."""
+    found = []
+    for terminal, pattern in TERMINAL_WORDS:
+        match = pattern.search(str(text or ""))
+        if match:
+            found.append((match.start(), terminal))
+    return min(found)[1] if found else None
+
 SYSTEM_PROMPT = """Você é a IA Local do CodeBridge: um assistente de programação experiente que roda no computador do usuário (Windows).
 Responda em português do Brasil, de forma clara e objetiva, falando diretamente com o usuário ("você"), nunca em terceira pessoa. Use seu conhecimento geral de programação à vontade.
 Pasta do projeto atual: {root}
@@ -52,7 +79,8 @@ Regras:
 - Diga de qual arquivo ou comando veio a informação.
 - Para perguntas de "como fazer", responda com o código num bloco ```.
 - Se o usuário recusou um comando, não insista; pergunte o que ele prefere.
-- Se realmente não souber algo, diga isso."""
+- Se realmente não souber algo, diga isso.
+- Não copie o bloco [Resultado da ação] inteiro: diga em uma frase o que aconteceu e mostre só a saída que interessa num bloco ```."""
 
 DECISION_INSTRUCTION = """[Planejador interno — esta mensagem não é do usuário]
 Escolha a PRÓXIMA ação para atender o último pedido do usuário. Responda só com o JSON.
@@ -71,13 +99,14 @@ REJECTED_PREFIX = "O usuário recusou"
 ANSWER = "responder"
 
 
-def decision_schema(rag_enabled: bool) -> dict:
+def decision_schema(rag_enabled: bool, terminal: str | None = None) -> dict:
     actions = [ANSWER, tools.TOOL_RUN, tools.TOOL_READ, tools.TOOL_LIST]
     if rag_enabled:
         actions.append(tools.TOOL_RAG)
+    terminals = [terminal] if terminal in tools.TERMINALS else list(tools.TERMINALS)
     return {"type": "object", "properties": {
         "acao": {"type": "string", "enum": actions},
-        "terminal": {"type": "string", "enum": list(tools.TERMINALS)},
+        "terminal": {"type": "string", "enum": terminals},
         "comando": {"type": "string"},
         "caminho": {"type": "string"},
         "consulta": {"type": "string"},
@@ -85,13 +114,16 @@ def decision_schema(rag_enabled: bool) -> dict:
     }, "required": ["acao", "motivo"]}
 
 
-def decision_to_call(decision, rag_enabled: bool):
-    """JSON do planejador -> chamada de ferramenta, ou None para responder."""
+def decision_to_call(decision, rag_enabled: bool, terminal: str | None = None):
+    """JSON do planejador -> chamada de ferramenta, ou None para responder.
+
+    Se o usuario pediu um terminal pelo nome, o comando vai para ele de qualquer jeito.
+    """
     if not isinstance(decision, dict):
         return None
     action = decision.get("acao")
     if action == tools.TOOL_RUN:
-        args = {"terminal": decision.get("terminal") or "POWERSHELL5.1",
+        args = {"terminal": terminal or decision.get("terminal") or "POWERSHELL5.1",
                 "comando": decision.get("comando") or "", "motivo": decision.get("motivo") or ""}
         if not args["comando"].strip():
             return None
@@ -150,7 +182,7 @@ def plain_history(history: list, context: str = "") -> list:
             out.append({"role": "user", "content": str(message.get("content") or "") + "\n\n" + context})
             continue
         if role == "tool":
-            out.append({"role": "user", "content": "[Resultado da ação]\n" + str(message.get("content") or "")})
+            out.append({"role": "user", "content": RESULT_HEADER + "\n" + str(message.get("content") or "")})
         elif role == "assistant" and message.get("tool_calls"):
             text = str(message.get("content") or "").strip()
             actions = "; ".join(describe_call(c) for c in message["tool_calls"])
@@ -176,6 +208,8 @@ def strip_tool_json(text: str) -> str:
                 data = None
             if isinstance(data, dict) and data and set(data) <= TOOL_ARG_KEYS:
                 continue
+        if body == RESULT_HEADER:  # o 7B as vezes copia o cabecalho do resultado
+            continue
         kept.append(line)
     return re.sub(r"\n{3,}", "\n\n", "\n".join(kept)).strip()
 
@@ -248,6 +282,7 @@ class LocalAiAgent:
         self._cancel = threading.Event()
         self._decision = queue.Queue()
         self._thread = None
+        self._terminal = None
 
     # ---- comandos da interface -----------------------------------------
     def send(self, text: str, rag_enabled: bool = True) -> bool:
@@ -300,6 +335,7 @@ class LocalAiAgent:
                      self._rag_context(text) if rag_enabled else ""]
             context = "\n\n".join(part for part in parts if part)
             self.history.append({"role": "user", "content": text})
+            self._terminal = requested_terminal(text)
             self._loop(context, rag_enabled)
         except LocalAiCancelled:
             self._emit("note", "interrompido")
@@ -383,13 +419,15 @@ class LocalAiAgent:
     def _decision_messages(self, context: str, rag_enabled: bool) -> list:
         instruction = DECISION_INSTRUCTION.format(root=self.project_root() or "(nenhuma)",
                                                   rag_option=RAG_OPTION if rag_enabled else "")
+        if self._terminal:
+            instruction += "\n" + TERMINAL_HINTS[self._terminal]
         return self._answer_messages(context) + [{"role": "user", "content": instruction}]
 
     def _decide(self, context: str, rag_enabled: bool):
         self._emit("status", "Decidindo o próximo passo\u2026")
         try:
             return self.client_factory().decide(self._decision_messages(context, rag_enabled),
-                                                decision_schema(rag_enabled))
+                                                decision_schema(rag_enabled, self._terminal))
         except LocalAiCancelled:
             raise
         except Exception as exc:
@@ -402,7 +440,7 @@ class LocalAiAgent:
         for _ in range(MAX_STEPS):
             if self.cancelled():
                 raise LocalAiCancelled()
-            call = decision_to_call(self._decide(context, rag_enabled), rag_enabled)
+            call = decision_to_call(self._decide(context, rag_enabled), rag_enabled, self._terminal)
             if self.cancelled():
                 raise LocalAiCancelled()
             if call is None:
