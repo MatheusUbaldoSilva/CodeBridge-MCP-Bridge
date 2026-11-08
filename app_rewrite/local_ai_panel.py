@@ -54,10 +54,25 @@ def format_message(text: str) -> str:
     return "".join(out)
 
 
+HEADING = re.compile(r"^#{1,6}\s+(.*)$")
+BULLET = re.compile(r"^(\s*)[-*]\s+(.*)$")
+BOLD = re.compile(r"\*\*(.+?)\*\*")
+
+
 def _format_plain(text: str) -> str:
-    escaped = html.escape(text)
-    escaped = INLINE_CODE.sub(r'<code style="background:#0a1015;">\1</code>', escaped)
-    return escaped.replace("\n", "<br>")
+    """Markdown simples do modelo: titulos, **negrito**, listas e `codigo`."""
+    lines = []
+    for line in html.escape(text).split("\n"):
+        heading = HEADING.match(line)
+        if heading:
+            line = '<b style="color:#dfe7ee;">%s</b>' % heading.group(1)
+        else:
+            bullet = BULLET.match(line)
+            if bullet:
+                line = "%s\u2022 %s" % ("&nbsp;" * 2 * len(bullet.group(1)), bullet.group(2))
+        line = BOLD.sub(r"<b>\1</b>", line)
+        lines.append(INLINE_CODE.sub(r'<code style="background:#0a1015;">\1</code>', line))
+    return "<br>".join(lines)
 
 
 def status_line(server, agent_status: str = "") -> tuple[str, str]:

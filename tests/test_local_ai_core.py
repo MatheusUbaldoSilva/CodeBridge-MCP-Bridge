@@ -169,10 +169,11 @@ class AgentTest(unittest.TestCase):
                 self.assertEqual(data["command"], "Get-Date")
                 agent.approve("Get-Date -Format s")
 
-        drain(agent, on_event=on_event)
+        self.events = drain(agent, on_event=on_event)
         self.assertEqual(self.runner.calls, [("POWERSHELL5.1", "Get-Date -Format s")])
         tool_msg = [m for m in agent.history if m["role"] == "tool"][0]
         self.assertIn("OK SAIDA", tool_msg["content"])
+        self.assertTrue(any(k == "note" and "concluído, código 0" in str(d) for k, d in self.events))
         self.assertIn("editou", tool_msg["content"])
 
     def test_rejected_command_is_reported_to_model(self):

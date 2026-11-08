@@ -172,6 +172,10 @@ class LocalAiPanelTest(unittest.TestCase):
         self.assertIn("<code", out)
         self.assertIn("pre-wrap", out)
         self.assertNotIn("<br><pre", out)
+        md = panel_mod.format_message("### Titulo\n- item **forte**\n  - sub")
+        self.assertIn('<b style="color:#dfe7ee;">Titulo</b>', md)
+        self.assertIn("\u2022 item <b>forte</b>", md)
+        self.assertNotIn("###", md)
 
 
 if __name__ == "__main__":

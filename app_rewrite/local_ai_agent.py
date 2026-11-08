@@ -28,6 +28,9 @@ CODE_EXTENSIONS = {".py", ".md", ".txt", ".json", ".js", ".ts", ".ps1", ".bat", 
                    ".yaml", ".yml", ".toml", ".ini", ".cfg", ".html", ".css", ".qss", ".nsi", ".sql"}
 MENTIONED_FILE_LINES = 200
 
+STATE_LABELS = {"FINISHED": "concluído", "FAILED": "falhou", "CANCELLED": "cancelado",
+                "INTERRUPTED": "interrompido"}
+
 MISSING_FILE_HINT = ("[Aviso do sistema] O arquivo %s NÃO existe na pasta do projeto (%s). "
                      "Não invente o conteúdo: diga ao usuário que não encontrou o arquivo e que ele "
                      "pode conferir o projeto selecionado na Central RAG.")
@@ -341,7 +344,8 @@ class LocalAiAgent:
             raise LocalAiCancelled()
         state, code = result.get("state"), result.get("exit_code")
         self._emit("note", "comando terminou (%s%s)" % (
-            str(state).lower(), "" if code is None else ", código %s" % code))
+            STATE_LABELS.get(str(state).upper(), str(state).lower()),
+            "" if code is None else ", código %s" % code))
         output = tools.clip(result.get("output") or "(sem saída)", COMMAND_OUTPUT_CHARS)
         edited_note = "" if command == request["command"] else "O usuário editou o comando antes de rodar.\n"
         return "%sComando: %s\nEstado: %s  Código: %s\nSaída:\n%s" % (
