@@ -33,6 +33,22 @@ BUTTON_OFF_STYLE = ("QPushButton{background:#1b2229;color:#c9d4dd;border:1px sol
 METER_STYLE = ("QProgressBar{background:#1b2229;border:1px solid #33414d;border-radius:4px;"
                "color:#dfe7ee;text-align:center;font-size:11px;}"
                "QProgressBar::chunk{background:%s;border-radius:3px;}")
+INPUT_MAX_LINES = 8
+COMPOSER_STYLE = ("QFrame#aiComposer{background:#161e26;border:1px solid #33414d;"
+                  "border-radius:16px;}")
+INPUT_STYLE = ("QPlainTextEdit#aiInput{background:transparent;border:none;color:#e6edf3;"
+               "font-size:13px;padding:0;}")
+SMALL_CHECK_STYLE = "QCheckBox{color:#8b98a5;font-size:11px;background:transparent;}"
+SMALL_BUTTON_STYLE = ("QPushButton{color:#8b98a5;background:transparent;border:none;font-size:11px;"
+                      "padding:2px 4px;}QPushButton:hover{color:#c9d4dd;}"
+                      "QPushButton:disabled{color:#4a5560;}")
+SEND_STYLE = ("QPushButton{background:#2b6cb0;color:white;border:none;border-radius:16px;"
+              "font-size:16px;font-weight:bold;}QPushButton:hover{background:#3182ce;}"
+              "QPushButton:disabled{background:#2a3540;color:#5b6670;}")
+STOP_STYLE = ("QPushButton{background:#c9d4dd;color:#161e26;border:none;border-radius:16px;"
+              "font-size:12px;}QPushButton:hover{background:#ffffff;}")
+
+
 def _gb(mb) -> str:
     return ("%.1f" % (mb / 1024)).replace(".", ",")
 
@@ -180,28 +196,68 @@ class LocalAiPanel(QWidget):
         self._pending = None
         layout.addWidget(self.card)
 
+        layout.addWidget(self._build_composer())
+
+    def _build_composer(self):
+        """Caixa de mensagem no estilo do app do Claude: campo que cresce e botoes dentro."""
+        self.composer = QFrame()
+        self.composer.setObjectName("aiComposer")
+        self.composer.setStyleSheet(COMPOSER_STYLE)
+        box = QVBoxLayout(self.composer)
+        box.setContentsMargins(14, 10, 10, 8)
+        box.setSpacing(4)
+
+        self.input = QPlainTextEdit()
+        self.input.setObjectName("aiInput")
+        self.input.setPlaceholderText("Pergunte ou peça uma tarefa…")
+        self.input.setToolTip("Enter envia · Shift+Enter quebra a linha")
+        self.input.setStyleSheet(INPUT_STYLE)
+        self.input.setFrameShape(QFrame.NoFrame)
+        self.input.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.input.installEventFilter(self)
+        self.input.document().contentsChanged.connect(self._fit_input)
+        box.addWidget(self.input)
+
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(10)
         self.use_rag = QCheckBox("Consultar Central RAG")
         self.use_rag.setChecked(False)  # liga so quando precisar dos conhecimentos do projeto
         self.use_rag.setToolTip("Marque quando a pergunta depender dos conhecimentos do projeto")
-        layout.addWidget(self.use_rag)
-
-        bottom = QHBoxLayout()
-        self.input = QPlainTextEdit()
-        self.input.setPlaceholderText("Pergunte ou peça uma tarefa…  (Enter envia, Shift+Enter nova linha)")
-        self.input.setMaximumHeight(84)
-        self.input.installEventFilter(self)
-        bottom.addWidget(self.input, 1)
-        side = QVBoxLayout()
-        self.send_button = QPushButton("Enviar")
-        self.stop_button = QPushButton("Parar")
-        self.clear_button = QPushButton("Limpar")
+        self.use_rag.setStyleSheet(SMALL_CHECK_STYLE)
+        self.clear_button = QPushButton("Limpar conversa")
+        self.clear_button.setFlat(True)
+        self.clear_button.setCursor(Qt.PointingHandCursor)
+        self.clear_button.setStyleSheet(SMALL_BUTTON_STYLE)
+        self.send_button = QPushButton("↑")
+        self.send_button.setToolTip("Enviar (Enter)")
+        self.stop_button = QPushButton("■")
+        self.stop_button.setToolTip("Parar")
+        for button, style in ((self.send_button, SEND_STYLE), (self.stop_button, STOP_STYLE)):
+            button.setFixedSize(32, 32)
+            button.setCursor(Qt.PointingHandCursor)
+            button.setStyleSheet(style)
+        self.stop_button.hide()
         self.send_button.clicked.connect(self.send)
         self.stop_button.clicked.connect(self.stop)
         self.clear_button.clicked.connect(self.clear)
-        for button in (self.send_button, self.stop_button, self.clear_button):
-            side.addWidget(button)
-        bottom.addLayout(side)
-        layout.addLayout(bottom)
+        row.addWidget(self.use_rag)
+        row.addWidget(self.clear_button)
+        row.addStretch(1)
+        row.addWidget(self.send_button)
+        row.addWidget(self.stop_button)
+        box.addLayout(row)
+        self._fit_input()
+        return self.composer
+
+    def _fit_input(self):
+        """Comeca com 1 linha e cresce ate INPUT_MAX_LINES; depois rola."""
+        lines = int(self.input.document().size().height()) or 1
+        lines = max(1, min(INPUT_MAX_LINES, lines))
+        spacing = self.input.fontMetrics().lineSpacing()
+        self.input.setFixedHeight(lines * spacing + 10)
+        self.send_button.setEnabled(not self.agent.running and self.server.mode != "OFF"
+                                    and bool(self.input.toPlainText().strip()))
 
     def _meter(self, color):
         meter = QProgressBar()
@@ -308,8 +364,11 @@ class LocalAiPanel(QWidget):
         self.status.setText(text)
         self.status.setStyleSheet("color:%s;" % color)
         running = self.agent.running
-        self.send_button.setEnabled(not running and self.server.mode != "OFF")
+        has_text = bool(self.input.toPlainText().strip())
+        self.send_button.setEnabled(not running and self.server.mode != "OFF" and has_text)
+        self.send_button.setVisible(not running)
         self.stop_button.setEnabled(running)
+        self.stop_button.setVisible(running)
         self.clear_button.setEnabled(not running and bool(self.blocks))
         self._render_mode()
         if self._dirty:

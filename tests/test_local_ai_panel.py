@@ -225,6 +225,28 @@ class LocalAiPanelTest(unittest.TestCase):
         panel._tick()
         self.assertEqual(panel.chat.items, [])
 
+    def test_composer_like_claude_app(self):
+        panel = self.make([{"content": "Ok."}])
+        self.assertNotIn("Shift", panel.input.placeholderText())
+        self.assertIs(panel.use_rag.parent(), panel.composer)
+        self.assertIs(panel.send_button.parent(), panel.composer)
+        self.assertFalse(panel.send_button.isEnabled())  # vazio: nao envia
+        one_line = panel.input.height()
+        panel.input.setPlainText("a\nb\nc\nd")
+        self.assertGreater(panel.input.height(), one_line)  # cresce com o texto
+        self.assertTrue(panel.send_button.isEnabled())
+        panel.input.setPlainText("\n".join("x" * 30))
+        self.assertLessEqual(panel.input.height(),
+                             panel_mod.INPUT_MAX_LINES * panel.input.fontMetrics().lineSpacing() + 10)
+        panel.input.setPlainText("oi")
+        panel.send()
+        panel._tick()
+        self.assertTrue(panel.stop_button.isHidden() is False or not panel.agent.running)
+        self.assertTrue(pump(panel, lambda: not panel.agent.running))
+        self.assertTrue(panel.stop_button.isHidden())
+        self.assertFalse(panel.send_button.isHidden())
+        self.assertEqual(panel.input.height(), one_line)  # volta para 1 linha
+
     def test_activity_summary_texts(self):
         import local_ai_chat as chat_mod
         notes = ["leu app/a.py, linhas 1–10", "leu app/b.py, linhas 1–5", "listou a pasta tests",
