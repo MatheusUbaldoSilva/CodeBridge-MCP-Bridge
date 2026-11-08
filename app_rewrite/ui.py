@@ -17,7 +17,8 @@ from terminal_widget import TerminalWidget
 from telemetry import TelemetryService
 from telemetry_widget import TelemetryPanel
 from rag_panel import RagPanel
-from local_ai_panel import LocalAiPanel, badge as ai_badge_style
+from local_ai_panel import LocalAiPanel
+from ai_status import AiStatusCard
 from ssh_hostkey_box import HostKeyBox
 from password_eye import PasswordEye
 import status_text
@@ -76,7 +77,18 @@ class MainWindow(QMainWindow):
                     brand_pixmap.scaledToHeight(72, Qt.SmoothTransformation)
                 )
                 self.brand.setFixedHeight(80)
-        info_layout.addWidget(self.brand)
+        brand_row = QHBoxLayout()
+        brand_row.setContentsMargins(0, 0, 0, 0)
+        brand_row.setSpacing(14)
+        brand_row.addWidget(self.brand, 0)
+        # Card "IAs": status da IA Local e dos modelos da Central RAG (clique abre a IA Local)
+        self.ai_status = AiStatusCard(
+            local_server=lambda: getattr(getattr(self, "ai_tab", None), "server", None),
+            on_click=self._open_ai_tab,
+            parent=info_panel,
+        )
+        brand_row.addWidget(self.ai_status, 1, Qt.AlignVCenter)
+        info_layout.addLayout(brand_row)
 
         self.overall = QLabel()
         self.author_mcp = QLabel()
@@ -107,11 +119,6 @@ class MainWindow(QMainWindow):
         buttons.addWidget(self.stop_button)
         buttons.addWidget(self.sound_button)
         buttons.addWidget(self.auto_button)
-        self.ai_badge = QPushButton("IA: OFF")
-        self.ai_badge.setToolTip("IA Local: clique para abrir a aba")
-        self.ai_badge.clicked.connect(self._open_ai_tab)
-        self._ai_badge_text = None
-        buttons.addWidget(self.ai_badge)
         buttons.addStretch(1)
         info_layout.addLayout(buttons)
 
@@ -366,16 +373,6 @@ class MainWindow(QMainWindow):
         ai_tab = getattr(self, "ai_tab", None)
         if ai_tab is not None:
             self.tabs.setCurrentWidget(ai_tab)
-
-    def _update_ai_badge(self):
-        ai_tab = getattr(self, "ai_tab", None)
-        if ai_tab is None:
-            return
-        text, style = ai_badge_style(ai_tab.server)
-        if text != self._ai_badge_text:
-            self._ai_badge_text = text
-            self.ai_badge.setText(text)
-            self.ai_badge.setStyleSheet(style)
 
     def _ai_project_root(self):
         project = getattr(self.rag_tab, "project_id", "") or ""
@@ -916,7 +913,6 @@ class MainWindow(QMainWindow):
         self._update_auto_button()
         self._update_sound_button()
         self._update_turn_mode_buttons()
-        self._update_ai_badge()
         t = s["terminals"]
         self._auto_swap_terminal_tab(t)
         author_mcp = s.get("author_mcp") or {}
