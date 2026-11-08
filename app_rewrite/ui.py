@@ -17,6 +17,7 @@ from terminal_widget import TerminalWidget
 from telemetry import TelemetryService
 from telemetry_widget import TelemetryPanel
 from rag_panel import RagPanel
+from local_ai_panel import LocalAiPanel, badge as ai_badge_style
 from ssh_hostkey_box import HostKeyBox
 from password_eye import PasswordEye
 import status_text
@@ -106,6 +107,11 @@ class MainWindow(QMainWindow):
         buttons.addWidget(self.stop_button)
         buttons.addWidget(self.sound_button)
         buttons.addWidget(self.auto_button)
+        self.ai_badge = QPushButton("IA: OFF")
+        self.ai_badge.setToolTip("IA Local: clique para abrir a aba")
+        self.ai_badge.clicked.connect(self._open_ai_tab)
+        self._ai_badge_text = None
+        buttons.addWidget(self.ai_badge)
         buttons.addStretch(1)
         info_layout.addLayout(buttons)
 
@@ -321,6 +327,13 @@ class MainWindow(QMainWindow):
                 lambda _query: self._note_ui_rag_query()
             )
         self.tabs.addTab(self.rag_tab, "Central RAG")
+        self.ai_tab = LocalAiPanel(
+            self.runtime,
+            project_id=lambda: getattr(self.rag_tab, "project_id", "") or "",
+            project_root=self._ai_project_root,
+            parent=self.tabs,
+        )
+        self.tabs.addTab(self.ai_tab, "IA Local")
         self.tabs.addTab(self.ssh_tab, "Configuracao SSH")
         self.tabs.currentChanged.connect(
             self._sync_telemetry_panel
@@ -349,6 +362,35 @@ class MainWindow(QMainWindow):
         self.telemetry_timer.start(500)
         self.refresh()
         self.refresh_telemetry()
+    def _open_ai_tab(self):
+        ai_tab = getattr(self, "ai_tab", None)
+        if ai_tab is not None:
+            self.tabs.setCurrentWidget(ai_tab)
+
+    def _update_ai_badge(self):
+        ai_tab = getattr(self, "ai_tab", None)
+        if ai_tab is None:
+            return
+        text, style = ai_badge_style(ai_tab.server)
+        if text != self._ai_badge_text:
+            self._ai_badge_text = text
+            self.ai_badge.setText(text)
+            self.ai_badge.setStyleSheet(style)
+
+    def _ai_project_root(self):
+        project = getattr(self.rag_tab, "project_id", "") or ""
+        folder = None
+        try:
+            from rag.runtime import knowledge_sync
+            folder = knowledge_sync.settings(project).get("folder")
+        except Exception:
+            folder = None
+        if folder and Path(folder).is_dir():
+            return str(folder)
+        if project == "codebridge":
+            return str(Path(__file__).resolve().parent.parent)
+        return None
+
     def _update_auto_button(self):
         enabled = bool(self.runtime.auto_execute)
         self.auto_button.setText("Auto: ON" if enabled else "Auto: OFF")
@@ -833,6 +875,12 @@ class MainWindow(QMainWindow):
             or ""
         ).upper()
 
+        # Na aba IA Local o usuario acompanha o comando pela conversa; nao troca de aba.
+        ai_tab = getattr(self, "ai_tab", None)
+        if ai_tab is not None and self.tabs.currentWidget() is ai_tab:
+            self._last_auto_swap_generation = generation
+            return
+
         if self._last_auto_swap_generation is None:
             self._last_auto_swap_generation = generation
             currently_executing = any(
@@ -868,6 +916,7 @@ class MainWindow(QMainWindow):
         self._update_auto_button()
         self._update_sound_button()
         self._update_turn_mode_buttons()
+        self._update_ai_badge()
         t = s["terminals"]
         self._auto_swap_terminal_tab(t)
         author_mcp = s.get("author_mcp") or {}
@@ -1035,6 +1084,12 @@ class MainWindow(QMainWindow):
             )
             event.ignore()
             return
+        ai_tab = getattr(self, "ai_tab", None)
+        if ai_tab is not None:
+            try:
+                ai_tab.shutdown()
+            except Exception:
+                pass
         try:
             self.telemetry.stop()
         finally:
