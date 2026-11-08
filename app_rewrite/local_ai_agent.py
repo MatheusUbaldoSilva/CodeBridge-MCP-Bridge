@@ -453,7 +453,9 @@ class LocalAiAgent:
             result = self._run_tool(call)
             self.history.append({"role": "tool", "tool_call_id": call["id"],
                                  "content": tools.clip(result)})
-            if result.startswith(REJECTED_PREFIX):
+            # Um comando por pedido: depois de rodar (ou ser recusado) a IA so responde.
+            # O 7B inventava tarefas extras (pediu "ls" e ele emendou um "df -h").
+            if result.startswith(REJECTED_PREFIX) or call["function"]["name"] == tools.TOOL_RUN:
                 break
         else:
             self._emit("note", "parei após %d ações; peça para continuar se quiser" % MAX_STEPS)

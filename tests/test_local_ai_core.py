@@ -345,6 +345,27 @@ class AgentTest(unittest.TestCase):
         self.assertTrue(any(k == "note" and "parei após" in d for k, d in events))
         self.assertIn(("assistant_done", "Fim."), events)
 
+    def test_only_one_command_per_request(self):
+        # caso real: pediu "ls" no SSH e o modelo emendou um "df -h" depois
+        agent = self.make([
+            {"content": "", "tool_calls": [call("executar_comando", terminal="SSH", comando="ls -la", motivo="x")]},
+            {"content": "", "tool_calls": [call("executar_comando", terminal="SSH", comando="df -h", motivo="y")]},
+            {"content": "Aqui está o ls."},
+        ])
+        agent.send("executar ls no terminal ssh", rag_enabled=False)
+        approvals = []
+
+        def on_event(kind, data):
+            if kind == "approval":
+                approvals.append(data["command"])
+                agent.approve()
+
+        events = drain(agent, on_event=on_event)
+        self.assertEqual(approvals, ["ls -la"])
+        self.assertEqual(self.runner.calls, [("SSH", "ls -la")])
+        self.assertEqual(len(self.client.decide_requests), 1)
+        self.assertTrue(any(k == "assistant_done" for k, _d in events))
+
     def test_repeated_decision_stops_and_answers(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
