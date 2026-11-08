@@ -33,6 +33,12 @@ START_TIMEOUT_SECONDS = 180
 # Pesos (4,4 GB) + cache de contexto 8k + buffers. Abaixo disso o modelo nao cabe.
 REQUIRED_FREE_VRAM_MB = 5000
 REQUIRED_FREE_RAM_MB = 800
+# No processador o modelo inteiro fica na RAM (pesos + contexto + folga).
+REQUIRED_FREE_RAM_CPU_MB = 6000
+
+# Chave CPU/GPU/Automatico do card "IAs" (mesmo arquivo de rag/models/compute_preference.py).
+COMPUTE_MODES = ("AUTO", "GPU", "CPU")
+COMPUTE_ENV = "CODEBRIDGE_AI_COMPUTE"
 
 STATE_OFF = "OFF"
 STATE_LOADING = "LOADING"
@@ -56,6 +62,32 @@ def save_mode(mode: str, path: Path = SETTINGS_FILE) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"mode": mode}) + "\n", encoding="utf-8")
+
+
+def compute_file(settings: Path = SETTINGS_FILE) -> Path:
+    return Path(settings).parent / "compute.json"
+
+
+def load_compute(path: Path | None = None) -> str:
+    env = os.environ.get(COMPUTE_ENV)
+    value = env
+    if not env:
+        try:
+            value = json.loads(Path(path or compute_file()).read_text(encoding="utf-8")).get("compute")
+        except (OSError, ValueError, AttributeError):
+            value = None
+    value = str(value or "").strip().upper()
+    return value if value in COMPUTE_MODES else "AUTO"
+
+
+def save_compute(mode: str, path: Path | None = None) -> str:
+    mode = str(mode or "").strip().upper()
+    if mode not in COMPUTE_MODES:
+        raise ValueError("modo de processamento invalido: " + str(mode))
+    path = Path(path or compute_file())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"compute": mode}) + "\n", encoding="utf-8")
+    return mode
 
 
 def installed(model: Path = MODEL_FILE, exe: Path = SERVER_EXE) -> bool:
@@ -88,8 +120,37 @@ def memory_snapshot() -> dict:
     return info
 
 
+def _free(memory: dict, kind: str):
+    total, used = memory.get(kind + "_total_mb"), memory.get(kind + "_used_mb")
+    return None if total is None or used is None else total - used
+
+
+def choose_device(compute: str, memory: dict) -> tuple[str, str | None]:
+    """("GPU"|"CPU", motivo para nao ligar ou None) conforme a chave do card IAs."""
+    compute = str(compute or "AUTO").upper()
+    vram, ram = _free(memory, "vram"), _free(memory, "ram")
+    if compute == "CPU":
+        if ram is not None and ram < REQUIRED_FREE_RAM_CPU_MB:
+            return "CPU", ("Memória insuficiente para rodar no processador: livre %s de RAM, precisa %s. "
+                           "Feche programas." % (_gb(ram), _gb(REQUIRED_FREE_RAM_CPU_MB)))
+        return "CPU", None
+    if compute == "GPU":
+        if vram is None:
+            return "GPU", ("Modo só GPU: nenhuma placa de vídeo NVIDIA encontrada. "
+                           "Escolha CPU ou Automático no card IAs.")
+        return "GPU", start_blocker(memory)
+    if vram is not None and vram >= REQUIRED_FREE_VRAM_MB:
+        return "GPU", start_blocker(memory)
+    if ram is not None and ram < REQUIRED_FREE_RAM_CPU_MB:
+        gpu = ("livre %s na placa de vídeo (precisa %s)" % (_gb(vram), _gb(REQUIRED_FREE_VRAM_MB))
+               if vram is not None else "sem placa de vídeo NVIDIA")
+        return "CPU", ("Memória insuficiente: %s e %s de RAM para o processador (precisa %s). "
+                       "Feche programas." % (gpu, _gb(ram), _gb(REQUIRED_FREE_RAM_CPU_MB)))
+    return "CPU", None
+
+
 def start_blocker(memory: dict, *, model_loaded: bool = False) -> str | None:
-    """Motivo em portugues para nao ligar, ou None se ha memoria suficiente."""
+    """Motivo em portugues para nao ligar na placa de video, ou None se ha memoria."""
     if model_loaded:
         return None
     total, used = memory.get("vram_total_mb"), memory.get("vram_used_mb")
@@ -117,12 +178,15 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
-def build_command(exe: Path, model: Path, port: int, api_key: str) -> list[str]:
+def build_command(exe: Path, model: Path, port: int, api_key: str,
+                  device: str = "GPU") -> list[str]:
+    on_cpu = str(device).upper() == "CPU"
     return [
         str(exe), "-m", str(model),
         "--host", "127.0.0.1", "--port", str(port),
         "--api-key", api_key,
-        "-ngl", "99", "-c", str(CONTEXT_TOKENS), "--parallel", "1",
+        *(["--device", "none", "-ngl", "0"] if on_cpu else ["-ngl", "99"]),
+        "-c", str(CONTEXT_TOKENS), "--parallel", "1",
         "--jinja", "--load-mode", "none",
     ]
 
@@ -145,6 +209,7 @@ class LocalAiServer:
         self.api_key = ""
         self.mode = load_mode(self.settings)
         self.busy = False
+        self.device = None  # "GPU" ou "CPU" do processo atual
         self._last_used = clock()
         self._generation = 0
 
@@ -188,10 +253,11 @@ class LocalAiServer:
             if not self.is_installed():
                 self.state, self.error = STATE_ERROR, "Modelo não instalado em " + str(AI_DIR)
                 return False
-            blocker = start_blocker(self._memory())
+            device, blocker = choose_device(load_compute(compute_file(self.settings)), self._memory())
             if blocker:
                 self.state, self.error = STATE_ERROR, blocker
                 return False
+            self.device = device
             self._kill_stale()
             self.port = _free_port()
             self.api_key = secrets.token_hex(16)
@@ -199,7 +265,7 @@ class LocalAiServer:
             self._log = open(LOG_FILE, "ab")
             try:
                 self._proc = self._popen(
-                    build_command(self.exe, self.model, self.port, self.api_key),
+                    build_command(self.exe, self.model, self.port, self.api_key, device),
                     stdout=self._log, stderr=subprocess.STDOUT,
                     stdin=subprocess.DEVNULL, creationflags=NO_WINDOW,
                     cwd=str(self.exe.parent),

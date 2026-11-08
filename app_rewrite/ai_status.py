@@ -10,7 +10,9 @@ import threading
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QVBoxLayout
+from PySide6.QtWidgets import (
+    QButtonGroup, QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton, QVBoxLayout,
+)
 
 # (chave, nome na tela, modelo na tela, trecho do nome do arquivo .gguf)
 MODELS = (
@@ -27,6 +29,16 @@ LOCAL_STATES = {  # estado do LocalAiServer -> (texto, cor, conta como ativa)
     "OFF": ("Desligada", GRAY, False),
 }
 GPU_FLAGS = ("-ngl", "--n-gpu-layers", "--gpu-layers")
+
+# Chave de processamento das IAs (mesma ordem e visual dos botoes do cronometro).
+COMPUTE_BUTTONS = (
+    ("CPU", "CPU", "#c0762c",
+     "Todas as IAs rodam no processador e a placa de vídeo fica livre."),
+    ("GPU", "GPU", "#2f9e44",
+     "Todas as IAs rodam na placa de vídeo. Sem placa ou sem memória livre, elas não ligam."),
+    ("AUTO", "Automático", "#3a78c2",
+     "Usa a placa de vídeo quando há memória livre; senão, o processador."),
+)
 
 BOX_STYLE = ("QFrame#aiStatusBox{background:#0a1015;border:1px solid #33414d;"
              "border-radius:10px;}QFrame#aiStatusBox:hover{border-color:#4a5c6b;}")
@@ -106,6 +118,19 @@ def describe(local_server, processes) -> list:
     return rows
 
 
+def compute_button_style(index: int, count: int, color: str, checked: bool) -> str:
+    """Botoes segmentados iguais aos do cronometro (ChatGPT | Claude | Desabilitado)."""
+    radius = ""
+    if index == 0:
+        radius = "border-top-left-radius:6px;border-bottom-left-radius:6px;"
+    elif index == count - 1:
+        radius = "border-top-right-radius:6px;border-bottom-right-radius:6px;"
+    return ("QPushButton{background:%s;color:%s;border:1px solid #33414d;border-radius:0px;%s"
+            "padding:3px 14px;font-size:12px;font-weight:%s;}"
+            % (color if checked else "#1b242c", "white" if checked else "#9fb0bd",
+               radius, "700" if checked else "500"))
+
+
 def title_for(rows) -> str:
     active = sum(1 for row in rows if row["active"])
     if not active:
@@ -118,20 +143,39 @@ class AiStatusCard(QFrame):
     """Card clicavel (abre a aba IA Local). Varre os processos fora da tela."""
 
     def __init__(self, local_server=lambda: None, on_click=None, scan=scan_llama_servers,
-                 parent=None, interval_ms: int = 2000):
+                 parent=None, interval_ms: int = 2000, compute=lambda: "AUTO", on_compute=None):
         super().__init__(parent)
         self.setObjectName("aiStatusBox")
         self.setStyleSheet(BOX_STYLE)
         self.setMinimumWidth(230)
-        self.setFixedHeight(84)
+        self.setFixedHeight(128)
         self.setCursor(Qt.PointingHandCursor)
         self.setToolTip("Status das IAs do CodeBridge · clique para abrir a IA Local")
         self._local_server, self._on_click, self._scan = local_server, on_click, scan
+        self._compute, self._on_compute = compute, on_compute
         self._processes, self._scanning = [], False
 
         box = QVBoxLayout(self)
-        box.setContentsMargins(14, 8, 14, 8)
+        box.setContentsMargins(14, 10, 14, 8)
         box.setSpacing(3)
+        buttons = QHBoxLayout()
+        buttons.setContentsMargins(0, 0, 0, 4)
+        buttons.setSpacing(0)
+        buttons.addStretch(1)
+        self.compute_group = QButtonGroup(self)
+        self.compute_group.setExclusive(True)
+        self.compute_buttons = {}
+        for mode, text, _color, tip in COMPUTE_BUTTONS:
+            button = QPushButton(text)
+            button.setCheckable(True)
+            button.setToolTip(tip)
+            button.setCursor(Qt.PointingHandCursor)
+            button.clicked.connect(lambda checked=False, value=mode: self.choose_compute(value))
+            self.compute_group.addButton(button)
+            self.compute_buttons[mode] = button
+            buttons.addWidget(button)
+        buttons.addStretch(1)
+        box.addLayout(buttons)
         self.title = QLabel("IAS")
         self.title.setStyleSheet(TITLE_STYLE)
         box.addWidget(self.title)
@@ -158,7 +202,27 @@ class AiStatusCard(QFrame):
         self._timer.timeout.connect(self._tick)
         self._timer.start(interval_ms)
 
+    def choose_compute(self, mode: str) -> None:
+        if self._on_compute is not None:
+            self._on_compute(mode)
+        self.refresh_now()
+
+    def _render_compute(self) -> None:
+        try:
+            current = str(self._compute() or "AUTO").upper()
+        except Exception:
+            current = "AUTO"
+        for index, (mode, _text, color, _tip) in enumerate(COMPUTE_BUTTONS):
+            button = self.compute_buttons[mode]
+            checked = mode == current
+            if button.isChecked() != checked:
+                button.setChecked(checked)
+            style = compute_button_style(index, len(COMPUTE_BUTTONS), color, checked)
+            if button.styleSheet() != style:
+                button.setStyleSheet(style)
+
     def refresh_now(self, processes=None) -> list:
+        self._render_compute()
         if processes is not None:
             self._processes = processes
         try:

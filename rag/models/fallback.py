@@ -174,6 +174,41 @@ def build_gpu_config(
     )
 
 
+def manager_for_compute(
+    base_config: LlamaServerConfig,
+    *,
+    compute: Optional[str] = None,
+    lifecycle_factory: Optional[LifecycleFactory] = None,
+    device_discovery: Optional[Callable[[Path], Sequence[str]]] = None,
+) -> "TextModelFallbackManager":
+    """Gerenciador conforme a chave CPU/GPU/Automatico do CodeBridge.
+
+    AUTO: igual a TextModelFallbackManager.auto (GPU primeiro, CPU se falhar).
+    CPU: so processador. GPU: so placa de video, sem cair para a CPU.
+    """
+    from .compute_preference import load_compute
+
+    mode = (compute or load_compute()).upper()
+    if mode == "CPU":
+        return TextModelFallbackManager(
+            gpu_config=None,
+            cpu_config=build_cpu_fallback_config(base_config),
+            selected_gpu_device=None,
+            lifecycle_factory=lifecycle_factory or TextModelLifecycle,
+            gpu_unavailable_reason="modo so CPU escolhido no CodeBridge",
+        )
+    # Mesma chamada de antes no modo AUTO (so repassa o que foi informado).
+    kwargs = {}
+    if lifecycle_factory is not None:
+        kwargs["lifecycle_factory"] = lifecycle_factory
+    if device_discovery is not None:
+        kwargs["device_discovery"] = device_discovery
+    manager = TextModelFallbackManager.auto(base_config, **kwargs)
+    if mode == "GPU":
+        manager._allow_cpu_fallback = False
+    return manager
+
+
 class TextModelFallbackManager:
     def __init__(
         self,
@@ -183,6 +218,7 @@ class TextModelFallbackManager:
         selected_gpu_device: Optional[str] = None,
         lifecycle_factory: LifecycleFactory = TextModelLifecycle,
         gpu_unavailable_reason: Optional[str] = None,
+        allow_cpu_fallback: bool = True,
     ) -> None:
         if gpu_config is not None:
             if gpu_config.device in (
@@ -235,6 +271,8 @@ class TextModelFallbackManager:
         self._gpu_unavailable_reason = (
             gpu_unavailable_reason
         )
+        # False no modo "so GPU" escolhido no CodeBridge: nao cai para a CPU.
+        self._allow_cpu_fallback = bool(allow_cpu_fallback)
 
         self._active_lifecycle: Optional[
             TextModelLifecycle
@@ -364,6 +402,12 @@ class TextModelFallbackManager:
             self._gpu_error = (
                 self._gpu_unavailable_reason
                 or "GPU unavailable"
+            )
+
+        if not self._allow_cpu_fallback:
+            raise ModelFallbackExhaustedError(
+                self._gpu_error,
+                "CPU desativada: modo so GPU escolhido no CodeBridge",
             )
 
         cpu_lifecycle = self._lifecycle_factory(

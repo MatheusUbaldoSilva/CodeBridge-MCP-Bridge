@@ -156,7 +156,8 @@ def _write_vectors(path: Path, project_id: str, text_rows, code_rows, *, text_cp
     from rag.models.code_backend_policy import (
         CODE_SEARCH_CONTEXT_TOKENS, CODE_SEARCH_PARALLEL_SLOTS,
     )
-    from rag.models.fallback import TextModelFallbackManager, build_cpu_fallback_config
+    from rag.models.fallback import TextModelFallbackManager, build_cpu_fallback_config, manager_for_compute
+    from rag.models.compute_preference import load_compute
 
     client=open_qdrant_local(path)
     llama=Path(r"C:\llama\llama-server.exe")
@@ -182,7 +183,7 @@ def _write_vectors(path: Path, project_id: str, text_rows, code_rows, *, text_cp
                         lifecycle_factory=TextModelLifecycle,
                         gpu_unavailable_reason="isolated auto-index TEXT CPU policy",
                     )
-                    if text_cpu_only else TextModelFallbackManager.auto(text_config)
+                    if text_cpu_only else manager_for_compute(text_config)
                 )
                 manager.load(timeout_seconds=90)
                 life=manager.active_lifecycle
@@ -195,11 +196,14 @@ def _write_vectors(path: Path, project_id: str, text_rows, code_rows, *, text_cp
                     ubatch_size=CODE_INDEX_UBATCH_TOKENS,
                     parallel_slots=CODE_SEARCH_PARALLEL_SLOTS,
                 )
-                manager=TextModelFallbackManager(
+                compute=load_compute()  # chave CPU/GPU/Automatico do CodeBridge
+                manager=(TextModelFallbackManager(
                     gpu_config=gpu_config,
                     cpu_config=build_cpu_fallback_config(gpu_config),
                     selected_gpu_device="CUDA0",
                     lifecycle_factory=CodeModelLifecycle)
+                    if compute=="AUTO" else
+                    manager_for_compute(gpu_config, compute=compute, lifecycle_factory=CodeModelLifecycle))
                 manager.load(timeout_seconds=90)
                 life=manager.active_lifecycle
             try:

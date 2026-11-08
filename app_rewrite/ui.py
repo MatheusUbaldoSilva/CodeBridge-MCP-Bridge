@@ -19,6 +19,7 @@ from telemetry_widget import TelemetryPanel
 from rag_panel import RagPanel
 from local_ai_panel import LocalAiPanel
 from ai_status import AiStatusCard
+from local_ai_server import load_compute as load_ai_compute, save_compute as save_ai_compute
 from ssh_hostkey_box import HostKeyBox
 from password_eye import PasswordEye
 import status_text
@@ -77,18 +78,25 @@ class MainWindow(QMainWindow):
                     brand_pixmap.scaledToHeight(72, Qt.SmoothTransformation)
                 )
                 self.brand.setFixedHeight(80)
-        brand_row = QHBoxLayout()
-        brand_row.setContentsMargins(0, 0, 0, 0)
-        brand_row.setSpacing(14)
-        brand_row.addWidget(self.brand, 0)
-        # Card "IAs": status da IA Local e dos modelos da Central RAG (clique abre a IA Local)
+        status_column = QVBoxLayout()
+        status_column.setContentsMargins(0, 0, 0, 0)
+        status_column.setSpacing(4)
+        status_column.addWidget(self.brand)
+        top_row = QHBoxLayout()
+        top_row.setContentsMargins(0, 0, 0, 0)
+        top_row.setSpacing(14)
+        top_row.addLayout(status_column, 0)
+        # Card "IAs": chave CPU/GPU/Automatico de todas as IAs + status da IA Local e
+        # dos modelos da Central RAG (clique fora dos botoes abre a IA Local)
         self.ai_status = AiStatusCard(
             local_server=lambda: getattr(getattr(self, "ai_tab", None), "server", None),
             on_click=self._open_ai_tab,
+            compute=load_ai_compute,
+            on_compute=self.set_ai_compute,
             parent=info_panel,
         )
-        brand_row.addWidget(self.ai_status, 1, Qt.AlignVCenter)
-        info_layout.addLayout(brand_row)
+        top_row.addWidget(self.ai_status, 1, Qt.AlignVCenter)
+        info_layout.addLayout(top_row)
 
         self.overall = QLabel()
         self.author_mcp = QLabel()
@@ -99,7 +107,7 @@ class MainWindow(QMainWindow):
         for widget in (
             self.overall, self.author_mcp, self.secure_tunnel, self.api, self.active
         ):
-            info_layout.addWidget(widget)
+            status_column.addWidget(widget)
 
         buttons = QHBoxLayout()
         self.refresh_button = QPushButton("Atualizar estado")
@@ -369,6 +377,19 @@ class MainWindow(QMainWindow):
         self.telemetry_timer.start(500)
         self.refresh()
         self.refresh_telemetry()
+    def set_ai_compute(self, mode):
+        """Chave CPU/GPU/Automatico de todas as IAs. A Central RAG le a escolha a cada
+        modelo que liga; a IA Local, se estiver ligada, reinicia no modo novo."""
+        try:
+            save_ai_compute(mode)
+        except (OSError, ValueError):
+            return
+        server = getattr(getattr(self, "ai_tab", None), "server", None)
+        if server is not None and server.is_running():
+            server.stop()
+            if server.mode == "ON":
+                server.start()
+
     def _open_ai_tab(self):
         ai_tab = getattr(self, "ai_tab", None)
         if ai_tab is not None:

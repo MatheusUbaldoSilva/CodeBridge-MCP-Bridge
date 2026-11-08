@@ -41,7 +41,7 @@ class ProductionSearchUnavailable(RuntimeError):
 
 
 def _embed_text(query: str, llama_server: Path):
-    from rag.models.fallback import TextModelFallbackManager
+    from rag.models.fallback import manager_for_compute
 
     base = LlamaServerConfig(
         executable_path=llama_server,
@@ -50,7 +50,7 @@ def _embed_text(query: str, llama_server: Path):
         ubatch_size=TEXT_SEARCH_UBATCH_TOKENS,
         port=0, gpu_layers=99, device="CUDA0",
     )
-    manager = TextModelFallbackManager.auto(base)
+    manager = manager_for_compute(base)  # chave CPU/GPU/Automatico do CodeBridge
     manager.load(timeout_seconds=90)
     try:
         return TextEmbeddingClient(manager.active_lifecycle).embed_query(query).values
@@ -59,7 +59,7 @@ def _embed_text(query: str, llama_server: Path):
 
 
 def _embed_code(query: str, llama_server: Path):
-    from rag.models.fallback import TextModelFallbackManager
+    from rag.models.fallback import manager_for_compute
 
     base = build_code_server_config(
         executable_path=llama_server,
@@ -69,7 +69,7 @@ def _embed_code(query: str, llama_server: Path):
         parallel_slots=CODE_SEARCH_PARALLEL_SLOTS,
         port=0, gpu_layers=99, device="CUDA0",
     )
-    manager = TextModelFallbackManager.auto(
+    manager = manager_for_compute(  # chave CPU/GPU/Automatico do CodeBridge
         base, lifecycle_factory=CodeModelLifecycle,
     )
     manager.load(timeout_seconds=90)
