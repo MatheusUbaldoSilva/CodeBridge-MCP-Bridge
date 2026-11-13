@@ -217,6 +217,10 @@ Section "CodeBridge" SEC_MAIN
   File "..\author_mcp\persistent_ledger.py"
   File "..\author_mcp\protocol.py"
   File "..\author_mcp\runtime_client.py"
+  File "..\author_mcp\http_pool.py"
+  File "..\author_mcp\rag_bridge.py"
+  File "..\author_mcp\development_checkpoint.py"
+  File "..\author_mcp\development_checkpoint_tools.py"
   File "..\author_mcp\requirements.txt"
 
   SetOutPath "$INSTDIR\rag"

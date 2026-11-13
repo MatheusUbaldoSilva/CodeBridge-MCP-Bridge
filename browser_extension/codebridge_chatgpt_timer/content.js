@@ -110,7 +110,7 @@
         if (!timer) return;
         if (timer.state === "RUNNING" && timer.claimed_by_codebridge) {
           observedRequestId = timer.request_id;
-          if (pendingCompletion && pendingCompletion.requestId === observedRequestId
+          if (pendingCompletion && (pendingCompletion.requestId === null || pendingCompletion.requestId === observedRequestId)
               && !findVisibleStopButton()) {
             const pending = pendingCompletion;
             pendingCompletion = null;
@@ -144,7 +144,7 @@
       if (observedRequestId) {
         sendEvent(action, observedRequestId);
       } else {
-        pendingCompletion = null;
+        pendingCompletion = { action, requestId: null };
       }
       manualStopClicked = false;
     }
@@ -169,6 +169,33 @@
     },
     true
   );
+
+  // CODEBRIDGE_TIMER_RECOVERY_V1: ao enviar nova mensagem, conclui o
+  // ciclo antigo apenas se nao houver geracao em andamento visivel.
+  function recoverPreviousTurnOnSubmit() {
+    if (!observedRequestId || findVisibleStopButton()) return;
+    if (pendingCompletion) return;
+    finishSent = true;
+    seenStopButton = false;
+    sendEvent("finish", observedRequestId);
+  }
+
+  document.addEventListener("submit", recoverPreviousTurnOnSubmit, true);
+  document.addEventListener("click", (event) => {
+    const button = event.target instanceof Element
+      ? event.target.closest("button")
+      : null;
+    if (!button || !isVisible(button)) return;
+    const hint = (
+      (button.getAttribute("data-testid") || "") + " " +
+      (button.getAttribute("aria-label") || "")
+    ).toLowerCase();
+    if (hint.includes("send-button") ||
+        hint.includes("send message") ||
+        hint.includes("enviar mensagem")) {
+      recoverPreviousTurnOnSubmit();
+    }
+  }, true);
 
   const observer = new MutationObserver(
     checkGenerationState
