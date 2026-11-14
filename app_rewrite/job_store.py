@@ -192,6 +192,11 @@ class JobStore:
                  error_type, error_message, job_id),
             )
         result = self.get(job_id)
+        try:  # registro diario dos comandos (app_rewrite/command_log.py)
+            import command_log
+            command_log.record(result)
+        except Exception:
+            pass
         self.prune_terminal_jobs()
         return result
 
