@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
 """Runner unico de testes do CodeBridge MCP Bridge.
 
-Motivo: os testes vivem em tests/ e so sao encontrados rodando de dentro dessa
-pasta (nao ha __init__/discover a partir da raiz). Alem disso, ~150 dos 668
-arquivos sao testes pesados de laboratorio/e2e/live que podem pendurar ou
-exigir servicos externos. Sem um ponto unico, cada um roda os testes de um
-jeito e regressao passa silenciosa ate instalar na maquina.
+Motivo: os testes vivem em DOIS lugares -- tests/ e author_mcp/ -- e so sao
+encontrados rodando de dentro da pasta certa (nao ha discover a partir da
+raiz). Alem disso, ~290 dos arquivos sao testes pesados de laboratorio/e2e/live
+que podem pendurar ou exigir servicos externos. Sem um ponto unico, cada um
+roda os testes de um jeito, author_mcp/ fica de fora e regressao passa
+silenciosa ate instalar na maquina.
 
-Este runner da um comando so:
+Este runner da um comando so, cobrindo os dois diretorios:
 
     python run_tests.py            # suite RAPIDA (exclui os pesados)
     python run_tests.py --full     # TUDO, inclusive lab/e2e/live (lento)
     python run_tests.py --pattern command_log   # so os que casam o filtro
     python run_tests.py --list     # mostra o que seria rodado, sem rodar
 
-Cada modulo roda em seu proprio subprocesso com timeout, entao um teste
-pendurado vira falha (TIMEOUT) em vez de travar o runner inteiro. Codigo de
-saida != 0 se qualquer modulo falhar/estourar o tempo -- pronto para CI.
+Cada modulo roda em seu proprio subprocesso, no cwd do diretorio dele, com
+timeout -- entao um teste pendurado vira TIMEOUT em vez de travar o runner.
+Codigo de saida != 0 se qualquer modulo falhar/estourar o tempo: pronto para CI.
 
 So depende da stdlib.
 """
@@ -27,7 +28,11 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-TESTS = ROOT / "tests"
+# (rotulo, diretorio) de cada raiz de testes, na ordem de execucao
+TEST_DIRS = [
+    ("tests", ROOT / "tests"),
+    ("author_mcp", ROOT / "author_mcp"),
+]
 
 # Marcadores de nome de testes PESADOS (laboratorio, e2e, processos reais,
 # servicos externos, supervisores/canary). Excluidos da suite rapida; incluidos
@@ -47,23 +52,26 @@ def is_heavy(name):
 
 
 def select(full, pattern):
-    files = sorted(p.name for p in TESTS.glob("test_*.py"))
+    """Retorna [(rotulo, diretorio, nome_arquivo)] selecionados."""
     out = []
-    for name in files:
-        if pattern and pattern.lower() not in name.lower():
+    for label, d in TEST_DIRS:
+        if not d.is_dir():
             continue
-        if not full and is_heavy(name):
-            continue
-        out.append(name)
+        for name in sorted(p.name for p in d.glob("test_*.py")):
+            if pattern and pattern.lower() not in name.lower():
+                continue
+            if not full and is_heavy(name):
+                continue
+            out.append((label, d, name))
     return out
 
 
-def run_module(name, timeout, verbose):
+def run_module(directory, name, timeout, verbose):
     mod = name[:-3]  # tira .py
     cmd = [sys.executable, "-m", "unittest", "-v" if verbose else "-q", mod]
     try:
         proc = subprocess.run(
-            cmd, cwd=str(TESTS), capture_output=True, text=True, timeout=timeout
+            cmd, cwd=str(directory), capture_output=True, text=True, timeout=timeout
         )
     except subprocess.TimeoutExpired:
         return "TIMEOUT", ""
@@ -87,10 +95,11 @@ def main(argv=None):
 
     selected = select(args.full, args.pattern)
     modo = "FULL" if args.full else "RAPIDA"
-    print(f"Suite {modo}: {len(selected)} modulo(s) em {TESTS}")
+    roots = ", ".join(label for label, _ in TEST_DIRS)
+    print(f"Suite {modo}: {len(selected)} modulo(s) em [{roots}]")
     if args.list:
-        for n in selected:
-            print("  " + n)
+        for label, _, name in selected:
+            print(f"  {label}/{name}")
         return 0
     if not selected:
         print("Nenhum teste selecionado.")
@@ -98,19 +107,20 @@ def main(argv=None):
 
     inicio = time.time()
     falhas = []
-    for i, name in enumerate(selected, 1):
-        status, tail = run_module(name, args.timeout, args.verbose)
+    total = len(selected)
+    for i, (label, directory, name) in enumerate(selected, 1):
+        status, tail = run_module(directory, name, args.timeout, args.verbose)
         marca = "." if status == "OK" else "X"
-        print(f"[{i}/{len(selected)}] {marca} {status:7} {name}")
+        print(f"[{i}/{total}] {marca} {status:7} {label}/{name}")
         if status != "OK":
-            falhas.append((name, status, tail))
+            falhas.append((f"{label}/{name}", status, tail))
 
     dur = time.time() - inicio
     print("-" * 60)
-    print(f"Total: {len(selected)}  OK: {len(selected) - len(falhas)}  "
+    print(f"Total: {total}  OK: {total - len(falhas)}  "
           f"Falhas: {len(falhas)}  ({dur:.1f}s)")
-    for name, status, tail in falhas:
-        print(f"\n### {status}: {name}")
+    for nome, status, tail in falhas:
+        print(f"\n### {status}: {nome}")
         if tail:
             print(tail)
     return 0 if not falhas else 1
