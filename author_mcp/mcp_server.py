@@ -749,189 +749,99 @@ def _rag_auto_return(operation):
 
 
 @mcp.tool(
-    name="codebridge_rag_auto_status",
+    name="codebridge_rag_auto",
     description=(
-        "RAG-AUTO: consulta somente leitura da fila persistente de indexacao "
-        "multiprojeto; sem iniciar worker, carregar modelos ou publicar."
-    ),
-    annotations=ToolAnnotations(read_only_hint=True,idempotent_hint=True,open_world_hint=False),
-    structured_output=True,
-)
-def codebridge_rag_auto_status(
-    project_id: str | None=None,job_id: str | None=None,
-) -> dict[str, Any]:
-    from rag.runtime.auto_index_api import auto_status
-    return _rag_auto_return(lambda:auto_status(project_id=project_id,job_id=job_id))
-
-
-@mcp.tool(
-    name="codebridge_rag_auto_preview",
-    description=(
-        "RAG-AUTO: audita somente leitura os arquivos selecionados, escopo "
-        "e hashes SHA256 para autorizacao futura. Nao cria fila."
-    ),
-    annotations=ToolAnnotations(read_only_hint=True,idempotent_hint=True,open_world_hint=False),
-    structured_output=True,
-)
-def codebridge_rag_auto_preview(
-    project_id: str,source_root: str,scope: str="BOTH",
-    paths: list[str] | None=None,
-) -> dict[str, Any]:
-    from rag.runtime.auto_index_api import auto_preview
-    return _rag_auto_return(
-        lambda:auto_preview(project_id,source_root,scope=scope,paths=paths)
-    )
-
-
-@mcp.tool(
-    name="codebridge_rag_auto_approve",
-    description=(
-        "RAG-AUTO: apenas registra fila de fontes, sem executar indexacao. "
-        "Exige execute=true, operator_approved=true, hash integral confirmado "
-        "e confirmation='RAG_AUTO_QUEUE:<project_id>:<sha256>'. "
-        "NUNCA inicia GPU, muda indice ativo ou publica."
-    ),
-    annotations=ToolAnnotations(read_only_hint=False,idempotent_hint=True,open_world_hint=False),
-    structured_output=True,
-)
-def codebridge_rag_auto_approve(
-    project_id: str,source_root: str,confirmed_digest: str,
-    scope: str="BOTH",paths: list[str] | None=None,execute: bool=False,
-    operator_approved: bool=False,confirmation: str | None=None,
-) -> dict[str, Any]:
-    from rag.runtime.auto_index_api import auto_approve
-    return _rag_auto_return(
-        lambda:auto_approve(
-            project_id,source_root,scope=scope,paths=paths,
-            confirmed_digest=confirmed_digest,execute=execute,
-            operator_approved=operator_approved,confirmation=confirmation,
-        )
-    )
-
-
-@mcp.tool(
-    name="codebridge_rag_auto_control",
-    description=(
-        "RAG-AUTO: grava pausa/retomada/cancelamento em trabalho existente. "
-        "Exige execute=true, operator_approved=true e "
-        "confirmation='RAG_AUTO_CONTROL:<job_id>:<action>'. "
-        "Nao inicia modelos ou publica indices."
-    ),
-    annotations=ToolAnnotations(read_only_hint=False,idempotent_hint=False,open_world_hint=False),
-    structured_output=True,
-)
-def codebridge_rag_auto_control(
-    job_id: str,action: str,execute: bool=False,
-    operator_approved: bool=False,confirmation: str | None=None,
-) -> dict[str, Any]:
-    from rag.runtime.auto_index_api import auto_control
-    return _rag_auto_return(
-        lambda:auto_control(
-            job_id,action,execute=execute,operator_approved=operator_approved,
-            confirmation=confirmation,
-        )
-    )
-
-
-@mcp.tool(
-    name="codebridge_rag_auto_start",
-    description=(
-        "RAG-AUTO: inicia worker de indexacao em subprocesso isolado apenas para "
-        "job aprovado e QUEUED. Requer execute=true, operator_approved=true "
-        "e confirmation='RAG_AUTO_LAUNCH:<job_id>'. Retorna PID, NAO conclusao; "
-        "nunca publica ou modifica o indice RAG publico."
+        "RAG-AUTO (avancado): fluxo de indexacao automatica, escolhido por "
+        "action. Valores: status | preview | approve | control | start | "
+        "canary_status | prepare_candidate | enable_canary | rollback_canary. "
+        "Ordem tipica: preview -> approve -> start -> prepare_candidate -> "
+        "enable_canary; canary_status acompanha, rollback_canary reverte, "
+        "control pausa/retoma/cancela, status le a fila. As acoes que mudam "
+        "estado exigem execute=True, operator_approved=True e a confirmation "
+        "exata que cada uma espera (ver mensagem de erro se faltar)."
     ),
     annotations=ToolAnnotations(
-        read_only_hint=False,idempotent_hint=False,open_world_hint=False,
+        read_only_hint=False, idempotent_hint=False, open_world_hint=False,
     ),
     structured_output=True,
 )
-def codebridge_rag_auto_start(
-    job_id: str,execute: bool=False,operator_approved: bool=False,
-    confirmation: str | None=None,
+def codebridge_rag_auto(
+    action: str,
+    project_id: str | None = None,
+    job_id: str | None = None,
+    source_root: str | None = None,
+    scope: str = "BOTH",
+    paths: list[str] | None = None,
+    confirmed_digest: str | None = None,
+    control_action: str | None = None,
+    execute: bool = False,
+    operator_approved: bool = False,
+    confirmation: str | None = None,
 ) -> dict[str, Any]:
-    def launch_with_gate():
-        if (execute is not True or operator_approved is not True
-                or confirmation!="RAG_AUTO_LAUNCH:"+job_id):
-            raise PermissionError("explicit job-specific launch authorization required")
-        from rag.runtime.auto_index_launch import launch_approved_auto_job
-        from rag.runtime.auto_index_queue import default_queue_path
-        return launch_approved_auto_job(
-            default_queue_path(),job_id,execute=True,
-            operator_approved=True,confirmation=confirmation,
-        )
-    return _rag_auto_return(launch_with_gate)
-
-
-@mcp.tool(
-    name="codebridge_rag_auto_canary_status",
-    description="RAG-AUTO: estado somente leitura da geracao preparada e registro isolado; nenhum cutover.",
-    annotations=ToolAnnotations(read_only_hint=True,idempotent_hint=True,open_world_hint=False),
-    structured_output=True,
-)
-def codebridge_rag_auto_canary_status(job_id: str) -> dict[str, Any]:
-    from rag.runtime.auto_index_promotion import auto_canary_status
-    return _rag_auto_return(lambda:auto_canary_status(job_id))
-
-
-@mcp.tool(
-    name="codebridge_rag_auto_prepare_candidate",
-    description=(
-        "RAG-AUTO: copiar staging READY_FOR_REVIEW para geracao verificada com snapshot "
-        "de fontes; exige execute, operator_approved e confirmation="
-        "'RAG_AUTO_PREPARE:<project_id>:<job_id>'. Nao registra nem publica."
-    ),
-    annotations=ToolAnnotations(read_only_hint=False,idempotent_hint=False,open_world_hint=False),
-    structured_output=True,
-)
-def codebridge_rag_auto_prepare_candidate(
-    job_id: str,execute: bool=False,operator_approved: bool=False,
-    confirmation: str | None=None,
-) -> dict[str, Any]:
-    from rag.runtime.auto_index_promotion import prepare_auto_candidate
-    return _rag_auto_return(lambda:prepare_auto_candidate(
-        job_id,execute=execute,operator_approved=operator_approved,confirmation=confirmation,
-    ))
-
-
-@mcp.tool(
-    name="codebridge_rag_auto_enable_canary",
-    description=(
-        "RAG-AUTO: registrar leitura isolada multiprojeto, com backup do catalogo; "
-        "exige execute, operator_approved e confirmation="
-        "'RAG_AUTO_CANARY:<project_id>:<job_id>'. Nunca move a geracao publica."
-    ),
-    annotations=ToolAnnotations(read_only_hint=False,idempotent_hint=False,open_world_hint=False),
-    structured_output=True,
-)
-def codebridge_rag_auto_enable_canary(
-    job_id: str,execute: bool=False,operator_approved: bool=False,
-    confirmation: str | None=None,
-) -> dict[str, Any]:
-    from rag.runtime.auto_index_promotion import enable_auto_canary
-    return _rag_auto_return(lambda:enable_auto_canary(
-        job_id,execute=execute,operator_approved=operator_approved,confirmation=confirmation,
-    ))
-
-
-@mcp.tool(
-    name="codebridge_rag_auto_rollback_canary",
-    description=(
-        "RAG-AUTO: restaurar bytes do catalogo anterior sem apagar geracoes; "
-        "exige execute, operator_approved e confirmation="
-        "'RAG_AUTO_CANARY_ROLLBACK:<job_id>'. Nunca move a geracao publica."
-    ),
-    annotations=ToolAnnotations(read_only_hint=False,idempotent_hint=False,open_world_hint=False),
-    structured_output=True,
-)
-def codebridge_rag_auto_rollback_canary(
-    job_id: str,execute: bool=False,operator_approved: bool=False,
-    confirmation: str | None=None,
-) -> dict[str, Any]:
-    from rag.runtime.auto_index_promotion import disable_auto_canary
-    return _rag_auto_return(lambda:disable_auto_canary(
-        job_id,execute=execute,operator_approved=operator_approved,confirmation=confirmation,
-    ))
+    act = (action or "").strip().lower()
+    if act == "status":
+        from rag.runtime.auto_index_api import auto_status
+        return _rag_auto_return(
+            lambda: auto_status(project_id=project_id, job_id=job_id))
+    if act == "preview":
+        from rag.runtime.auto_index_api import auto_preview
+        return _rag_auto_return(
+            lambda: auto_preview(project_id, source_root, scope=scope, paths=paths))
+    if act == "approve":
+        from rag.runtime.auto_index_api import auto_approve
+        return _rag_auto_return(lambda: auto_approve(
+            project_id, source_root, scope=scope, paths=paths,
+            confirmed_digest=confirmed_digest, execute=execute,
+            operator_approved=operator_approved, confirmation=confirmation,
+        ))
+    if act == "control":
+        from rag.runtime.auto_index_api import auto_control
+        return _rag_auto_return(lambda: auto_control(
+            job_id, control_action, execute=execute,
+            operator_approved=operator_approved, confirmation=confirmation,
+        ))
+    if act == "start":
+        def launch_with_gate():
+            if (execute is not True or operator_approved is not True
+                    or confirmation != "RAG_AUTO_LAUNCH:" + str(job_id)):
+                raise PermissionError(
+                    "explicit job-specific launch authorization required")
+            from rag.runtime.auto_index_launch import launch_approved_auto_job
+            from rag.runtime.auto_index_queue import default_queue_path
+            return launch_approved_auto_job(
+                default_queue_path(), job_id, execute=True,
+                operator_approved=True, confirmation=confirmation,
+            )
+        return _rag_auto_return(launch_with_gate)
+    if act == "canary_status":
+        from rag.runtime.auto_index_promotion import auto_canary_status
+        return _rag_auto_return(lambda: auto_canary_status(job_id))
+    if act == "prepare_candidate":
+        from rag.runtime.auto_index_promotion import prepare_auto_candidate
+        return _rag_auto_return(lambda: prepare_auto_candidate(
+            job_id, execute=execute, operator_approved=operator_approved,
+            confirmation=confirmation,
+        ))
+    if act == "enable_canary":
+        from rag.runtime.auto_index_promotion import enable_auto_canary
+        return _rag_auto_return(lambda: enable_auto_canary(
+            job_id, execute=execute, operator_approved=operator_approved,
+            confirmation=confirmation,
+        ))
+    if act == "rollback_canary":
+        from rag.runtime.auto_index_promotion import disable_auto_canary
+        return _rag_auto_return(lambda: disable_auto_canary(
+            job_id, execute=execute, operator_approved=operator_approved,
+            confirmation=confirmation,
+        ))
+    return {
+        "operation_ok": False,
+        "error_type": "invalid",
+        "error_message": (
+            "action invalida; use status|preview|approve|control|start|"
+            "canary_status|prepare_candidate|enable_canary|rollback_canary"
+        ),
+    }
 
 
 @mcp.tool(
