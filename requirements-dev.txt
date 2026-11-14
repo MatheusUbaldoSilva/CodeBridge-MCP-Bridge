@@ -1,0 +1,12 @@
+# Dependencias para rodar a suite de testes no venv de desenvolvimento.
+#
+# Motivo: sem o pacote mcp instalado, o teste de registro das ferramentas MCP
+# (ex.: test_command_log_tools.RegisterTest) e PULADO, deixando sem cobertura
+# justamente a parte que confirma que a ferramenta registra de verdade.
+#
+# Instale com:
+#   python -m pip install -r requirements-dev.txt
+# Depois rode:
+#   python run_tests.py
+mcp
+pydantic
