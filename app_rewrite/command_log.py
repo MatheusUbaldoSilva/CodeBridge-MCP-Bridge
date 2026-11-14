@@ -147,3 +147,105 @@ def record(job, root=None) -> bool:
         return True
     except Exception:
         return False
+
+
+# --- leitura / resumo do log ---------------------------------------------
+def available_days(root=None) -> list:
+    """Datas (AAAA-MM-DD) que tem arquivo de log, da mais antiga a mais recente."""
+    directory = log_dir(root)
+    try:
+        return sorted(p.stem.replace("commands-", "") for p in directory.glob("commands-*.jsonl"))
+    except OSError:
+        return []
+
+
+def read_day(day=None, root=None) -> list:
+    """Registros do dia (um dict por comando); ignora linhas invalidas."""
+    if day is None:
+        day = datetime.now().astimezone().strftime("%Y-%m-%d")
+    path = log_dir(root) / ("commands-%s.jsonl" % day)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    entries = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entries.append(json.loads(line))
+        except ValueError:
+            continue
+    return entries
+
+
+def _hhmm(ts) -> str:
+    try:
+        return datetime.fromisoformat(ts).strftime("%H:%M")
+    except (TypeError, ValueError):
+        return "--:--"
+
+
+def render_day(entries) -> str:
+    """Lista cronologica legivel dos comandos (para 'quais comandos rodaram')."""
+    linhas = []
+    for e in entries:
+        exit_code = e.get("exit")
+        if exit_code == 0:
+            marca = "ok"
+        elif exit_code not in (None, 0):
+            marca = "x(%s)" % exit_code
+        else:
+            marca = (e.get("estado") or "?").lower()
+        ms = e.get("ms")
+        dur = ((" %.1fs" % (ms / 1000)).replace(".", ",")) if isinstance(ms, int) else ""
+        linhas.append("%s [%s] %s%s: %s" % (
+            _hhmm(e.get("ts")), e.get("tipo", "?"), marca, dur, e.get("comando", "")))
+    return "\n".join(linhas)
+
+
+def summarize_day(entries) -> dict:
+    """Contagens do dia: total, por tipo, falhas e janela de horario."""
+    from collections import Counter
+    tipos = Counter(e.get("tipo", "?") for e in entries)
+    falhas = sum(1 for e in entries if e.get("exit") not in (None, 0))
+    horas = [_hhmm(e.get("ts")) for e in entries if e.get("ts")]
+    return {
+        "total": len(entries),
+        "por_tipo": dict(tipos),
+        "falhas": falhas,
+        "primeiro": horas[0] if horas else None,
+        "ultimo": horas[-1] if horas else None,
+    }
+
+
+def _main(argv=None) -> int:
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="Le o log diario de comandos do CodeBridge.")
+    parser.add_argument("--day", help="AAAA-MM-DD (padrao: hoje)")
+    parser.add_argument("--list", action="store_true", help="lista os dias com log")
+    parser.add_argument("--summary", action="store_true", help="so o resumo do dia")
+    parser.add_argument("--root", help="base alternativa (uso interno/testes)")
+    args = parser.parse_args(argv)
+    if args.list:
+        days = available_days(args.root)
+        print("\n".join(days) if days else "(nenhum dia com log)")
+        return 0
+    day = args.day or datetime.now().astimezone().strftime("%Y-%m-%d")
+    entries = read_day(day, args.root)
+    resumo = summarize_day(entries)
+    print("Dia %s: %d comando(s), %d falha(s), tipos %s"
+          % (day, resumo["total"], resumo["falhas"], resumo["por_tipo"] or "{}"))
+    if resumo["primeiro"]:
+        print("Janela: %s - %s" % (resumo["primeiro"], resumo["ultimo"]))
+    if not args.summary and entries:
+        print("-" * 40)
+        print(render_day(entries))
+    return 0
+
+
+if __name__ == "__main__":
+    import sys as _sys
+    _sys.exit(_main())
