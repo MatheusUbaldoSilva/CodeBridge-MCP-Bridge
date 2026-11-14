@@ -1,9 +1,8 @@
-"""Testa o preenchimento de next_action na base ProtocolOutcome.
+﻿"""Testa o preenchimento de next_action na base ProtocolOutcome.
 
 next_action e preenchido por um model_validator na base, a partir do
-error_type/execution_recoverable, usando tool_hints.hint_for. Garante que a
-dica chega nos resultados de exec (subclasse de ProtocolOutcome) sem o servidor
-precisar setar nada em cada ponto de erro.
+error_type/execution_recoverable, usando tool_hints.hint_for. So deve aparecer
+quando ha erro de fato -- nunca em resposta de sucesso.
 """
 import unittest
 
@@ -36,6 +35,14 @@ class NextActionTest(unittest.TestCase):
     def test_sucesso_sem_next_action(self):
         r = _exec({"operation_ok": True, "state": "FINISHED",
                    "exit_code": 0, "output": "ok"})
+        self.assertIsNone(r.next_action)
+
+    def test_sucesso_com_recoverable_true_sem_next_action(self):
+        # regressao: no real, sucesso vem com execution_recoverable=True;
+        # nao pode gerar a dica generica de "repita".
+        r = _exec({"operation_ok": True, "state": "FINISHED",
+                   "exit_code": 0, "output": "ok",
+                   "execution_recoverable": True})
         self.assertIsNone(r.next_action)
 
     def test_resultado_e_subclasse_da_base(self):

@@ -33,6 +33,16 @@ class ProtocolOutcome(BaseModel):
             return self
         try:
             et = self.operation_error_type or getattr(self, "error_type", None)
+            op_ok = getattr(self, "operation_ok", True)
+            state = getattr(self, "state", None)
+            falha = (
+                op_ok is False
+                or bool(et)
+                or (isinstance(state, str)
+                    and state in {"FAILED", "ERROR", "CANCELLED", "INTERRUPTED"})
+            )
+            if not falha:
+                return self
             rec = getattr(self, "execution_recoverable", None)
             if not isinstance(rec, bool):
                 rec = getattr(self, "retryable", None)
