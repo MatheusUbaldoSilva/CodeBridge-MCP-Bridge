@@ -1538,7 +1538,7 @@ def codebridge_discard(request_id: str | None = None) -> DiscardResult:
 
 @mcp.tool(
     name="codebridge_exec",
-    description="Executa pelo caminho v2 com modos NORMAL COMPACT RAW. NORMAL compacta automaticamente saidas grandes; RAW permanece recuperavel pelo execution_id. Use block_until_done=True para esperar ate o comando terminar e devolver o resultado completo numa unica chamada (ate block_max_ms, padrao 60s), sem precisar de codebridge_wait.",
+    description="Executa pelo caminho v2 com modos NORMAL COMPACT RAW. NORMAL compacta automaticamente saidas grandes; RAW permanece recuperavel pelo execution_id. Use block_until_done=True para esperar ate o comando terminar e devolver o resultado completo numa unica chamada (ate block_max_ms, padrao 60s), sem precisar de codebridge_wait. Sem ele, se o comando nao terminar na janela, a resposta traz execution_id e state=RUNNING -- continue com codebridge_wait passando esse execution_id.",
     annotations=ToolAnnotations(
         read_only_hint=False,
         destructive_hint=True,
@@ -1650,7 +1650,7 @@ def codebridge_exec(
 
 @mcp.tool(
     name="codebridge_wait",
-    description="Aguarda por evento de nova saida ou estado terminal sem polling agressivo e retorna somente o delta desde o cursor. Timeout e RAW integral permanecem suportados.",
+    description="Continua um comando que codebridge_exec devolveu com state=RUNNING: passe o mesmo execution_id e o cursor do resultado anterior; repita ate state=FINISHED. Aguarda por evento de nova saida ou estado terminal sem polling agressivo e retorna somente o delta desde o cursor. Se vier erro recuperavel (ex.: timed out), chame de novo com o mesmo execution_id e cursor. Timeout e RAW integral permanecem suportados.",
     annotations=ToolAnnotations(
         read_only_hint=True,
         idempotent_hint=True,
