@@ -221,6 +221,7 @@ Section "CodeBridge" SEC_MAIN
   File "..\author_mcp\rag_bridge.py"
   File "..\author_mcp\development_checkpoint.py"
   File "..\author_mcp\development_checkpoint_tools.py"
+  File "..\author_mcp\command_log_tools.py"
   File "..\author_mcp\requirements.txt"
 
   SetOutPath "$INSTDIR\rag"
