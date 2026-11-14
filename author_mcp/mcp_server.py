@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, model_validator
 from http_client import ProtocolHTTPClient
 from development_checkpoint_tools import register_development_checkpoint_tools
 from command_log_tools import register_command_log_tools
+from project_sync_tools import register_project_sync_tools
 from tool_hints import hint_for
 
 
@@ -343,6 +344,7 @@ mcp = MCPServer(
 
 register_development_checkpoint_tools(mcp)
 register_command_log_tools(mcp)
+register_project_sync_tools(mcp)
 
 def _outcome_fields(payload):
     return {

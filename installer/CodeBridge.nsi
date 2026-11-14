@@ -39,7 +39,7 @@ Var InstalledVersion
 !define MUI_INSTFILESPAGE_COLORS "E8EEF4 0B1117"
 !define MUI_INSTFILESPAGE_PROGRESSBAR "colored"
 !define MUI_WELCOMEPAGE_TITLE "CodeBridge Setup"
-!define MUI_WELCOMEPAGE_TEXT "Instale o CodeBridge em um computador novo ou atualize uma instalaÃ§Ã£o existente sem perder a configuraÃ§Ã£o da empresa, API key protegida, Tunnel ID ou SSH."
+!define MUI_WELCOMEPAGE_TEXT "Instale o CodeBridge em um computador novo ou atualize uma instalaÃƒÂ§ÃƒÂ£o existente sem perder a configuraÃƒÂ§ÃƒÂ£o da empresa, API key protegida, Tunnel ID ou SSH."
 
 !insertmacro MUI_PAGE_WELCOME
 
@@ -85,7 +85,7 @@ Function ApplyOuterDark
   GetDlgItem $0 $HWNDPARENT 1045
   SetCtlColors $0 0x33414D 0x0B1117
 
-  ; Windows 10/11: solicita barra de tÃ­tulo escura. Em versÃµes antigas a chamada Ã© ignorada.
+  ; Windows 10/11: solicita barra de tÃƒÂ­tulo escura. Em versÃƒÂµes antigas a chamada ÃƒÂ© ignorada.
   System::Call 'dwmapi::DwmSetWindowAttribute(p $HWNDPARENT, i 20, *i 1, i 4)i.r0'
 FunctionEnd
 
@@ -222,6 +222,7 @@ Section "CodeBridge" SEC_MAIN
   File "..\author_mcp\development_checkpoint.py"
   File "..\author_mcp\development_checkpoint_tools.py"
   File "..\author_mcp\command_log_tools.py"
+  File "..\author_mcp\project_sync_tools.py"
   File "..\author_mcp\tool_hints.py"
   File "..\author_mcp\requirements.txt"
 
@@ -248,8 +249,8 @@ Section "CodeBridge" SEC_MAIN
   File "p9b_update_process_guard.py"
   File "rag_p9b_postupdate_mcp_tool_probe.py"
 
-  ; ExtensÃ£o unpacked em caminho fixo. O Chrome deve apontar sempre
-  ; para esta pasta, inclusive depois de futuras atualizaÃ§Ãµes.
+  ; ExtensÃƒÂ£o unpacked em caminho fixo. O Chrome deve apontar sempre
+  ; para esta pasta, inclusive depois de futuras atualizaÃƒÂ§ÃƒÂµes.
   SetOutPath "$INSTDIR\browser_extension\codebridge_chatgpt_timer"
   File "..\browser_extension\codebridge_chatgpt_timer\manifest.json"
   File "..\browser_extension\codebridge_chatgpt_timer\background.js"
@@ -259,7 +260,7 @@ Section "CodeBridge" SEC_MAIN
   File "payload\tools\tunnel-client.exe"
   File "payload\tools\cloudflared.exe"
 
-  DetailPrint "Preparando runtime Python e dependÃªncias do CodeBridge..."
+  DetailPrint "Preparando runtime Python e dependÃƒÂªncias do CodeBridge..."
   nsExec::Exec '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\installer\bootstrap.ps1" -InstallRoot "$INSTDIR"'
   Pop $0
   StrCmp $0 "0" bootstrap_ok
@@ -283,7 +284,7 @@ Section "CodeBridge" SEC_MAIN
     CreateDirectory "$SMPROGRAMS\CodeBridge"
     CreateShortcut "$SMPROGRAMS\CodeBridge\CodeBridge.lnk" "$INSTDIR\runtime\python\pythonw.exe" '"$INSTDIR\app_rewrite\main.py"' "$INSTDIR\assets\codebridge.ico" 0 SW_SHOWNORMAL "" "CodeBridge MCP Bridge"
     CreateShortcut "$SMPROGRAMS\CodeBridge\Configurar CodeBridge.lnk" "$INSTDIR\runtime\python\pythonw.exe" '"$INSTDIR\installer\company_setup.py"' "$INSTDIR\assets\codebridge.ico" 0 SW_SHOWNORMAL "" "Configurar CodeBridge"
-    CreateShortcut "$SMPROGRAMS\CodeBridge\ExtensÃ£o ChatGPT Timer.lnk" "$INSTDIR\runtime\python\pythonw.exe" '"$INSTDIR\installer\extension_setup.py"' "$INSTDIR\assets\codebridge.ico" 0 SW_SHOWNORMAL "" "Configurar extensÃ£o ChatGPT Timer"
+    CreateShortcut "$SMPROGRAMS\CodeBridge\ExtensÃƒÂ£o ChatGPT Timer.lnk" "$INSTDIR\runtime\python\pythonw.exe" '"$INSTDIR\installer\extension_setup.py"' "$INSTDIR\assets\codebridge.ico" 0 SW_SHOWNORMAL "" "Configurar extensÃƒÂ£o ChatGPT Timer"
     CreateShortcut "$SMPROGRAMS\CodeBridge\Atualizar CodeBridge.lnk" "$INSTDIR\runtime\python\pythonw.exe" '"$INSTDIR\installer\updater.py"' "$INSTDIR\assets\codebridge.ico" 0 SW_SHOWNORMAL "" "Atualizar CodeBridge"
     CreateShortcut "$DESKTOP\CodeBridge 2.0 - MCP Bridge.lnk" "$INSTDIR\runtime\python\pythonw.exe" '"$INSTDIR\app_rewrite\main.py"' "$INSTDIR\assets\codebridge.ico" 0 SW_SHOWNORMAL "" "CodeBridge MCP Bridge"
     CreateShortcut "$SMPROGRAMS\CodeBridge\Configurar IAs.lnk" "$INSTDIR\runtime\python\pythonw.exe" '"$INSTDIR\app_rewrite\ai_setup.py"' "$INSTDIR\assets\codebridge.ico" 0 SW_SHOWNORMAL "" "Instalar, verificar ou reparar as IAs do CodeBridge"
@@ -291,7 +292,7 @@ Section "CodeBridge" SEC_MAIN
     FileWrite $1 "created"
     FileClose $1
 
-  ; Em atualizaÃ§Ã£o, nunca forÃ§a o usuÃ¡rio a refazer a configuraÃ§Ã£o.
+  ; Em atualizaÃƒÂ§ÃƒÂ£o, nunca forÃƒÂ§a o usuÃƒÂ¡rio a refazer a configuraÃƒÂ§ÃƒÂ£o.
   StrCmp $IsUpdate "1" config_done
   IfSilent config_done
     ExecWait '"$INSTDIR\runtime\python\pythonw.exe" "$INSTDIR\installer\company_setup.py"'
@@ -309,25 +310,25 @@ Section "CodeBridge" SEC_MAIN
       ExecWait '"$INSTDIR\runtime\python\pythonw.exe" "$INSTDIR\app_rewrite\ai_setup.py" --if-needed --installer' $0
     ai_result:
     StrCmp $0 "0" ai_done
-      DetailPrint "IAs nÃ£o concluÃ­das (cÃ³digo $0). Use o atalho Configurar IAs ou o botÃ£o Verificar / Reparar IAs."
+      DetailPrint "IAs nÃƒÂ£o concluÃƒÂ­das (cÃƒÂ³digo $0). Use o atalho Configurar IAs ou o botÃƒÂ£o Verificar / Reparar IAs."
   ai_done:
-  ; Garante que o CodeBridge esteja aberto antes de testar Companion/extensÃ£o/MCP.
-  ; Em atualizaÃ§Ã£o com o app jÃ¡ aberto, o helper apenas confirma o Companion.
-  DetailPrint "Iniciando CodeBridge e aguardando serviÃ§os locais..."
+  ; Garante que o CodeBridge esteja aberto antes de testar Companion/extensÃƒÂ£o/MCP.
+  ; Em atualizaÃƒÂ§ÃƒÂ£o com o app jÃƒÂ¡ aberto, o helper apenas confirma o Companion.
+  DetailPrint "Iniciando CodeBridge e aguardando serviÃƒÂ§os locais..."
   nsExec::Exec '"$INSTDIR\runtime\python\python.exe" "$INSTDIR\installer\extension_setup.py" --ensure-codebridge'
   Pop $0
   StrCmp $0 "0" codebridge_ready
-    DetailPrint "CodeBridge ainda nÃ£o ficou pronto. O assistente permitirÃ¡ iniciar novamente."
+    DetailPrint "CodeBridge ainda nÃƒÂ£o ficou pronto. O assistente permitirÃƒÂ¡ iniciar novamente."
   codebridge_ready:
 
-  ; O assistente sÃ³ Ã© oferecido quando a extensÃ£o ainda precisa de atenÃ§Ã£o:
-  ; primeira ativaÃ§Ã£o, caminho incorreto, desabilitada ou versÃ£o antiga.
+  ; O assistente sÃƒÂ³ ÃƒÂ© oferecido quando a extensÃƒÂ£o ainda precisa de atenÃƒÂ§ÃƒÂ£o:
+  ; primeira ativaÃƒÂ§ÃƒÂ£o, caminho incorreto, desabilitada ou versÃƒÂ£o antiga.
   IfSilent extension_done
     nsExec::Exec '"$INSTDIR\runtime\python\python.exe" "$INSTDIR\installer\extension_setup.py" --needs-attention'
     Pop $0
     StrCmp $0 "10" 0 extension_done
 
-    MessageBox MB_ICONINFORMATION|MB_YESNO       "CodeBridge instalado/atualizado com sucesso.$\r$\n$\r$\nPara usar o cronÃ´metro do ChatGPT, falta ativar ou recarregar a extensÃ£o do navegador.$\r$\n$\r$\nDeseja configurar agora?"       IDNO extension_done
+    MessageBox MB_ICONINFORMATION|MB_YESNO       "CodeBridge instalado/atualizado com sucesso.$\r$\n$\r$\nPara usar o cronÃƒÂ´metro do ChatGPT, falta ativar ou recarregar a extensÃƒÂ£o do navegador.$\r$\n$\r$\nDeseja configurar agora?"       IDNO extension_done
 
     Exec '"$INSTDIR\runtime\python\pythonw.exe" "$INSTDIR\installer\extension_setup.py"'
   extension_done:
@@ -340,7 +341,7 @@ Section "Uninstall"
     Delete "$DESKTOP\CodeBridge 2.0 - MCP Bridge.lnk"
     Delete "$SMPROGRAMS\CodeBridge\CodeBridge.lnk"
     Delete "$SMPROGRAMS\CodeBridge\Configurar CodeBridge.lnk"
-    Delete "$SMPROGRAMS\CodeBridge\ExtensÃ£o ChatGPT Timer.lnk"
+    Delete "$SMPROGRAMS\CodeBridge\ExtensÃƒÂ£o ChatGPT Timer.lnk"
     Delete "$SMPROGRAMS\CodeBridge\Atualizar CodeBridge.lnk"
     RMDir "$SMPROGRAMS\CodeBridge"
   skip_shortcut_cleanup:
