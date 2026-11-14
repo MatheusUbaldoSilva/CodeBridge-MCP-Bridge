@@ -10,11 +10,12 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import Icon, ToolAnnotations
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from http_client import ProtocolHTTPClient
 from development_checkpoint_tools import register_development_checkpoint_tools
 from command_log_tools import register_command_log_tools
+from tool_hints import hint_for
 
 
 class ProtocolOutcome(BaseModel):
@@ -22,6 +23,25 @@ class ProtocolOutcome(BaseModel):
     operation_error_type: str | None = None
     operation_error_message: str | None = None
     turn_control: dict[str, Any] | None = None
+    next_action: str | None = None
+
+    @model_validator(mode="after")
+    def _preenche_next_action(self):
+        # Dica de proxima acao para a IA se recuperar (ver tool_hints.py).
+        # Defensivo: nunca levanta; nao sobrescreve valor ja definido.
+        if self.next_action:
+            return self
+        try:
+            et = self.operation_error_type or getattr(self, "error_type", None)
+            rec = getattr(self, "execution_recoverable", None)
+            if not isinstance(rec, bool):
+                rec = getattr(self, "retryable", None)
+            dica = hint_for(et, recoverable=rec if isinstance(rec, bool) else None)
+            if dica:
+                object.__setattr__(self, "next_action", dica)
+        except Exception:
+            pass
+        return self
 
 
 class StatusResult(ProtocolOutcome):
