@@ -1528,7 +1528,7 @@ def codebridge_discard(request_id: str | None = None) -> DiscardResult:
 
 @mcp.tool(
     name="codebridge_exec",
-    description="Executa pelo caminho v2 com modos NORMAL COMPACT RAW. NORMAL compacta automaticamente saidas grandes; RAW permanece recuperavel pelo execution_id.",
+    description="Executa pelo caminho v2 com modos NORMAL COMPACT RAW. NORMAL compacta automaticamente saidas grandes; RAW permanece recuperavel pelo execution_id. Use block_until_done=True para esperar ate o comando terminar e devolver o resultado completo numa unica chamada (ate block_max_ms, padrao 60s), sem precisar de codebridge_wait.",
     annotations=ToolAnnotations(
         read_only_hint=False,
         destructive_hint=True,
@@ -1542,9 +1542,17 @@ def codebridge_exec(
     command: str,
     wait_timeout_ms: int = 1500,
     output_mode: str = "NORMAL",
+    block_until_done: bool = False,
+    block_max_ms: int = 60000,
 ) -> ExecResult:
     wait_timeout_ms = max(0, min(int(wait_timeout_ms or 0), 10000))
     output_mode = _normalize_output_mode(output_mode)
+    if block_until_done:
+        janela_ms = max(0, min(int(block_max_ms or 0), 120000))
+        poll_interval = 0.5
+    else:
+        janela_ms = wait_timeout_ms
+        poll_interval = 0.05
 
     start_exchange = _safe_exchange(
         "EXECUTION_V2_START",
@@ -1573,7 +1581,7 @@ def codebridge_exec(
             command=command,
         )
 
-    deadline = time.monotonic() + (wait_timeout_ms / 1000.0)
+    deadline = time.monotonic() + (janela_ms / 1000.0)
     last_exchange = start_exchange
     last_payload = start_payload
 
@@ -1590,7 +1598,7 @@ def codebridge_exec(
                 output_mode=output_mode,
                 wait_timeout_ms=wait_timeout_ms,
              )
-        time.sleep(min(0.05, remaining))
+        time.sleep(min(poll_interval, remaining))
         last_exchange = _safe_exchange(
             "EXECUTION_V2_STATUS",
             {"execution_id": execution_id},
