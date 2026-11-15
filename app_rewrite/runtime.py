@@ -144,6 +144,12 @@ class BridgeRuntime:
         self._sync_claude_watcher()
         self.author_mcp.start()
         self.secure_tunnel.start()
+        try:
+            from sync_scheduler import SyncScheduler
+            self._sync_scheduler = SyncScheduler()
+            self._sync_scheduler.start()
+        except Exception:
+            self._sync_scheduler = None
         self._invalidate_availability_cache()
         return True
 
@@ -1294,6 +1300,11 @@ class BridgeRuntime:
             return True
 
         self._invalidate_availability_cache()
+        if getattr(self, "_sync_scheduler", None) is not None:
+            try:
+                self._sync_scheduler.stop()
+            except Exception:
+                pass
         self._commit_pending_rag_changes()
         try:
             self.claude_watcher.stop()
