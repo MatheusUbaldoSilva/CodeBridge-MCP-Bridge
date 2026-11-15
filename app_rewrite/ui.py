@@ -281,7 +281,20 @@ class MainWindow(QMainWindow):
             status = QLabel()
             status.setContentsMargins(4, 4, 4, 0)
             view = TerminalWidget(self.runtime.terminals, target, tab)
-            tab_layout.addWidget(status)
+            if target == "SSH":
+                ssh_head = QHBoxLayout()
+                ssh_head.setContentsMargins(4, 4, 4, 0)
+                ssh_head.addWidget(status)
+                ssh_head.addStretch(1)
+                self.ssh_config_toggle = QPushButton("⚙ Configurações SSH")
+                self.ssh_config_toggle.setCheckable(True)
+                self.ssh_config_toggle.setToolTip("Mostra/esconde as configuracoes de conexao SSH")
+                self.ssh_config_toggle.toggled.connect(self._toggle_ssh_config)
+                ssh_head.addWidget(self.ssh_config_toggle)
+                tab_layout.addLayout(ssh_head)
+                self._ssh_terminal_layout = tab_layout
+            else:
+                tab_layout.addWidget(status)
             tab_layout.addWidget(view, 1)
             self.terminal_status[target] = status
             self.terminal_views[target] = view
@@ -290,14 +303,6 @@ class MainWindow(QMainWindow):
 
         self.ssh_tab = QWidget()
         ssh_layout = QVBoxLayout(self.ssh_tab)
-        ssh_config_bar = QHBoxLayout()
-        ssh_config_bar.addStretch(1)
-        self.ssh_config_toggle = QPushButton("⚙ Configurações SSH")
-        self.ssh_config_toggle.setCheckable(True)
-        self.ssh_config_toggle.setToolTip("Mostra/esconde as configuracoes de conexao SSH")
-        self.ssh_config_toggle.toggled.connect(self._toggle_ssh_config)
-        ssh_config_bar.addWidget(self.ssh_config_toggle)
-        ssh_layout.addLayout(ssh_config_bar)
         self.ssh_config_box = QWidget()
         config_layout = QVBoxLayout(self.ssh_config_box)
         config_layout.setContentsMargins(0, 0, 0, 0)
@@ -335,7 +340,7 @@ class MainWindow(QMainWindow):
         self.ssh_hostkey_box.accept_requested.connect(self.trust_ssh_hostkey)
         config_layout.addWidget(self.ssh_hostkey_box)
         self.ssh_config_box.setVisible(False)
-        ssh_layout.addWidget(self.ssh_config_box)
+        self._ssh_terminal_layout.insertWidget(1, self.ssh_config_box)
         self._pending_ssh_action = None
         self.ssh_transfer_panel = None
         terminals = self.runtime.terminals
