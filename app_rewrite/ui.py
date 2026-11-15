@@ -290,6 +290,17 @@ class MainWindow(QMainWindow):
 
         self.ssh_tab = QWidget()
         ssh_layout = QVBoxLayout(self.ssh_tab)
+        ssh_config_bar = QHBoxLayout()
+        ssh_config_bar.addStretch(1)
+        self.ssh_config_toggle = QPushButton("⚙ Configurações SSH")
+        self.ssh_config_toggle.setCheckable(True)
+        self.ssh_config_toggle.setToolTip("Mostra/esconde as configuracoes de conexao SSH")
+        self.ssh_config_toggle.toggled.connect(self._toggle_ssh_config)
+        ssh_config_bar.addWidget(self.ssh_config_toggle)
+        ssh_layout.addLayout(ssh_config_bar)
+        self.ssh_config_box = QWidget()
+        config_layout = QVBoxLayout(self.ssh_config_box)
+        config_layout.setContentsMargins(0, 0, 0, 0)
         form = QFormLayout()
         self.ssh_host = QLineEdit()
         self.ssh_port = QSpinBox()
@@ -303,7 +314,7 @@ class MainWindow(QMainWindow):
         form.addRow("Porta:", self.ssh_port)
         form.addRow("Login:", self.ssh_user)
         form.addRow("Senha:", self.ssh_password)
-        ssh_layout.addLayout(form)
+        config_layout.addLayout(form)
 
         ssh_buttons = QHBoxLayout()
         self.ssh_test_button = QPushButton("Testar conexao")
@@ -317,12 +328,14 @@ class MainWindow(QMainWindow):
         self.ssh_hostkey_button.clicked.connect(self.probe_ssh_hostkey)
         ssh_buttons.addWidget(self.ssh_hostkey_button)
         ssh_buttons.addStretch(1)
-        ssh_layout.addLayout(ssh_buttons)
+        config_layout.addLayout(ssh_buttons)
         self.ssh_config_status = QLabel()
-        ssh_layout.addWidget(self.ssh_config_status)
+        config_layout.addWidget(self.ssh_config_status)
         self.ssh_hostkey_box = HostKeyBox(self.ssh_tab)
         self.ssh_hostkey_box.accept_requested.connect(self.trust_ssh_hostkey)
-        ssh_layout.addWidget(self.ssh_hostkey_box)
+        config_layout.addWidget(self.ssh_hostkey_box)
+        self.ssh_config_box.setVisible(False)
+        ssh_layout.addWidget(self.ssh_config_box)
         self._pending_ssh_action = None
         self.ssh_transfer_panel = None
         terminals = self.runtime.terminals
@@ -349,7 +362,7 @@ class MainWindow(QMainWindow):
             parent=self.tabs,
         )
         self.tabs.addTab(self.ai_tab, "IA Local")
-        self.tabs.addTab(self.ssh_tab, "Configuracao SSH")
+        self.tabs.addTab(self.ssh_tab, "Transferência de arquivos SFTP")
         self.tabs.currentChanged.connect(
             self._sync_telemetry_panel
         )
@@ -569,6 +582,9 @@ class MainWindow(QMainWindow):
             self.ssh_user.text().strip(),
             self._resolved_password(),
         )
+
+    def _toggle_ssh_config(self, checked):
+        self.ssh_config_box.setVisible(bool(checked))
 
     def test_ssh(self):
         if self._ssh_busy:
