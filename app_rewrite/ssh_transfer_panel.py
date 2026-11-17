@@ -88,7 +88,7 @@ class SshTransferPanel(QWidget):
     POLL_MS = 400
 
     def __init__(self, registry, channel_factory, parent=None, ask_overwrite=None,
-                 local_start=None):
+                 local_start=None, on_mark_sync=None):
         super().__init__(parent)
         self.registry = registry
         self._channel_factory = channel_factory
@@ -128,6 +128,15 @@ class SshTransferPanel(QWidget):
         bottom.addWidget(self.overwrite)
         bottom.addWidget(self.progress, 1)
         bottom.addWidget(self.cancel_btn)
+        if on_mark_sync is not None:
+            self.mark_sync_btn = QPushButton("Marcar p/ sincronizar")
+            self.mark_sync_btn.setToolTip(
+                "Cria um par de sincronizacao com a pasta aberta no "
+                "Windows e no Linux.")
+            self.mark_sync_btn.clicked.connect(
+                lambda: on_mark_sync(
+                    self.local.path.text(), self.remote.path.text()))
+            bottom.insertWidget(0, self.mark_sync_btn)
         layout.addLayout(bottom)
         layout.addWidget(self.progress_label)
         self.recent = QLabel("")

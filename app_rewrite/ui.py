@@ -25,6 +25,7 @@ from password_eye import PasswordEye
 import status_text
 from ssh_transfer import SshFileChannel
 from ssh_transfer_panel import SshTransferPanel
+from sync_panel import SyncPanel
 from theme import apply_dark_theme
 
 
@@ -349,6 +350,7 @@ class MainWindow(QMainWindow):
                 terminals.transfers,
                 lambda: SshFileChannel(terminals.open_sftp),
                 self.ssh_tab,
+                on_mark_sync=lambda l, r: self.sync_panel.add_pair_from_paths(l, r),
             )
             ssh_layout.addWidget(self.ssh_transfer_panel, 1)
         else:
@@ -369,6 +371,12 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.ai_tab, "IA Local")
         self.tabs.insertTab(
             self.terminal_tab_indices["SSH"] + 1, self.ssh_tab, "SFTP")
+        self.sync_panel = SyncPanel(
+            self.runtime,
+            go_to_rag=lambda pair: self.tabs.setCurrentWidget(self.rag_tab))
+        self.tabs.insertTab(
+            self.tabs.indexOf(self.ssh_tab) + 1, self.sync_panel,
+            "Sincronização")
         self.tabs.currentChanged.connect(
             self._sync_telemetry_panel
         )
