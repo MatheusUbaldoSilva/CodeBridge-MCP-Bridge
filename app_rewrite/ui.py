@@ -367,7 +367,8 @@ class MainWindow(QMainWindow):
             parent=self.tabs,
         )
         self.tabs.addTab(self.ai_tab, "IA Local")
-        self.tabs.addTab(self.ssh_tab, "Transferência de arquivos SFTP")
+        self.tabs.insertTab(
+            self.terminal_tab_indices["SSH"] + 1, self.ssh_tab, "SFTP")
         self.tabs.currentChanged.connect(
             self._sync_telemetry_panel
         )
