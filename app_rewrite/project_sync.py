@@ -159,6 +159,37 @@ def _walk_remote(sftp, root):
                 yield rpath, remote_path, int(at.st_size), int(at.st_mtime)
 
 
+def _shq(s):
+    return "'" + str(s).replace("'", "'\\''") + "'"
+
+
+def _walk_remote_fast(client, root):
+    """Varredura rapida: um unico 'find' no servidor, em vez de dir a dir."""
+    root = str(root).rstrip("/")
+    cmd = "find %s -type f -printf '%%P\\t%%s\\t%%T@\\n'" % _shq(root)
+    _in, out, err = client.exec_command(cmd)
+    data = out.read().decode("utf-8", "replace")
+    status = out.channel.recv_exit_status()
+    if status != 0:
+        msg = err.read().decode("utf-8", "replace").strip()
+        raise RuntimeError("find falhou (%d): %s" % (status, msg or "sem detalhe"))
+    saida = []
+    for line in data.splitlines():
+        if not line:
+            continue
+        parts = line.split("\t")
+        if len(parts) != 3:
+            continue
+        rpath, size_s, mtime_s = parts
+        try:
+            size = int(size_s)
+            mtime = int(float(mtime_s))
+        except ValueError:
+            continue
+        saida.append((rpath, root + "/" + rpath, size, mtime))
+    return saida
+
+
 def _precisa_baixar(local_file, size, mtime):
     try:
         st = local_file.stat()
@@ -167,10 +198,9 @@ def _precisa_baixar(local_file, size, mtime):
     return not (st.st_size == size and int(st.st_mtime) >= mtime)
 
 
-def sync_pair(pair, sftp=None, connector=None, max_files=None):
+def sync_pair(pair, sftp=None, connector=None, max_files=None, client=None):
     """Baixa novos/alterados do remoto para o local (aditivo). Retorna resumo."""
     own = False
-    client = None
     if sftp is None:
         client, sftp = (connector or _default_connect)()
         own = True
@@ -179,7 +209,16 @@ def sync_pair(pair, sftp=None, connector=None, max_files=None):
         remote_root = pair["remote"]
         resumo = {"added": 0, "updated": 0, "skipped": 0, "bytes": 0,
                   "files": [], "errors": []}
-        for rpath, remote_path, size, mtime in _walk_remote(sftp, remote_root):
+        itens = None
+        if client is not None:
+            try:
+                itens = _walk_remote_fast(client, remote_root)
+            except Exception as exc:
+                resumo["errors"].append({"path": "<manifest>", "error": str(exc)})
+                itens = None
+        if itens is None:
+            itens = _walk_remote(sftp, remote_root)
+        for rpath, remote_path, size, mtime in itens:
             local_file = local_root / rpath
             existe = local_file.exists()
             if not _precisa_baixar(local_file, size, mtime):
@@ -220,7 +259,7 @@ def sync_pairs(pairs, sftp=None, connector=None, path=None):
     try:
         resultados = []
         for pair in pairs:
-            r = sync_pair(pair, sftp=sftp)
+            r = sync_pair(pair, sftp=sftp, client=client)
             _update_pair(pair["id"], {"last_sync": _now()}, path)
             resultados.append(dict(r, id=pair.get("id")))
         return resultados
