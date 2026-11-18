@@ -493,10 +493,12 @@ class LocalAiAgent:
                                                arguments.get("linha_inicial", 1),
                                                arguments.get("quantidade", tools.DEFAULT_READ_LINES))
                 self._emit("note", note)
+                self._emit("output", tools.clip(result, DISPLAY_OUTPUT_CHARS))
                 return result
             if name == tools.TOOL_LIST:
                 result, note = tools.list_dir(self.project_root(), arguments.get("caminho", "."))
                 self._emit("note", note)
+                self._emit("output", tools.clip(result, DISPLAY_OUTPUT_CHARS))
                 return result
             if name == tools.TOOL_RUN:
                 return self._run_command(tools.validate_command(arguments))
